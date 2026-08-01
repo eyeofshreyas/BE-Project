@@ -1,0 +1,8 @@
+.venv/
+unsloth_compiled_cache/
+.pip-cache/
+lora_adapter/
+data_prep/raw/
+data_prep/data/*.jsonl
+similar_cases/index.faiss
+similar_cases/metadata.json
