@@ -2,7 +2,8 @@ requests
 tqdm
 rouge-score
 
-# training/eval deps below need a CUDA GPU with >=12GB VRAM (use Colab T4/A100, not the local 4GB laptop GPU)
+# fine-tuning/eval/inference deps -- 1B model + QLoRA fits on a 4GB GPU (see SETUP.md)
+# install torch first: pip install torch --index-url https://download.pytorch.org/whl/cu126
 unsloth
 torch
 transformers
@@ -11,3 +12,7 @@ peft
 accelerate
 bitsandbytes
 datasets
+
+# similar case discovery deps (same venv as above)
+sentence-transformers
+faiss-cpu
