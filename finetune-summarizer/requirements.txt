@@ -1,0 +1,13 @@
+requests
+tqdm
+rouge-score
+
+# training/eval deps below need a CUDA GPU with >=12GB VRAM (use Colab T4/A100, not the local 4GB laptop GPU)
+unsloth
+torch
+transformers
+trl
+peft
+accelerate
+bitsandbytes
+datasets
