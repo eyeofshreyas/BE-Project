@@ -187,10 +187,13 @@
 }
 
 .heroImage {
+  display: block;
+  width: 100%;
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 30px 60px rgba(42, 33, 24, .18);
   aspect-ratio: 6 / 5;
+  object-fit: cover;
   background: linear-gradient(135deg, #EFE4CB, #D8C79A 55%, #B08D3E);
 }
 
@@ -413,10 +416,13 @@
 }
 
 .whyImage {
+  display: block;
+  width: 100%;
   border-radius: 18px;
   overflow: hidden;
   box-shadow: 0 20px 44px rgba(42, 33, 24, .16);
   aspect-ratio: 5 / 4;
+  object-fit: cover;
   background: linear-gradient(150deg, #2A2118, #4a3626 60%, #8C6A2E);
 }
 

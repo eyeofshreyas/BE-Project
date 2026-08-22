@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
+import heroDashboard from '../../assets/hero-dashboard.jpg'
+import heroAttorney from '../../assets/hero-attorney.jpg'
 import styles from './LandingPage.module.css'
 
 const PRIMARY = '#B08D3E'
@@ -126,7 +128,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className={styles.heroImageWrap}>
-          <div className={styles.heroImage} />
+          <img src={heroDashboard} alt="LexFlow case intelligence dashboard in a modern office" className={styles.heroImage} />
           <div className={styles.floatCard1}>
             <div className={styles.floatCard1Label}>Precedent AI</div>
             <div className={styles.floatBar}><div className={styles.floatBarFill} /></div>
@@ -180,7 +182,7 @@ export default function LandingPage() {
 
       <div className={styles.whySection} id="why" ref={(el) => { sectionRefs.current.why = el }}>
         <div className={styles.whyInner}>
-          <div className={styles.whyImage} />
+          <img src={heroAttorney} alt="Attorney reviewing LexFlow case analysis in a law library" className={styles.whyImage} />
           <div>
             <div className={styles.kicker}>Intelligent Design</div>
             <div className={styles.sectionTitle}>Built for the Future of Law</div>
