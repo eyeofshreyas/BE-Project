@@ -1,0 +1,172 @@
+.page {
+  min-height: 100vh;
+  width: 100%;
+  background: #FCF9F3;
+  color: #2A2118;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+}
+
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 36px;
+}
+
+.logo {
+  width: 40px;
+  height: 40px;
+  display: block;
+}
+
+.brandName {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 21px;
+  letter-spacing: -.02em;
+}
+
+.headline {
+  max-width: 760px;
+  width: 100%;
+  text-align: center;
+  margin-bottom: 36px;
+  animation: lf-fade .25s ease-out;
+}
+
+.title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+
+.subtitle {
+  font-size: 14.5px;
+  color: #8C7C5E;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 260px));
+  gap: 20px;
+  max-width: 840px;
+  width: 100%;
+}
+
+.card {
+  position: relative;
+  background: #FFFFFF;
+  border-radius: 18px;
+  padding: 26px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  cursor: pointer;
+  transition: all .18s;
+}
+
+.iconWrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+}
+
+.cardTitle {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16.5px;
+  font-weight: 700;
+  margin-top: 16px;
+}
+
+.cardDesc {
+  font-size: 12.5px;
+  color: #8C7C5E;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.bullets {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.bullet {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: #6A5C42;
+}
+
+.dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #B08D3E;
+  flex-shrink: 0;
+}
+
+.radio {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.continueBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 13px 28px;
+  border-radius: 11px;
+  transition: all .15s;
+}
+
+.loginLine {
+  font-size: 13px;
+  color: #8C7C5E;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #2A2118;
+  color: #FCF9F3;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 13px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .25);
+  z-index: 60;
+  animation: lf-fade .2s ease-out;
+}
