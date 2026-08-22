@@ -1,8 +1,16 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from supabase_client import supabase
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- Schemas ---
 class SignupRequest(BaseModel):
@@ -50,7 +58,7 @@ def login(data: LoginRequest):
 @app.post("/forgot-password")
 def forgot_password(data: ForgotPasswordRequest):
     try:
-        supabase.auth.reset_password_email(data.email)
+        supabase.auth.reset_password_for_email(data.email)
         return {"message": "Password reset email sent. Check your inbox."}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
