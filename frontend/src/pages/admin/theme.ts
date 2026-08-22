@@ -1,0 +1,17 @@
+import type { CSSProperties } from 'react'
+
+export const C = {
+  primary: '#B08D3E',
+  primaryDark: '#8f6743',
+  secondary: '#D8C79A',
+  border: '#E7DCC6',
+  text: '#2A2118',
+  muted: '#8C7C5E',
+  success: '#4CAF50',
+  warning: '#FFB74D',
+  danger: '#EF5350',
+}
+
+export function pillStyle(color: string): CSSProperties {
+  return { color, background: color + '1f' }
+}

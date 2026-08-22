@@ -1,0 +1,446 @@
+.page {
+  display: flex;
+  height: 100vh;
+  min-width: 1280px;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+  color: #2A2118;
+  background: #FCF9F3;
+}
+
+.sidebar {
+  width: 256px;
+  flex-shrink: 0;
+  background: #EFE4CB;
+  border-right: 1px solid #E7DCC6;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+  box-sizing: border-box;
+}
+
+.sidebarBrandRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 20px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #E7DCC6;
+}
+
+.sidebarLogo {
+  width: 38px;
+  height: 38px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.sidebarBrandName {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -.02em;
+  white-space: nowrap;
+}
+
+.sidebarBrandSub {
+  font-size: 10.5px;
+  color: #93826d;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.navList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.navRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 11px;
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: background .15s;
+}
+
+.navIcon {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.navLabel {
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+.sidebarFooter {
+  border-top: 1px solid #E7DCC6;
+  padding-top: 10px;
+  margin-top: 8px;
+  flex-shrink: 0;
+}
+
+.logoutRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background .18s ease-out;
+}
+
+.logoutRow:hover {
+  background: #F7E3DF;
+  color: #C0392B;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.topbar {
+  height: 72px;
+  flex-shrink: 0;
+  background: #F8F3E8;
+  border-bottom: 1px solid #E7DCC6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  position: relative;
+  z-index: 20;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #FFFFFF;
+  border: 1px solid #E7DCC6;
+  border-radius: 10px;
+  padding: 9px 14px;
+  width: 340px;
+}
+
+.searchInput {
+  border: none;
+  outline: none;
+  font-size: 13.5px;
+  color: #2A2118;
+  background: transparent;
+  flex: 1;
+  font-family: 'Inter', sans-serif;
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.todayLabel {
+  font-size: 13px;
+  color: #8C7C5E;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.bellBtn {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.bellDot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #EF5350;
+  border: 1.5px solid #F8F3E8;
+}
+
+.notifDropdown {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  width: 320px;
+  background: #FFFFFF;
+  border: 1px solid #E7DCC6;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(42, 33, 24, .14);
+  padding: 8px;
+  animation: lf-fade .15s ease-out;
+  z-index: 40;
+}
+
+.notifDropdownTitle {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 10px;
+  color: #2A2118;
+}
+
+.notifDropdownRow {
+  display: flex;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.notifDropdownRow:hover {
+  background: #EFE4CB;
+}
+
+.vDivider {
+  width: 1px;
+  height: 26px;
+  background: #E7DCC6;
+}
+
+.profileBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 10px;
+}
+
+.profileBtn:hover {
+  background: #EFE4CB;
+}
+
+.avatarCircle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #B08D3E;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+}
+
+.profileDropdown {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  width: 200px;
+  background: #FFFFFF;
+  border: 1px solid #E7DCC6;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(42, 33, 24, .14);
+  padding: 6px;
+  animation: lf-fade .15s ease-out;
+  z-index: 40;
+}
+
+.profileDropdownItem {
+  padding: 9px 12px;
+  font-size: 13px;
+  color: #2A2118;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.profileDropdownItem:hover {
+  background: #EFE4CB;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 40px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.pageHeadRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  animation: lf-fade .25s ease-out;
+}
+
+.pageTitle {
+  font-family: 'Poppins', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #2A2118;
+  letter-spacing: -.01em;
+}
+
+.pageSubtitle {
+  font-size: 14px;
+  color: #8C7C5E;
+  margin-top: 4px;
+  max-width: 640px;
+  line-height: 1.45;
+}
+
+.card {
+  background: #FFFFFF;
+  border: 1px solid #E7DCC6;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 1px 2px rgba(42, 33, 24, .04);
+}
+
+.cardHeadRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.cardTitle {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #2A2118;
+  font-family: 'Poppins', sans-serif;
+}
+
+.sectionTitle {
+  font-family: 'Poppins', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: #2A2118;
+  letter-spacing: -.01em;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.th {
+  text-align: left;
+  padding: 0 12px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8C7C5E;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  border-bottom: 1px solid #E7DCC6;
+  white-space: nowrap;
+}
+
+.tr {
+  border-bottom: 1px solid #F1E9D9;
+}
+
+.tr:hover {
+  background: #FCF7EC;
+}
+
+.td {
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+.actionBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #F5EFDF;
+}
+
+.actionBtnDanger {
+  composes: actionBtn;
+  background: #FDEDEC;
+}
+
+.pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.chipBase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toggleTrack {
+  border-radius: 20px;
+  padding: 2px;
+  cursor: pointer;
+  display: flex;
+  flex-shrink: 0;
+}
+
+.toggleDot {
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .2);
+}
+
+.toast {
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #2A2118;
+  color: #F8F3E8;
+  padding: 13px 18px;
+  border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(42, 33, 24, .28);
+  font-size: 13.5px;
+  font-weight: 500;
+  animation: lf-fade .2s ease-out;
+}
+
+.toastDismiss {
+  font-size: 12px;
+  font-weight: 600;
+  color: #D8C9A8;
+  cursor: pointer;
+}
