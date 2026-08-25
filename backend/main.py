@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from supabase_client import supabase
 
+from ml.similar_cases import router as similar_cases_router
+
 app = FastAPI()
 
 app.add_middleware(
@@ -11,6 +13,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(similar_cases_router)
 
 # --- Schemas ---
 class SignupRequest(BaseModel):
