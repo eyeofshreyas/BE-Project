@@ -1,0 +1,157 @@
+{
+  "info": {
+    "name": "LexFlow Backend",
+    "description": "Endpoints built so far on feature/backend-ml. Run the backend locally first: cd backend && source .venv/bin/activate && uvicorn main:app --reload",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Root",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Signup - Lawyer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/signup", "host": ["{{base_url}}"], "path": ["signup"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new.lawyer@example.com\",\n  \"password\": \"TestPass123!\",\n  \"full_name\": \"Adv. Test Lawyer\",\n  \"phone\": \"9000000000\",\n  \"role\": \"lawyer\",\n  \"bar_council_number\": \"BC-1234\",\n  \"specialization\": \"Corporate Law\",\n  \"experience_years\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "Signup - Client",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/signup", "host": ["{{base_url}}"], "path": ["signup"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new.client@example.com\",\n  \"password\": \"TestPass123!\",\n  \"full_name\": \"Test Client\",\n  \"phone\": \"9111111111\",\n  \"role\": \"client\",\n  \"address\": \"123 Test Street\",\n  \"preferred_language\": \"Hindi\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/login", "host": ["{{base_url}}"], "path": ["login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"rajesh@lexflow.com\",\n  \"password\": \"<real-password>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/forgot-password", "host": ["{{base_url}}"], "path": ["forgot-password"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"rajesh@lexflow.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Protected (needs Bearer token from Login)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/protected", "host": ["{{base_url}}"], "path": ["protected"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cases",
+      "item": [
+        {
+          "name": "List Cases",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/cases", "host": ["{{base_url}}"], "path": ["cases"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Conveyancing",
+      "item": [
+        {
+          "name": "Summary",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/conveyancing/summary", "host": ["{{base_url}}"], "path": ["conveyancing", "summary"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "List Documents",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/documents", "host": ["{{base_url}}"], "path": ["documents"] }
+          }
+        },
+        {
+          "name": "Get Document Summary",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/documents/1/summary", "host": ["{{base_url}}"], "path": ["documents", "1", "summary"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI",
+      "item": [
+        {
+          "name": "Similar Case Search",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/ai/similar-cases", "host": ["{{base_url}}"], "path": ["ai", "similar-cases"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"The appellant was convicted under section 302 of the Indian Penal Code for murder\",\n  \"top_k\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "Summarize Judgment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/ai/summarize", "host": ["{{base_url}}"], "path": ["ai", "summarize"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Paste a judgment excerpt here...\",\n  \"document_id\": null\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
