@@ -11,6 +11,13 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return data as T
 }
 
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail ?? 'Request failed')
+  return data as T
+}
+
 export interface UserProfile {
   user_id: number
   role_id: number
@@ -46,4 +53,18 @@ export interface SignupPayload {
 
 export function signup(payload: SignupPayload) {
   return post<{ message: string }>('/signup', payload)
+}
+
+export interface CaseSummary {
+  id: string
+  client: string | null
+  lawyer: string | null
+  court: string | null
+  status: string
+  hearing: string | null
+  priority: string
+}
+
+export function listCases() {
+  return get<CaseSummary[]>('/cases')
 }

@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr
 from supabase_client import supabase
 
 from ml.similar_cases import router as similar_cases_router
+from cases import router as cases_router
 
 app = FastAPI()
 
@@ -17,6 +18,7 @@ app.add_middleware(
 )
 
 app.include_router(similar_cases_router)
+app.include_router(cases_router)
 
 ROLE_IDS = {"lawyer": 2, "client": 3}
 
