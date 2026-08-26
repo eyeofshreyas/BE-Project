@@ -68,3 +68,18 @@ export interface CaseSummary {
 export function listCases() {
   return get<CaseSummary[]>('/cases')
 }
+
+export interface ConveyancingSummary {
+  stats: {
+    active_matters: number
+    pending_registrations: number
+    completed_registrations: number
+    upcoming_appointments: number
+  }
+  status_breakdown: { label: string; count: number }[]
+  recent_matters: { number: string; client: string | null; type: string; status: string }[]
+}
+
+export function getConveyancingSummary() {
+  return get<ConveyancingSummary>('/conveyancing/summary')
+}
