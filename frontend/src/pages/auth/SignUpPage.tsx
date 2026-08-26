@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
+import { signup } from '../../lib/api'
 import styles from './SignUpPage.module.css'
 
 const PRIMARY = '#B08D3E'
@@ -59,6 +60,7 @@ const STRENGTH_META = [
 type FocusName = 'fullName' | 'phone' | 'email' | 'password' | 'confirm' | 'bar' | 'practice' | 'years' | 'language' | 'address' | null
 
 export default function SignUpPage() {
+  const navigate = useNavigate()
   const [role, setRole] = useState<'lawyer' | 'client'>('lawyer')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -91,7 +93,7 @@ export default function SignUpPage() {
   })
   const mkFocus = (name: FocusName) => () => setFocused(name)
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!fullName.trim()) { setError('Enter your full name.'); return }
     if (!isValidEmail(email)) { setError('Enter a valid email address.'); return }
     if (!phone.trim()) { setError('Enter your phone number.'); return }
@@ -102,11 +104,23 @@ export default function SignUpPage() {
     if (!canSubmit) { setError('Please accept the Terms & Conditions and Privacy Policy.'); return }
     setLoading(true)
     setError('')
-    setTimeout(() => {
+    try {
+      await signup({
+        email,
+        password,
+        full_name: fullName,
+        phone,
+        role,
+        ...(isLawyer
+          ? { bar_council_number: barNumber, specialization: practiceArea, experience_years: Number(yearsExp) || undefined }
+          : { address, preferred_language: preferredLanguage }),
+      })
+      setToast('Account created — redirecting to sign in…')
+      setTimeout(() => navigate('/login'), 1400)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Signup failed.')
       setLoading(false)
-      setToast('Account created — redirecting to your dashboard…')
-      setTimeout(() => setToast(null), 2200)
-    }, 900)
+    }
   }
 
   return (

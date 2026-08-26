@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
@@ -16,10 +18,20 @@ app.add_middleware(
 
 app.include_router(similar_cases_router)
 
+ROLE_IDS = {"lawyer": 2, "client": 3}
+
 # --- Schemas ---
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str
+    full_name: str
+    phone: str
+    role: Literal["lawyer", "client"]
+    bar_council_number: str | None = None
+    specialization: str | None = None
+    experience_years: int | None = None
+    address: str | None = None
+    preferred_language: str | None = None
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -36,13 +48,41 @@ def read_root():
 @app.post("/signup")
 def signup(data: SignupRequest):
     try:
-        result = supabase.auth.sign_up({
+        supabase.auth.sign_up({
             "email": data.email,
             "password": data.password
         })
-        return {"message": "Signup successful. Check your email to verify your account."}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        user_row = supabase.table("users").insert({
+            "role_id": ROLE_IDS[data.role],
+            "full_name": data.full_name,
+            "email": data.email,
+            "password_hash": "managed_by_supabase_auth",
+            "phone": data.phone,
+        }).execute().data[0]
+
+        if data.role == "lawyer":
+            supabase.table("lawyers").insert({
+                "user_id": user_row["user_id"],
+                "bar_council_number": data.bar_council_number,
+                "specialization": data.specialization,
+                "experience_years": data.experience_years,
+            }).execute()
+        else:
+            supabase.table("clients").insert({
+                "user_id": user_row["user_id"],
+                "address": data.address,
+                "preferred_language": data.preferred_language,
+            }).execute()
+    except Exception as e:
+        # ponytail: auth account now exists without a profile row if this
+        # fails partway; a reconciliation job is the ceiling, not built yet.
+        raise HTTPException(status_code=500, detail=f"Auth account created but profile setup failed: {e}")
+
+    return {"message": "Signup successful. Check your email to verify your account."}
 
 @app.post("/login")
 def login(data: LoginRequest):
@@ -51,13 +91,16 @@ def login(data: LoginRequest):
             "email": data.email,
             "password": data.password
         })
-        return {
-            "access_token": result.session.access_token,
-            "refresh_token": result.session.refresh_token,
-            "user_email": result.user.email
-        }
     except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    profile_rows = supabase.table("users").select("*").eq("email", data.email).execute().data
+    return {
+        "access_token": result.session.access_token,
+        "refresh_token": result.session.refresh_token,
+        "user_email": result.user.email,
+        "profile": profile_rows[0] if profile_rows else None,
+    }
 
 @app.post("/forgot-password")
 def forgot_password(data: ForgotPasswordRequest):

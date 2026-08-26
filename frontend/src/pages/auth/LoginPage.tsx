@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import logoWhite from '../../assets/logo-white.svg'
+import { login } from '../../lib/api'
 import styles from './LoginPage.module.css'
 
 const PRIMARY = '#B08D3E'
@@ -109,6 +110,7 @@ function isValidEmail(v: string) {
 }
 
 export default function LoginPage() {
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -125,16 +127,21 @@ export default function LoginPage() {
     boxShadow: focused === name ? '0 0 0 3px rgba(176,141,62,.14)' : 'none',
   })
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!email || !isValidEmail(email)) { setError('Enter a valid email address.'); return }
     if (!password || password.length < 6) { setError('Password must be at least 6 characters.'); return }
     setLoading(true)
     setError('')
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      const result = await login(email, password)
+      localStorage.setItem('lexflow_token', result.access_token)
+      if (result.profile) localStorage.setItem('lexflow_profile', JSON.stringify(result.profile))
       setToast('Signed in — redirecting to your dashboard…')
-      setTimeout(() => setToast(null), 2200)
-    }, 900)
+      setTimeout(() => navigate(result.profile?.role_id === 1 ? '/admin' : '/conveyancing'), 900)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed.')
+      setLoading(false)
+    }
   }
 
   return (
