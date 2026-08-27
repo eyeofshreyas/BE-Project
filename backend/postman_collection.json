@@ -125,6 +125,56 @@
       ]
     },
     {
+      "name": "Billing",
+      "item": [
+        {
+          "name": "List Invoices",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/billing/invoices", "host": ["{{base_url}}"], "path": ["billing", "invoices"] }
+          }
+        },
+        {
+          "name": "Get Invoice",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/billing/invoices/1", "host": ["{{base_url}}"], "path": ["billing", "invoices", "1"] }
+          }
+        },
+        {
+          "name": "Create Invoice",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/billing/invoices", "host": ["{{base_url}}"], "path": ["billing", "invoices"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_id\": 1,\n  \"invoice_number\": \"INV-1010\",\n  \"amount\": 5000,\n  \"tax\": 900,\n  \"total_amount\": 5900,\n  \"issue_date\": \"2026-08-27\",\n  \"due_date\": \"2026-09-27\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Payments for Invoice",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/billing/invoices/1/payments", "host": ["{{base_url}}"], "path": ["billing", "invoices", "1", "payments"] }
+          }
+        },
+        {
+          "name": "Record Payment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/billing/payments", "host": ["{{base_url}}"], "path": ["billing", "payments"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoice_id\": 1,\n  \"amount\": 5900,\n  \"payment_method\": \"UPI\",\n  \"transaction_reference\": \"TXN123456\",\n  \"payment_date\": \"2026-08-27\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "AI",
       "item": [
         {
