@@ -83,3 +83,29 @@ export interface ConveyancingSummary {
 export function getConveyancingSummary() {
   return get<ConveyancingSummary>('/conveyancing/summary')
 }
+
+export interface DocumentSummary {
+  id: number
+  file_name: string
+  mime_type: string
+  upload_date: string
+  document_type: string | null
+  case_number: string | null
+  uploaded_by: string | null
+}
+
+export function listDocuments() {
+  return get<DocumentSummary[]>('/documents')
+}
+
+export interface AiSummary {
+  summary_text: string
+  translated_text: string | null
+  keywords: string | null
+  important_dates: string | null
+  important_sections: string | null
+}
+
+export function getDocumentSummary(documentId: number) {
+  return get<AiSummary>(`/documents/${documentId}/summary`)
+}

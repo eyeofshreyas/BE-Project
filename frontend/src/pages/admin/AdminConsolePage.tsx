@@ -6,17 +6,19 @@ import { C } from './theme'
 import DashboardView from './views/DashboardView'
 import UsersView from './views/UsersView'
 import CasesView from './views/CasesView'
+import DocumentsView from './views/DocumentsView'
 import ReportsView from './views/ReportsView'
 import AnalyticsView from './views/AnalyticsView'
 import SettingsView from './views/SettingsView'
 import styles from './adminShared.module.css'
 
-type PageKey = 'dashboard' | 'users' | 'cases' | 'reports' | 'analytics' | 'settings'
+type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'reports' | 'analytics' | 'settings'
 
 const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
   { key: 'users', label: 'Users', icon: 'users' },
   { key: 'cases', label: 'Cases', icon: 'scale' },
+  { key: 'documents', label: 'Documents', icon: 'file-text' },
   { key: 'reports', label: 'Reports', icon: 'bar-chart-2' },
   { key: 'analytics', label: 'Analytics', icon: 'pie-chart' },
 ]
@@ -136,6 +138,7 @@ export default function AdminConsolePage() {
           {activePage === 'dashboard' && <DashboardView quickActions={quickActions} />}
           {activePage === 'users' && <UsersView />}
           {activePage === 'cases' && <CasesView />}
+          {activePage === 'documents' && <DocumentsView />}
           {activePage === 'reports' && <ReportsView />}
           {activePage === 'analytics' && <AnalyticsView />}
           {activePage === 'settings' && <SettingsView onSave={() => showToast('Settings saved.')} />}
