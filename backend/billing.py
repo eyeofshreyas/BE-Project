@@ -11,6 +11,11 @@ INVOICES_SELECT = (
 
 PAYMENTS_SELECT = "payment_id,invoice_id,amount,payment_method,transaction_reference,payment_date,payment_status"
 
+EXPENSES_SELECT = (
+    "expense_id,matter_id,expense_type,description,amount,expense_date,receipt_document_id,"
+    "conveyancing_matters(matter_number),users(full_name)"
+)
+
 
 class InvoiceSummary(BaseModel):
     id: int
@@ -53,6 +58,42 @@ class PaymentCreate(BaseModel):
     transaction_reference: str | None = None
     payment_date: str
     payment_status: str = "Completed"
+
+
+class ExpenseSummary(BaseModel):
+    id: int
+    matter_number: str | None
+    expense_type: str
+    description: str | None
+    amount: float
+    expense_date: str
+    receipt_document_id: int | None
+    created_by: str | None
+
+
+class ExpenseCreate(BaseModel):
+    matter_id: int
+    expense_type: str
+    description: str | None = None
+    amount: float
+    expense_date: str
+    receipt_document_id: int | None = None
+    created_by: int
+
+
+def _to_expense_summary(row: dict) -> dict:
+    matter = row.get("conveyancing_matters")
+    creator = row.get("users")
+    return {
+        "id": row["expense_id"],
+        "matter_number": matter["matter_number"] if matter else None,
+        "expense_type": row["expense_type"],
+        "description": row["description"],
+        "amount": row["amount"],
+        "expense_date": row["expense_date"],
+        "receipt_document_id": row["receipt_document_id"],
+        "created_by": creator["full_name"] if creator else None,
+    }
 
 
 def _to_invoice_summary(row: dict) -> dict:
@@ -118,3 +159,19 @@ def create_payment(data: PaymentCreate):
         supabase.table("invoices").update({"payment_status": new_status}).eq("invoice_id", data.invoice_id).execute()
 
     return payment
+
+
+@router.get("/expenses", response_model=list[ExpenseSummary])
+def list_expenses(matter_id: int | None = None):
+    query = supabase.table("miscellaneous_expenses").select(EXPENSES_SELECT)
+    if matter_id is not None:
+        query = query.eq("matter_id", matter_id)
+    rows = query.order("expense_date", desc=True).execute().data
+    return [_to_expense_summary(row) for row in rows]
+
+
+@router.post("/expenses", response_model=ExpenseSummary)
+def create_expense(data: ExpenseCreate):
+    row = supabase.table("miscellaneous_expenses").insert(data.model_dump()).execute().data[0]
+    rows = supabase.table("miscellaneous_expenses").select(EXPENSES_SELECT).eq("expense_id", row["expense_id"]).execute().data
+    return _to_expense_summary(rows[0])

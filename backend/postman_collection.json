@@ -171,6 +171,37 @@
               "raw": "{\n  \"invoice_id\": 1,\n  \"amount\": 5900,\n  \"payment_method\": \"UPI\",\n  \"transaction_reference\": \"TXN123456\",\n  \"payment_date\": \"2026-08-27\"\n}"
             }
           }
+        },
+        {
+          "name": "List Expenses",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/billing/expenses", "host": ["{{base_url}}"], "path": ["billing", "expenses"] }
+          }
+        },
+        {
+          "name": "List Expenses for Matter",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/billing/expenses?matter_id=10",
+              "host": ["{{base_url}}"],
+              "path": ["billing", "expenses"],
+              "query": [{ "key": "matter_id", "value": "10" }]
+            }
+          }
+        },
+        {
+          "name": "Create Expense",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/billing/expenses", "host": ["{{base_url}}"], "path": ["billing", "expenses"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matter_id\": 10,\n  \"expense_type\": \"Stamp Duty\",\n  \"description\": \"Registration stamp duty\",\n  \"amount\": 15000,\n  \"expense_date\": \"2026-08-27\",\n  \"created_by\": 1\n}"
+            }
+          }
         }
       ]
     },
