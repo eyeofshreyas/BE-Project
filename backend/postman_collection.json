@@ -268,6 +268,61 @@
       ]
     },
     {
+      "name": "Hearings",
+      "item": [
+        {
+          "name": "List Hearings",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/hearings", "host": ["{{base_url}}"], "path": ["hearings"] }
+          }
+        },
+        {
+          "name": "List Hearings for Case",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/hearings?case_id=1",
+              "host": ["{{base_url}}"],
+              "path": ["hearings"],
+              "query": [{ "key": "case_id", "value": "1" }]
+            }
+          }
+        },
+        {
+          "name": "Get Hearing",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/hearings/1", "host": ["{{base_url}}"], "path": ["hearings", "1"] }
+          }
+        },
+        {
+          "name": "Create Hearing",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/hearings", "host": ["{{base_url}}"], "path": ["hearings"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_id\": 1,\n  \"judge_id\": 1,\n  \"hearing_date\": \"2026-09-15\",\n  \"hearing_time\": \"10:00:00\",\n  \"courtroom\": \"Court Room 1\",\n  \"notes\": \"Next hearing\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Hearing (mark completed)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/hearings/1", "host": ["{{base_url}}"], "path": ["hearings", "1"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hearing_status\": \"Completed\",\n  \"hearing_outcome\": \"Adjourned to next date\",\n  \"next_hearing_date\": \"2026-10-01\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "AI",
       "item": [
         {
