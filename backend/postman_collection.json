@@ -206,6 +206,68 @@
       ]
     },
     {
+      "name": "Meetings",
+      "item": [
+        {
+          "name": "List Meetings",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/meetings", "host": ["{{base_url}}"], "path": ["meetings"] }
+          }
+        },
+        {
+          "name": "List Meetings for Case",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/meetings?case_id=1",
+              "host": ["{{base_url}}"],
+              "path": ["meetings"],
+              "query": [{ "key": "case_id", "value": "1" }]
+            }
+          }
+        },
+        {
+          "name": "Get Meeting",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/meetings/1", "host": ["{{base_url}}"], "path": ["meetings", "1"] }
+          }
+        },
+        {
+          "name": "Create Meeting",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/meetings", "host": ["{{base_url}}"], "path": ["meetings"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_id\": 1,\n  \"conducted_by\": 1,\n  \"meeting_title\": \"Initial client consultation\",\n  \"meeting_type\": \"Consultation\",\n  \"meeting_date\": \"2026-09-01T10:00:00\",\n  \"duration_minutes\": 45,\n  \"agenda\": \"Discuss case strategy\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Participants",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/meetings/1/participants", "host": ["{{base_url}}"], "path": ["meetings", "1", "participants"] }
+          }
+        },
+        {
+          "name": "Add Participant",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/meetings/1/participants", "host": ["{{base_url}}"], "path": ["meetings", "1", "participants"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 2,\n  \"participant_role\": \"Client\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "AI",
       "item": [
         {
