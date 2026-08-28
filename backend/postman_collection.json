@@ -531,6 +531,18 @@
           }
         },
         {
+          "name": "Translate Text",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/ai/translate", "host": ["{{base_url}}"], "path": ["ai", "translate"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Property ownership dispute.\",\n  \"target_language\": \"marathi\",\n  \"document_id\": null\n}"
+            }
+          }
+        },
+        {
           "name": "Summarize Judgment",
           "request": {
             "method": "POST",

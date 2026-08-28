@@ -7,6 +7,7 @@ from supabase_client import supabase
 
 from ml.similar_cases import router as similar_cases_router
 from ml.summarize import router as summarize_router
+from ml.translate import router as translate_router
 from cases import router as cases_router
 from conveyancing import router as conveyancing_router
 from documents import router as documents_router
@@ -29,6 +30,7 @@ app.add_middleware(
 
 app.include_router(similar_cases_router)
 app.include_router(summarize_router)
+app.include_router(translate_router)
 app.include_router(cases_router)
 app.include_router(conveyancing_router)
 app.include_router(documents_router)
