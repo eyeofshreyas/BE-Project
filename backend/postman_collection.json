@@ -323,6 +323,56 @@
       ]
     },
     {
+      "name": "Case History",
+      "item": [
+        {
+          "name": "List Notes",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/cases/1/notes", "host": ["{{base_url}}"], "path": ["cases", "1", "notes"] }
+          }
+        },
+        {
+          "name": "Add Note",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/cases/1/notes", "host": ["{{base_url}}"], "path": ["cases", "1", "notes"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lawyer_id\": 1,\n  \"note\": \"Client requested update on filing status\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Timeline",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/cases/1/timeline", "host": ["{{base_url}}"], "path": ["cases", "1", "timeline"] }
+          }
+        },
+        {
+          "name": "List Status History",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/cases/1/status-history", "host": ["{{base_url}}"], "path": ["cases", "1", "status-history"] }
+          }
+        },
+        {
+          "name": "Change Case Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/cases/1/status", "host": ["{{base_url}}"], "path": ["cases", "1", "status"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"new_status\": \"In Progress\",\n  \"changed_by\": 1\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Reference",
       "item": [
         {
