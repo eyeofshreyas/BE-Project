@@ -323,6 +323,32 @@
       ]
     },
     {
+      "name": "Reference",
+      "item": [
+        {
+          "name": "Case Types",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/reference/case-types", "host": ["{{base_url}}"], "path": ["reference", "case-types"] }
+          }
+        },
+        {
+          "name": "Courts",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/reference/courts", "host": ["{{base_url}}"], "path": ["reference", "courts"] }
+          }
+        },
+        {
+          "name": "Judges",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/reference/judges", "host": ["{{base_url}}"], "path": ["reference", "judges"] }
+          }
+        }
+      ]
+    },
+    {
       "name": "AI",
       "item": [
         {
