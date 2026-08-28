@@ -102,6 +102,32 @@
             "method": "GET",
             "url": { "raw": "{{base_url}}/conveyancing/summary", "host": ["{{base_url}}"], "path": ["conveyancing", "summary"] }
           }
+        },
+        {
+          "name": "Matter Detail",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/conveyancing/matters/10", "host": ["{{base_url}}"], "path": ["conveyancing", "matters", "10"] }
+          }
+        },
+        {
+          "name": "Update Due Diligence",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/conveyancing/matters/10/due-diligence", "host": ["{{base_url}}"], "path": ["conveyancing", "matters", "10", "due-diligence"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"encumbrance_checked\": true,\n  \"remarks\": \"Re-verified after registration\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Complete Progress Stage",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/conveyancing/matters/10/progress/3", "host": ["{{base_url}}"], "path": ["conveyancing", "matters", "10", "progress", "3"] }
+          }
         }
       ]
     },
