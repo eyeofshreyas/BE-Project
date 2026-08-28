@@ -62,7 +62,7 @@ export default function AdminConsolePage() {
 
   useEffect(() => {
     if (!profile) return
-    listNotifications(profile.user_id).then(setNotifications).catch(() => {})
+    listNotifications().then(setNotifications).catch(() => {})
   }, [profile])
 
   function openNotification(n: NotificationSummary) {

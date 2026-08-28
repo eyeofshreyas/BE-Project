@@ -1,9 +1,10 @@
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from supabase_client import supabase
+from auth import get_current_user
 
 from ml.similar_cases import router as similar_cases_router
 from ml.summarize import router as summarize_router
@@ -135,14 +136,6 @@ def forgot_password(data: ForgotPasswordRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 # --- Protected route example ---
-def get_current_user(authorization: str = Header(...)):
-    token = authorization.replace("Bearer ", "")
-    try:
-        user = supabase.auth.get_user(token)
-        return user.user
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
 @app.get("/protected")
 def protected_route(current_user=Depends(get_current_user)):
     return {"message": f"Hello {current_user.email}, you're authenticated!"}

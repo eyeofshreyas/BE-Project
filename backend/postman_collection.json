@@ -1,11 +1,18 @@
 {
   "info": {
     "name": "LexFlow Backend",
-    "description": "Endpoints built so far on feature/backend-ml. Run the backend locally first: cd backend && source .venv/bin/activate && uvicorn main:app --reload",
+    "description": "Endpoints built so far on feature/backend-ml. Run the backend locally first: cd backend && source .venv/bin/activate && uvicorn main:app --reload. Every endpoint except Root/Signup/Login/Forgot Password now requires auth: run Login once (any real account) and its test script auto-fills the access_token collection variable used by every other request.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:8000" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -15,7 +22,18 @@
           "name": "Root",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] }
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
           }
         }
       ]
@@ -27,11 +45,27 @@
           "name": "Signup - Lawyer",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/signup", "host": ["{{base_url}}"], "path": ["signup"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/signup",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "signup"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"new.lawyer@example.com\",\n  \"password\": \"TestPass123!\",\n  \"full_name\": \"Adv. Test Lawyer\",\n  \"phone\": \"9000000000\",\n  \"role\": \"lawyer\",\n  \"bar_council_number\": \"BC-1234\",\n  \"specialization\": \"Corporate Law\",\n  \"experience_years\": 5\n}"
+            },
+            "auth": {
+              "type": "noauth"
             }
           }
         },
@@ -39,11 +73,27 @@
           "name": "Signup - Client",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/signup", "host": ["{{base_url}}"], "path": ["signup"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/signup",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "signup"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"new.client@example.com\",\n  \"password\": \"TestPass123!\",\n  \"full_name\": \"Test Client\",\n  \"phone\": \"9111111111\",\n  \"role\": \"client\",\n  \"address\": \"123 Test Street\",\n  \"preferred_language\": \"Hindi\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
             }
           }
         },
@@ -51,23 +101,64 @@
           "name": "Login",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/login", "host": ["{{base_url}}"], "path": ["login"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"rajesh@lexflow.com\",\n  \"password\": \"<real-password>\"\n}"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.access_token) { pm.collectionVariables.set('access_token', data.access_token); }"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Forgot Password",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/forgot-password", "host": ["{{base_url}}"], "path": ["forgot-password"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/forgot-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "forgot-password"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"rajesh@lexflow.com\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
             }
           }
         },
@@ -75,8 +166,21 @@
           "name": "Protected (needs Bearer token from Login)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/protected", "host": ["{{base_url}}"], "path": ["protected"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/protected",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "protected"
+              ]
+            }
           }
         }
       ]
@@ -88,7 +192,15 @@
           "name": "List Cases",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/cases", "host": ["{{base_url}}"], "path": ["cases"] }
+            "url": {
+              "raw": "{{base_url}}/cases",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases"
+              ]
+            }
           }
         }
       ]
@@ -100,22 +212,57 @@
           "name": "Summary",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/conveyancing/summary", "host": ["{{base_url}}"], "path": ["conveyancing", "summary"] }
+            "url": {
+              "raw": "{{base_url}}/conveyancing/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conveyancing",
+                "summary"
+              ]
+            }
           }
         },
         {
           "name": "Matter Detail",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/conveyancing/matters/10", "host": ["{{base_url}}"], "path": ["conveyancing", "matters", "10"] }
+            "url": {
+              "raw": "{{base_url}}/conveyancing/matters/10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conveyancing",
+                "matters",
+                "10"
+              ]
+            }
           }
         },
         {
           "name": "Update Due Diligence",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/conveyancing/matters/10/due-diligence", "host": ["{{base_url}}"], "path": ["conveyancing", "matters", "10", "due-diligence"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/conveyancing/matters/10/due-diligence",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conveyancing",
+                "matters",
+                "10",
+                "due-diligence"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"encumbrance_checked\": true,\n  \"remarks\": \"Re-verified after registration\"\n}"
@@ -126,7 +273,19 @@
           "name": "Complete Progress Stage",
           "request": {
             "method": "PATCH",
-            "url": { "raw": "{{base_url}}/conveyancing/matters/10/progress/3", "host": ["{{base_url}}"], "path": ["conveyancing", "matters", "10", "progress", "3"] }
+            "url": {
+              "raw": "{{base_url}}/conveyancing/matters/10/progress/3",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conveyancing",
+                "matters",
+                "10",
+                "progress",
+                "3"
+              ]
+            }
           }
         }
       ]
@@ -138,14 +297,32 @@
           "name": "List Documents",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/documents", "host": ["{{base_url}}"], "path": ["documents"] }
+            "url": {
+              "raw": "{{base_url}}/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "documents"
+              ]
+            }
           }
         },
         {
           "name": "Get Document Summary",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/documents/1/summary", "host": ["{{base_url}}"], "path": ["documents", "1", "summary"] }
+            "url": {
+              "raw": "{{base_url}}/documents/1/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "documents",
+                "1",
+                "summary"
+              ]
+            }
           }
         }
       ]
@@ -157,22 +334,55 @@
           "name": "List Invoices",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/billing/invoices", "host": ["{{base_url}}"], "path": ["billing", "invoices"] }
+            "url": {
+              "raw": "{{base_url}}/billing/invoices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "invoices"
+              ]
+            }
           }
         },
         {
           "name": "Get Invoice",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/billing/invoices/1", "host": ["{{base_url}}"], "path": ["billing", "invoices", "1"] }
+            "url": {
+              "raw": "{{base_url}}/billing/invoices/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "invoices",
+                "1"
+              ]
+            }
           }
         },
         {
           "name": "Create Invoice",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/billing/invoices", "host": ["{{base_url}}"], "path": ["billing", "invoices"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/billing/invoices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "invoices"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"case_id\": 1,\n  \"invoice_number\": \"INV-1010\",\n  \"amount\": 5000,\n  \"tax\": 900,\n  \"total_amount\": 5900,\n  \"issue_date\": \"2026-08-27\",\n  \"due_date\": \"2026-09-27\"\n}"
@@ -183,15 +393,40 @@
           "name": "List Payments for Invoice",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/billing/invoices/1/payments", "host": ["{{base_url}}"], "path": ["billing", "invoices", "1", "payments"] }
+            "url": {
+              "raw": "{{base_url}}/billing/invoices/1/payments",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "invoices",
+                "1",
+                "payments"
+              ]
+            }
           }
         },
         {
           "name": "Record Payment",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/billing/payments", "host": ["{{base_url}}"], "path": ["billing", "payments"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/billing/payments",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "payments"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"invoice_id\": 1,\n  \"amount\": 5900,\n  \"payment_method\": \"UPI\",\n  \"transaction_reference\": \"TXN123456\",\n  \"payment_date\": \"2026-08-27\"\n}"
@@ -202,7 +437,16 @@
           "name": "List Expenses",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/billing/expenses", "host": ["{{base_url}}"], "path": ["billing", "expenses"] }
+            "url": {
+              "raw": "{{base_url}}/billing/expenses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "expenses"
+              ]
+            }
           }
         },
         {
@@ -211,9 +455,19 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/billing/expenses?matter_id=10",
-              "host": ["{{base_url}}"],
-              "path": ["billing", "expenses"],
-              "query": [{ "key": "matter_id", "value": "10" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "expenses"
+              ],
+              "query": [
+                {
+                  "key": "matter_id",
+                  "value": "10"
+                }
+              ]
             }
           }
         },
@@ -221,8 +475,22 @@
           "name": "Create Expense",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/billing/expenses", "host": ["{{base_url}}"], "path": ["billing", "expenses"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/billing/expenses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "expenses"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"matter_id\": 10,\n  \"expense_type\": \"Stamp Duty\",\n  \"description\": \"Registration stamp duty\",\n  \"amount\": 15000,\n  \"expense_date\": \"2026-08-27\",\n  \"created_by\": 1\n}"
@@ -238,7 +506,15 @@
           "name": "List Meetings",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/meetings", "host": ["{{base_url}}"], "path": ["meetings"] }
+            "url": {
+              "raw": "{{base_url}}/meetings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings"
+              ]
+            }
           }
         },
         {
@@ -247,9 +523,18 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/meetings?case_id=1",
-              "host": ["{{base_url}}"],
-              "path": ["meetings"],
-              "query": [{ "key": "case_id", "value": "1" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings"
+              ],
+              "query": [
+                {
+                  "key": "case_id",
+                  "value": "1"
+                }
+              ]
             }
           }
         },
@@ -257,15 +542,37 @@
           "name": "Get Meeting",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/meetings/1", "host": ["{{base_url}}"], "path": ["meetings", "1"] }
+            "url": {
+              "raw": "{{base_url}}/meetings/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings",
+                "1"
+              ]
+            }
           }
         },
         {
           "name": "Create Meeting",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/meetings", "host": ["{{base_url}}"], "path": ["meetings"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/meetings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"case_id\": 1,\n  \"conducted_by\": 1,\n  \"meeting_title\": \"Initial client consultation\",\n  \"meeting_type\": \"Consultation\",\n  \"meeting_date\": \"2026-09-01T10:00:00\",\n  \"duration_minutes\": 45,\n  \"agenda\": \"Discuss case strategy\"\n}"
@@ -276,15 +583,40 @@
           "name": "List Participants",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/meetings/1/participants", "host": ["{{base_url}}"], "path": ["meetings", "1", "participants"] }
+            "url": {
+              "raw": "{{base_url}}/meetings/1/participants",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings",
+                "1",
+                "participants"
+              ]
+            }
           }
         },
         {
           "name": "Add Participant",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/meetings/1/participants", "host": ["{{base_url}}"], "path": ["meetings", "1", "participants"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/meetings/1/participants",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings",
+                "1",
+                "participants"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"user_id\": 2,\n  \"participant_role\": \"Client\"\n}"
@@ -300,7 +632,15 @@
           "name": "List Hearings",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/hearings", "host": ["{{base_url}}"], "path": ["hearings"] }
+            "url": {
+              "raw": "{{base_url}}/hearings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hearings"
+              ]
+            }
           }
         },
         {
@@ -309,9 +649,18 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/hearings?case_id=1",
-              "host": ["{{base_url}}"],
-              "path": ["hearings"],
-              "query": [{ "key": "case_id", "value": "1" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hearings"
+              ],
+              "query": [
+                {
+                  "key": "case_id",
+                  "value": "1"
+                }
+              ]
             }
           }
         },
@@ -319,15 +668,37 @@
           "name": "Get Hearing",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/hearings/1", "host": ["{{base_url}}"], "path": ["hearings", "1"] }
+            "url": {
+              "raw": "{{base_url}}/hearings/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hearings",
+                "1"
+              ]
+            }
           }
         },
         {
           "name": "Create Hearing",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/hearings", "host": ["{{base_url}}"], "path": ["hearings"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hearings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hearings"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"case_id\": 1,\n  \"judge_id\": 1,\n  \"hearing_date\": \"2026-09-15\",\n  \"hearing_time\": \"10:00:00\",\n  \"courtroom\": \"Court Room 1\",\n  \"notes\": \"Next hearing\"\n}"
@@ -338,8 +709,22 @@
           "name": "Update Hearing (mark completed)",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/hearings/1", "host": ["{{base_url}}"], "path": ["hearings", "1"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hearings/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hearings",
+                "1"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"hearing_status\": \"Completed\",\n  \"hearing_outcome\": \"Adjourned to next date\",\n  \"next_hearing_date\": \"2026-10-01\"\n}"
@@ -356,10 +741,14 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/notifications?user_id=4",
-              "host": ["{{base_url}}"],
-              "path": ["notifications"],
-              "query": [{ "key": "user_id", "value": "4" }]
+              "raw": "{{base_url}}/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ],
+              "query": []
             }
           }
         },
@@ -368,10 +757,19 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/notifications?user_id=4&unread_only=true",
-              "host": ["{{base_url}}"],
-              "path": ["notifications"],
-              "query": [{ "key": "user_id", "value": "4" }, { "key": "unread_only", "value": "true" }]
+              "raw": "{{base_url}}/notifications?unread_only=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "unread_only",
+                  "value": "true"
+                }
+              ]
             }
           }
         },
@@ -379,7 +777,17 @@
           "name": "Mark Notification Read",
           "request": {
             "method": "PATCH",
-            "url": { "raw": "{{base_url}}/notifications/1/read", "host": ["{{base_url}}"], "path": ["notifications", "1", "read"] }
+            "url": {
+              "raw": "{{base_url}}/notifications/1/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "1",
+                "read"
+              ]
+            }
           }
         },
         {
@@ -387,10 +795,15 @@
           "request": {
             "method": "POST",
             "url": {
-              "raw": "{{base_url}}/notifications/read-all?user_id=4",
-              "host": ["{{base_url}}"],
-              "path": ["notifications", "read-all"],
-              "query": [{ "key": "user_id", "value": "4" }]
+              "raw": "{{base_url}}/notifications/read-all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "read-all"
+              ],
+              "query": []
             }
           }
         }
@@ -403,7 +816,15 @@
           "name": "List Users",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/users", "host": ["{{base_url}}"], "path": ["users"] }
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
           }
         },
         {
@@ -412,9 +833,18 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/users?role=lawyer",
-              "host": ["{{base_url}}"],
-              "path": ["users"],
-              "query": [{ "key": "role", "value": "lawyer" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "lawyer"
+                }
+              ]
             }
           }
         },
@@ -422,8 +852,23 @@
           "name": "Suspend / Reactivate User",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/users/2/status", "host": ["{{base_url}}"], "path": ["users", "2", "status"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/2/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "2",
+                "status"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"is_active\": false\n}"
@@ -439,18 +884,43 @@
           "name": "List Notes",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/cases/1/notes", "host": ["{{base_url}}"], "path": ["cases", "1", "notes"] }
+            "url": {
+              "raw": "{{base_url}}/cases/1/notes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "1",
+                "notes"
+              ]
+            }
           }
         },
         {
           "name": "Add Note",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/cases/1/notes", "host": ["{{base_url}}"], "path": ["cases", "1", "notes"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cases/1/notes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "1",
+                "notes"
+              ]
+            },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"lawyer_id\": 1,\n  \"note\": \"Client requested update on filing status\"\n}"
+              "raw": "{\n  \"note\": \"Client requested update on filing status\"\n}"
             }
           }
         },
@@ -458,25 +928,60 @@
           "name": "List Timeline",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/cases/1/timeline", "host": ["{{base_url}}"], "path": ["cases", "1", "timeline"] }
+            "url": {
+              "raw": "{{base_url}}/cases/1/timeline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "1",
+                "timeline"
+              ]
+            }
           }
         },
         {
           "name": "List Status History",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/cases/1/status-history", "host": ["{{base_url}}"], "path": ["cases", "1", "status-history"] }
+            "url": {
+              "raw": "{{base_url}}/cases/1/status-history",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "1",
+                "status-history"
+              ]
+            }
           }
         },
         {
           "name": "Change Case Status",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/cases/1/status", "host": ["{{base_url}}"], "path": ["cases", "1", "status"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cases/1/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "1",
+                "status"
+              ]
+            },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"new_status\": \"In Progress\",\n  \"changed_by\": 1\n}"
+              "raw": "{\n  \"new_status\": \"In Progress\"\n}"
             }
           }
         }
@@ -489,28 +994,64 @@
           "name": "Roles",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/reference/roles", "host": ["{{base_url}}"], "path": ["reference", "roles"] }
+            "url": {
+              "raw": "{{base_url}}/reference/roles",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reference",
+                "roles"
+              ]
+            }
           }
         },
         {
           "name": "Case Types",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/reference/case-types", "host": ["{{base_url}}"], "path": ["reference", "case-types"] }
+            "url": {
+              "raw": "{{base_url}}/reference/case-types",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reference",
+                "case-types"
+              ]
+            }
           }
         },
         {
           "name": "Courts",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/reference/courts", "host": ["{{base_url}}"], "path": ["reference", "courts"] }
+            "url": {
+              "raw": "{{base_url}}/reference/courts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reference",
+                "courts"
+              ]
+            }
           }
         },
         {
           "name": "Judges",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/reference/judges", "host": ["{{base_url}}"], "path": ["reference", "judges"] }
+            "url": {
+              "raw": "{{base_url}}/reference/judges",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reference",
+                "judges"
+              ]
+            }
           }
         }
       ]
@@ -522,8 +1063,22 @@
           "name": "Similar Case Search",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/ai/similar-cases", "host": ["{{base_url}}"], "path": ["ai", "similar-cases"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/similar-cases",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai",
+                "similar-cases"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"query\": \"The appellant was convicted under section 302 of the Indian Penal Code for murder\",\n  \"top_k\": 5\n}"
@@ -534,8 +1089,22 @@
           "name": "Translate Text",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/ai/translate", "host": ["{{base_url}}"], "path": ["ai", "translate"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/translate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai",
+                "translate"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"text\": \"Property ownership dispute.\",\n  \"target_language\": \"marathi\",\n  \"document_id\": null\n}"
@@ -546,8 +1115,22 @@
           "name": "Summarize Judgment",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/ai/summarize", "host": ["{{base_url}}"], "path": ["ai", "summarize"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/summarize",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai",
+                "summarize"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"text\": \"Paste a judgment excerpt here...\",\n  \"document_id\": null\n}"
@@ -556,5 +1139,15 @@
         }
       ]
     }
-  ]
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  }
 }

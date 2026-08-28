@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import ADMIN, LAWYER, get_current_profile, require_roles
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -112,22 +113,26 @@ def _to_invoice_summary(row: dict) -> dict:
     }
 
 
-@router.get("/invoices", response_model=list[InvoiceSummary])
-def list_invoices():
-    rows = supabase.table("invoices").select(INVOICES_SELECT).order("invoice_id", desc=True).execute().data
-    return [_to_invoice_summary(row) for row in rows]
-
-
-@router.get("/invoices/{invoice_id}", response_model=InvoiceSummary)
-def get_invoice(invoice_id: int):
+def _get_invoice(invoice_id: int) -> dict:
     rows = supabase.table("invoices").select(INVOICES_SELECT).eq("invoice_id", invoice_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Invoice not found")
     return _to_invoice_summary(rows[0])
 
 
+@router.get("/invoices", response_model=list[InvoiceSummary])
+def list_invoices(profile: dict = Depends(get_current_profile)):
+    rows = supabase.table("invoices").select(INVOICES_SELECT).order("invoice_id", desc=True).execute().data
+    return [_to_invoice_summary(row) for row in rows]
+
+
+@router.get("/invoices/{invoice_id}", response_model=InvoiceSummary)
+def get_invoice(invoice_id: int, profile: dict = Depends(get_current_profile)):
+    return _get_invoice(invoice_id)
+
+
 @router.post("/invoices", response_model=InvoiceSummary)
-def create_invoice(data: InvoiceCreate):
+def create_invoice(data: InvoiceCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     row = supabase.table("invoices").insert({
         "case_id": data.case_id,
         "invoice_number": data.invoice_number,
@@ -139,16 +144,16 @@ def create_invoice(data: InvoiceCreate):
         "remarks": data.remarks,
         "payment_status": "Pending",
     }).execute().data[0]
-    return get_invoice(row["invoice_id"])
+    return _get_invoice(row["invoice_id"])
 
 
 @router.get("/invoices/{invoice_id}/payments", response_model=list[PaymentSummary])
-def list_invoice_payments(invoice_id: int):
+def list_invoice_payments(invoice_id: int, profile: dict = Depends(get_current_profile)):
     return supabase.table("payments").select(PAYMENTS_SELECT).eq("invoice_id", invoice_id).order("payment_date", desc=True).execute().data
 
 
 @router.post("/payments", response_model=PaymentSummary)
-def create_payment(data: PaymentCreate):
+def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     payment = supabase.table("payments").insert(data.model_dump()).execute().data[0]
 
     invoice = supabase.table("invoices").select("total_amount").eq("invoice_id", data.invoice_id).execute().data
@@ -162,7 +167,7 @@ def create_payment(data: PaymentCreate):
 
 
 @router.get("/expenses", response_model=list[ExpenseSummary])
-def list_expenses(matter_id: int | None = None):
+def list_expenses(matter_id: int | None = None, profile: dict = Depends(get_current_profile)):
     query = supabase.table("miscellaneous_expenses").select(EXPENSES_SELECT)
     if matter_id is not None:
         query = query.eq("matter_id", matter_id)
@@ -171,7 +176,7 @@ def list_expenses(matter_id: int | None = None):
 
 
 @router.post("/expenses", response_model=ExpenseSummary)
-def create_expense(data: ExpenseCreate):
+def create_expense(data: ExpenseCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     row = supabase.table("miscellaneous_expenses").insert(data.model_dump()).execute().data[0]
     rows = supabase.table("miscellaneous_expenses").select(EXPENSES_SELECT).eq("expense_id", row["expense_id"]).execute().data
     return _to_expense_summary(rows[0])

@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import ADMIN, LAWYER, get_current_profile, require_roles
 
 router = APIRouter(prefix="/conveyancing", tags=["conveyancing"])
 
@@ -41,7 +42,7 @@ class ConveyancingSummary(BaseModel):
 
 
 @router.get("/summary", response_model=ConveyancingSummary)
-def conveyancing_summary():
+def conveyancing_summary(profile: dict = Depends(get_current_profile)):
     rows = supabase.table("conveyancing_matters").select(MATTERS_SELECT).order("matter_id", desc=True).execute().data
 
     completed = sum(1 for r in rows if r["registration_status"] in COMPLETED_STATUSES)
@@ -162,7 +163,7 @@ class MatterDetail(BaseModel):
 
 
 @router.get("/matters/{matter_id}", response_model=MatterDetail)
-def get_matter_detail(matter_id: int):
+def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profile)):
     matter_rows = supabase.table("conveyancing_matters").select("*").eq("matter_id", matter_id).execute().data
     if not matter_rows:
         raise HTTPException(status_code=404, detail="Matter not found")
@@ -217,7 +218,7 @@ def get_matter_detail(matter_id: int):
 
 
 @router.patch("/matters/{matter_id}/due-diligence", response_model=DueDiligence)
-def update_due_diligence(matter_id: int, data: DueDiligenceUpdate):
+def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     rows = supabase.table("due_diligence").select("diligence_id").eq("matter_id", matter_id).execute().data
     if not rows:
@@ -230,7 +231,7 @@ def update_due_diligence(matter_id: int, data: DueDiligenceUpdate):
 
 
 @router.patch("/matters/{matter_id}/progress/{progress_id}", response_model=ProgressStage)
-def complete_progress_stage(matter_id: int, progress_id: int):
+def complete_progress_stage(matter_id: int, progress_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     rows = supabase.table("registration_progress").update({
         "completed": True,
         "completed_at": datetime.now(timezone.utc).isoformat(),

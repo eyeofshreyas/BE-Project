@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import ADMIN, LAWYER, get_current_profile, require_roles
 
 router = APIRouter(tags=["case-history"])
 
@@ -18,7 +19,6 @@ class NoteSummary(BaseModel):
 
 
 class NoteCreate(BaseModel):
-    lawyer_id: int
     note: str
 
 
@@ -43,7 +43,6 @@ class StatusHistoryEntry(BaseModel):
 
 class StatusChange(BaseModel):
     new_status: str
-    changed_by: int
 
 
 def _to_note(row: dict) -> dict:
@@ -83,16 +82,20 @@ def _to_status_history(row: dict) -> dict:
 
 
 @router.get("/cases/{case_id}/notes", response_model=list[NoteSummary])
-def list_case_notes(case_id: int):
+def list_case_notes(case_id: int, profile: dict = Depends(get_current_profile)):
     rows = supabase.table("case_notes").select(NOTES_SELECT).eq("case_id", case_id).order("created_at", desc=True).execute().data
     return [_to_note(row) for row in rows]
 
 
 @router.post("/cases/{case_id}/notes", response_model=NoteSummary)
-def add_case_note(case_id: int, data: NoteCreate):
+def add_case_note(case_id: int, data: NoteCreate, profile: dict = Depends(require_roles(LAWYER))):
+    lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
+    if not lawyer_rows:
+        raise HTTPException(status_code=400, detail="No lawyer profile for this account")
+
     row = supabase.table("case_notes").insert({
         "case_id": case_id,
-        "lawyer_id": data.lawyer_id,
+        "lawyer_id": lawyer_rows[0]["lawyer_id"],
         "note": data.note,
     }).execute().data[0]
     rows = supabase.table("case_notes").select(NOTES_SELECT).eq("note_id", row["note_id"]).execute().data
@@ -100,23 +103,24 @@ def add_case_note(case_id: int, data: NoteCreate):
 
 
 @router.get("/cases/{case_id}/timeline", response_model=list[TimelineEvent])
-def list_case_timeline(case_id: int):
+def list_case_timeline(case_id: int, profile: dict = Depends(get_current_profile)):
     rows = supabase.table("case_timeline").select(TIMELINE_SELECT).eq("case_id", case_id).order("created_at", desc=True).execute().data
     return [_to_timeline_event(row) for row in rows]
 
 
 @router.get("/cases/{case_id}/status-history", response_model=list[StatusHistoryEntry])
-def list_status_history(case_id: int):
+def list_status_history(case_id: int, profile: dict = Depends(get_current_profile)):
     rows = supabase.table("case_status_history").select(STATUS_HISTORY_SELECT).eq("case_id", case_id).order("changed_at", desc=True).execute().data
     return [_to_status_history(row) for row in rows]
 
 
 @router.patch("/cases/{case_id}/status", response_model=StatusHistoryEntry)
-def change_case_status(case_id: int, data: StatusChange):
+def change_case_status(case_id: int, data: StatusChange, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     case_rows = supabase.table("cases").select("status").eq("case_id", case_id).execute().data
     if not case_rows:
         raise HTTPException(status_code=404, detail="Case not found")
     previous_status = case_rows[0]["status"]
+    changed_by = profile["user_id"]
 
     supabase.table("cases").update({"status": data.new_status}).eq("case_id", case_id).execute()
 
@@ -124,7 +128,7 @@ def change_case_status(case_id: int, data: StatusChange):
         "case_id": case_id,
         "previous_status": previous_status,
         "current_status": data.new_status,
-        "changed_by": data.changed_by,
+        "changed_by": changed_by,
     }).execute().data[0]
 
     supabase.table("case_timeline").insert({
@@ -132,7 +136,7 @@ def change_case_status(case_id: int, data: StatusChange):
         "event_type": "status_change",
         "event_title": f"Status changed to {data.new_status}",
         "event_description": f"Status changed from {previous_status} to {data.new_status}",
-        "created_by": data.changed_by,
+        "created_by": changed_by,
     }).execute()
 
     rows = supabase.table("case_status_history").select(STATUS_HISTORY_SELECT).eq("history_id", history_row["history_id"]).execute().data

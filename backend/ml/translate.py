@@ -3,9 +3,10 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import ADMIN, LAWYER, require_roles
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -38,7 +39,7 @@ class TranslateResponse(BaseModel):
 
 
 @router.post("/translate", response_model=TranslateResponse)
-def translate_text(data: TranslateRequest):
+def translate_text(data: TranslateRequest, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     target_lang = LANGUAGE_CODES.get(data.target_language.lower(), data.target_language)
 
     # ponytail: reloads the IndicTrans2 model on every call, same tradeoff

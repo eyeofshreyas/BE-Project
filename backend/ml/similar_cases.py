@@ -2,8 +2,9 @@ import json
 import subprocess
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from auth import get_current_profile
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -24,7 +25,7 @@ class SimilarCaseResult(BaseModel):
 
 
 @router.post("/similar-cases", response_model=list[SimilarCaseResult])
-def similar_cases(data: SimilarCasesRequest):
+def similar_cases(data: SimilarCasesRequest, profile: dict = Depends(get_current_profile)):
     # ponytail: reloads the embedding model + FAISS index on every call (a few
     # seconds). Fine for now; move to a long-lived worker if latency matters.
     proc = subprocess.run(

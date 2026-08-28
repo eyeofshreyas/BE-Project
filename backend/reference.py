@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import get_current_profile
 
 router = APIRouter(prefix="/reference", tags=["reference"])
 
@@ -35,22 +36,22 @@ class Judge(BaseModel):
 
 
 @router.get("/roles", response_model=list[Role])
-def list_roles():
+def list_roles(profile: dict = Depends(get_current_profile)):
     return supabase.table("roles").select("*").order("role_id").execute().data
 
 
 @router.get("/case-types", response_model=list[CaseType])
-def list_case_types():
+def list_case_types(profile: dict = Depends(get_current_profile)):
     return supabase.table("case_types").select("*").order("case_type_name").execute().data
 
 
 @router.get("/courts", response_model=list[Court])
-def list_courts():
+def list_courts(profile: dict = Depends(get_current_profile)):
     return supabase.table("courts").select("*").order("court_name").execute().data
 
 
 @router.get("/judges", response_model=list[Judge])
-def list_judges():
+def list_judges(profile: dict = Depends(get_current_profile)):
     rows = supabase.table("judges").select("judge_id,judge_name,designation,court_id,courts(court_name)").order("judge_name").execute().data
     return [
         {

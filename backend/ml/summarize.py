@@ -3,9 +3,10 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import ADMIN, LAWYER, require_roles
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -25,7 +26,7 @@ class SummarizeResponse(BaseModel):
 
 
 @router.post("/summarize", response_model=SummarizeResponse)
-def summarize_text(data: SummarizeRequest):
+def summarize_text(data: SummarizeRequest, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     # ponytail: reloads the 1B model + LoRA adapter on every call (tens of
     # seconds on a laptop GPU). Fine for now; a long-lived worker is the
     # upgrade path if latency matters.

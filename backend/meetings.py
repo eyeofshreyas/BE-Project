@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import ADMIN, LAWYER, get_current_profile, require_roles
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
@@ -86,8 +87,15 @@ def _to_participant_summary(row: dict) -> dict:
     }
 
 
+def _get_meeting(meeting_id: int) -> dict:
+    rows = supabase.table("meetings").select(MEETINGS_SELECT).eq("meeting_id", meeting_id).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return _to_meeting_summary(rows[0])
+
+
 @router.get("", response_model=list[MeetingSummary])
-def list_meetings(case_id: int | None = None):
+def list_meetings(case_id: int | None = None, profile: dict = Depends(get_current_profile)):
     query = supabase.table("meetings").select(MEETINGS_SELECT)
     if case_id is not None:
         query = query.eq("case_id", case_id)
@@ -96,15 +104,12 @@ def list_meetings(case_id: int | None = None):
 
 
 @router.get("/{meeting_id}", response_model=MeetingSummary)
-def get_meeting(meeting_id: int):
-    rows = supabase.table("meetings").select(MEETINGS_SELECT).eq("meeting_id", meeting_id).execute().data
-    if not rows:
-        raise HTTPException(status_code=404, detail="Meeting not found")
-    return _to_meeting_summary(rows[0])
+def get_meeting(meeting_id: int, profile: dict = Depends(get_current_profile)):
+    return _get_meeting(meeting_id)
 
 
 @router.post("", response_model=MeetingSummary)
-def create_meeting(data: MeetingCreate):
+def create_meeting(data: MeetingCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     row = supabase.table("meetings").insert({
         "case_id": data.case_id,
         "conducted_by": data.conducted_by,
@@ -116,17 +121,17 @@ def create_meeting(data: MeetingCreate):
         "next_meeting_date": data.next_meeting_date,
         "meeting_status": "Scheduled",
     }).execute().data[0]
-    return get_meeting(row["meeting_id"])
+    return _get_meeting(row["meeting_id"])
 
 
 @router.get("/{meeting_id}/participants", response_model=list[ParticipantSummary])
-def list_participants(meeting_id: int):
+def list_participants(meeting_id: int, profile: dict = Depends(get_current_profile)):
     rows = supabase.table("meeting_participants").select(PARTICIPANTS_SELECT).eq("meeting_id", meeting_id).execute().data
     return [_to_participant_summary(row) for row in rows]
 
 
 @router.post("/{meeting_id}/participants", response_model=ParticipantSummary)
-def add_participant(meeting_id: int, data: ParticipantCreate):
+def add_participant(meeting_id: int, data: ParticipantCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     row = supabase.table("meeting_participants").insert({
         "meeting_id": meeting_id,
         "user_id": data.user_id,

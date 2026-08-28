@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import ADMIN, LAWYER, get_current_profile, require_roles
 
 router = APIRouter(prefix="/hearings", tags=["hearings"])
 
@@ -60,8 +61,15 @@ def _to_hearing_summary(row: dict) -> dict:
     }
 
 
+def _get_hearing(hearing_id: int) -> dict:
+    rows = supabase.table("hearings").select(HEARINGS_SELECT).eq("hearing_id", hearing_id).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="Hearing not found")
+    return _to_hearing_summary(rows[0])
+
+
 @router.get("", response_model=list[HearingSummary])
-def list_hearings(case_id: int | None = None):
+def list_hearings(case_id: int | None = None, profile: dict = Depends(get_current_profile)):
     query = supabase.table("hearings").select(HEARINGS_SELECT)
     if case_id is not None:
         query = query.eq("case_id", case_id)
@@ -70,15 +78,12 @@ def list_hearings(case_id: int | None = None):
 
 
 @router.get("/{hearing_id}", response_model=HearingSummary)
-def get_hearing(hearing_id: int):
-    rows = supabase.table("hearings").select(HEARINGS_SELECT).eq("hearing_id", hearing_id).execute().data
-    if not rows:
-        raise HTTPException(status_code=404, detail="Hearing not found")
-    return _to_hearing_summary(rows[0])
+def get_hearing(hearing_id: int, profile: dict = Depends(get_current_profile)):
+    return _get_hearing(hearing_id)
 
 
 @router.post("", response_model=HearingSummary)
-def create_hearing(data: HearingCreate):
+def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     row = supabase.table("hearings").insert({
         "case_id": data.case_id,
         "judge_id": data.judge_id,
@@ -89,14 +94,14 @@ def create_hearing(data: HearingCreate):
         "hearing_status": "Scheduled",
     }).execute().data[0]
     supabase.table("cases").update({"next_hearing_date": data.hearing_date}).eq("case_id", data.case_id).execute()
-    return get_hearing(row["hearing_id"])
+    return _get_hearing(row["hearing_id"])
 
 
 @router.patch("/{hearing_id}", response_model=HearingSummary)
-def update_hearing(hearing_id: int, data: HearingUpdate):
+def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if not updates:
-        return get_hearing(hearing_id)
+        return _get_hearing(hearing_id)
 
     rows = supabase.table("hearings").update(updates).eq("hearing_id", hearing_id).execute().data
     if not rows:
@@ -105,4 +110,4 @@ def update_hearing(hearing_id: int, data: HearingUpdate):
     if data.next_hearing_date is not None:
         supabase.table("cases").update({"next_hearing_date": data.next_hearing_date}).eq("case_id", rows[0]["case_id"]).execute()
 
-    return get_hearing(hearing_id)
+    return _get_hearing(hearing_id)

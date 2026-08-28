@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import get_current_profile
 
 router = APIRouter(tags=["cases"])
 
@@ -30,7 +31,7 @@ def _active_lawyer_name(case_lawyers: list[dict]) -> str | None:
 
 
 @router.get("/cases", response_model=list[CaseSummary])
-def list_cases():
+def list_cases(profile: dict = Depends(get_current_profile)):
     rows = supabase.table("cases").select(CASES_SELECT).order("case_id").execute().data
     return [
         {

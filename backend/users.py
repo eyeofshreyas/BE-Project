@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import ADMIN, require_roles
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -35,7 +36,7 @@ def _to_user_summary(row: dict) -> dict:
 
 
 @router.get("", response_model=list[UserSummary])
-def list_users(role: str | None = None):
+def list_users(role: str | None = None, profile: dict = Depends(require_roles(ADMIN))):
     rows = supabase.table("users").select(USERS_SELECT).order("created_at", desc=True).execute().data
     # ponytail: filters in Python post-fetch, fine while the users table is small;
     # switch to a PostgREST embedded filter (roles.role_name=eq.X) if the table grows large.
@@ -45,7 +46,7 @@ def list_users(role: str | None = None):
 
 
 @router.patch("/{user_id}/status", response_model=UserSummary)
-def set_user_status(user_id: int, data: StatusUpdate):
+def set_user_status(user_id: int, data: StatusUpdate, profile: dict = Depends(require_roles(ADMIN))):
     rows = supabase.table("users").update({"is_active": data.is_active}).eq("user_id", user_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="User not found")

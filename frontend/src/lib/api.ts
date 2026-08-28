@@ -1,32 +1,38 @@
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('lexflow_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: { ...authHeaders(), ...(options.headers ?? {}) },
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail ?? 'Request failed')
+  return data as T
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.detail ?? 'Request failed')
-  return data as T
 }
 
 async function patch<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  return request<T>(path, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.detail ?? 'Request failed')
-  return data as T
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`)
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.detail ?? 'Request failed')
-  return data as T
+  return request<T>(path)
 }
 
 export interface UserProfile {
@@ -150,8 +156,8 @@ export interface NotificationSummary {
   created_at: string
 }
 
-export function listNotifications(userId: number) {
-  return get<NotificationSummary[]>(`/notifications?user_id=${userId}`)
+export function listNotifications() {
+  return get<NotificationSummary[]>('/notifications')
 }
 
 export function markNotificationRead(notificationId: number) {

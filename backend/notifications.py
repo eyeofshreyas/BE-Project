@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import ADMIN, get_current_profile
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -33,8 +34,8 @@ def _to_notification(row: dict) -> dict:
 
 
 @router.get("", response_model=list[NotificationSummary])
-def list_notifications(user_id: int, unread_only: bool = False):
-    query = supabase.table("notifications").select(NOTIFICATIONS_SELECT).eq("user_id", user_id)
+def list_notifications(unread_only: bool = False, profile: dict = Depends(get_current_profile)):
+    query = supabase.table("notifications").select(NOTIFICATIONS_SELECT).eq("user_id", profile["user_id"])
     if unread_only:
         query = query.eq("is_read", False)
     rows = query.order("created_at", desc=True).execute().data
@@ -42,15 +43,19 @@ def list_notifications(user_id: int, unread_only: bool = False):
 
 
 @router.patch("/{notification_id}/read", response_model=NotificationSummary)
-def mark_read(notification_id: int):
-    rows = supabase.table("notifications").update({"is_read": True}).eq("notification_id", notification_id).execute().data
+def mark_read(notification_id: int, profile: dict = Depends(get_current_profile)):
+    rows = supabase.table("notifications").select("user_id").eq("notification_id", notification_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Notification not found")
+    if rows[0]["user_id"] != profile["user_id"] and profile["role_id"] != ADMIN:
+        raise HTTPException(status_code=403, detail="This notification doesn't belong to you")
+
+    supabase.table("notifications").update({"is_read": True}).eq("notification_id", notification_id).execute()
     result = supabase.table("notifications").select(NOTIFICATIONS_SELECT).eq("notification_id", notification_id).execute().data
     return _to_notification(result[0])
 
 
 @router.post("/read-all")
-def mark_all_read(user_id: int):
-    supabase.table("notifications").update({"is_read": True}).eq("user_id", user_id).eq("is_read", False).execute()
+def mark_all_read(profile: dict = Depends(get_current_profile)):
+    supabase.table("notifications").update({"is_read": True}).eq("user_id", profile["user_id"]).eq("is_read", False).execute()
     return {"message": "All notifications marked as read."}

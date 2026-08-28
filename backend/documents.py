@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
+from auth import get_current_profile
 
 router = APIRouter(tags=["documents"])
 
@@ -29,7 +30,7 @@ class AiSummary(BaseModel):
 
 
 @router.get("/documents", response_model=list[DocumentSummary])
-def list_documents():
+def list_documents(profile: dict = Depends(get_current_profile)):
     rows = supabase.table("documents").select(DOCUMENTS_SELECT).eq("is_deleted", False).order("document_id").execute().data
     return [
         {
@@ -46,7 +47,7 @@ def list_documents():
 
 
 @router.get("/documents/{document_id}/summary", response_model=AiSummary)
-def get_document_summary(document_id: int):
+def get_document_summary(document_id: int, profile: dict = Depends(get_current_profile)):
     rows = (
         supabase.table("ai_summaries")
         .select("summary_text,translated_text,keywords,important_dates,important_sections")
