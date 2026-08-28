@@ -323,6 +323,42 @@
       ]
     },
     {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/users", "host": ["{{base_url}}"], "path": ["users"] }
+          }
+        },
+        {
+          "name": "List Users by Role",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/users?role=lawyer",
+              "host": ["{{base_url}}"],
+              "path": ["users"],
+              "query": [{ "key": "role", "value": "lawyer" }]
+            }
+          }
+        },
+        {
+          "name": "Suspend / Reactivate User",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/users/2/status", "host": ["{{base_url}}"], "path": ["users", "2", "status"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": false\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Case History",
       "item": [
         {
@@ -375,6 +411,13 @@
     {
       "name": "Reference",
       "item": [
+        {
+          "name": "Roles",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/reference/roles", "host": ["{{base_url}}"], "path": ["reference", "roles"] }
+          }
+        },
         {
           "name": "Case Types",
           "request": {

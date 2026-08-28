@@ -20,12 +20,23 @@ class Court(BaseModel):
     address: str | None
 
 
+class Role(BaseModel):
+    role_id: int
+    role_name: str
+    description: str | None
+
+
 class Judge(BaseModel):
     judge_id: int
     judge_name: str
     designation: str | None
     court_id: int
     court_name: str | None
+
+
+@router.get("/roles", response_model=list[Role])
+def list_roles():
+    return supabase.table("roles").select("*").order("role_id").execute().data
 
 
 @router.get("/case-types", response_model=list[CaseType])

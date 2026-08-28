@@ -11,6 +11,17 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return data as T
 }
 
+async function patch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail ?? 'Request failed')
+  return data as T
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`)
   const data = await res.json()
@@ -108,4 +119,22 @@ export interface AiSummary {
 
 export function getDocumentSummary(documentId: number) {
   return get<AiSummary>(`/documents/${documentId}/summary`)
+}
+
+export interface UserSummary {
+  id: number
+  full_name: string
+  email: string
+  phone: string
+  role: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export function listUsers(role?: string) {
+  return get<UserSummary[]>(role ? `/users?role=${encodeURIComponent(role)}` : '/users')
+}
+
+export function setUserStatus(userId: number, isActive: boolean) {
+  return patch<UserSummary>(`/users/${userId}/status`, { is_active: isActive })
 }
