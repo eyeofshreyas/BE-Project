@@ -1,20 +1,9 @@
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, get_current_profile
+from app.models.notifications import NotificationSummary
 
 NOTIFICATIONS_SELECT = "notification_id,case_id,title,message,notification_type,is_read,created_at,cases(case_number)"
-
-
-class NotificationSummary(BaseModel):
-    id: int
-    case_id: int | None
-    case_number: str | None
-    title: str | None
-    message: str | None
-    notification_type: str
-    is_read: bool
-    created_at: str
 
 
 def _to_notification(row: dict) -> dict:

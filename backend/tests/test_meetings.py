@@ -6,7 +6,8 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.meetings import create_meeting, add_participant, MeetingCreate, ParticipantCreate
+from app.controllers.meetings import create_meeting, add_participant
+from app.models.meetings import MeetingCreate, ParticipantCreate
 
 
 def _fake_supabase(rows_by_table):

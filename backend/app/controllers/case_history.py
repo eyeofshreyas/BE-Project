@@ -1,46 +1,11 @@
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, ensure_case_access
+from app.models.case_history import NoteSummary, NoteCreate, TimelineEvent, StatusHistoryEntry, StatusChange
 
 NOTES_SELECT = "note_id,case_id,note,created_at,lawyers(users(full_name))"
 TIMELINE_SELECT = "timeline_id,case_id,event_type,event_title,event_description,created_at,users(full_name)"
 STATUS_HISTORY_SELECT = "history_id,case_id,previous_status,current_status,changed_at,users(full_name)"
-
-
-class NoteSummary(BaseModel):
-    id: int
-    case_id: int
-    note: str
-    created_at: str
-    lawyer_name: str | None
-
-
-class NoteCreate(BaseModel):
-    note: str
-
-
-class TimelineEvent(BaseModel):
-    id: int
-    case_id: int
-    event_type: str
-    event_title: str
-    event_description: str | None
-    created_at: str
-    created_by: str | None
-
-
-class StatusHistoryEntry(BaseModel):
-    id: int
-    case_id: int
-    previous_status: str | None
-    current_status: str | None
-    changed_at: str
-    changed_by: str | None
-
-
-class StatusChange(BaseModel):
-    new_status: str
 
 
 def _to_note(row: dict) -> dict:

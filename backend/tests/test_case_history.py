@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.case_history import change_case_status, StatusChange, add_case_note, NoteCreate
+from app.controllers.case_history import change_case_status, add_case_note
+from app.models.case_history import StatusChange, NoteCreate
 
 
 def _fake_supabase(rows_by_table):

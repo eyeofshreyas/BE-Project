@@ -1,14 +1,11 @@
 from fastapi import APIRouter
 from app.controllers.conveyancing import (
     conveyancing_summary,
-    ConveyancingSummary,
     get_matter_detail,
-    MatterDetail,
     update_due_diligence,
-    DueDiligence,
     complete_progress_stage,
-    ProgressStage,
 )
+from app.models.conveyancing import ConveyancingSummary, MatterDetail, DueDiligence, ProgressStage
 
 router = APIRouter(prefix="/conveyancing", tags=["conveyancing"])
 

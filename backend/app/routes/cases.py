@@ -1,5 +1,6 @@
 from fastapi import APIRouter
-from app.controllers.cases import list_cases, CaseSummary
+from app.controllers.cases import list_cases
+from app.models.cases import CaseSummary
 
 router = APIRouter(tags=["cases"])
 

@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
+from app.models.meetings import MeetingSummary, MeetingCreate, ParticipantSummary, ParticipantCreate
 
 MEETINGS_SELECT = (
     "meeting_id,case_id,meeting_title,meeting_type,meeting_date,duration_minutes,"
@@ -10,47 +10,6 @@ MEETINGS_SELECT = (
 )
 
 PARTICIPANTS_SELECT = "participant_id,meeting_id,user_id,participant_role,users(full_name)"
-
-
-class MeetingSummary(BaseModel):
-    id: int
-    case_id: int
-    case_number: str | None
-    meeting_title: str | None
-    meeting_type: str | None
-    meeting_date: str
-    duration_minutes: int | None
-    agenda: str | None
-    discussion_summary: str | None
-    decisions: str | None
-    action_items: str | None
-    next_meeting_date: str | None
-    meeting_status: str
-    conducted_by: str | None
-
-
-class MeetingCreate(BaseModel):
-    case_id: int
-    conducted_by: int
-    meeting_title: str | None = None
-    meeting_type: str | None = None
-    meeting_date: str
-    duration_minutes: int | None = None
-    agenda: str | None = None
-    next_meeting_date: str | None = None
-
-
-class ParticipantSummary(BaseModel):
-    participant_id: int
-    meeting_id: int
-    user_id: int
-    participant_role: str | None
-    full_name: str | None
-
-
-class ParticipantCreate(BaseModel):
-    user_id: int
-    participant_role: str | None = None
 
 
 def _to_meeting_summary(row: dict) -> dict:

@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.hearings import create_hearing, update_hearing, HearingCreate, HearingUpdate
+from app.controllers.hearings import create_hearing, update_hearing
+from app.models.hearings import HearingCreate, HearingUpdate
 
 
 def _fake_supabase(rows_by_table):

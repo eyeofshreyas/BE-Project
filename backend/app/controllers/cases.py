@@ -1,7 +1,7 @@
 from fastapi import Depends
-from pydantic import BaseModel
 from app.db.supabase_client import supabase
 from app.middleware.auth import get_current_profile, get_scoped_case_ids
+from app.models.cases import CaseSummary
 
 CASES_SELECT = (
     "case_id,case_number,case_title,status,priority,next_hearing_date,"
@@ -9,16 +9,6 @@ CASES_SELECT = (
     "courts(court_name),"
     "case_lawyers(assigned_role,is_active,lawyers(users(full_name)))"
 )
-
-
-class CaseSummary(BaseModel):
-    id: str
-    client: str | None
-    lawyer: str | None
-    court: str | None
-    status: str
-    hearing: str | None
-    priority: str
 
 
 def _active_lawyer_name(case_lawyers: list[dict]) -> str | None:

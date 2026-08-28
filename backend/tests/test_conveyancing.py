@@ -6,7 +6,8 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.conveyancing import update_due_diligence, complete_progress_stage, DueDiligenceUpdate
+from app.controllers.conveyancing import update_due_diligence, complete_progress_stage
+from app.models.conveyancing import DueDiligenceUpdate
 
 
 def _fake_supabase(rows_by_table):

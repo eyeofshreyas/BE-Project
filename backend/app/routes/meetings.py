@@ -1,13 +1,12 @@
 from fastapi import APIRouter
 from app.controllers.meetings import (
     list_meetings,
-    MeetingSummary,
     get_meeting,
     create_meeting,
     list_participants,
-    ParticipantSummary,
     add_participant,
 )
+from app.models.meetings import MeetingSummary, ParticipantSummary
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 

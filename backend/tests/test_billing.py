@@ -12,10 +12,8 @@ from app.controllers.billing import (
     create_invoice,
     create_payment,
     create_expense,
-    InvoiceCreate,
-    PaymentCreate,
-    ExpenseCreate,
 )
+from app.models.billing import InvoiceCreate, PaymentCreate, ExpenseCreate
 
 
 def _fake_supabase(rows_by_table):

@@ -1,43 +1,12 @@
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
+from app.models.hearings import HearingSummary, HearingCreate, HearingUpdate
 
 HEARINGS_SELECT = (
     "hearing_id,case_id,hearing_date,hearing_time,courtroom,hearing_status,hearing_outcome,next_hearing_date,notes,"
     "cases(case_number),judges(judge_name,courts(court_name))"
 )
-
-
-class HearingSummary(BaseModel):
-    id: int
-    case_id: int
-    case_number: str | None
-    judge_name: str | None
-    court_name: str | None
-    hearing_date: str
-    hearing_time: str | None
-    courtroom: str | None
-    hearing_status: str
-    hearing_outcome: str | None
-    next_hearing_date: str | None
-    notes: str | None
-
-
-class HearingCreate(BaseModel):
-    case_id: int
-    judge_id: int
-    hearing_date: str
-    hearing_time: str | None = None
-    courtroom: str | None = None
-    notes: str | None = None
-
-
-class HearingUpdate(BaseModel):
-    hearing_status: str | None = None
-    hearing_outcome: str | None = None
-    next_hearing_date: str | None = None
-    notes: str | None = None
 
 
 def _to_hearing_summary(row: dict) -> dict:

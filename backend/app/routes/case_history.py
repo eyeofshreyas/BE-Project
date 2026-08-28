@@ -1,14 +1,12 @@
 from fastapi import APIRouter
 from app.controllers.case_history import (
     list_case_notes,
-    NoteSummary,
     add_case_note,
     list_case_timeline,
-    TimelineEvent,
     list_status_history,
-    StatusHistoryEntry,
     change_case_status,
 )
+from app.models.case_history import NoteSummary, TimelineEvent, StatusHistoryEntry
 
 router = APIRouter(tags=["case-history"])
 

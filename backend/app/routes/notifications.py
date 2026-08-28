@@ -1,5 +1,6 @@
 from fastapi import APIRouter
-from app.controllers.notifications import list_notifications, NotificationSummary, mark_read, mark_all_read
+from app.controllers.notifications import list_notifications, mark_read, mark_all_read
+from app.models.notifications import NotificationSummary
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 

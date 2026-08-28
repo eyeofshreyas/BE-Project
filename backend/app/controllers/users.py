@@ -1,23 +1,9 @@
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, require_roles
+from app.models.users import UserSummary, StatusUpdate
 
 USERS_SELECT = "user_id,full_name,email,phone,is_active,created_at,roles(role_name)"
-
-
-class UserSummary(BaseModel):
-    id: int
-    full_name: str
-    email: str
-    phone: str
-    role: str | None
-    is_active: bool
-    created_at: str
-
-
-class StatusUpdate(BaseModel):
-    is_active: bool
 
 
 def _to_user_summary(row: dict) -> dict:

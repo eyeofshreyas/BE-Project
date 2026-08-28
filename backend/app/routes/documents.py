@@ -1,5 +1,6 @@
 from fastapi import APIRouter
-from app.controllers.documents import list_documents, DocumentSummary, get_document_summary, AiSummary
+from app.controllers.documents import list_documents, get_document_summary
+from app.models.documents import DocumentSummary, AiSummary
 
 router = APIRouter(tags=["documents"])
 

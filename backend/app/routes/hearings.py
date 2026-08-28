@@ -1,11 +1,11 @@
 from fastapi import APIRouter
 from app.controllers.hearings import (
     list_hearings,
-    HearingSummary,
     get_hearing,
     create_hearing,
     update_hearing,
 )
+from app.models.hearings import HearingSummary
 
 router = APIRouter(prefix="/hearings", tags=["hearings"])
 

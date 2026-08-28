@@ -1,14 +1,6 @@
 from fastapi import APIRouter
-from app.controllers.reference import (
-    list_roles,
-    Role,
-    list_case_types,
-    CaseType,
-    list_courts,
-    Court,
-    list_judges,
-    Judge,
-)
+from app.controllers.reference import list_roles, list_case_types, list_courts, list_judges
+from app.models.reference import Role, CaseType, Court, Judge
 
 router = APIRouter(prefix="/reference", tags=["reference"])
 

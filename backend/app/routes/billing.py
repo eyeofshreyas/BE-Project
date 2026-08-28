@@ -3,14 +3,12 @@ from app.controllers.billing import (
     list_invoices,
     get_invoice,
     create_invoice,
-    InvoiceSummary,
     list_invoice_payments,
-    PaymentSummary,
     create_payment,
     list_expenses,
-    ExpenseSummary,
     create_expense,
 )
+from app.models.billing import InvoiceSummary, PaymentSummary, ExpenseSummary
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 

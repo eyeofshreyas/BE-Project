@@ -1,30 +1,12 @@
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel
 from app.db.supabase_client import supabase
 from app.middleware.auth import get_current_profile, get_scoped_case_ids
+from app.models.documents import DocumentSummary, AiSummary
 
 DOCUMENTS_SELECT = (
     "document_id,file_name,mime_type,upload_date,case_id,"
     "document_types(type_name),cases(case_number),users(full_name)"
 )
-
-
-class DocumentSummary(BaseModel):
-    id: int
-    file_name: str
-    mime_type: str
-    upload_date: str
-    document_type: str | None
-    case_number: str | None
-    uploaded_by: str | None
-
-
-class AiSummary(BaseModel):
-    summary_text: str
-    translated_text: str | None
-    keywords: str | None
-    important_dates: str | None
-    important_sections: str | None
 
 
 def list_documents(profile: dict = Depends(get_current_profile)):
