@@ -16,6 +16,7 @@ from hearings import router as hearings_router
 from reference import router as reference_router
 from case_history import router as case_history_router
 from users import router as users_router
+from notifications import router as notifications_router
 
 app = FastAPI()
 
@@ -37,6 +38,7 @@ app.include_router(hearings_router)
 app.include_router(reference_router)
 app.include_router(case_history_router)
 app.include_router(users_router)
+app.include_router(notifications_router)
 
 ROLE_IDS = {"lawyer": 2, "client": 3}
 

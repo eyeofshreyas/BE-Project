@@ -323,6 +323,54 @@
       ]
     },
     {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List Notifications for User",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/notifications?user_id=4",
+              "host": ["{{base_url}}"],
+              "path": ["notifications"],
+              "query": [{ "key": "user_id", "value": "4" }]
+            }
+          }
+        },
+        {
+          "name": "List Unread Only",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/notifications?user_id=4&unread_only=true",
+              "host": ["{{base_url}}"],
+              "path": ["notifications"],
+              "query": [{ "key": "user_id", "value": "4" }, { "key": "unread_only", "value": "true" }]
+            }
+          }
+        },
+        {
+          "name": "Mark Notification Read",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/notifications/1/read", "host": ["{{base_url}}"], "path": ["notifications", "1", "read"] }
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/notifications/read-all?user_id=4",
+              "host": ["{{base_url}}"],
+              "path": ["notifications", "read-all"],
+              "query": [{ "key": "user_id", "value": "4" }]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Users",
       "item": [
         {

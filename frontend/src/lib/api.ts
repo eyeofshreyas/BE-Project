@@ -138,3 +138,22 @@ export function listUsers(role?: string) {
 export function setUserStatus(userId: number, isActive: boolean) {
   return patch<UserSummary>(`/users/${userId}/status`, { is_active: isActive })
 }
+
+export interface NotificationSummary {
+  id: number
+  case_id: number | null
+  case_number: string | null
+  title: string | null
+  message: string | null
+  notification_type: string
+  is_read: boolean
+  created_at: string
+}
+
+export function listNotifications(userId: number) {
+  return get<NotificationSummary[]>(`/notifications?user_id=${userId}`)
+}
+
+export function markNotificationRead(notificationId: number) {
+  return patch<NotificationSummary>(`/notifications/${notificationId}/read`, {})
+}

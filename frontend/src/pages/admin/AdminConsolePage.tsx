@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
 import { Icon, type IconName } from './icons'
@@ -10,12 +10,24 @@ import DocumentsView from './views/DocumentsView'
 import ReportsView from './views/ReportsView'
 import AnalyticsView from './views/AnalyticsView'
 import SettingsView from './views/SettingsView'
-import type { UserProfile } from '../../lib/api'
+import { listNotifications, markNotificationRead, type UserProfile, type NotificationSummary } from '../../lib/api'
 import styles from './adminShared.module.css'
 
 type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'reports' | 'analytics' | 'settings'
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Super Admin', 2: 'Lawyer', 3: 'Client' }
+
+const NOTIF_COLORS: Record<string, string> = { Hearing: C.warning, Payment: C.success, Document: C.primary }
+
+function timeAgo(iso: string) {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
 
 function initialsOf(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
@@ -39,19 +51,28 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
   { key: 'analytics', label: 'Analytics', icon: 'pie-chart' },
 ]
 
-const TOP_NOTIFS = [
-  { text: 'Unusual login attempt blocked from a new device', time: '2m ago', color: C.danger },
-  { text: '14 new sign-ups today across lawyers and clients', time: '18m ago', color: C.primary },
-  { text: 'Translation job failed for CASE-2019', time: '1h ago', color: C.warning },
-]
-
 export default function AdminConsolePage() {
   const [activePage, setActivePage] = useState<PageKey>('dashboard')
   const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [profile] = useState<UserProfile | null>(loadProfile)
+  const [notifications, setNotifications] = useState<NotificationSummary[]>([])
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!profile) return
+    listNotifications(profile.user_id).then(setNotifications).catch(() => {})
+  }, [profile])
+
+  function openNotification(n: NotificationSummary) {
+    if (!n.is_read) {
+      markNotificationRead(n.id)
+        .then((updated) => setNotifications((prev) => prev.map((x) => (x.id === updated.id ? updated : x))))
+        .catch(() => {})
+    }
+    goTo('dashboard')
+  }
 
   function logout() {
     localStorage.removeItem('lexflow_token')
@@ -124,17 +145,19 @@ export default function AdminConsolePage() {
             <div className={styles.todayLabel}>Friday, August 7, 2026</div>
             <div style={{ position: 'relative' }}>
               <div className={styles.bellBtn} style={{ background: notifOpen ? '#EFE4CB' : 'transparent' }} onClick={(e) => { e.stopPropagation(); setNotifOpen((v) => !v); setProfileOpen(false) }}>
-                <Icon name="bell" size={19} color="#6A5C42" /><span className={styles.bellDot} />
+                <Icon name="bell" size={19} color="#6A5C42" />
+                {notifications.some((n) => !n.is_read) && <span className={styles.bellDot} />}
               </div>
               {notifOpen && (
                 <div className={styles.notifDropdown}>
                   <div className={styles.notifDropdownTitle}>Notifications</div>
-                  {TOP_NOTIFS.map((n) => (
-                    <div key={n.text} className={styles.notifDropdownRow} onClick={() => { goTo('dashboard') }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 5, flexShrink: 0, background: n.color }} />
+                  {notifications.length === 0 && <div style={{ padding: '10px 4px', fontSize: 12.5, color: '#A38F66' }}>No notifications.</div>}
+                  {notifications.map((n) => (
+                    <div key={n.id} className={styles.notifDropdownRow} onClick={() => openNotification(n)}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 5, flexShrink: 0, background: n.is_read ? '#D8C79A' : (NOTIF_COLORS[n.notification_type] ?? C.primary) }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12.5, color: '#2A2118', lineHeight: 1.4 }}>{n.text}</div>
-                        <div style={{ fontSize: 11, color: '#A38F66', marginTop: 2 }}>{n.time}</div>
+                        <div style={{ fontSize: 12.5, color: '#2A2118', lineHeight: 1.4 }}>{n.title ?? n.message}</div>
+                        <div style={{ fontSize: 11, color: '#A38F66', marginTop: 2 }}>{timeAgo(n.created_at)}</div>
                       </div>
                     </div>
                   ))}
