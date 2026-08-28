@@ -10,9 +10,25 @@ import DocumentsView from './views/DocumentsView'
 import ReportsView from './views/ReportsView'
 import AnalyticsView from './views/AnalyticsView'
 import SettingsView from './views/SettingsView'
+import type { UserProfile } from '../../lib/api'
 import styles from './adminShared.module.css'
 
 type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'reports' | 'analytics' | 'settings'
+
+const ROLE_LABELS: Record<number, string> = { 1: 'Super Admin', 2: 'Lawyer', 3: 'Client' }
+
+function initialsOf(name: string) {
+  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+}
+
+function loadProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
 
 const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
@@ -34,7 +50,14 @@ export default function AdminConsolePage() {
   const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [profile] = useState<UserProfile | null>(loadProfile)
   const navigate = useNavigate()
+
+  function logout() {
+    localStorage.removeItem('lexflow_token')
+    localStorage.removeItem('lexflow_profile')
+    navigate('/')
+  }
 
   function closeMenus() {
     setNotifOpen(false)
@@ -84,7 +107,7 @@ export default function AdminConsolePage() {
             <span className={styles.navIcon}><Icon name="settings" size={18} color={activePage === 'settings' ? C.primaryDark : '#93826d'} /></span>
             <span className={styles.navLabel} style={{ fontWeight: activePage === 'settings' ? 600 : 500, color: activePage === 'settings' ? C.text : '#6A5C42' }}>Settings</span>
           </div>
-          <div className={styles.logoutRow} onClick={() => navigate('/')} title="Logout">
+          <div className={styles.logoutRow} onClick={logout} title="Logout">
             <span className={styles.navIcon}><Icon name="log-out" size={18} color="#93826d" /></span>
             <span style={{ fontSize: 13.5, fontWeight: 500, color: '#6A5C42' }}>Logout</span>
           </div>
@@ -121,8 +144,8 @@ export default function AdminConsolePage() {
             <div className={styles.vDivider} />
             <div style={{ position: 'relative' }}>
               <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v); setNotifOpen(false) }}>
-                <div className={styles.avatarCircle}>PN</div>
-                <div style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>Priya Nair</div><div style={{ fontSize: 11, color: '#A38F66' }}>Super Admin</div></div>
+                <div className={styles.avatarCircle}>{profile ? initialsOf(profile.full_name) : '—'}</div>
+                <div style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>{profile?.full_name ?? 'Unknown user'}</div><div style={{ fontSize: 11, color: '#A38F66' }}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'User') : ''}</div></div>
                 <span style={{ color: '#A38F66', display: 'flex' }}><Icon name="chevron-down" size={15} color="#A38F66" /></span>
               </div>
               {profileOpen && (
