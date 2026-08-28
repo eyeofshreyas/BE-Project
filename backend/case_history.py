@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
-from auth import ADMIN, LAWYER, get_current_profile, require_roles
+from auth import ADMIN, LAWYER, get_current_profile, require_roles, ensure_case_access
 
 router = APIRouter(tags=["case-history"])
 
@@ -83,6 +83,7 @@ def _to_status_history(row: dict) -> dict:
 
 @router.get("/cases/{case_id}/notes", response_model=list[NoteSummary])
 def list_case_notes(case_id: int, profile: dict = Depends(get_current_profile)):
+    ensure_case_access(case_id, profile)
     rows = supabase.table("case_notes").select(NOTES_SELECT).eq("case_id", case_id).order("created_at", desc=True).execute().data
     return [_to_note(row) for row in rows]
 
@@ -104,18 +105,21 @@ def add_case_note(case_id: int, data: NoteCreate, profile: dict = Depends(requir
 
 @router.get("/cases/{case_id}/timeline", response_model=list[TimelineEvent])
 def list_case_timeline(case_id: int, profile: dict = Depends(get_current_profile)):
+    ensure_case_access(case_id, profile)
     rows = supabase.table("case_timeline").select(TIMELINE_SELECT).eq("case_id", case_id).order("created_at", desc=True).execute().data
     return [_to_timeline_event(row) for row in rows]
 
 
 @router.get("/cases/{case_id}/status-history", response_model=list[StatusHistoryEntry])
 def list_status_history(case_id: int, profile: dict = Depends(get_current_profile)):
+    ensure_case_access(case_id, profile)
     rows = supabase.table("case_status_history").select(STATUS_HISTORY_SELECT).eq("case_id", case_id).order("changed_at", desc=True).execute().data
     return [_to_status_history(row) for row in rows]
 
 
 @router.patch("/cases/{case_id}/status", response_model=StatusHistoryEntry)
 def change_case_status(case_id: int, data: StatusChange, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    ensure_case_access(case_id, profile)
     case_rows = supabase.table("cases").select("status").eq("case_id", case_id).execute().data
     if not case_rows:
         raise HTTPException(status_code=404, detail="Case not found")

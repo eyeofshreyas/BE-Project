@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
-from auth import ADMIN, LAWYER, get_current_profile, require_roles
+from auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 
 router = APIRouter(prefix="/conveyancing", tags=["conveyancing"])
 
@@ -43,7 +43,14 @@ class ConveyancingSummary(BaseModel):
 
 @router.get("/summary", response_model=ConveyancingSummary)
 def conveyancing_summary(profile: dict = Depends(get_current_profile)):
-    rows = supabase.table("conveyancing_matters").select(MATTERS_SELECT).order("matter_id", desc=True).execute().data
+    case_ids = get_scoped_case_ids(profile)
+    if case_ids is not None and not case_ids:
+        rows = []
+    else:
+        query = supabase.table("conveyancing_matters").select(MATTERS_SELECT)
+        if case_ids is not None:
+            query = query.in_("case_id", list(case_ids))
+        rows = query.order("matter_id", desc=True).execute().data
 
     completed = sum(1 for r in rows if r["registration_status"] in COMPLETED_STATUSES)
     pending = sum(1 for r in rows if r["registration_status"] in PENDING_STATUSES)
@@ -169,6 +176,10 @@ def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profil
         raise HTTPException(status_code=404, detail="Matter not found")
     matter = matter_rows[0]
 
+    case_ids = get_scoped_case_ids(profile)
+    if case_ids is not None and matter.get("case_id") not in case_ids:
+        raise HTTPException(status_code=403, detail="You don't have access to this matter")
+
     property_rows = supabase.table("properties").select("*").eq("property_id", matter["property_id"]).execute().data
     property_ = property_rows[0] if property_rows else None
 
@@ -217,8 +228,17 @@ def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profil
     }
 
 
+def _ensure_matter_access(matter_id: int, profile: dict) -> None:
+    matter_rows = supabase.table("conveyancing_matters").select("case_id").eq("matter_id", matter_id).execute().data
+    if not matter_rows:
+        raise HTTPException(status_code=404, detail="Matter not found")
+    ensure_case_access(matter_rows[0]["case_id"], profile)
+
+
 @router.patch("/matters/{matter_id}/due-diligence", response_model=DueDiligence)
 def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    _ensure_matter_access(matter_id, profile)
+
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     rows = supabase.table("due_diligence").select("diligence_id").eq("matter_id", matter_id).execute().data
     if not rows:
@@ -232,6 +252,8 @@ def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict
 
 @router.patch("/matters/{matter_id}/progress/{progress_id}", response_model=ProgressStage)
 def complete_progress_stage(matter_id: int, progress_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    _ensure_matter_access(matter_id, profile)
+
     rows = supabase.table("registration_progress").update({
         "completed": True,
         "completed_at": datetime.now(timezone.utc).isoformat(),

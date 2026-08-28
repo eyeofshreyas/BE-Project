@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
-from auth import ADMIN, LAWYER, get_current_profile, require_roles
+from auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 
 router = APIRouter(prefix="/hearings", tags=["hearings"])
 
@@ -61,29 +61,38 @@ def _to_hearing_summary(row: dict) -> dict:
     }
 
 
-def _get_hearing(hearing_id: int) -> dict:
+def _get_hearing(hearing_id: int, case_ids: set[int] | None = None) -> dict:
     rows = supabase.table("hearings").select(HEARINGS_SELECT).eq("hearing_id", hearing_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Hearing not found")
+    if case_ids is not None and rows[0]["case_id"] not in case_ids:
+        raise HTTPException(status_code=403, detail="You don't have access to this hearing")
     return _to_hearing_summary(rows[0])
 
 
 @router.get("", response_model=list[HearingSummary])
 def list_hearings(case_id: int | None = None, profile: dict = Depends(get_current_profile)):
+    case_ids = get_scoped_case_ids(profile)
+    if case_ids is not None and not case_ids:
+        return []
+
     query = supabase.table("hearings").select(HEARINGS_SELECT)
     if case_id is not None:
         query = query.eq("case_id", case_id)
+    if case_ids is not None:
+        query = query.in_("case_id", list(case_ids))
     rows = query.order("hearing_date", desc=True).execute().data
     return [_to_hearing_summary(row) for row in rows]
 
 
 @router.get("/{hearing_id}", response_model=HearingSummary)
 def get_hearing(hearing_id: int, profile: dict = Depends(get_current_profile)):
-    return _get_hearing(hearing_id)
+    return _get_hearing(hearing_id, get_scoped_case_ids(profile))
 
 
 @router.post("", response_model=HearingSummary)
 def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    ensure_case_access(data.case_id, profile)
     row = supabase.table("hearings").insert({
         "case_id": data.case_id,
         "judge_id": data.judge_id,
@@ -99,6 +108,8 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
 
 @router.patch("/{hearing_id}", response_model=HearingSummary)
 def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    _get_hearing(hearing_id, get_scoped_case_ids(profile))
+
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if not updates:
         return _get_hearing(hearing_id)

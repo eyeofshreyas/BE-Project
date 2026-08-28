@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from supabase_client import supabase
-from auth import ADMIN, LAWYER, get_current_profile, require_roles
+from auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
 INVOICES_SELECT = (
-    "invoice_id,invoice_number,amount,tax,total_amount,issue_date,due_date,payment_status,remarks,"
+    "invoice_id,invoice_number,amount,tax,total_amount,issue_date,due_date,payment_status,remarks,case_id,"
     "cases(case_number,clients(users(full_name)))"
 )
 
@@ -14,7 +14,7 @@ PAYMENTS_SELECT = "payment_id,invoice_id,amount,payment_method,transaction_refer
 
 EXPENSES_SELECT = (
     "expense_id,matter_id,expense_type,description,amount,expense_date,receipt_document_id,"
-    "conveyancing_matters(matter_number),users(full_name)"
+    "conveyancing_matters(matter_number,case_id),users(full_name)"
 )
 
 
@@ -97,6 +97,14 @@ def _to_expense_summary(row: dict) -> dict:
     }
 
 
+def _invoice_status_for(total_paid: float, total_amount: float) -> str:
+    if total_paid >= total_amount:
+        return "Paid"
+    if total_paid > 0:
+        return "Partially Paid"
+    return "Pending"
+
+
 def _to_invoice_summary(row: dict) -> dict:
     case = row.get("cases")
     return {
@@ -113,26 +121,36 @@ def _to_invoice_summary(row: dict) -> dict:
     }
 
 
-def _get_invoice(invoice_id: int) -> dict:
+def _get_invoice(invoice_id: int, case_ids: set[int] | None = None) -> dict:
     rows = supabase.table("invoices").select(INVOICES_SELECT).eq("invoice_id", invoice_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Invoice not found")
+    if case_ids is not None and rows[0]["case_id"] not in case_ids:
+        raise HTTPException(status_code=403, detail="You don't have access to this invoice")
     return _to_invoice_summary(rows[0])
 
 
 @router.get("/invoices", response_model=list[InvoiceSummary])
 def list_invoices(profile: dict = Depends(get_current_profile)):
-    rows = supabase.table("invoices").select(INVOICES_SELECT).order("invoice_id", desc=True).execute().data
+    case_ids = get_scoped_case_ids(profile)
+    if case_ids is not None and not case_ids:
+        return []
+
+    query = supabase.table("invoices").select(INVOICES_SELECT)
+    if case_ids is not None:
+        query = query.in_("case_id", list(case_ids))
+    rows = query.order("invoice_id", desc=True).execute().data
     return [_to_invoice_summary(row) for row in rows]
 
 
 @router.get("/invoices/{invoice_id}", response_model=InvoiceSummary)
 def get_invoice(invoice_id: int, profile: dict = Depends(get_current_profile)):
-    return _get_invoice(invoice_id)
+    return _get_invoice(invoice_id, get_scoped_case_ids(profile))
 
 
 @router.post("/invoices", response_model=InvoiceSummary)
 def create_invoice(data: InvoiceCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    ensure_case_access(data.case_id, profile)
     row = supabase.table("invoices").insert({
         "case_id": data.case_id,
         "invoice_number": data.invoice_number,
@@ -149,18 +167,20 @@ def create_invoice(data: InvoiceCreate, profile: dict = Depends(require_roles(AD
 
 @router.get("/invoices/{invoice_id}/payments", response_model=list[PaymentSummary])
 def list_invoice_payments(invoice_id: int, profile: dict = Depends(get_current_profile)):
+    _get_invoice(invoice_id, get_scoped_case_ids(profile))
     return supabase.table("payments").select(PAYMENTS_SELECT).eq("invoice_id", invoice_id).order("payment_date", desc=True).execute().data
 
 
 @router.post("/payments", response_model=PaymentSummary)
 def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    _get_invoice(data.invoice_id, get_scoped_case_ids(profile))
     payment = supabase.table("payments").insert(data.model_dump()).execute().data[0]
 
     invoice = supabase.table("invoices").select("total_amount").eq("invoice_id", data.invoice_id).execute().data
     if invoice:
         paid = supabase.table("payments").select("amount").eq("invoice_id", data.invoice_id).eq("payment_status", "Completed").execute().data
         total_paid = sum(p["amount"] for p in paid)
-        new_status = "Paid" if total_paid >= invoice[0]["total_amount"] else "Partially Paid" if total_paid > 0 else "Pending"
+        new_status = _invoice_status_for(total_paid, invoice[0]["total_amount"])
         supabase.table("invoices").update({"payment_status": new_status}).eq("invoice_id", data.invoice_id).execute()
 
     return payment
@@ -168,15 +188,28 @@ def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(AD
 
 @router.get("/expenses", response_model=list[ExpenseSummary])
 def list_expenses(matter_id: int | None = None, profile: dict = Depends(get_current_profile)):
+    case_ids = get_scoped_case_ids(profile)
+    if case_ids is not None and not case_ids:
+        return []
+
     query = supabase.table("miscellaneous_expenses").select(EXPENSES_SELECT)
     if matter_id is not None:
         query = query.eq("matter_id", matter_id)
     rows = query.order("expense_date", desc=True).execute().data
+    if case_ids is not None:
+        # ponytail: matter->case ownership filtered in Python, same pattern as
+        # users.py's role filter; move to a PostgREST embedded filter if this table grows large.
+        rows = [r for r in rows if r.get("conveyancing_matters") and r["conveyancing_matters"]["case_id"] in case_ids]
     return [_to_expense_summary(row) for row in rows]
 
 
 @router.post("/expenses", response_model=ExpenseSummary)
 def create_expense(data: ExpenseCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    matter_rows = supabase.table("conveyancing_matters").select("case_id").eq("matter_id", data.matter_id).execute().data
+    if not matter_rows:
+        raise HTTPException(status_code=404, detail="Matter not found")
+    ensure_case_access(matter_rows[0]["case_id"], profile)
+
     row = supabase.table("miscellaneous_expenses").insert(data.model_dump()).execute().data[0]
     rows = supabase.table("miscellaneous_expenses").select(EXPENSES_SELECT).eq("expense_id", row["expense_id"]).execute().data
     return _to_expense_summary(rows[0])
