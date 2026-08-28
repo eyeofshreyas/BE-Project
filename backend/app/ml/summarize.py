@@ -1,0 +1,53 @@
+from datetime import datetime, timezone
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from app.db.supabase_client import supabase
+from app.middleware.auth import ADMIN, LAWYER, require_roles, ensure_case_access
+from app.ml.subprocess_utils import run_ml_subprocess
+
+router = APIRouter(prefix="/ai", tags=["ai"])
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+FINETUNE_VENV_PYTHON = REPO_ROOT / "finetune-summarizer" / ".venv" / "bin" / "python"
+INFERENCE_DIR = REPO_ROOT / "finetune-summarizer" / "inference"
+SUMMARIZE_RUNNER = Path(__file__).resolve().parent / "runners" / "summarize_runner.py"
+
+
+class SummarizeRequest(BaseModel):
+    text: str
+    document_id: int | None = None
+
+
+class SummarizeResponse(BaseModel):
+    summary: str
+
+
+@router.post("/summarize", response_model=SummarizeResponse)
+def summarize_text(data: SummarizeRequest, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    if data.document_id is not None:
+        doc_rows = supabase.table("documents").select("case_id").eq("document_id", data.document_id).execute().data
+        if not doc_rows:
+            raise HTTPException(status_code=404, detail="Document not found")
+        ensure_case_access(doc_rows[0]["case_id"], profile)
+
+    # ponytail: reloads the 1B model + LoRA adapter on every call (tens of
+    # seconds on a laptop GPU). Fine for now; a long-lived worker is the
+    # upgrade path if latency matters.
+    result = run_ml_subprocess(
+        [str(FINETUNE_VENV_PYTHON), str(SUMMARIZE_RUNNER)],
+        {"text": data.text},
+        cwd=str(INFERENCE_DIR),
+        timeout=600,
+    )
+
+    if data.document_id is not None:
+        # ai_summaries.document_id is unique -- one summary per document.
+        supabase.table("ai_summaries").upsert({
+            "document_id": data.document_id,
+            "summary_text": result["summary"],
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }, on_conflict="document_id").execute()
+
+    return result

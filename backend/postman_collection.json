@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "LexFlow Backend",
-    "description": "Endpoints built so far on feature/backend-ml. Run the backend locally first: cd backend && source .venv/bin/activate && uvicorn main:app --reload. Every endpoint except Root/Signup/Login/Forgot Password now requires auth: run Login once (any real account) and its test script auto-fills the access_token collection variable used by every other request.",
+    "description": "Endpoints built so far on feature/backend-ml. Run the backend locally first: cd backend && source .venv/bin/activate && uvicorn app.main:app --reload. Every endpoint except Root/Signup/Login/Forgot Password now requires auth: run Login once (any real account) and its test script auto-fills the access_token collection variable used by every other request.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [

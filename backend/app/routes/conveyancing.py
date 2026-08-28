@@ -1,0 +1,18 @@
+from fastapi import APIRouter
+from app.controllers.conveyancing import (
+    conveyancing_summary,
+    ConveyancingSummary,
+    get_matter_detail,
+    MatterDetail,
+    update_due_diligence,
+    DueDiligence,
+    complete_progress_stage,
+    ProgressStage,
+)
+
+router = APIRouter(prefix="/conveyancing", tags=["conveyancing"])
+
+router.get("/summary", response_model=ConveyancingSummary)(conveyancing_summary)
+router.get("/matters/{matter_id}", response_model=MatterDetail)(get_matter_detail)
+router.patch("/matters/{matter_id}/due-diligence", response_model=DueDiligence)(update_due_diligence)
+router.patch("/matters/{matter_id}/progress/{progress_id}", response_model=ProgressStage)(complete_progress_stage)

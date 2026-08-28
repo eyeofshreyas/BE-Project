@@ -1,0 +1,23 @@
+from fastapi import APIRouter
+from app.controllers.billing import (
+    list_invoices,
+    get_invoice,
+    create_invoice,
+    InvoiceSummary,
+    list_invoice_payments,
+    PaymentSummary,
+    create_payment,
+    list_expenses,
+    ExpenseSummary,
+    create_expense,
+)
+
+router = APIRouter(prefix="/billing", tags=["billing"])
+
+router.get("/invoices", response_model=list[InvoiceSummary])(list_invoices)
+router.get("/invoices/{invoice_id}", response_model=InvoiceSummary)(get_invoice)
+router.post("/invoices", response_model=InvoiceSummary)(create_invoice)
+router.get("/invoices/{invoice_id}/payments", response_model=list[PaymentSummary])(list_invoice_payments)
+router.post("/payments", response_model=PaymentSummary)(create_payment)
+router.get("/expenses", response_model=list[ExpenseSummary])(list_expenses)
+router.post("/expenses", response_model=ExpenseSummary)(create_expense)
