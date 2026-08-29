@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../icons'
 import { C, pillStyle } from '../theme'
-import { listCases, type CaseSummary } from '../../../lib/api'
+import { listCases } from '../../../api/client'
+import type { CaseSummary } from '../../../types/api'
 import styles from '../adminShared.module.css'
 
 const CASE_COLUMNS = ['Case ID', 'Client', 'Assigned Lawyer', 'Court', 'Status', 'Next Hearing', 'Priority', 'Actions']

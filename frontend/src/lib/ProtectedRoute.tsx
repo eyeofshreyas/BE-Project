@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
-import type { UserProfile } from './api'
+import type { UserProfile } from '../types/api'
 
 function loadProfile(): UserProfile | null {
   try {

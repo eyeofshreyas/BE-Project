@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../icons'
 import { C, pillStyle } from '../theme'
-import { listUsers, setUserStatus, type UserSummary } from '../../../lib/api'
+import { listUsers, setUserStatus } from '../../../api/client'
+import type { UserSummary } from '../../../types/api'
 import styles from '../adminShared.module.css'
 
 const USER_COLUMNS = ['User', 'Role', 'Email', 'Phone', 'Status', 'Registered', 'Actions']

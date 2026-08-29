@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { getConveyancingSummary, type ConveyancingSummary } from '../../lib/api'
+import { getConveyancingSummary } from '../../api/client'
+import type { ConveyancingSummary } from '../../types/api'
 import styles from './ConveyancingDashboardPage.module.css'
 
 const PRIMARY = '#B08D3E'

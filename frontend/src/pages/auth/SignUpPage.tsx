@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
-import { signup } from '../../lib/api'
+import { signup } from '../../api/client'
 import styles from './SignUpPage.module.css'
 
 const PRIMARY = '#B08D3E'

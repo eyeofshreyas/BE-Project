@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Icon } from '../icons'
 import { C } from '../theme'
-import { listDocuments, getDocumentSummary, type DocumentSummary, type AiSummary } from '../../../lib/api'
+import { listDocuments, getDocumentSummary } from '../../../api/client'
+import type { DocumentSummary, AiSummary } from '../../../types/api'
 import styles from '../adminShared.module.css'
 
 const DOC_COLUMNS = ['File', 'Type', 'Case', 'Uploaded By', 'Upload Date', 'Actions']

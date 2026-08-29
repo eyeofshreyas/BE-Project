@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import logoWhite from '../../assets/logo-white.svg'
-import { login } from '../../lib/api'
+import { login } from '../../api/client'
 import styles from './LoginPage.module.css'
 
 const PRIMARY = '#B08D3E'
