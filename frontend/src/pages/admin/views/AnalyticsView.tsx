@@ -1,4 +1,4 @@
-import { Icon, type IconName } from '../icons'
+import { Icon, type IconName } from '../../../components/icons'
 import { C, pillStyle } from '../theme'
 import styles from '../adminShared.module.css'
 

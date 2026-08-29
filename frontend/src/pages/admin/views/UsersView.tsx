@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Icon } from '../icons'
+import { Icon } from '../../../components/icons'
 import { C, pillStyle } from '../theme'
 import { listUsers, setUserStatus } from '../../../api/client'
 import type { UserSummary } from '../../../types/api'

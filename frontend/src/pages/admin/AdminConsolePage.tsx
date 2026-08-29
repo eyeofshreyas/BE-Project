@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
-import { Icon, type IconName } from './icons'
+import { Icon, type IconName } from '../../components/icons'
 import { C } from './theme'
 import DashboardView from './views/DashboardView'
 import UsersView from './views/UsersView'

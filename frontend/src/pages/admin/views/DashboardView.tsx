@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Icon, type IconName } from '../icons'
+import { Icon, type IconName } from '../../../components/icons'
 import { C } from '../theme'
 import styles from '../adminShared.module.css'
 

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { Icon } from '../icons'
+import { Icon } from '../../../components/icons'
 import { C } from '../theme'
 import { listDocuments, getDocumentSummary } from '../../../api/client'
 import type { DocumentSummary, AiSummary } from '../../../types/api'
