@@ -6,7 +6,7 @@ import RoleSelectionPage from './pages/auth/RoleSelectionPage'
 import AdminConsolePage from './pages/admin/AdminConsolePage'
 import ConveyancingDashboardPage from './pages/conveyancing/ConveyancingDashboardPage'
 import SettingsPage from './pages/settings/SettingsPage'
-import ProtectedRoute from './lib/ProtectedRoute'
+import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
   return (
