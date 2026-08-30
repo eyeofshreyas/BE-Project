@@ -13,6 +13,7 @@ class CaseSummary(BaseModel):
     lawyer_email: str | None
     lawyer_phone: str | None
     court: str | None
+    case_type: str | None
     status: str
     hearing: str | None
     priority: str

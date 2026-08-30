@@ -39,6 +39,7 @@ export interface CaseSummary {
   lawyer_email: string | null
   lawyer_phone: string | null
   court: string | null
+  case_type: string | null
   status: string
   hearing: string | null
   priority: string

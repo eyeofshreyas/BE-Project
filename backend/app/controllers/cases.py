@@ -7,6 +7,7 @@ CASES_SELECT = (
     "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,"
     "clients(users(full_name)),"
     "courts(court_name),"
+    "case_types(case_type_name),"
     "case_lawyers(lawyer_id,assigned_role,is_active,lawyers(users(full_name,email,phone)))"
 )
 
@@ -32,6 +33,7 @@ def _to_case_summary(row: dict) -> dict:
         "lawyer_email": active_lawyer["lawyers"]["users"]["email"] if active_lawyer else None,
         "lawyer_phone": active_lawyer["lawyers"]["users"]["phone"] if active_lawyer else None,
         "court": row["courts"]["court_name"] if row["courts"] else None,
+        "case_type": row["case_types"]["case_type_name"] if row.get("case_types") else None,
         "status": row["status"],
         "hearing": row["next_hearing_date"],
         "priority": row["priority"],

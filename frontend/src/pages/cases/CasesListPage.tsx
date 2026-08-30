@@ -15,7 +15,16 @@ const STATUS_STYLE_MAP: Record<string, [string, string]> = {
   Pending: ['#B87F1E', '#FFF2E0'],
 }
 const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
-const FILTERS = ['All', 'Open', 'In Progress', 'Pending', 'Completed', 'Closed']
+const FILTERS = ['All', 'Active', 'Pending', 'Closed']
+const ACTIVE_STATUSES = new Set(['Open', 'In Progress'])
+
+function matchesFilter(status: string, filter: string) {
+  if (filter === 'All') return true
+  if (filter === 'Active') return ACTIVE_STATUSES.has(status)
+  if (filter === 'Pending') return status === 'Pending'
+  if (filter === 'Closed') return CLOSED_STATUSES.has(status)
+  return true
+}
 
 // ponytail: same status->progress approximation used on the client dashboard --
 // litigation cases have no real stage tracking, only conveyancing matters do.
@@ -68,10 +77,11 @@ function StaffCasesView() {
 
   const searchLower = search.toLowerCase()
   const filtered = cases.filter((c) => {
-    const matchesStatus = statusFilter === 'All' || c.status === statusFilter
-    const matchesSearch = !searchLower || c.id.toLowerCase().includes(searchLower) || (c.client ?? '').toLowerCase().includes(searchLower) || (c.court ?? '').toLowerCase().includes(searchLower)
+    const matchesStatus = matchesFilter(c.status, statusFilter)
+    const matchesSearch = !searchLower || c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower) || (c.client ?? '').toLowerCase().includes(searchLower)
     return matchesStatus && matchesSearch
   })
+  const activeCount = cases.filter((c) => ACTIVE_STATUSES.has(c.status)).length
 
   return (
     <div className={styles.page}>
@@ -79,13 +89,14 @@ function StaffCasesView() {
         <div className={styles.header}>
           <div>
             <div className={styles.title}>Cases</div>
-            <div className={styles.subtitle}>{cases.length} total{cases.length !== filtered.length ? ` · ${filtered.length} shown` : ''}</div>
+            <div className={styles.subtitle}>{cases.length} total · {activeCount} active</div>
           </div>
+          <div className={styles.primaryChip} onClick={() => navigate('/conveyancing')}><Icon name="plus" size={15} color="#FFFFFF" /> New Case</div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <input
-            placeholder="Search by case number, client, or court..."
+            placeholder="Search by case name, client, or number..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: 240, padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
@@ -111,12 +122,12 @@ function StaffCasesView() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th className={styles.th}>Case No.</th>
+                  <th className={styles.th}>Case</th>
                   <th className={styles.th}>Client</th>
-                  <th className={styles.th}>Court</th>
+                  <th className={styles.th}>Type</th>
                   <th className={styles.th}>Status</th>
-                  <th className={styles.th}>Priority</th>
                   <th className={styles.th}>Next Hearing</th>
+                  <th className={styles.th}></th>
                 </tr>
               </thead>
               <tbody>
@@ -124,12 +135,15 @@ function StaffCasesView() {
                   const [color, bg] = STATUS_STYLE_MAP[c.status] || DEFAULT_STATUS_STYLE
                   return (
                     <tr key={c.id} className={styles.tr} onClick={() => navigate(`/cases/${c.case_id}`)}>
-                      <td className={styles.tdMono}>{c.id}</td>
-                      <td className={styles.tdClient}>{c.client ?? '—'}</td>
-                      <td className={styles.td}>{c.court ?? '—'}</td>
+                      <td className={styles.tdClient}>
+                        <div style={{ fontWeight: 700 }}>{c.case_title ?? c.id}</div>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: '#B08D3E', fontWeight: 500, marginTop: 2 }}>{c.id}</div>
+                      </td>
+                      <td className={styles.td}>{c.client ?? '—'}</td>
+                      <td className={styles.td}>{c.case_type ?? '—'}</td>
                       <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{c.status}</span></td>
-                      <td className={styles.td}>{c.priority}</td>
-                      <td className={styles.td}>{c.hearing ?? '—'}</td>
+                      <td className={styles.td}>{c.hearing ? formatDate(c.hearing) : '—'}</td>
+                      <td className={styles.td} style={{ textAlign: 'right' }}><span style={{ display: 'inline-flex', transform: 'rotate(-90deg)' }}><Icon name="chevron-down" size={15} color="#B08D3E" strokeWidth={2.2} /></span></td>
                     </tr>
                   )
                 })}
