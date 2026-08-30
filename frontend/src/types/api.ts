@@ -30,9 +30,12 @@ export interface SignupPayload {
 export interface CaseSummary {
   id: string
   case_id: number
+  case_title: string | null
   client: string | null
   lawyer_id: number | null
   lawyer: string | null
+  lawyer_email: string | null
+  lawyer_phone: string | null
   court: string | null
   status: string
   hearing: string | null
@@ -139,6 +142,54 @@ export interface MeetingSummary {
   agenda: string | null
   meeting_status: string
   conducted_by: string | null
+}
+
+export interface ClientSummary {
+  id: number
+  full_name: string
+  email: string
+  phone: string
+  address: string | null
+  preferred_language: string | null
+  active_cases: number
+}
+
+export interface HearingSummary {
+  id: number
+  case_id: number
+  case_number: string | null
+  judge_name: string | null
+  court_name: string | null
+  hearing_date: string
+  hearing_time: string | null
+  courtroom: string | null
+  hearing_status: string
+  hearing_outcome: string | null
+  next_hearing_date: string | null
+  notes: string | null
+}
+
+export interface InvoiceSummary {
+  id: number
+  invoice_number: string
+  case_number: string | null
+  client: string | null
+  amount: number
+  tax: number | null
+  total_amount: number
+  issue_date: string
+  due_date: string | null
+  payment_status: string
+}
+
+export interface PaymentSummary {
+  payment_id: number
+  invoice_id: number
+  amount: number
+  payment_method: string | null
+  transaction_reference: string | null
+  payment_date: string
+  payment_status: string
 }
 
 export interface ClientRequestSummary {
