@@ -225,6 +225,10 @@ export function listMeetings(caseId: number) {
   return get<MeetingSummary[]>(`/meetings?case_id=${caseId}`)
 }
 
+export function listAllMeetings() {
+  return get<MeetingSummary[]>('/meetings')
+}
+
 export function createMeeting(payload: { case_id: number; conducted_by: number; meeting_title: string; meeting_type?: string; meeting_date: string; agenda?: string }) {
   return post<MeetingSummary>('/meetings', payload)
 }

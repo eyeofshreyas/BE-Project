@@ -70,7 +70,7 @@ export interface ConveyancingSummary {
     upcoming_appointments: number
   }
   status_breakdown: { label: string; count: number }[]
-  recent_matters: { matter_id: number; case_id: number | null; number: string; title: string; client: string | null; type: string; property: string | null; lawyer: string | null; status: string }[]
+  recent_matters: { matter_id: number; case_id: number | null; number: string; title: string; client: string | null; type: string; property: string | null; lawyer: string | null; reg_date: string | null; status: string }[]
 }
 
 export interface DocumentSummary {

@@ -22,6 +22,7 @@ class MatterSummary(BaseModel):
     type: str
     property: str | None
     lawyer: str | None
+    reg_date: str | None
     status: str
 
 

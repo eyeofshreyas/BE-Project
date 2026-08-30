@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getConveyancingSummary, listCourts, listCaseTypes, sendClientRequest, listCases, listNotifications, markNotificationRead, listClientRequests } from '../../api/client'
-import type { ConveyancingSummary, CourtOption, CaseTypeOption, CaseSummary, NotificationSummary, ClientRequestSummary, UserProfile } from '../../types/api'
+import { getConveyancingSummary, listCourts, listCaseTypes, sendClientRequest, listAllMeetings } from '../../api/client'
+import type { ConveyancingSummary, CourtOption, CaseTypeOption, MeetingSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import styles from './ConveyancingDashboardPage.module.css'
 
@@ -23,7 +23,6 @@ const iconProps = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', s
 const BriefcaseIcon = () => <svg {...iconProps}><rect x={2} y={7} width={20} height={14} rx={2} /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
 const ClockIcon = () => <svg {...iconProps}><circle cx={12} cy={12} r={10} /><polyline points="12 6 12 12 16 14" /></svg>
 const CheckCircleIcon = () => <svg {...iconProps}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
-const BellIcon = () => <svg {...iconProps}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
 const CalendarIcon = () => <svg {...iconProps}><rect x={3} y={4} width={18} height={18} rx={2} /><line x1={16} y1={2} x2={16} y2={6} /><line x1={8} y1={2} x2={8} y2={6} /><line x1={3} y1={10} x2={21} y2={10} /></svg>
 const FilterIcon = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
 const PlusIcon = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><line x1={12} y1={5} x2={12} y2={19} /><line x1={5} y1={12} x2={19} y2={12} /></svg>
@@ -42,13 +41,24 @@ const STATUS_STYLE_MAP: Record<string, [string, string]> = {
   Pending: ['#B87F1E', '#FFF2E0'],
 }
 const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
-const REQUEST_STATUS_STYLE: Record<string, [string, string]> = {
-  pending: ['#B87F1E', '#FFF2E0'],
-  accepted: ['#2E9E58', '#E4F5EA'],
-  declined: ['#B05C5C', '#FBEAEA'],
-}
 
 const QUICK_ACTIONS = ['Schedule Registration', 'Upload Documents', 'Request Settlement Funds']
+const MATTERS_PAGE_SIZE = 6
+
+function relativeDateTime(iso: string) {
+  const d = new Date(iso)
+  const now = new Date()
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  const tomorrow = new Date(now)
+  tomorrow.setDate(now.getDate() + 1)
+  if (d.toDateString() === now.toDateString()) return `Today, ${time}`
+  if (d.toDateString() === tomorrow.toDateString()) return `Tomorrow, ${time}`
+  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
 export default function ConveyancingDashboardPage() {
   const profile = loadProfile()
@@ -60,11 +70,14 @@ function StaffConveyancingView() {
   const navigate = useNavigate()
   const [toast, setToast] = useState<string | null>(null)
   const [summary, setSummary] = useState<ConveyancingSummary | null>(null)
-  const [myCases, setMyCases] = useState<CaseSummary[]>([])
-  const [notifications, setNotifications] = useState<NotificationSummary[]>([])
-  const [sentRequests, setSentRequests] = useState<ClientRequestSummary[]>([])
+  const [meetings, setMeetings] = useState<MeetingSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('All')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [page, setPage] = useState(1)
 
   const [addClientOpen, setAddClientOpen] = useState(false)
   const [courts, setCourts] = useState<CourtOption[]>([])
@@ -81,21 +94,12 @@ function StaffConveyancingView() {
       .then(setSummary)
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load conveyancing data.'))
       .finally(() => setLoading(false))
-    listCases().then(setMyCases).catch(() => {})
-    listNotifications().then(setNotifications).catch(() => {})
-    listClientRequests().then(setSentRequests).catch(() => {})
+    listAllMeetings().then(setMeetings).catch(() => {})
   }, [])
 
   function fireAction(label: string) {
     setToast(`${label}…`)
     setTimeout(() => setToast(null), 1800)
-  }
-
-  function openNotification(n: NotificationSummary) {
-    if (!n.is_read) {
-      markNotificationRead(n.id).catch(() => {})
-      setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)))
-    }
   }
 
   function openAddClient() {
@@ -120,8 +124,7 @@ function StaffConveyancingView() {
     setSending(true)
     setReqError('')
     try {
-      const created = await sendClientRequest({ email: reqEmail, court_id: Number(reqCourtId), case_type_id: Number(reqCaseTypeId), message: reqMessage || undefined })
-      setSentRequests((prev) => [created, ...prev])
+      await sendClientRequest({ email: reqEmail, court_id: Number(reqCourtId), case_type_id: Number(reqCaseTypeId), message: reqMessage || undefined })
       closeAddClient()
       setToast('Client request sent.')
       setTimeout(() => setToast(null), 2200)
@@ -143,15 +146,31 @@ function StaffConveyancingView() {
       }).join(', ')
     : '#E7DCC6 0% 100%'
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length
-
   const statCards = summary ? [
     { label: 'Active Matters', value: String(summary.stats.active_matters), icon: <BriefcaseIcon /> },
     { label: 'Pending Reg.', value: String(summary.stats.pending_registrations), icon: <ClockIcon /> },
     { label: 'Completed Reg.', value: String(summary.stats.completed_registrations), icon: <CheckCircleIcon /> },
     { label: 'Upcoming Appts', value: String(summary.stats.upcoming_appointments), icon: <CalendarIcon /> },
-    { label: 'Unread Notifications', value: String(unreadCount), icon: <BellIcon /> },
   ] : []
+
+  const upcomingMeetings = [...meetings]
+    .filter((m) => new Date(m.meeting_date).getTime() >= Date.now())
+    .sort((a, b) => a.meeting_date.localeCompare(b.meeting_date))
+    .slice(0, 5)
+
+  const matters = summary?.recent_matters ?? []
+  const matterTypes = ['All', ...new Set(matters.map((m) => m.type))]
+  const matterStatuses = ['All', ...new Set(matters.map((m) => m.status))]
+  const searchLower = search.toLowerCase()
+  const filteredMatters = matters.filter((m) =>
+    (typeFilter === 'All' || m.type === typeFilter) &&
+    (statusFilter === 'All' || m.status === statusFilter) &&
+    (!searchLower || m.number.toLowerCase().includes(searchLower) || (m.client ?? '').toLowerCase().includes(searchLower))
+  )
+  const totalPages = Math.max(1, Math.ceil(filteredMatters.length / MATTERS_PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageStart = (currentPage - 1) * MATTERS_PAGE_SIZE
+  const pagedMatters = filteredMatters.slice(pageStart, pageStart + MATTERS_PAGE_SIZE)
 
   return (
     <div className={styles.page}>
@@ -203,113 +222,109 @@ function StaffConveyancingView() {
               </div>
             </div>
 
-            <div className={styles.tableCard}>
-              <div className={styles.tableHead}>
-                <div className={styles.tableHeadTitle}>My Cases</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+              <div className={styles.panelCard}>
+                <div className={styles.panelTitle}>Quick Actions</div>
+                <div className={styles.quickActionsList}>
+                  {QUICK_ACTIONS.map((label) => (
+                    <div key={label} className={styles.quickAction} onClick={() => fireAction(label)}>
+                      <span>{label}</span><ChevronRightIcon />
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              <div className={styles.panelCard}>
+                <div className={styles.panelTitle}>Upcoming Appointments</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {upcomingMeetings.map((m, i) => (
+                    <div key={m.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ width: 9, height: 9, borderRadius: '50%', marginTop: 5, flexShrink: 0, background: i === 0 ? PRIMARY_DARK : 'transparent', border: `2px solid ${PRIMARY_DARK}` }} />
+                      <div>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: PRIMARY_DARK }}>{relativeDateTime(m.meeting_date)}</div>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118', marginTop: 2 }}>{m.meeting_title ?? m.case_number ?? 'Meeting'}</div>
+                        {m.case_number && <div style={{ fontSize: 12, color: MUTED, marginTop: 1 }}>{m.case_number}</div>}
+                      </div>
+                    </div>
+                  ))}
+                  {upcomingMeetings.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No upcoming appointments.</div>}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className={styles.sectionTitle}>Conveyancing Matters</div>
+              <div style={{ fontSize: 13, color: MUTED, marginTop: 2 }}>Manage all property registration matters</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                placeholder="Search by number or client..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                style={{ flex: 1, minWidth: 220, padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
+              />
+              <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13, background: '#FFFFFF' }}>
+                {matterTypes.map((t) => <option key={t} value={t}>{t === 'All' ? 'All Matter Types' : t}</option>)}
+              </select>
+              <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13, background: '#FFFFFF' }}>
+                {matterStatuses.map((s) => <option key={s} value={s}>{s === 'All' ? 'All Statuses' : s}</option>)}
+              </select>
+              <div className={styles.primaryChip} style={{ opacity: .5, cursor: 'default' }} title="Matter creation coming soon"><PlusIcon /><span>New Matter</span></div>
+            </div>
+
+            <div className={styles.tableCard}>
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th className={styles.th}>Case No.</th>
+                    <th className={styles.th}>Matter Number</th>
+                    <th className={styles.th}>Title</th>
                     <th className={styles.th}>Client</th>
+                    <th className={styles.th}>Matter Type</th>
+                    <th className={styles.th}>Reg Date</th>
                     <th className={styles.th}>Status</th>
-                    <th className={styles.th}>Next Hearing</th>
+                    <th className={styles.th}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {myCases.map((c) => {
-                    const [color, bg] = STATUS_STYLE_MAP[c.status] || DEFAULT_STATUS_STYLE
+                  {pagedMatters.map((m) => {
+                    const [color, bg] = STATUS_STYLE_MAP[m.status] || DEFAULT_STATUS_STYLE
                     return (
-                      <tr key={c.id} className={styles.tr} onClick={() => navigate(`/cases/${c.case_id}`)}>
-                        <td className={styles.tdMono}>{c.id}</td>
-                        <td className={styles.tdClient}>{c.client ?? '—'}</td>
-                        <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{c.status}</span></td>
-                        <td className={styles.td}>{c.hearing ?? '—'}</td>
+                      <tr key={m.matter_id} className={styles.tr}>
+                        <td className={styles.tdMono}>{m.number}</td>
+                        <td className={styles.tdClient}>{m.title}</td>
+                        <td className={styles.td}>{m.client ?? '—'}</td>
+                        <td className={styles.td}>{m.type}</td>
+                        <td className={styles.td}>{m.reg_date ? formatDate(m.reg_date) : 'TBD'}</td>
+                        <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{m.status}</span></td>
+                        <td className={styles.td}>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            {m.case_id ? (
+                              <div onClick={() => navigate(`/cases/${m.case_id}`)} style={{ cursor: 'pointer', display: 'flex' }} title="View case"><Icon name="eye" size={16} color="#6A5C42" /></div>
+                            ) : <span style={{ width: 16 }} />}
+                            <div style={{ cursor: 'default', display: 'flex', opacity: .4 }} title="Editing matters coming soon"><Icon name="edit" size={16} color="#6A5C42" /></div>
+                          </div>
+                        </td>
                       </tr>
                     )
                   })}
-                  {myCases.length === 0 && (
-                    <tr><td className={styles.td} colSpan={4} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No cases assigned to you yet.</td></tr>
+                  {pagedMatters.length === 0 && (
+                    <tr><td className={styles.td} colSpan={7} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No conveyancing matters match your filters.</td></tr>
                   )}
                 </tbody>
               </table>
-            </div>
-
-            <div className={styles.midGrid}>
-              <div className={styles.tableCard}>
-                <div className={styles.tableHead}>
-                  <div className={styles.tableHeadTitle}>Recent Conveyancing Matters</div>
-                  <span className={styles.viewAll}>View All</span>
-                </div>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th className={styles.th}>Matter Number</th>
-                      <th className={styles.th}>Client</th>
-                      <th className={styles.th}>Matter Type</th>
-                      <th className={styles.th}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.recent_matters.map((m) => {
-                      const [color, bg] = STATUS_STYLE_MAP[m.status] || DEFAULT_STATUS_STYLE
-                      return (
-                        <tr key={m.number} className={styles.tr}>
-                          <td className={styles.tdMono}>{m.number}</td>
-                          <td className={styles.tdClient}>{m.client ?? '—'}</td>
-                          <td className={styles.td}>{m.type}</td>
-                          <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{m.status}</span></td>
-                        </tr>
-                      )
-                    })}
-                    {summary.recent_matters.length === 0 && (
-                      <tr><td className={styles.td} colSpan={4} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No conveyancing matters yet.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className={styles.sideCol}>
-                <div className={styles.panelCard}>
-                  <div className={styles.panelTitle}>Notifications</div>
-                  <div className={styles.quickActionsList}>
-                    {notifications.map((n) => (
-                      <div key={n.id} className={styles.quickAction} onClick={() => openNotification(n)} style={{ opacity: n.is_read ? 0.6 : 1 }}>
-                        <span>{n.title ?? n.message ?? 'Notification'}</span>
-                      </div>
+              {filteredMatters.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderTop: '1px solid #E7DCC6' }}>
+                  <span style={{ fontSize: 12.5, color: MUTED }}>Showing {pageStart + 1} to {Math.min(pageStart + MATTERS_PAGE_SIZE, filteredMatters.length)} of {filteredMatters.length} entries</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <div className={styles.ghostChip} style={{ padding: '6px 12px', opacity: currentPage === 1 ? .5 : 1, cursor: currentPage === 1 ? 'default' : 'pointer' }} onClick={() => currentPage > 1 && setPage(currentPage - 1)}>Previous</div>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                      <div key={p} onClick={() => setPage(p)} style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', background: p === currentPage ? PRIMARY_DARK : 'transparent', color: p === currentPage ? '#FFFFFF' : '#6A5C42' }}>{p}</div>
                     ))}
-                    {notifications.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No notifications yet.</div>}
+                    <div className={styles.ghostChip} style={{ padding: '6px 12px', opacity: currentPage === totalPages ? .5 : 1, cursor: currentPage === totalPages ? 'default' : 'pointer' }} onClick={() => currentPage < totalPages && setPage(currentPage + 1)}>Next</div>
                   </div>
                 </div>
-
-                <div className={styles.panelCard}>
-                  <div className={styles.panelTitle}>Sent Requests</div>
-                  <div className={styles.quickActionsList}>
-                    {sentRequests.map((r) => {
-                      const [color, bg] = REQUEST_STATUS_STYLE[r.status] || DEFAULT_STATUS_STYLE
-                      return (
-                        <div key={r.id} style={{ padding: '10px 14px', border: '1px solid #E7DCC6', borderRadius: 10 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>{r.client_name ?? r.invite_email ?? 'Unknown'}</div>
-                          <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>{r.case_type_name} · {r.court_name}</div>
-                          <span className={styles.statusBadge} style={{ color, background: bg, marginTop: 6, display: 'inline-block' }}>{r.status}</span>
-                        </div>
-                      )
-                    })}
-                    {sentRequests.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No requests sent yet.</div>}
-                  </div>
-                </div>
-
-                <div className={styles.panelCard}>
-                  <div className={styles.panelTitle}>Quick Actions</div>
-                  <div className={styles.quickActionsList}>
-                    {QUICK_ACTIONS.map((label) => (
-                      <div key={label} className={styles.quickAction} onClick={() => fireAction(label)}>
-                        <span>{label}</span><ChevronRightIcon />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </>
         )}

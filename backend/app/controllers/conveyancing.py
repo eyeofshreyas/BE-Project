@@ -9,8 +9,17 @@ MATTERS_SELECT = (
     "matter_id,matter_number,matter_type,transaction_type,registration_status,completion_percentage,case_id,"
     "conveyancing_parties(party_name,role),"
     "properties(property_name,address,city),"
+    "property_registrations(registration_date),"
     "cases(case_lawyers(lawyer_id,is_active,lawyers(users(full_name))))"
 )
+
+
+def _registration_date(row: dict) -> str | None:
+    regs = row.get("property_registrations")
+    if not regs:
+        return None
+    reg = regs[0] if isinstance(regs, list) else regs
+    return reg.get("registration_date")
 
 
 def _active_matter_lawyer(case_lawyers: list[dict]) -> str | None:
@@ -72,9 +81,10 @@ def conveyancing_summary(profile: dict = Depends(get_current_profile)):
                 "type": r["matter_type"],
                 "property": f"{r['properties']['address']}, {r['properties']['city']}" if r.get("properties") else None,
                 "lawyer": _active_matter_lawyer(r["cases"]["case_lawyers"] if r.get("cases") else []),
+                "reg_date": _registration_date(r),
                 "status": r["registration_status"],
             }
-            for r in rows[:10]
+            for r in rows[:500]
         ],
     }
 
