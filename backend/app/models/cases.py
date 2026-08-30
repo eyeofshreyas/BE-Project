@@ -5,6 +5,8 @@ class CaseSummary(BaseModel):
     id: str
     case_id: int
     case_title: str | None
+    filing_date: str | None
+    created_at: str | None
     client: str | None
     lawyer_id: int | None
     lawyer: str | None

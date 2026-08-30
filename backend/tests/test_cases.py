@@ -45,7 +45,7 @@ def test_unassign_lawyer_denied_for_unassigned_lawyer():
 def test_unassign_lawyer_allowed_for_assigned_lawyer():
     profile = {"role_id": auth.LAWYER, "user_id": 1, "full_name": "Test Lawyer"}
     case_row = {
-        "case_id": 42, "case_number": "C001", "case_title": "x", "status": "Open",
+        "case_id": 42, "case_number": "C001", "case_title": "x", "filing_date": None, "created_at": None, "status": "Open",
         "priority": "Medium", "next_hearing_date": None, "clients": None, "courts": None,
         "case_lawyers": [],
     }

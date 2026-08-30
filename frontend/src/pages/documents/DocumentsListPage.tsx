@@ -6,6 +6,7 @@ import {
 import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
+import shellStyles from '../../components/AppShell.module.css'
 
 const MUTED = '#8C7C5E'
 const PRIMARY = '#B08D3E'
@@ -351,9 +352,9 @@ function ClientDocumentsView() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 6, borderTop: '1px solid #F1E9D9', paddingTop: 10 }}>
-                      <div onClick={() => toggleSummary(d.id)} className={styles.actionBtn} style={{ background: expandedId === d.id ? '#EFE4CB' : '#F5EFDF' }} title="Summary"><Icon name="sparkles" size={14} color="#6A5C42" /></div>
-                      <div onClick={() => openDocument(d.id)} className={styles.actionBtn} title="Download"><Icon name="download" size={14} color="#6A5C42" /></div>
-                      <div onClick={() => removeDocument(d.id)} className={styles.actionBtnDanger} title="Delete"><Icon name="trash-2" size={14} color="#B05C5C" /></div>
+                      <div onClick={() => toggleSummary(d.id)} className={shellStyles.actionBtn} style={{ background: expandedId === d.id ? '#EFE4CB' : '#F5EFDF' }} title="Summary"><Icon name="sparkles" size={14} color="#6A5C42" /></div>
+                      <div onClick={() => openDocument(d.id)} className={shellStyles.actionBtn} title="Download"><Icon name="download" size={14} color="#6A5C42" /></div>
+                      <div onClick={() => removeDocument(d.id)} className={shellStyles.actionBtnDanger} title="Delete"><Icon name="trash-2" size={14} color="#B05C5C" /></div>
                     </div>
                     {expandedId === d.id && (
                       <div style={{ fontSize: 12.5, color: '#3D3126', borderTop: '1px solid #F1E9D9', paddingTop: 10 }}>

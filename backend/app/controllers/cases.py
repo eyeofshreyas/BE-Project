@@ -4,7 +4,7 @@ from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, get_current_p
 from app.models.cases import CaseSummary
 
 CASES_SELECT = (
-    "case_id,case_number,case_title,status,priority,next_hearing_date,"
+    "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,"
     "clients(users(full_name)),"
     "courts(court_name),"
     "case_lawyers(lawyer_id,assigned_role,is_active,lawyers(users(full_name,email,phone)))"
@@ -24,6 +24,8 @@ def _to_case_summary(row: dict) -> dict:
         "id": row["case_number"],
         "case_id": row["case_id"],
         "case_title": row["case_title"],
+        "filing_date": row["filing_date"],
+        "created_at": row["created_at"],
         "client": row["clients"]["users"]["full_name"] if row["clients"] else None,
         "lawyer": active_lawyer["lawyers"]["users"]["full_name"] if active_lawyer else None,
         "lawyer_id": active_lawyer["lawyer_id"] if active_lawyer else None,

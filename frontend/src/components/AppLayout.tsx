@@ -9,13 +9,14 @@ import type { UserProfile, NotificationSummary } from '../types/api'
 import styles from './AppShell.module.css'
 
 const ROLE_LABELS: Record<number, string> = { 2: 'Lawyer', 3: 'Client' }
+const BRAND_SUB_LABELS: Record<number, string> = { 2: 'Legal Intelligence', 3: 'Client Portal' }
 const NOTIF_COLORS: Record<string, string> = { Hearing: C.warning, Payment: C.success, Document: C.primary }
 
 type NavDef = { label: string; icon: IconName; path?: string }
 
 const LAWYER_NAV: NavDef[] = [
-  { label: 'Dashboard', icon: 'grid', path: '/conveyancing' },
-  { label: 'Conveyancing', icon: 'scale' },
+  { label: 'Dashboard', icon: 'grid', path: '/dashboard' },
+  { label: 'Conveyancing', icon: 'scale', path: '/conveyancing' },
   { label: 'Cases', icon: 'briefcase', path: '/cases' },
   { label: 'Clients', icon: 'users', path: '/clients' },
   { label: 'Documents', icon: 'file-text', path: '/documents' },
@@ -97,7 +98,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <img src={logo} alt="LexFlow" className={styles.sidebarLogo} />
           <div>
             <div className={styles.sidebarBrandName}>LexFlow</div>
-            <div className={styles.sidebarBrandSub}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'Workspace') : 'Workspace'}</div>
+            <div className={styles.sidebarBrandSub}>{profile ? (BRAND_SUB_LABELS[profile.role_id] ?? 'Workspace') : 'Workspace'}</div>
           </div>
         </div>
         <div className={styles.navList}>

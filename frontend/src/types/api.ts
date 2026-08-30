@@ -31,6 +31,8 @@ export interface CaseSummary {
   id: string
   case_id: number
   case_title: string | null
+  filing_date: string | null
+  created_at: string | null
   client: string | null
   lawyer_id: number | null
   lawyer: string | null
@@ -160,6 +162,7 @@ export interface HearingSummary {
   id: number
   case_id: number
   case_number: string | null
+  case_title: string | null
   judge_name: string | null
   court_name: string | null
   hearing_date: string
