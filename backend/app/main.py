@@ -28,6 +28,7 @@ from app.routes.reference import router as reference_router
 from app.routes.case_history import router as case_history_router
 from app.routes.users import router as users_router
 from app.routes.notifications import router as notifications_router
+from app.routes.client_requests import router as client_requests_router
 
 app = FastAPI()
 
@@ -51,6 +52,7 @@ app.include_router(reference_router)
 app.include_router(case_history_router)
 app.include_router(users_router)
 app.include_router(notifications_router)
+app.include_router(client_requests_router)
 
 ROLE_IDS = {"lawyer": 2, "client": 3}
 
@@ -107,11 +109,24 @@ def signup(data: SignupRequest):
                 "experience_years": data.experience_years,
             }).execute()
         else:
-            supabase.table("clients").insert({
+            client_row = supabase.table("clients").insert({
                 "user_id": user_row["user_id"],
                 "address": data.address,
                 "preferred_language": data.preferred_language,
-            }).execute()
+            }).execute().data[0]
+            # A lawyer may have invited this email before the account existed;
+            # attach any such pending requests now that a client_id exists.
+            backfilled = supabase.table("client_requests").update({"client_id": client_row["client_id"]}) \
+                .eq("invite_email", data.email).is_("client_id", "null").eq("status", "pending").execute().data
+            if backfilled:
+                supabase.table("notifications").insert({
+                    "user_id": user_row["user_id"],
+                    "case_id": None,
+                    "title": "New client request",
+                    "message": "You have a pending request from a lawyer on LexFlow.",
+                    "notification_type": "client_request",
+                    "is_read": False,
+                }).execute()
     except Exception:
         # ponytail: auth account now exists without a profile row if this
         # fails partway; a reconciliation job is the ceiling, not built yet.

@@ -29,12 +29,32 @@ export interface SignupPayload {
 
 export interface CaseSummary {
   id: string
+  case_id: number
   client: string | null
+  lawyer_id: number | null
   lawyer: string | null
   court: string | null
   status: string
   hearing: string | null
   priority: string
+}
+
+export interface NoteSummary {
+  id: number
+  case_id: number
+  note: string
+  created_at: string
+  lawyer_name: string | null
+}
+
+export interface TimelineEvent {
+  id: number
+  case_id: number
+  event_type: string
+  event_title: string
+  event_description: string | null
+  created_at: string
+  created_by: string | null
 }
 
 export interface ConveyancingSummary {
@@ -84,5 +104,51 @@ export interface NotificationSummary {
   message: string | null
   notification_type: string
   is_read: boolean
+  created_at: string
+}
+
+export interface CourtOption {
+  court_id: number
+  court_name: string
+  court_type: string | null
+  city: string | null
+  state: string | null
+  address: string | null
+}
+
+export interface CaseTypeOption {
+  case_type_id: number
+  case_type_name: string
+  description: string | null
+}
+
+export interface DocumentTypeOption {
+  document_type_id: number
+  type_name: string
+  description: string | null
+}
+
+export interface MeetingSummary {
+  id: number
+  case_id: number
+  case_number: string | null
+  meeting_title: string | null
+  meeting_type: string | null
+  meeting_date: string
+  duration_minutes: number | null
+  agenda: string | null
+  meeting_status: string
+  conducted_by: string | null
+}
+
+export interface ClientRequestSummary {
+  id: number
+  lawyer_name: string | null
+  client_name: string | null
+  invite_email: string | null
+  court_name: string | null
+  case_type_name: string | null
+  message: string | null
+  status: 'pending' | 'accepted' | 'declined'
   created_at: string
 }
