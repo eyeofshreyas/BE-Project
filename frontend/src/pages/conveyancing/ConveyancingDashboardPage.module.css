@@ -418,6 +418,86 @@
   background: #B08D3E;
 }
 
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #8C7C5E;
+}
+
+.breadcrumb span:last-child {
+  color: #2A2118;
+  font-weight: 600;
+}
+
+.calendarNavBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #E7DCC6;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.calendarNavBtn:hover {
+  background: #FBF7EE;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendarDowCell {
+  padding: 10px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8C7C5E;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  text-align: left;
+  background: #FBF7EE;
+  border-bottom: 1px solid #E7DCC6;
+}
+
+.calendarCell {
+  min-height: 90px;
+  padding: 8px;
+  border-right: 1px solid #F1E9D9;
+  border-bottom: 1px solid #F1E9D9;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calendarDayNum {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2A2118;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.calendarChip {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: #EFE4CB;
+  color: #6A5C42;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .darkBtn {
   display: inline-flex;
   align-items: center;
