@@ -6,9 +6,18 @@ from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_role
 from app.models.conveyancing import Stats, StatusCount, MatterSummary, ConveyancingSummary, Property, DueDiligence, DueDiligenceUpdate, ProgressStage, PropertyRegistration, MatterDocument, MatterDetail
 
 MATTERS_SELECT = (
-    "matter_id,matter_number,matter_type,registration_status,completion_percentage,case_id,"
-    "conveyancing_parties(party_name,role)"
+    "matter_id,matter_number,matter_type,transaction_type,registration_status,completion_percentage,case_id,"
+    "conveyancing_parties(party_name,role),"
+    "properties(property_name,address,city),"
+    "cases(case_lawyers(lawyer_id,is_active,lawyers(users(full_name))))"
 )
+
+
+def _active_matter_lawyer(case_lawyers: list[dict]) -> str | None:
+    for cl in case_lawyers or []:
+        if cl.get("is_active") and cl.get("lawyers"):
+            return cl["lawyers"]["users"]["full_name"]
+    return None
 
 COMPLETED_STATUSES = {"Completed", "Registered"}
 PENDING_STATUSES = {"Pending", "Registration Scheduled"}
@@ -55,9 +64,14 @@ def conveyancing_summary(profile: dict = Depends(get_current_profile)):
         "status_breakdown": [{"label": k, "count": v} for k, v in status_counts.items()],
         "recent_matters": [
             {
+                "matter_id": r["matter_id"],
+                "case_id": r.get("case_id"),
                 "number": r["matter_number"],
+                "title": f"{r['transaction_type']} of {r['properties']['property_name']}" if r.get("properties") else f"{r['transaction_type']} matter",
                 "client": r["conveyancing_parties"][0]["party_name"] if r["conveyancing_parties"] else None,
                 "type": r["matter_type"],
+                "property": f"{r['properties']['address']}, {r['properties']['city']}" if r.get("properties") else None,
+                "lawyer": _active_matter_lawyer(r["cases"]["case_lawyers"] if r.get("cases") else []),
                 "status": r["registration_status"],
             }
             for r in rows[:10]

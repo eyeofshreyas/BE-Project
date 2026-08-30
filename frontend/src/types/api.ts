@@ -68,7 +68,7 @@ export interface ConveyancingSummary {
     upcoming_appointments: number
   }
   status_breakdown: { label: string; count: number }[]
-  recent_matters: { number: string; client: string | null; type: string; status: string }[]
+  recent_matters: { matter_id: number; case_id: number | null; number: string; title: string; client: string | null; type: string; property: string | null; lawyer: string | null; status: string }[]
 }
 
 export interface DocumentSummary {
@@ -76,9 +76,11 @@ export interface DocumentSummary {
   file_name: string
   mime_type: string
   upload_date: string
+  file_size: number | null
   document_type: string | null
   case_number: string | null
   uploaded_by: string | null
+  has_summary: boolean
 }
 
 export interface AiSummary {

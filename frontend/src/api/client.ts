@@ -14,6 +14,10 @@ import type {
   TimelineEvent,
   DocumentTypeOption,
   MeetingSummary,
+  InvoiceSummary,
+  PaymentSummary,
+  HearingSummary,
+  ClientSummary,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -24,22 +28,42 @@ function authHeaders(): Record<string, string> {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: { ...authHeaders(), ...(options.headers ?? {}) },
-  })
-  if (res.status === 401 && localStorage.getItem('lexflow_token')) {
-    // Session token rejected by the backend (expired/revoked) -- clear it and
-    // send the user back to log in instead of leaving every view stuck on a
-    // silent or generic "failed to load" error forever.
-    localStorage.removeItem('lexflow_token')
-    localStorage.removeItem('lexflow_profile')
-    window.location.href = '/login'
-    return new Promise<T>(() => {})
+  // GET is idempotent, so it's safe to silently retry once on a transient
+  // network blip or 5xx -- POST/PATCH never retry here, to avoid double-submitting.
+  const isRetryable = (options.method ?? 'GET') === 'GET'
+  const maxAttempts = isRetryable ? 2 : 1
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let res: Response
+    try {
+      res = await fetch(`${API_URL}${path}`, {
+        ...options,
+        headers: { ...authHeaders(), ...(options.headers ?? {}) },
+      })
+    } catch (err) {
+      if (attempt < maxAttempts) { await new Promise((r) => setTimeout(r, 300)); continue }
+      throw err
+    }
+
+    if (res.status === 401 && localStorage.getItem('lexflow_token')) {
+      // Session token rejected by the backend (expired/revoked) -- clear it and
+      // send the user back to log in instead of leaving every view stuck on a
+      // silent or generic "failed to load" error forever.
+      localStorage.removeItem('lexflow_token')
+      localStorage.removeItem('lexflow_profile')
+      window.location.href = '/login'
+      return new Promise<T>(() => {})
+    }
+    if (res.status >= 500 && attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, 300))
+      continue
+    }
+
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.detail ?? 'Request failed')
+    return data as T
   }
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.detail ?? 'Request failed')
-  return data as T
+  throw new Error('Request failed')
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -64,6 +88,10 @@ async function get<T>(path: string): Promise<T> {
 
 async function postForm<T>(path: string, formData: FormData): Promise<T> {
   return request<T>(path, { method: 'POST', body: formData })
+}
+
+async function del<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' })
 }
 
 export function login(email: string, password: string) {
@@ -150,6 +178,30 @@ export function unassignLawyer(caseId: number) {
   return post<CaseSummary>(`/cases/${caseId}/unassign-lawyer`, {})
 }
 
+export function listInvoices() {
+  return get<InvoiceSummary[]>('/billing/invoices')
+}
+
+export function createInvoice(payload: { case_id: number; invoice_number: string; amount: number; tax?: number; total_amount: number; issue_date: string; due_date?: string }) {
+  return post<InvoiceSummary>('/billing/invoices', payload)
+}
+
+export function listInvoicePayments(invoiceId: number) {
+  return get<PaymentSummary[]>(`/billing/invoices/${invoiceId}/payments`)
+}
+
+export function createPayment(payload: { invoice_id: number; amount: number; payment_method?: string; transaction_reference?: string; payment_date: string }) {
+  return post<PaymentSummary>('/billing/payments', payload)
+}
+
+export function listHearings() {
+  return get<HearingSummary[]>('/hearings')
+}
+
+export function listClients() {
+  return get<ClientSummary[]>('/clients')
+}
+
 export function listDocumentTypes() {
   return get<DocumentTypeOption[]>('/reference/document-types')
 }
@@ -159,6 +211,10 @@ export function uploadDocument(caseId: number, file: File, documentTypeId: numbe
   formData.append('file', file)
   formData.append('document_type_id', String(documentTypeId))
   return postForm<DocumentSummary>(`/cases/${caseId}/documents`, formData)
+}
+
+export function deleteDocument(documentId: number) {
+  return del<{ message: string }>(`/documents/${documentId}`)
 }
 
 export function getDocumentDownloadUrl(documentId: number) {

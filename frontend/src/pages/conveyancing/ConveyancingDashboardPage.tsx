@@ -1,8 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getConveyancingSummary, listCourts, listCaseTypes, sendClientRequest, listCases, listNotifications, markNotificationRead, listClientRequests } from '../../api/client'
-import type { ConveyancingSummary, CourtOption, CaseTypeOption, CaseSummary, NotificationSummary, ClientRequestSummary } from '../../types/api'
+import type { ConveyancingSummary, CourtOption, CaseTypeOption, CaseSummary, NotificationSummary, ClientRequestSummary, UserProfile } from '../../types/api'
+import { Icon } from '../../components/icons'
 import styles from './ConveyancingDashboardPage.module.css'
+
+function loadProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
 
 const PRIMARY = '#B08D3E'
 const PRIMARY_DARK = '#8f6743'
@@ -41,6 +51,12 @@ const REQUEST_STATUS_STYLE: Record<string, [string, string]> = {
 const QUICK_ACTIONS = ['Schedule Registration', 'Upload Documents', 'Request Settlement Funds']
 
 export default function ConveyancingDashboardPage() {
+  const profile = loadProfile()
+  if (profile?.role_id === 3) return <ClientConveyancingView />
+  return <StaffConveyancingView />
+}
+
+function StaffConveyancingView() {
   const navigate = useNavigate()
   const [toast, setToast] = useState<string | null>(null)
   const [summary, setSummary] = useState<ConveyancingSummary | null>(null)
@@ -352,6 +368,104 @@ export default function ConveyancingDashboardPage() {
               </div>
             </div>
           </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ClientConveyancingView() {
+  const navigate = useNavigate()
+  const [summary, setSummary] = useState<ConveyancingSummary | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    getConveyancingSummary()
+      .then(setSummary)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load conveyancing data.'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const statCards = summary ? [
+    { label: 'Active Matters', value: summary.stats.active_matters, sublabel: 'In progress', icon: 'briefcase' as const },
+    { label: 'Pending Registrations', value: summary.stats.pending_registrations, sublabel: 'Awaiting slot', icon: 'bar-chart-2' as const },
+    { label: 'Completed', value: summary.stats.completed_registrations, sublabel: 'All time', icon: 'check-circle' as const },
+    { label: 'Upcoming Appointments', value: summary.stats.upcoming_appointments, sublabel: 'This week', icon: 'calendar' as const },
+  ] : []
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.wrap}>
+        <div className={styles.header}>
+          <div>
+            <div className={styles.title}>My Conveyancing Matters</div>
+            <div className={styles.subtitle}>Track the progress of your property registration matters.</div>
+          </div>
+        </div>
+
+        {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading conveyancing data…</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+
+        {summary && (
+          <>
+            <div className={styles.statCards}>
+              {statCards.map((s) => (
+                <div key={s.label} className={styles.statCard}>
+                  <div className={styles.statIconRow}><div className={styles.statIconWrap}><Icon name={s.icon} size={18} color={PRIMARY_DARK} /></div></div>
+                  <div>
+                    <div className={styles.statValue}>{s.value}</div>
+                    <div className={styles.statLabel}>{s.label}</div>
+                    <div style={{ fontSize: 11.5, color: '#B08D3E', fontWeight: 600, marginTop: 4 }}>{s.sublabel}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className={styles.tableCard}>
+              <div className={styles.tableHead}>
+                <div className={styles.tableHeadTitle}>Current Matters</div>
+              </div>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th className={styles.th}>Matter No.</th>
+                    <th className={styles.th}>Title</th>
+                    <th className={styles.th}>Type</th>
+                    <th className={styles.th}>Property</th>
+                    <th className={styles.th}>Lawyer</th>
+                    <th className={styles.th}>Status</th>
+                    <th className={styles.th}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.recent_matters.map((m) => {
+                    const [color, bg] = STATUS_STYLE_MAP[m.status] || DEFAULT_STATUS_STYLE
+                    return (
+                      <tr key={m.matter_id} className={styles.tr}>
+                        <td className={styles.tdMono}>{m.number}</td>
+                        <td className={styles.tdClient}>{m.title}</td>
+                        <td className={styles.td}>{m.type}</td>
+                        <td className={styles.td}>{m.property ?? '—'}</td>
+                        <td className={styles.td}>{m.lawyer ?? '—'}</td>
+                        <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{m.status}</span></td>
+                        <td className={styles.td}>
+                          {m.case_id ? (
+                            <span className={styles.viewAll} onClick={() => navigate(`/cases/${m.case_id}`)}>View Details</span>
+                          ) : (
+                            <span style={{ color: MUTED, fontSize: 12.5 }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {summary.recent_matters.length === 0 && (
+                    <tr><td className={styles.td} colSpan={7} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No conveyancing matters yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

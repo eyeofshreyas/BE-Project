@@ -14,9 +14,14 @@ class StatusCount(BaseModel):
 
 
 class MatterSummary(BaseModel):
+    matter_id: int
+    case_id: int | None
     number: str
+    title: str
     client: str | None
     type: str
+    property: str | None
+    lawyer: str | None
     status: str
 
 
