@@ -5,7 +5,7 @@ export type IconName =
   | 'calendar' | 'bar-chart-2' | 'pie-chart' | 'bell' | 'settings' | 'log-out' | 'search'
   | 'chevron-down' | 'plus' | 'download' | 'receipt' | 'banknote' | 'alert-triangle'
   | 'check-circle' | 'database' | 'server' | 'hard-drive' | 'eye' | 'edit' | 'ban'
-  | 'trash-2' | 'mail' | 'phone' | 'shield' | 'palette' | 'info' | 'x'
+  | 'trash-2' | 'mail' | 'phone' | 'shield' | 'palette' | 'info' | 'x' | 'gavel' | 'clock'
 
 export function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 1.8 }: Props) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
@@ -45,5 +45,7 @@ export function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 1.
     case 'palette': return <svg {...common}><path d="M12 3a9 9 0 1 0 .3 18c1.2 0 1.9-.9 1.9-1.9 0-.5-.2-1-.5-1.4-.3-.4-.5-.9-.5-1.4 0-1.1.9-1.9 1.9-1.9H17a4 4 0 0 0 4-4c0-4.6-4-7.4-9-7.4z" /><circle cx={7.5} cy={10.5} r={1.2} /><circle cx={11} cy={7.5} r={1.2} /><circle cx={15} cy={8.5} r={1.2} /></svg>
     case 'info': return <svg {...common}><circle cx={12} cy={12} r={9} /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
     case 'x': return <svg {...common}><path d="M18 6L6 18" /><path d="M6 6l12 12" /></svg>
+    case 'gavel': return <svg {...common}><path d="M14 4l6 6" /><path d="M4 14l6 6" /><path d="M9.5 8.5l-6 6" /><path d="M15.5 2.5l6 6" /><path d="M10.5 13.5L18 6" /><path d="M2 22h10" /></svg>
+    case 'clock': return <svg {...common}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l3.5 2" /></svg>
   }
 }

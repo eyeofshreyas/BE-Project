@@ -20,7 +20,7 @@ const LAWYER_NAV: NavDef[] = [
   { label: 'Cases', icon: 'briefcase', path: '/cases' },
   { label: 'Clients', icon: 'users', path: '/clients' },
   { label: 'Documents', icon: 'file-text', path: '/documents' },
-  { label: 'Judgements', icon: 'gavel' },
+  { label: 'Judgements', icon: 'gavel', path: '/judgements' },
   { label: 'Calendar', icon: 'calendar', path: '/hearings' },
   { label: 'Billing', icon: 'receipt', path: '/billing' },
 ]

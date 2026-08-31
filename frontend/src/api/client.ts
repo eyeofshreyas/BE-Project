@@ -18,6 +18,8 @@ import type {
   PaymentSummary,
   HearingSummary,
   ClientSummary,
+  JudgementSummary,
+  JudgementCreatePayload,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -200,6 +202,14 @@ export function listHearings() {
 
 export function listClients() {
   return get<ClientSummary[]>('/clients')
+}
+
+export function listJudgements() {
+  return get<JudgementSummary[]>('/judgements')
+}
+
+export function createJudgement(data: JudgementCreatePayload) {
+  return post<JudgementSummary>('/judgements', data)
 }
 
 export function listDocumentTypes() {

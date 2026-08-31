@@ -29,6 +29,8 @@ from app.routes.case_history import router as case_history_router
 from app.routes.users import router as users_router
 from app.routes.notifications import router as notifications_router
 from app.routes.client_requests import router as client_requests_router
+from app.routes.clients import router as clients_router
+from app.routes.judgements import router as judgements_router
 
 app = FastAPI()
 
@@ -53,6 +55,8 @@ app.include_router(case_history_router)
 app.include_router(users_router)
 app.include_router(notifications_router)
 app.include_router(client_requests_router)
+app.include_router(clients_router)
+app.include_router(judgements_router)
 
 ROLE_IDS = {"lawyer": 2, "client": 3}
 
