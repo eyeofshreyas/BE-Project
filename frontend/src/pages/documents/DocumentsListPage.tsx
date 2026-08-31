@@ -31,141 +31,6 @@ function formatSize(bytes: number | null) {
 }
 
 export default function DocumentsListPage() {
-  const profile = loadProfile()
-  if (profile?.role_id === 3) return <ClientDocumentsView />
-  return <StaffDocumentsView />
-}
-
-function StaffDocumentsView() {
-  const [documents, setDocuments] = useState<DocumentSummary[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
-
-  const [expandedId, setExpandedId] = useState<number | null>(null)
-  const [summary, setSummary] = useState<AiSummary | null>(null)
-  const [summaryLoading, setSummaryLoading] = useState(false)
-  const [summaryError, setSummaryError] = useState('')
-
-  useEffect(() => {
-    listDocuments()
-      .then(setDocuments)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load documents.'))
-      .finally(() => setLoading(false))
-  }, [])
-
-  function toggleSummary(id: number) {
-    if (expandedId === id) { setExpandedId(null); return }
-    setExpandedId(id)
-    setSummary(null)
-    setSummaryError('')
-    setSummaryLoading(true)
-    getDocumentSummary(id)
-      .then(setSummary)
-      .catch((err) => setSummaryError(err instanceof Error ? err.message : 'No AI summary available.'))
-      .finally(() => setSummaryLoading(false))
-  }
-
-  async function download(id: number) {
-    const tab = window.open('', '_blank')
-    try {
-      const { url } = await getDocumentDownloadUrl(id)
-      if (tab) tab.location.href = url
-    } catch {
-      tab?.close()
-    }
-  }
-
-  const searchLower = search.toLowerCase()
-  const filtered = documents.filter((d) =>
-    !searchLower || d.file_name.toLowerCase().includes(searchLower) || (d.case_number ?? '').toLowerCase().includes(searchLower)
-  )
-
-  return (
-    <div className={styles.page}>
-      <div className={styles.wrap}>
-        <div className={styles.header}>
-          <div>
-            <div className={styles.title}>Documents</div>
-            <div className={styles.subtitle}>Every document uploaded across your cases, with AI-generated summaries where available.</div>
-          </div>
-        </div>
-
-        <input
-          placeholder="Search by document name or case number..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
-        />
-
-        {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading documents…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
-
-        {!loading && !error && (
-          <div className={styles.tableCard}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.th}>Document</th>
-                  <th className={styles.th}>Type</th>
-                  <th className={styles.th}>Case</th>
-                  <th className={styles.th}>Uploaded By</th>
-                  <th className={styles.th}>Upload Date</th>
-                  <th className={styles.th}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((d) => (
-                  <Fragment key={d.id}>
-                    <tr className={styles.tr}>
-                      <td className={styles.tdClient}>{d.file_name}</td>
-                      <td className={styles.td}>{d.document_type ?? '—'}</td>
-                      <td className={styles.tdMono}>{d.case_number ?? '—'}</td>
-                      <td className={styles.td}>{d.uploaded_by ?? '—'}</td>
-                      <td className={styles.td}>{d.upload_date}</td>
-                      <td className={styles.td}>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                          <div onClick={() => toggleSummary(d.id)} style={{ cursor: 'pointer', display: 'flex' }} title="AI Summary">
-                            <Icon name="sparkles" size={16} color={expandedId === d.id ? PRIMARY : '#6A5C42'} />
-                          </div>
-                          <div onClick={() => download(d.id)} style={{ cursor: 'pointer', display: 'flex' }} title="Download">
-                            <Icon name="download" size={16} color="#6A5C42" />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                    {expandedId === d.id && (
-                      <tr>
-                        <td className={styles.td} colSpan={6} style={{ background: '#FBF7ED' }}>
-                          {summaryLoading && <div style={{ color: MUTED, fontSize: 13 }}>Loading summary…</div>}
-                          {summaryError && <div style={{ color: MUTED, fontSize: 13 }}>{summaryError}</div>}
-                          {summary && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: '#3D3126', padding: '4px 0' }}>
-                              <div><strong>Summary:</strong> {summary.summary_text}</div>
-                              {summary.keywords && <div><strong>Keywords:</strong> {summary.keywords}</div>}
-                              {summary.important_dates && <div><strong>Important dates:</strong> {summary.important_dates}</div>}
-                              {summary.important_sections && <div><strong>Important sections:</strong> {summary.important_sections}</div>}
-                              {summary.translated_text && <div><strong>Translation:</strong> {summary.translated_text}</div>}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                ))}
-                {filtered.length === 0 && (
-                  <tr><td className={styles.td} colSpan={6} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No documents found.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function ClientDocumentsView() {
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [docTypes, setDocTypes] = useState<DocumentTypeOption[]>([])
@@ -184,6 +49,9 @@ function ClientDocumentsView() {
   const [uploadError, setUploadError] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
 
   useEffect(() => {
     Promise.all([listDocuments(), listCases(), listDocumentTypes()])
@@ -268,6 +136,12 @@ function ClientDocumentsView() {
   ]
 
   const summarizedDocs = [...documents].filter((d) => d.has_summary).sort((a, b) => b.upload_date.localeCompare(a.upload_date)).slice(0, 3)
+
+  const searchLower = search.toLowerCase()
+  const filteredDocuments = documents.filter((d) =>
+    (!searchLower || d.file_name.toLowerCase().includes(searchLower) || (d.case_number ?? '').toLowerCase().includes(searchLower)) &&
+    (!typeFilter || d.document_type === typeFilter)
+  )
 
   return (
     <div className={styles.page}>
@@ -368,6 +242,23 @@ function ClientDocumentsView() {
               </div>
             )}
 
+            <div style={{ display: 'flex', gap: 10 }}>
+              <input
+                placeholder="Search by document name, case number…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ flex: 1, padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
+              />
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
+              >
+                <option value="">All types</option>
+                {docTypes.map((t) => <option key={t.document_type_id} value={t.type_name}>{t.type_name}</option>)}
+              </select>
+            </div>
+
             <div className={styles.tableCard}>
               <table className={styles.table}>
                 <thead>
@@ -381,7 +272,7 @@ function ClientDocumentsView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {documents.map((d) => (
+                  {filteredDocuments.map((d) => (
                     <tr key={d.id} className={styles.tr}>
                       <td className={styles.tdClient}>{d.file_name}</td>
                       <td className={styles.td}>{d.document_type ?? '—'}</td>
@@ -392,12 +283,13 @@ function ClientDocumentsView() {
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                           <div onClick={() => toggleSummary(d.id)} style={{ cursor: 'pointer', display: 'flex' }} title="View summary"><Icon name="eye" size={16} color="#6A5C42" /></div>
                           <div onClick={() => openDocument(d.id)} style={{ cursor: 'pointer', display: 'flex' }} title="Download"><Icon name="download" size={16} color="#6A5C42" /></div>
+                          <div onClick={() => removeDocument(d.id)} style={{ cursor: 'pointer', display: 'flex' }} title="Delete"><Icon name="trash-2" size={16} color="#B05C5C" /></div>
                         </div>
                       </td>
                     </tr>
                   ))}
-                  {documents.length === 0 && (
-                    <tr><td className={styles.td} colSpan={6} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No documents yet.</td></tr>
+                  {filteredDocuments.length === 0 && (
+                    <tr><td className={styles.td} colSpan={6} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No documents found.</td></tr>
                   )}
                 </tbody>
               </table>
