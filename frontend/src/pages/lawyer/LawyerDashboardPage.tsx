@@ -56,13 +56,34 @@ export default function LawyerDashboardPage() {
   const totalInvoiced = invoices.reduce((sum, i) => sum + i.total_amount, 0)
   const aiSummaryCount = documents.filter((d) => d.has_summary).length
 
+  const now0 = new Date()
+  const isThisMonth = (raw: string | null | undefined) => {
+    if (!raw) return false
+    const d = new Date(raw)
+    return d.getFullYear() === now0.getFullYear() && d.getMonth() === now0.getMonth()
+  }
+  const casesThisMonth = cases.filter((c) => isThisMonth(c.filing_date ?? c.created_at)).length
+  const activeCasesThisMonth = activeCases.filter((c) => isThisMonth(c.filing_date ?? c.created_at)).length
+  const activeClientsCount = clients.filter((c) => c.status === 'Active').length
+  const aiSummariesThisMonth = documents.filter((d) => d.has_summary && isThisMonth(d.upload_date)).length
+
+  const invoicedThisMonth = invoices.filter((i) => isThisMonth(i.issue_date)).reduce((sum, i) => sum + i.total_amount, 0)
+  const invoicedLastMonth = invoices
+    .filter((i) => {
+      const d = new Date(i.issue_date)
+      const lastMonth = new Date(now0.getFullYear(), now0.getMonth() - 1, 1)
+      return d.getFullYear() === lastMonth.getFullYear() && d.getMonth() === lastMonth.getMonth()
+    })
+    .reduce((sum, i) => sum + i.total_amount, 0)
+  const invoicePctChange = invoicedLastMonth > 0 ? Math.round(((invoicedThisMonth - invoicedLastMonth) / invoicedLastMonth) * 100) : null
+
   const statCards = [
-    { label: 'Total Cases', value: String(cases.length), sublabel: 'On your docket', icon: 'briefcase' as const },
-    { label: 'Active Cases', value: String(activeCases.length), sublabel: 'Currently open', icon: 'bar-chart-2' as const },
-    { label: 'Pending Hearings', value: String(pendingHearingsThisWeek.length), sublabel: 'This week', icon: 'calendar' as const },
-    { label: 'Total Clients', value: String(clients.length), sublabel: 'Across all cases', icon: 'users' as const },
-    { label: 'Invoices Generated', value: formatLakh(totalInvoiced), sublabel: 'All time', icon: 'receipt' as const },
-    { label: 'AI Summaries', value: String(aiSummaryCount), sublabel: 'Across your cases', icon: 'sparkles' as const },
+    { label: 'Total Cases', value: String(cases.length), pill: `+${casesThisMonth} this mo`, icon: 'briefcase' as const },
+    { label: 'Active Cases', value: String(activeCases.length), pill: `+${activeCasesThisMonth} this mo`, icon: 'bar-chart-2' as const },
+    { label: 'Pending Hearings', value: String(pendingHearingsThisWeek.length), pill: 'This week', icon: 'calendar' as const },
+    { label: 'Total Clients', value: String(clients.length), pill: `${activeClientsCount} active`, icon: 'users' as const },
+    { label: 'Invoices Generated', value: formatLakh(totalInvoiced), pill: invoicePctChange !== null ? `${invoicePctChange >= 0 ? '+' : ''}${invoicePctChange}%` : null, icon: 'receipt' as const },
+    { label: 'AI Summaries', value: String(aiSummaryCount), pill: `+${aiSummariesThisMonth} this mo`, icon: 'sparkles' as const },
   ]
 
   // Monthly "cases filed" histogram for the last 12 months, using filing_date
@@ -113,13 +134,16 @@ export default function LawyerDashboardPage() {
           <>
             <div className={styles.statCards}>
               {statCards.map((s) => (
-                <div key={s.label} className={styles.statCard}>
-                  <div className={styles.statIconRow}><div className={styles.statIconWrap}><Icon name={s.icon} size={19} color={PRIMARY_DARK} /></div></div>
+                <div key={s.label} className={styles.statCard} style={{ gap: 8 }}>
+                  <div className={styles.statIconRow}>
+                    <div className={styles.statIconWrap}><Icon name={s.icon} size={19} color={PRIMARY_DARK} /></div>
+                    {s.pill && <span className={styles.statusBadge} style={{ background: '#EFE4CB', color: PRIMARY_DARK }}>{s.pill}</span>}
+                  </div>
                   <div>
                     <div className={styles.statValue}>{s.value}</div>
-                    <div className={styles.statLabel}>{s.label}</div>
-                    <div style={{ fontSize: 11.5, color: '#B08D3E', fontWeight: 600, marginTop: 4 }}>{s.sublabel}</div>
+                    <div className={styles.statLabel} style={{ textTransform: 'uppercase', fontSize: 11, fontWeight: 700, letterSpacing: '.03em' }}>{s.label}</div>
                   </div>
+                  <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: '100%' }} /></div>
                 </div>
               ))}
             </div>
