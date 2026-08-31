@@ -1,24 +1,15 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   listDocuments, getDocumentSummary, getDocumentDownloadUrl, deleteDocument,
   listCases, listDocumentTypes, uploadDocument,
 } from '../../api/client'
-import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption, UserProfile } from '../../types/api'
+import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption } from '../../types/api'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import shellStyles from '../../components/AppShell.module.css'
 
 const MUTED = '#8C7C5E'
 const PRIMARY = '#B08D3E'
-
-function loadProfile(): UserProfile | null {
-  try {
-    const raw = localStorage.getItem('lexflow_profile')
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })

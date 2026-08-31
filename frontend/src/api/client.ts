@@ -208,6 +208,10 @@ export function listClients() {
   return get<ClientSummary[]>('/clients')
 }
 
+export function sendInvoiceReminder(invoiceId: number) {
+  return post<{ message: string }>(`/billing/invoices/${invoiceId}/remind`, {})
+}
+
 export function listJudgements() {
   return get<JudgementSummary[]>('/judgements')
 }

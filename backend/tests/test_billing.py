@@ -12,6 +12,7 @@ from app.controllers.billing import (
     create_invoice,
     create_payment,
     create_expense,
+    send_invoice_reminder,
 )
 from app.models.billing import InvoiceCreate, PaymentCreate, ExpenseCreate
 
@@ -73,6 +74,51 @@ def test_create_expense_rejects_matter_on_out_of_scope_case():
             assert e.status_code == 403
 
 
+def test_send_invoice_reminder_rejects_invoice_on_out_of_scope_case():
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    invoice_row = {"invoice_number": "INV-1", "total_amount": 100, "case_id": 20, "cases": {"client_id": 9, "case_number": "LX-1"}}
+    with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
+         patch("app.controllers.billing.supabase", _fake_supabase({"invoices": [invoice_row]})):
+        try:
+            send_invoice_reminder(7, profile)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 403
+
+
+def test_send_invoice_reminder_notifies_the_client_user():
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    invoice_row = {"invoice_number": "INV-1", "total_amount": 100, "case_id": 10, "cases": {"client_id": 9, "case_number": "LX-1"}}
+    client_row = {"user_id": 42}
+
+    inserted = {}
+
+    fake = MagicMock()
+
+    def table(name):
+        m = MagicMock()
+        if name == "invoices":
+            m.select.return_value.eq.return_value.execute.return_value.data = [invoice_row]
+        elif name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = [client_row]
+        elif name == "notifications":
+            def insert(payload):
+                inserted.update(payload)
+                return MagicMock(execute=MagicMock(return_value=MagicMock(data=[payload])))
+            m.insert.side_effect = insert
+        return m
+
+    fake.table.side_effect = table
+
+    with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
+         patch("app.controllers.billing.supabase", fake):
+        result = send_invoice_reminder(7, profile)
+        assert result == {"message": "Reminder sent."}
+        assert inserted["user_id"] == 42
+        assert inserted["case_id"] == 10
+        assert "INV-1" in inserted["message"]
+
+
 def test_no_payments_is_pending():
     assert _invoice_status_for(0, 1000) == "Pending"
 
@@ -93,6 +139,8 @@ if __name__ == "__main__":
     test_create_invoice_rejects_out_of_scope_case()
     test_create_payment_rejects_invoice_on_out_of_scope_case()
     test_create_expense_rejects_matter_on_out_of_scope_case()
+    test_send_invoice_reminder_rejects_invoice_on_out_of_scope_case()
+    test_send_invoice_reminder_notifies_the_client_user()
     test_no_payments_is_pending()
     test_partial_payment_is_partially_paid()
     test_full_payment_is_paid()

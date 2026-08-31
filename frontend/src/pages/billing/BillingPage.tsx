@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { listInvoices, createInvoice, createPayment, listCases, listInvoicePayments } from '../../api/client'
+import { listInvoices, createInvoice, createPayment, sendInvoiceReminder, listCases, listInvoicePayments } from '../../api/client'
 import type { InvoiceSummary, CaseSummary, PaymentSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
@@ -20,12 +20,33 @@ const MUTED = '#8C7C5E'
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
   Paid: ['#2E9E58', '#E4F5EA'],
   'Partially Paid': ['#B87F1E', '#FFF2E0'],
-  Pending: ['#B05C5C', '#FBEAEA'],
+  Pending: ['#B87F1E', '#FFF2E0'],
+  Overdue: ['#B05C5C', '#FBEAEA'],
 }
 const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
+const TIME_FILTERS = ['All Time', 'This Month', 'This Quarter', 'This Year'] as const
 
 function money(n: number) {
   return `₹${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function moneyRound(n: number) {
+  return `₹${Math.round(n).toLocaleString()}`
+}
+
+function displayStatus(inv: InvoiceSummary): string {
+  const today = new Date().toISOString().slice(0, 10)
+  if (inv.payment_status !== 'Paid' && inv.due_date && inv.due_date < today) return 'Overdue'
+  return inv.payment_status
+}
+
+function withinTimeFilter(issueDate: string, filter: (typeof TIME_FILTERS)[number]): boolean {
+  if (filter === 'All Time') return true
+  const now = new Date()
+  const d = new Date(issueDate)
+  if (filter === 'This Month') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  if (filter === 'This Quarter') return d.getFullYear() === now.getFullYear() && Math.floor(d.getMonth() / 3) === Math.floor(now.getMonth() / 3)
+  return d.getFullYear() === now.getFullYear()
 }
 
 export default function BillingPage() {
@@ -42,6 +63,8 @@ function StaffBillingView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [timeFilter, setTimeFilter] = useState<(typeof TIME_FILTERS)[number]>('All Time')
   const [toast, setToast] = useState<string | null>(null)
 
   const [genOpen, setGenOpen] = useState(false)
@@ -54,6 +77,7 @@ function StaffBillingView() {
   const [saving, setSaving] = useState(false)
 
   const [payingId, setPayingId] = useState<number | null>(null)
+  const [remindingId, setRemindingId] = useState<number | null>(null)
 
   useEffect(() => {
     refresh()
@@ -129,46 +153,86 @@ function StaffBillingView() {
     }
   }
 
-  const searchLower = search.toLowerCase()
-  const filtered = invoices.filter((inv) =>
-    !searchLower || inv.invoice_number.toLowerCase().includes(searchLower) || (inv.client ?? '').toLowerCase().includes(searchLower) || (inv.case_number ?? '').toLowerCase().includes(searchLower)
-  )
+  async function remind(inv: InvoiceSummary) {
+    setRemindingId(inv.id)
+    try {
+      await sendInvoiceReminder(inv.id)
+      showToast('Reminder sent.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to send reminder.')
+    } finally {
+      setRemindingId(null)
+    }
+  }
 
+  const searchLower = search.toLowerCase()
+  const filtered = invoices.filter((inv) => {
+    const status = displayStatus(inv)
+    const matchesSearch = !searchLower || inv.invoice_number.toLowerCase().includes(searchLower) || (inv.client ?? '').toLowerCase().includes(searchLower) || (inv.case_number ?? '').toLowerCase().includes(searchLower)
+    const matchesStatus = statusFilter === 'All' || status === statusFilter
+    const matchesTime = withinTimeFilter(inv.issue_date, timeFilter)
+    return matchesSearch && matchesStatus && matchesTime
+  })
+
+  const totalBilled = invoices.reduce((sum, i) => sum + i.total_amount, 0)
   const totalOutstanding = invoices.filter((i) => i.payment_status !== 'Paid').reduce((sum, i) => sum + i.total_amount, 0)
   const totalCollected = invoices.filter((i) => i.payment_status === 'Paid').reduce((sum, i) => sum + i.total_amount, 0)
+  const totalGst = invoices.reduce((sum, i) => sum + (i.tax ?? 0), 0)
+  const pendingCount = invoices.filter((i) => i.payment_status !== 'Paid').length
+  const recoveryPct = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0
 
   return (
     <div className={styles.page}>
       <div className={styles.wrap}>
+        {canManage && <div className={styles.breadcrumb}><span>Dashboard</span><span>›</span><span>Billing &amp; Invoices</span></div>}
+
         <div className={styles.header}>
           <div>
             <div className={styles.title}>{canManage ? 'Billing & Invoices' : 'Invoices'}</div>
-            <div className={styles.subtitle}>{canManage ? 'Track professional fees and collections across every client engagement.' : 'Your invoices and payment status.'}</div>
+            <div className={styles.subtitle}>{canManage ? 'Track professional fees, GST and collections across every client engagement.' : 'Your invoices and payment status.'}</div>
           </div>
           {canManage && <div className={styles.primaryChip} onClick={openGenerate}>+ Generate Invoice</div>}
         </div>
 
         <div className={styles.statCards}>
           <div className={styles.statCard} style={{ gap: 4 }}>
-            <div className={styles.statLabel}>Total Invoices</div>
-            <div className={styles.statValue} style={{ fontSize: 22 }}>{invoices.length}</div>
+            <div className={styles.statLabel}>Total Billed</div>
+            <div className={styles.statValue} style={{ fontSize: 22 }}>{moneyRound(totalBilled)}</div>
+            <div style={{ fontSize: 11.5, color: MUTED }}>Professional fees, all invoices</div>
           </div>
           <div className={styles.statCard} style={{ gap: 4 }}>
-            <div className={styles.statLabel}>Outstanding</div>
-            <div className={styles.statValue} style={{ fontSize: 22 }}>{money(totalOutstanding)}</div>
+            <div className={styles.statLabel}>Revenue Collected</div>
+            <div className={styles.statValue} style={{ fontSize: 22 }}>{moneyRound(totalCollected)}</div>
+            <div style={{ fontSize: 11.5, color: MUTED }}>{recoveryPct}% recovery rate</div>
+            <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${recoveryPct}%` }} /></div>
           </div>
           <div className={styles.statCard} style={{ gap: 4 }}>
-            <div className={styles.statLabel}>Collected</div>
-            <div className={styles.statValue} style={{ fontSize: 22 }}>{money(totalCollected)}</div>
+            <div className={styles.statLabel}>Outstanding Balance</div>
+            <div className={styles.statValue} style={{ fontSize: 22 }}>{moneyRound(totalOutstanding)}</div>
+            <div style={{ fontSize: 11.5, color: '#B05C5C' }}>{pendingCount} Invoices Pending</div>
+          </div>
+          <div className={styles.statCard} style={{ gap: 4 }}>
+            <div className={styles.statLabel}>GST Accrued</div>
+            <div className={styles.statValue} style={{ fontSize: 22 }}>{moneyRound(totalGst)}</div>
+            <div style={{ fontSize: 11.5, color: MUTED }}>Estimated across all invoices</div>
           </div>
         </div>
 
-        <input
-          placeholder="Search by invoice number, client, or case..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <input
+            placeholder="Invoice ID, Client, or Case Name"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ flex: 1, minWidth: 220, padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
+          />
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
+            {['All', 'Paid', 'Partially Paid', 'Pending', 'Overdue'].map((s) => <option key={s} value={s}>{s === 'All' ? 'Status: All' : s}</option>)}
+          </select>
+          <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as (typeof TIME_FILTERS)[number])} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
+            {TIME_FILTERS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <div className={styles.ghostChip} style={{ opacity: .5, cursor: 'default' }} title="Report export coming soon"><Icon name="download" size={14} color="#6A5C42" /> Export Report</div>
+        </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading invoices…</div>}
         {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
@@ -180,29 +244,44 @@ function StaffBillingView() {
                 <tr>
                   <th className={styles.th}>Invoice No.</th>
                   <th className={styles.th}>Client</th>
-                  <th className={styles.th}>Case</th>
-                  <th className={styles.th}>Amount</th>
+                  <th className={styles.th}>Case Reference</th>
+                  <th className={styles.th}>Professional Fees</th>
+                  <th className={styles.th}>GST</th>
                   <th className={styles.th}>Status</th>
                   <th className={styles.th}></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((inv) => {
-                  const [color, bg] = STATUS_STYLE_MAP[inv.payment_status] || DEFAULT_STATUS_STYLE
+                  const status = displayStatus(inv)
+                  const [color, bg] = STATUS_STYLE_MAP[status] || DEFAULT_STATUS_STYLE
                   return (
                     <tr key={inv.id} className={styles.tr}>
-                      <td className={styles.tdMono}>{inv.invoice_number}</td>
+                      <td className={styles.tdMono} style={{ color: status === 'Overdue' ? '#B05C5C' : undefined, fontWeight: status === 'Overdue' ? 700 : undefined }}>{inv.invoice_number}</td>
                       <td className={styles.tdClient}>{inv.client ?? '—'}</td>
-                      <td className={styles.td}>{inv.case_number ?? '—'}</td>
-                      <td className={styles.td}>{money(inv.total_amount)}</td>
-                      <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{inv.payment_status}</span></td>
+                      <td className={styles.tdMono}>{inv.case_number ?? '—'}</td>
+                      <td className={styles.td}>{money(inv.amount)}</td>
+                      <td className={styles.td}>{inv.tax != null ? money(inv.tax) : '—'}</td>
+                      <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{status}</span></td>
                       <td className={styles.td}>
-                        {canManage && inv.payment_status !== 'Paid' && (
-                          <div
-                            onClick={() => payingId !== inv.id && recordFullPayment(inv)}
-                            style={{ fontSize: 12, fontWeight: 600, color: '#8f6743', cursor: 'pointer', opacity: payingId === inv.id ? 0.6 : 1, whiteSpace: 'nowrap' }}
-                          >
-                            {payingId === inv.id ? 'Recording…' : 'Record Payment'}
+                        {canManage && (
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            {status !== 'Paid' && (
+                              <div
+                                onClick={() => remindingId !== inv.id && remind(inv)}
+                                style={{ fontSize: 11.5, fontWeight: 600, color: '#B05C5C', border: '1px solid #E9B8B8', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', opacity: remindingId === inv.id ? 0.6 : 1, whiteSpace: 'nowrap' }}
+                              >
+                                {remindingId === inv.id ? 'Sending…' : 'Send Reminder'}
+                              </div>
+                            )}
+                            {inv.payment_status !== 'Paid' && (
+                              <div
+                                onClick={() => payingId !== inv.id && recordFullPayment(inv)}
+                                style={{ fontSize: 11.5, fontWeight: 600, color: '#6A5C42', border: '1px solid #E7DCC6', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', opacity: payingId === inv.id ? 0.6 : 1, whiteSpace: 'nowrap' }}
+                              >
+                                {payingId === inv.id ? 'Recording…' : 'Record Payment'}
+                              </div>
+                            )}
                           </div>
                         )}
                       </td>
@@ -210,7 +289,7 @@ function StaffBillingView() {
                   )
                 })}
                 {filtered.length === 0 && (
-                  <tr><td className={styles.td} colSpan={6} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No invoices found.</td></tr>
+                  <tr><td className={styles.td} colSpan={7} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No invoices found.</td></tr>
                 )}
               </tbody>
             </table>
@@ -265,10 +344,6 @@ function StaffBillingView() {
       </div>
     </div>
   )
-}
-
-function moneyRound(n: number) {
-  return `₹${Math.round(n).toLocaleString()}`
 }
 
 function formatDate(iso: string) {

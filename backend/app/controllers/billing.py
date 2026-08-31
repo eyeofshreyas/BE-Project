@@ -80,6 +80,35 @@ def get_invoice(invoice_id: int, profile: dict = Depends(get_current_profile)):
     return _get_invoice(invoice_id, get_scoped_case_ids(profile))
 
 
+def send_invoice_reminder(invoice_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    rows = supabase.table("invoices").select(
+        "invoice_number,total_amount,case_id,cases(client_id,case_number)"
+    ).eq("invoice_id", invoice_id).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    row = rows[0]
+    ensure_case_access(row["case_id"], profile)
+
+    case = row.get("cases")
+    client_id = case["client_id"] if case else None
+    client_user_id = None
+    if client_id is not None:
+        client_rows = supabase.table("clients").select("user_id").eq("client_id", client_id).execute().data
+        client_user_id = client_rows[0]["user_id"] if client_rows else None
+    if client_user_id is None:
+        raise HTTPException(status_code=404, detail="No client to notify for this invoice")
+
+    supabase.table("notifications").insert({
+        "user_id": client_user_id,
+        "case_id": row["case_id"],
+        "title": "Payment reminder",
+        "message": f"Invoice {row['invoice_number']} for {row['total_amount']} is due. Please arrange payment at your earliest convenience.",
+        "notification_type": "invoice_reminder",
+        "is_read": False,
+    }).execute()
+    return {"message": "Reminder sent."}
+
+
 def create_invoice(data: InvoiceCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     ensure_case_access(data.case_id, profile)
     row = supabase.table("invoices").insert({
@@ -137,6 +166,11 @@ def create_expense(data: ExpenseCreate, profile: dict = Depends(require_roles(AD
         raise HTTPException(status_code=404, detail="Matter not found")
     ensure_case_access(matter_rows[0]["case_id"], profile)
 
-    row = supabase.table("miscellaneous_expenses").insert(data.model_dump()).execute().data[0]
+    # created_by is the acting user, not client-supplied -- otherwise any
+    # lawyer could attribute an expense to an arbitrary user_id.
+    row = supabase.table("miscellaneous_expenses").insert({
+        **data.model_dump(exclude={"created_by"}),
+        "created_by": profile["user_id"],
+    }).execute().data[0]
     rows = supabase.table("miscellaneous_expenses").select(EXPENSES_SELECT).eq("expense_id", row["expense_id"]).execute().data
     return _to_expense_summary(rows[0])
