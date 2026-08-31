@@ -5,6 +5,7 @@ import {
   listMeetings, createMeeting, listDocumentTypes, uploadDocument, getDocumentDownloadUrl, unassignLawyer,
 } from '../../api/client'
 import type { CaseSummary, NoteSummary, TimelineEvent, DocumentSummary, MeetingSummary, DocumentTypeOption, UserProfile } from '../../types/api'
+import { formatDate as formatDateWith } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
 const PRIMARY = '#B08D3E'
@@ -34,7 +35,7 @@ function loadProfile(): UserProfile | null {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return formatDateWith(iso, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 export default function CaseDetailPage() {

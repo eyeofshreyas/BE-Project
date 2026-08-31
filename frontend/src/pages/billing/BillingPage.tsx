@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { listInvoices, createInvoice, createPayment, sendInvoiceReminder, listCases, listInvoicePayments } from '../../api/client'
 import type { InvoiceSummary, CaseSummary, PaymentSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
+import { formatDate } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
 const LAWYER = 2
@@ -357,10 +358,6 @@ function StaffBillingView() {
       </div>
     </div>
   )
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 const TXN_STATUS_STYLE: Record<string, [string, string]> = {

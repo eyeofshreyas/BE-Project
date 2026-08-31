@@ -5,6 +5,7 @@ import {
 } from '../../api/client'
 import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption } from '../../types/api'
 import { Icon } from '../../components/icons'
+import { formatDate as formatDateWith } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import shellStyles from '../../components/AppShell.module.css'
 
@@ -12,7 +13,7 @@ const MUTED = '#8C7C5E'
 const PRIMARY = '#B08D3E'
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return formatDateWith(iso, { month: 'short', day: 'numeric' })
 }
 
 function formatSize(bytes: number | null) {

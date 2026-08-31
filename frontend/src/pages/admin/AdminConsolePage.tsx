@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
 import { Icon, type IconName } from '../../components/icons'
-import { C } from './theme'
+import { C } from '../../components/theme'
 import DashboardView from './views/DashboardView'
 import UsersView from './views/UsersView'
 import CasesView from './views/CasesView'
@@ -12,23 +12,14 @@ import AnalyticsView from './views/AnalyticsView'
 import SettingsView from './views/SettingsView'
 import { listNotifications, markNotificationRead } from '../../api/client'
 import type { UserProfile, NotificationSummary } from '../../types/api'
-import styles from './adminShared.module.css'
+import { timeAgo } from '../../utils/date'
+import styles from '../../components/AppShell.module.css'
 
 type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'reports' | 'analytics' | 'settings'
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Super Admin', 2: 'Lawyer', 3: 'Client' }
 
 const NOTIF_COLORS: Record<string, string> = { Hearing: C.warning, Payment: C.success, Document: C.primary }
-
-function timeAgo(iso: string) {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diffMs / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
 
 function initialsOf(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()

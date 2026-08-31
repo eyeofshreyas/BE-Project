@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { listJudgements, createJudgement, listCases } from '../../api/client'
 import type { JudgementSummary, JudgementOutcome, CaseSummary } from '../../types/api'
 import { Icon } from '../../components/icons'
+import { formatDate } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
 const MUTED = '#8C7C5E'
@@ -18,10 +19,6 @@ function money(n: number) {
   if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)} Cr`
   if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`
   return `₹${Math.round(n).toLocaleString()}`
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function monthsBetween(a: string, b: string) {

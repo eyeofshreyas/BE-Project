@@ -6,6 +6,7 @@ import { Icon, type IconName } from './icons'
 import { C } from './theme'
 import { listNotifications, markNotificationRead } from '../api/client'
 import type { UserProfile, NotificationSummary } from '../types/api'
+import { timeAgo } from '../utils/date'
 import styles from './AppShell.module.css'
 
 const ROLE_LABELS: Record<number, string> = { 2: 'Lawyer', 3: 'Client' }
@@ -45,16 +46,6 @@ function loadProfile(): UserProfile | null {
 
 function initialsOf(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
-}
-
-function timeAgo(iso: string) {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diffMs / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
 }
 
 export default function AppLayout({ children }: { children: ReactNode }) {

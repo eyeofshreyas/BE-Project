@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { listCases, listHearings, listCaseTimeline } from '../../api/client'
 import type { CaseSummary, HearingSummary, TimelineEvent, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
+import { formatDate, timeAgo } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
 const MUTED = '#8C7C5E'
@@ -39,19 +40,6 @@ function loadProfile(): UserProfile | null {
   } catch {
     return null
   }
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function timeAgo(iso: string) {
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
 }
 
 export default function CasesListPage() {

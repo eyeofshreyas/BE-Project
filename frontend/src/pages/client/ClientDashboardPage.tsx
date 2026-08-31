@@ -9,6 +9,7 @@ import type {
   NotificationSummary, ClientRequestSummary, UserProfile,
 } from '../../types/api'
 import { Icon } from '../../components/icons'
+import { formatDate } from '../../utils/date'
 import shellStyles from '../../components/AppShell.module.css'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
@@ -44,10 +45,6 @@ function loadProfile(): UserProfile | null {
 
 function money(n: number) {
   return `₹${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function dueLabel(iso: string) {

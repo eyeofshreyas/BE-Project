@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getConveyancingSummary, listCourts, listCaseTypes, sendClientRequest, listAllMeetings } from '../../api/client'
 import type { ConveyancingSummary, CourtOption, CaseTypeOption, MeetingSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
+import { formatDate as formatDateWith } from '../../utils/date'
 import styles from './ConveyancingDashboardPage.module.css'
 
 function loadProfile(): UserProfile | null {
@@ -57,7 +58,7 @@ function relativeDateTime(iso: string) {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatDateWith(iso, { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 export default function ConveyancingDashboardPage() {
