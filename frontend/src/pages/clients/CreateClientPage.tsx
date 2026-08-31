@@ -31,6 +31,10 @@ export default function CreateClientPage() {
   const [preferredTitle, setPreferredTitle] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [regNumber, setRegNumber] = useState('')
+  const [contactPerson, setContactPerson] = useState('')
+  const [contactDesignation, setContactDesignation] = useState('')
+  const isOrg = clientType === 'Organization'
 
   const [caseTypeId, setCaseTypeId] = useState('')
   const [courtId, setCourtId] = useState('')
@@ -46,23 +50,36 @@ export default function CreateClientPage() {
     listCaseTypes().then(setCaseTypes).catch(() => {})
   }, [])
 
-  const trackedFields = [fullName, email, phone, courtId, caseTypeId, matterName, matterDescription, notes]
+  const trackedFields = isOrg
+    ? [fullName, email, phone, regNumber, contactPerson, courtId, caseTypeId, matterName, matterDescription, notes]
+    : [fullName, email, phone, courtId, caseTypeId, matterName, matterDescription, notes]
   const completion = Math.round((trackedFields.filter(Boolean).length / trackedFields.length) * 100)
   const selectedCaseType = caseTypes.find((c) => String(c.case_type_id) === caseTypeId)
 
   async function submit() {
-    if (!fullName.trim()) { setError("Enter the client's full name."); return }
+    if (!fullName.trim()) { setError(isOrg ? "Enter the organization's name." : "Enter the client's full name."); return }
     if (!email.trim()) { setError("Enter the client's email address."); return }
     if (!courtId || !caseTypeId) { setError('Choose a court and a matter category.'); return }
 
-    const messageParts = [
-      `Client type: ${clientType}`,
-      `Contact: ${preferredTitle ? preferredTitle + ' ' : ''}${fullName}`,
-      phone && `Phone: ${phone}`,
-      matterName && `Matter: ${matterName}`,
-      matterDescription && `Details: ${matterDescription}`,
-      notes && `Internal notes: ${notes}`,
-    ].filter(Boolean)
+    const messageParts = isOrg
+      ? [
+          `Client type: Organization`,
+          `Organization: ${fullName}`,
+          regNumber && `Registration / GST No.: ${regNumber}`,
+          contactPerson && `Contact Person: ${contactPerson}${contactDesignation ? ` (${contactDesignation})` : ''}`,
+          phone && `Phone: ${phone}`,
+          matterName && `Matter: ${matterName}`,
+          matterDescription && `Details: ${matterDescription}`,
+          notes && `Internal notes: ${notes}`,
+        ].filter(Boolean)
+      : [
+          `Client type: Individual`,
+          `Contact: ${preferredTitle ? preferredTitle + ' ' : ''}${fullName}`,
+          phone && `Phone: ${phone}`,
+          matterName && `Matter: ${matterName}`,
+          matterDescription && `Details: ${matterDescription}`,
+          notes && `Internal notes: ${notes}`,
+        ].filter(Boolean)
 
     setSending(true)
     setError('')
@@ -106,10 +123,23 @@ export default function CreateClientPage() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <Field label="Full Name" required><input placeholder="e.g. Eleanor Vance" value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} /></Field>
-                <Field label="Preferred Title"><input placeholder="e.g. Ms., Dr." value={preferredTitle} onChange={(e) => setPreferredTitle(e.target.value)} style={inputStyle} /></Field>
-                <Field label="Email Address" required><input type="email" placeholder="contact@client.com" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} /></Field>
-                <Field label="Phone Number"><input placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} /></Field>
+                {isOrg ? (
+                  <>
+                    <Field label="Organization Name" required><input placeholder="e.g. Vance Textiles Pvt. Ltd." value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} /></Field>
+                    <Field label="Registration / GST No."><input placeholder="e.g. 27AAAPL1234C1Z5" value={regNumber} onChange={(e) => setRegNumber(e.target.value)} style={inputStyle} /></Field>
+                    <Field label="Email Address" required><input type="email" placeholder="contact@client.com" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} /></Field>
+                    <Field label="Phone Number"><input placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} /></Field>
+                    <Field label="Contact Person"><input placeholder="e.g. Eleanor Vance" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} style={inputStyle} /></Field>
+                    <Field label="Contact Designation"><input placeholder="e.g. Managing Director" value={contactDesignation} onChange={(e) => setContactDesignation(e.target.value)} style={inputStyle} /></Field>
+                  </>
+                ) : (
+                  <>
+                    <Field label="Full Name" required><input placeholder="e.g. Eleanor Vance" value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} /></Field>
+                    <Field label="Preferred Title"><input placeholder="e.g. Ms., Dr." value={preferredTitle} onChange={(e) => setPreferredTitle(e.target.value)} style={inputStyle} /></Field>
+                    <Field label="Email Address" required><input type="email" placeholder="contact@client.com" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} /></Field>
+                    <Field label="Phone Number"><input placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} /></Field>
+                  </>
+                )}
               </div>
             </div>
 
