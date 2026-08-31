@@ -15,6 +15,12 @@
 -- match, or just use /signup's own flow for anyone you need to click through
 -- the app as.
 --
+-- Gotcha: POST /signup (self-service) rejects @example.com addresses with
+-- "email_address_invalid" -- Supabase's signup endpoint blocklists reserved
+-- domains like example.com/.org/.net. Dashboard "Add user" and the Admin API
+-- are unaffected (they bypass that check), so use one of those for the
+-- seeded emails below, not self-service signup.
+--
 -- Safe to re-run: reference/lookup tables use ON CONFLICT DO NOTHING; people
 -- and case data use a WHERE NOT EXISTS guard keyed on a natural unique value
 -- (email, case_number, matter_number, invoice_number).
