@@ -17,6 +17,7 @@ function loadProfile(): UserProfile | null {
 }
 
 const MUTED = '#8C7C5E'
+const PRIMARY = '#B08D3E'
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
   Paid: ['#2E9E58', '#E4F5EA'],
   'Partially Paid': ['#B87F1E', '#FFF2E0'],
@@ -196,23 +197,35 @@ function StaffBillingView() {
 
         <div className={styles.statCards}>
           <div className={styles.statCard} style={{ gap: 4 }}>
-            <div className={styles.statLabel}>Total Billed</div>
+            <div className={styles.statIconRow}>
+              <div className={styles.statLabel} style={{ margin: 0 }}>Total Billed</div>
+              <div className={styles.statIconWrap}><Icon name="file-text" size={16} color={PRIMARY} /></div>
+            </div>
             <div className={styles.statValue} style={{ fontSize: 22 }}>{moneyRound(totalBilled)}</div>
             <div style={{ fontSize: 11.5, color: MUTED }}>Professional fees, all invoices</div>
           </div>
           <div className={styles.statCard} style={{ gap: 4 }}>
-            <div className={styles.statLabel}>Revenue Collected</div>
+            <div className={styles.statIconRow}>
+              <div className={styles.statLabel} style={{ margin: 0 }}>Revenue Collected</div>
+              <div className={styles.statIconWrap}><Icon name="bar-chart-2" size={16} color={PRIMARY} /></div>
+            </div>
             <div className={styles.statValue} style={{ fontSize: 22 }}>{moneyRound(totalCollected)}</div>
             <div style={{ fontSize: 11.5, color: MUTED }}>{recoveryPct}% recovery rate</div>
             <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${recoveryPct}%` }} /></div>
           </div>
           <div className={styles.statCard} style={{ gap: 4 }}>
-            <div className={styles.statLabel}>Outstanding Balance</div>
+            <div className={styles.statIconRow}>
+              <div className={styles.statLabel} style={{ margin: 0 }}>Outstanding Balance</div>
+              <div className={styles.statIconWrap}><Icon name="info" size={16} color={PRIMARY} /></div>
+            </div>
             <div className={styles.statValue} style={{ fontSize: 22 }}>{moneyRound(totalOutstanding)}</div>
             <div style={{ fontSize: 11.5, color: '#B05C5C' }}>{pendingCount} Invoices Pending</div>
           </div>
           <div className={styles.statCard} style={{ gap: 4 }}>
-            <div className={styles.statLabel}>GST Accrued</div>
+            <div className={styles.statIconRow}>
+              <div className={styles.statLabel} style={{ margin: 0 }}>GST Accrued</div>
+              <div className={styles.statIconWrap}><Icon name="receipt" size={16} color={PRIMARY} /></div>
+            </div>
             <div className={styles.statValue} style={{ fontSize: 22 }}>{moneyRound(totalGst)}</div>
             <div style={{ fontSize: 11.5, color: MUTED }}>Estimated across all invoices</div>
           </div>
