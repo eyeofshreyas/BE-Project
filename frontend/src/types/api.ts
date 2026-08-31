@@ -191,6 +191,8 @@ export interface ClientSummary {
   address: string | null
   preferred_language: string | null
   active_cases: number
+  status: string
+  pending_amount: number
 }
 
 export interface HearingSummary {
