@@ -4,6 +4,7 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
+from supabase_auth.errors import AuthApiError
 from app.core.config import CORS_ORIGINS, LOG_LEVEL
 from app.db.supabase_client import supabase
 from app.middleware.auth import get_current_user
@@ -146,6 +147,10 @@ def login(data: LoginRequest):
             "email": data.email,
             "password": data.password
         })
+    except AuthApiError as e:
+        if e.code == "email_not_confirmed":
+            raise HTTPException(status_code=403, detail="Please confirm your email before logging in -- check your inbox for the verification link.")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 

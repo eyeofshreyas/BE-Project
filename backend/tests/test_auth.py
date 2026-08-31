@@ -3,8 +3,10 @@
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
+from supabase_auth.errors import AuthApiError
 
 from app.middleware import auth
+from app.main import login, LoginRequest
 
 
 def _fake_supabase(rows_by_table):
@@ -95,6 +97,52 @@ def test_ensure_case_access_rejects_lawyer_out_of_scope():
             assert e.status_code == 403
 
 
+def test_get_current_user_rejects_actually_invalid_token():
+    fake = MagicMock()
+    fake.auth.get_user.side_effect = AuthApiError("invalid JWT", 401, None)
+    with patch("app.middleware.auth.supabase", fake):
+        try:
+            auth.get_current_user(authorization="Bearer bad-token")
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 401
+
+
+def test_get_current_user_does_not_logout_on_network_error():
+    fake = MagicMock()
+    fake.auth.get_user.side_effect = ConnectionError("Resource temporarily unavailable")
+    with patch("app.middleware.auth.supabase", fake):
+        try:
+            auth.get_current_user(authorization="Bearer some-token")
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 503
+
+
+def test_login_reports_unconfirmed_email_distinctly():
+    fake = MagicMock()
+    fake.auth.sign_in_with_password.side_effect = AuthApiError("Email not confirmed", 400, "email_not_confirmed")
+    with patch("app.main.supabase", fake):
+        try:
+            login(LoginRequest(email="x@example.com", password="whatever"))
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 403
+            assert "confirm" in e.detail.lower()
+
+
+def test_login_rejects_actually_wrong_password():
+    fake = MagicMock()
+    fake.auth.sign_in_with_password.side_effect = AuthApiError("Invalid login credentials", 400, "invalid_credentials")
+    with patch("app.main.supabase", fake):
+        try:
+            login(LoginRequest(email="x@example.com", password="wrong"))
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 401
+            assert e.detail == "Invalid email or password"
+
+
 if __name__ == "__main__":
     test_admin_is_unrestricted()
     test_client_with_no_profile_row_sees_nothing()
@@ -108,4 +156,8 @@ if __name__ == "__main__":
     test_ensure_case_access_allows_admin_for_any_case()
     test_ensure_case_access_allows_lawyer_in_scope()
     test_ensure_case_access_rejects_lawyer_out_of_scope()
+    test_get_current_user_rejects_actually_invalid_token()
+    test_get_current_user_does_not_logout_on_network_error()
+    test_login_reports_unconfirmed_email_distinctly()
+    test_login_rejects_actually_wrong_password()
     print("ok")
