@@ -30,6 +30,7 @@ export default function ClientsPage() {
   const [statusFilter, setStatusFilter] = useState('All Statuses')
   const [sort, setSort] = useState<(typeof SORTS)[number]>('Newest')
   const [toast, setToast] = useState<string | null>(null)
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
 
   const [addOpen, setAddOpen] = useState(false)
   const [courts, setCourts] = useState<CourtOption[]>([])
@@ -113,24 +114,30 @@ export default function ClientsPage() {
         </div>
 
         <div className={styles.statCards}>
-          {statCards.map((s) => (
+          {statCards.map((s) => {
+            const lit = s.highlight || hoveredCard === s.label
+            return (
             <div
               key={s.label}
               className={styles.statCard}
-              style={s.highlight ? { background: '#FBF0D6', border: '1px solid #EAD49B' } : undefined}
+              style={lit ? { background: '#FBF0D6', border: '1px solid #EAD49B' } : undefined}
+              onMouseEnter={() => setHoveredCard(s.label)}
+              onMouseLeave={() => setHoveredCard(null)}
             >
               <div
                 style={{
                   width: 42, height: 42, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: s.highlight ? PRIMARY_DARK : '#EFE4CB',
+                  background: lit ? PRIMARY_DARK : '#EFE4CB',
+                  transition: 'background .15s',
                 }}
               >
-                <Icon name={s.icon} size={18} color={s.highlight ? '#FFFFFF' : '#8f6743'} />
+                <Icon name={s.icon} size={18} color={lit ? '#FFFFFF' : '#8f6743'} />
               </div>
               <div className={styles.statValue} style={{ fontSize: 26, marginTop: 4 }}>{String(s.value).padStart(2, '0')}</div>
               <div className={styles.statLabel} style={{ textTransform: 'uppercase', fontSize: 11, fontWeight: 700, letterSpacing: '.03em' }}>{s.label}</div>
             </div>
-          ))}
+            )
+          })}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
