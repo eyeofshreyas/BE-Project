@@ -6,6 +6,8 @@ class HearingSummary(BaseModel):
     case_id: int
     case_number: str | None
     case_title: str | None
+    client: str | None
+    priority: str | None
     judge_name: str | None
     court_name: str | None
     hearing_date: str

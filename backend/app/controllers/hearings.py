@@ -5,7 +5,7 @@ from app.models.hearings import HearingSummary, HearingCreate, HearingUpdate
 
 HEARINGS_SELECT = (
     "hearing_id,case_id,hearing_date,hearing_time,courtroom,hearing_status,hearing_outcome,next_hearing_date,notes,"
-    "cases(case_number,case_title),judges(judge_name,courts(court_name))"
+    "cases(case_number,case_title,priority,clients(users(full_name))),judges(judge_name,courts(court_name))"
 )
 
 
@@ -17,6 +17,8 @@ def _to_hearing_summary(row: dict) -> dict:
         "case_id": row["case_id"],
         "case_number": case["case_number"] if case else None,
         "case_title": case["case_title"] if case else None,
+        "client": case["clients"]["users"]["full_name"] if case and case.get("clients") else None,
+        "priority": case["priority"] if case else None,
         "judge_name": judge["judge_name"] if judge else None,
         "court_name": judge["courts"]["court_name"] if judge and judge.get("courts") else None,
         "hearing_date": row["hearing_date"],

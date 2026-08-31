@@ -200,6 +200,10 @@ export function listHearings() {
   return get<HearingSummary[]>('/hearings')
 }
 
+export function updateHearingStatus(hearingId: number, hearing_status: string) {
+  return patch<HearingSummary>(`/hearings/${hearingId}`, { hearing_status })
+}
+
 export function listClients() {
   return get<ClientSummary[]>('/clients')
 }

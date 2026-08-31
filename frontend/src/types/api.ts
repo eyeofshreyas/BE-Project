@@ -198,6 +198,8 @@ export interface HearingSummary {
   case_id: number
   case_number: string | null
   case_title: string | null
+  client: string | null
+  priority: string | null
   judge_name: string | null
   court_name: string | null
   hearing_date: string

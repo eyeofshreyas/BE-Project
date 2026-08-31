@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { listHearings } from '../../api/client'
+import { listHearings, updateHearingStatus } from '../../api/client'
 import type { HearingSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
@@ -28,6 +28,24 @@ function isoDate(d: Date) {
   return d.toISOString().slice(0, 10)
 }
 
+const PRIORITY_COLORS: Record<string, string> = { High: '#B05C5C', Medium: '#B87F1E', Low: '#2E9E58' }
+
+function daysFromToday(dateStr: string) {
+  const diff = Math.round((new Date(dateStr).getTime() - new Date(isoDate(new Date())).getTime()) / 86400000)
+  return diff
+}
+
+function buildMonthCells(viewDate: Date) {
+  const year = viewDate.getFullYear()
+  const month = viewDate.getMonth()
+  const monthLabel = viewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const startWeekday = new Date(year, month, 1).getDay()
+  const cells: (number | null)[] = [...Array(startWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)]
+  while (cells.length % 7 !== 0) cells.push(null)
+  return { year, month, monthLabel, cells }
+}
+
 export default function HearingsPage() {
   const profile = loadProfile()
   if (profile?.role_id === 3) return <ClientHearingsView />
@@ -38,75 +56,155 @@ function StaffHearingsView() {
   const [hearings, setHearings] = useState<HearingSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [view, setView] = useState<'List' | 'Month'>('List')
+  const [viewDate, setViewDate] = useState(() => new Date())
 
   useEffect(() => {
+    refresh()
+  }, [])
+
+  function refresh() {
     listHearings()
       .then((rows) => setHearings([...rows].sort((a, b) => a.hearing_date.localeCompare(b.hearing_date))))
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load hearings.'))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  async function cancelHearing(h: HearingSummary) {
+    if (!window.confirm('Cancel this hearing?')) return
+    try {
+      await updateHearingStatus(h.id, 'Cancelled')
+      setHearings((prev) => prev.map((x) => (x.id === h.id ? { ...x, hearing_status: 'Cancelled' } : x)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel hearing.')
+    }
+  }
+
+  function jumpToMonth(dateStr: string) {
+    setViewDate(new Date(dateStr))
+    setView('Month')
+  }
 
   const today = isoDate(new Date())
-  const upcoming = hearings.filter((h) => h.hearing_date >= today)
-  const past = hearings.filter((h) => h.hearing_date < today)
+  const upcoming = hearings.filter((h) => h.hearing_date >= today && h.hearing_status !== 'Cancelled')
 
-  function renderTable(rows: HearingSummary[], emptyLabel: string) {
-    return (
-      <div className={styles.tableCard}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.th}>Case</th>
-              <th className={styles.th}>Court</th>
-              <th className={styles.th}>Judge</th>
-              <th className={styles.th}>Date</th>
-              <th className={styles.th}>Time</th>
-              <th className={styles.th}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((h) => {
-              const [color, bg] = STATUS_STYLE_MAP[h.hearing_status] || DEFAULT_STATUS_STYLE
-              return (
-                <tr key={h.id} className={styles.tr}>
-                  <td className={styles.tdMono}>{h.case_number ?? '—'}</td>
-                  <td className={styles.td}>{h.court_name ?? '—'}</td>
-                  <td className={styles.td}>{h.judge_name ?? '—'}</td>
-                  <td className={styles.td}>{h.hearing_date}</td>
-                  <td className={styles.td}>{h.hearing_time ?? '—'}</td>
-                  <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{h.hearing_status}</span></td>
-                </tr>
-              )
-            })}
-            {rows.length === 0 && (
-              <tr><td className={styles.td} colSpan={6} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>{emptyLabel}</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    )
-  }
+  const byDate = useMemo(() => {
+    const map = new Map<string, HearingSummary[]>()
+    for (const h of hearings) {
+      const list = map.get(h.hearing_date) ?? []
+      list.push(h)
+      map.set(h.hearing_date, list)
+    }
+    return map
+  }, [hearings])
+  const { year, month, monthLabel, cells } = buildMonthCells(viewDate)
 
   return (
     <div className={styles.page}>
       <div className={styles.wrap}>
         <div className={styles.header}>
           <div>
-            <div className={styles.title}>Hearings</div>
-            <div className={styles.subtitle}>Upcoming and past hearing dates across your cases.</div>
+            <div className={styles.title}>Calendar</div>
+            <div className={styles.subtitle}>All scheduled hearings, synced live from client records.</div>
+          </div>
+          <div style={{ display: 'flex', gap: 4, background: '#EFE4CB', borderRadius: 10, padding: 4 }}>
+            {(['List', 'Month'] as const).map((v) => (
+              <div
+                key={v}
+                onClick={() => setView(v)}
+                style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', color: view === v ? '#FFFFFF' : '#6A5C42', background: view === v ? PRIMARY : 'transparent' }}
+              >
+                {v}
+              </div>
+            ))}
           </div>
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading hearings…</div>}
         {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
 
-        {!loading && !error && (
-          <>
-            <div className={styles.tableHeadTitle}>Upcoming</div>
-            {renderTable(upcoming, 'No upcoming hearings.')}
-            <div className={styles.tableHeadTitle}>Past</div>
-            {renderTable(past, 'No past hearings.')}
-          </>
+        {!loading && !error && view === 'List' && (
+          <div className={styles.tableCard}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.th}>Date</th>
+                  <th className={styles.th}>Hearing</th>
+                  <th className={styles.th}>Client</th>
+                  <th className={styles.th}>Court</th>
+                  <th className={styles.th}>Priority</th>
+                  <th className={styles.th}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {upcoming.map((h) => {
+                  const dayOffset = daysFromToday(h.hearing_date)
+                  const label = h.notes || h.case_number || 'Hearing'
+                  const priorityColor = h.priority ? PRIORITY_COLORS[h.priority] : undefined
+                  return (
+                    <tr key={h.id} className={styles.tr}>
+                      <td className={styles.td}>
+                        {new Date(h.hearing_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{h.hearing_time?.slice(0, 5) ?? '—'} · {dayOffset}d</div>
+                      </td>
+                      <td className={styles.tdClient}>
+                        {label}
+                        {h.case_title && <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{h.case_title}</div>}
+                      </td>
+                      <td className={styles.td}>{h.client ?? '—'}</td>
+                      <td className={styles.td}>{h.court_name ?? '—'}{h.courtroom ? ` - ${h.courtroom}` : ''}</td>
+                      <td className={styles.td}>
+                        {h.priority && <span className={styles.statusBadge} style={{ color: priorityColor, background: '#EFEAE1' }}>{h.priority}</span>}
+                      </td>
+                      <td className={styles.td}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <div onClick={() => jumpToMonth(h.hearing_date)} style={{ cursor: 'pointer', display: 'flex' }} title="View in calendar"><Icon name="calendar" size={16} color="#6A5C42" /></div>
+                          <div onClick={() => cancelHearing(h)} style={{ cursor: 'pointer', display: 'flex' }} title="Cancel hearing"><Icon name="trash-2" size={16} color="#B05C5C" /></div>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {upcoming.length === 0 && (
+                  <tr><td className={styles.td} colSpan={6} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No upcoming hearings.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!loading && !error && view === 'Month' && (
+          <div className={styles.tableCard}>
+            <div className={styles.tableHead}>
+              <div className={styles.tableHeadTitle}>{monthLabel}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div className={styles.calendarNavBtn} onClick={() => setViewDate(new Date(year, month - 1, 1))}>‹</div>
+                <div className={styles.calendarNavBtn} onClick={() => setViewDate(new Date(year, month + 1, 1))}>›</div>
+              </div>
+            </div>
+            <div className={styles.calendarGrid}>
+              {DOW.map((d) => <div key={d} className={styles.calendarDowCell}>{d}</div>)}
+              {cells.map((day, i) => {
+                const dateKey = day ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : null
+                const dayHearings = dateKey ? byDate.get(dateKey) ?? [] : []
+                const isToday = dateKey === today
+                return (
+                  <div key={i} className={styles.calendarCell}>
+                    {day && <div className={styles.calendarDayNum} style={isToday ? { background: PRIMARY, color: '#FFFFFF' } : {}}>{day}</div>}
+                    {dayHearings.map((h) => {
+                      const [color] = STATUS_STYLE_MAP[h.hearing_status] || DEFAULT_STATUS_STYLE
+                      const label = h.notes || h.case_number || 'Hearing'
+                      return (
+                        <div key={h.id} className={styles.calendarChip} style={{ color }} title={label}>
+                          {h.hearing_time?.slice(0, 5)} {label}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -137,13 +235,7 @@ function ClientHearingsView() {
     return map
   }, [hearings])
 
-  const year = viewDate.getFullYear()
-  const month = viewDate.getMonth()
-  const monthLabel = viewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const startWeekday = new Date(year, month, 1).getDay()
-  const cells: (number | null)[] = [...Array(startWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)]
-  while (cells.length % 7 !== 0) cells.push(null)
+  const { year, month, monthLabel, cells } = buildMonthCells(viewDate)
 
   const todaysCount = hearings.filter((h) => h.hearing_date === today).length
   const upcomingCount = hearings.filter((h) => h.hearing_date >= today).length
