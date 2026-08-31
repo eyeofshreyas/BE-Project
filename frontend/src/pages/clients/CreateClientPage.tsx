@@ -50,6 +50,7 @@ export default function CreateClientPage() {
 
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   useEffect(() => {
     listCourts().then(setCourts).catch(() => {})
@@ -62,11 +63,15 @@ export default function CreateClientPage() {
   const completion = Math.round((trackedFields.filter(Boolean).length / trackedFields.length) * 100)
   const selectedCaseType = caseTypes.find((c) => String(c.case_type_id) === caseTypeId)
 
-  async function submit() {
+  function reviewAndConfirm() {
     if (!fullName.trim()) { setError(isOrg ? "Enter the organization's name." : "Enter the client's full name."); return }
     if (!email.trim()) { setError("Enter the client's email address."); return }
     if (!courtId || !caseTypeId) { setError('Choose a court and a matter category.'); return }
+    setError('')
+    setConfirmOpen(true)
+  }
 
+  async function submit() {
     const messageParts = isOrg
       ? [
           `Client type: Organization`,
@@ -93,6 +98,7 @@ export default function CreateClientPage() {
       await sendClientRequest({ email: email.trim(), court_id: Number(courtId), case_type_id: Number(caseTypeId), message: messageParts.join('\n') })
       navigate('/clients', { state: { toast: 'Invite sent — the client will appear once they accept.' } })
     } catch (err) {
+      setConfirmOpen(false)
       setError(err instanceof Error ? err.message : 'Failed to send invite.')
     } finally {
       setSending(false)
@@ -256,10 +262,31 @@ export default function CreateClientPage() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
           <div className={styles.ghostChip} onClick={() => navigate('/clients')}>Cancel</div>
-          <div className={styles.primaryChip} style={{ opacity: sending ? 0.7 : 1, pointerEvents: sending ? 'none' : 'auto' }} onClick={submit}>
-            {sending ? 'Sending…' : 'Create Client →'}
-          </div>
+          <div className={styles.primaryChip} onClick={reviewAndConfirm}>Create Client →</div>
         </div>
+
+        {confirmOpen && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={() => !sending && setConfirmOpen(false)}>
+            <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 24, width: 400, boxShadow: '0 20px 48px rgba(0,0,0,.2)' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 16, fontWeight: 700, color: '#2A2118', marginBottom: 4 }}>Send invite to {fullName || 'this client'}?</div>
+              <div style={{ fontSize: 12.5, color: MUTED, marginBottom: 16 }}>Review before sending — this emails them a real invite.</div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, background: '#FBF7EE', border: '1px solid #E7DCC6', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: MUTED }}>Type</span><strong>{clientType}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: MUTED }}>Email</span><strong>{email}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: MUTED }}>Matter</span><strong>{selectedCaseType?.case_type_name ?? '—'}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: MUTED }}>Court</span><strong>{courts.find((c) => String(c.court_id) === courtId)?.court_name ?? '—'}</strong></div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center', opacity: sending ? 0.6 : 1, pointerEvents: sending ? 'none' : 'auto' }} onClick={() => setConfirmOpen(false)}>Back</div>
+                <div className={styles.primaryChip} style={{ flex: 1, justifyContent: 'center', opacity: sending ? 0.7 : 1, pointerEvents: sending ? 'none' : 'auto' }} onClick={submit}>
+                  {sending ? 'Sending…' : 'Confirm & Send Invite'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
