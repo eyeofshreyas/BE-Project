@@ -42,8 +42,9 @@ function buildMonthCells(viewDate: Date) {
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const startWeekday = new Date(year, month, 1).getDay()
   const cells: (number | null)[] = [...Array(startWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)]
+  const trailingEmpty = (7 - (cells.length % 7)) % 7
   while (cells.length % 7 !== 0) cells.push(null)
-  return { year, month, monthLabel, cells }
+  return { year, month, monthLabel, cells, trailingEmpty }
 }
 
 export default function HearingsPage() {
@@ -97,7 +98,7 @@ function StaffHearingsView() {
     }
     return map
   }, [hearings])
-  const { year, month, monthLabel, cells } = buildMonthCells(viewDate)
+  const { year, month, monthLabel, cells, trailingEmpty } = buildMonthCells(viewDate)
 
   return (
     <div className={styles.page}>
@@ -185,12 +186,20 @@ function StaffHearingsView() {
             <div className={styles.calendarGrid}>
               {DOW.map((d) => <div key={d} className={styles.calendarDowCell}>{d}</div>)}
               {cells.map((day, i) => {
-                const dateKey = day ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : null
-                const dayHearings = dateKey ? byDate.get(dateKey) ?? [] : []
+                const trailingStart = cells.length - trailingEmpty
+                if (trailingEmpty > 0 && i === trailingStart) {
+                  return <div key="trailing" style={{ gridColumn: `span ${trailingEmpty}`, background: '#EFE4CB' }} />
+                }
+                if (day === null) {
+                  if (i > trailingStart) return null
+                  return <div key={i} className={styles.calendarCell} />
+                }
+                const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                const dayHearings = byDate.get(dateKey) ?? []
                 const isToday = dateKey === today
                 return (
                   <div key={i} className={styles.calendarCell}>
-                    {day && <div className={styles.calendarDayNum} style={isToday ? { background: PRIMARY, color: '#FFFFFF' } : {}}>{day}</div>}
+                    <div className={styles.calendarDayNum} style={isToday ? { background: PRIMARY, color: '#FFFFFF' } : {}}>{day}</div>
                     {dayHearings.map((h) => {
                       const [color] = STATUS_STYLE_MAP[h.hearing_status] || DEFAULT_STATUS_STYLE
                       const label = h.notes || h.case_number || 'Hearing'
@@ -235,7 +244,7 @@ function ClientHearingsView() {
     return map
   }, [hearings])
 
-  const { year, month, monthLabel, cells } = buildMonthCells(viewDate)
+  const { year, month, monthLabel, cells, trailingEmpty } = buildMonthCells(viewDate)
 
   const todaysCount = hearings.filter((h) => h.hearing_date === today).length
   const upcomingCount = hearings.filter((h) => h.hearing_date >= today).length
@@ -291,12 +300,20 @@ function ClientHearingsView() {
               <div className={styles.calendarGrid}>
                 {DOW.map((d) => <div key={d} className={styles.calendarDowCell}>{d}</div>)}
                 {cells.map((day, i) => {
-                  const dateKey = day ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : null
-                  const dayHearings = dateKey ? byDate.get(dateKey) ?? [] : []
+                  const trailingStart = cells.length - trailingEmpty
+                  if (trailingEmpty > 0 && i === trailingStart) {
+                    return <div key="trailing" style={{ gridColumn: `span ${trailingEmpty}`, background: '#EFE4CB' }} />
+                  }
+                  if (day === null) {
+                    if (i > trailingStart) return null
+                    return <div key={i} className={styles.calendarCell} />
+                  }
+                  const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                  const dayHearings = byDate.get(dateKey) ?? []
                   const isToday = dateKey === today
                   return (
                     <div key={i} className={styles.calendarCell}>
-                      {day && <div className={styles.calendarDayNum} style={isToday ? { background: PRIMARY, color: '#FFFFFF' } : {}}>{day}</div>}
+                      <div className={styles.calendarDayNum} style={isToday ? { background: PRIMARY, color: '#FFFFFF' } : {}}>{day}</div>
                       {dayHearings.map((h) => {
                         const [color] = STATUS_STYLE_MAP[h.hearing_status] || DEFAULT_STATUS_STYLE
                         const label = h.notes || `${h.case_number ?? 'Hearing'}`
