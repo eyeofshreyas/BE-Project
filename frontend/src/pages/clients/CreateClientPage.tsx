@@ -34,7 +34,13 @@ export default function CreateClientPage() {
   const [regNumber, setRegNumber] = useState('')
   const [contactPerson, setContactPerson] = useState('')
   const [contactDesignation, setContactDesignation] = useState('')
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const isOrg = clientType === 'Organization'
+
+  function pickLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) setLogoPreview(URL.createObjectURL(file))
+  }
 
   const [caseTypeId, setCaseTypeId] = useState('')
   const [courtId, setCourtId] = useState('')
@@ -121,6 +127,23 @@ export default function CreateClientPage() {
                   </div>
                 ))}
               </div>
+
+              {isOrg && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <label style={{ width: 64, height: 64, borderRadius: 14, border: '1.5px dashed #E0CE9E', background: '#FBF7EE', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, overflow: 'hidden' }}>
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="Organization logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <Icon name="briefcase" size={20} color="#8f6743" />
+                    )}
+                    <input type="file" accept="image/*" onChange={pickLogo} style={{ display: 'none' }} />
+                  </label>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>{logoPreview ? 'Logo selected' : 'Upload Logo'}</div>
+                    <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>Preview only for now — re-attach it to their profile once the client accepts.</div>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 {isOrg ? (
