@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { listClients, listCourts, listCaseTypes, sendClientRequest } from '../../api/client'
-import type { ClientSummary, CourtOption, CaseTypeOption } from '../../types/api'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { listClients } from '../../api/client'
+import type { ClientSummary } from '../../types/api'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
@@ -23,24 +24,16 @@ function moneyRound(n: number) {
 }
 
 export default function ClientsPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [clients, setClients] = useState<ClientSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All Statuses')
   const [sort, setSort] = useState<(typeof SORTS)[number]>('Newest')
-  const [toast, setToast] = useState<string | null>(null)
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
-
-  const [addOpen, setAddOpen] = useState(false)
-  const [courts, setCourts] = useState<CourtOption[]>([])
-  const [caseTypes, setCaseTypes] = useState<CaseTypeOption[]>([])
-  const [reqEmail, setReqEmail] = useState('')
-  const [reqCourtId, setReqCourtId] = useState('')
-  const [reqCaseTypeId, setReqCaseTypeId] = useState('')
-  const [reqMessage, setReqMessage] = useState('')
-  const [reqError, setReqError] = useState('')
-  const [sending, setSending] = useState(false)
+  const [toast, setToast] = useState<string | null>((location.state as { toast?: string } | null)?.toast ?? null)
 
   useEffect(() => {
     listClients()
@@ -49,38 +42,12 @@ export default function ClientsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  function openAdd() {
-    setAddOpen(true)
-    setReqError('')
-    if (courts.length === 0) listCourts().then(setCourts).catch(() => {})
-    if (caseTypes.length === 0) listCaseTypes().then(setCaseTypes).catch(() => {})
-  }
-
-  function closeAdd() {
-    setAddOpen(false)
-    setReqEmail('')
-    setReqCourtId('')
-    setReqCaseTypeId('')
-    setReqMessage('')
-    setReqError('')
-  }
-
-  async function submitAdd() {
-    if (!reqEmail) { setReqError("Enter the client's email address."); return }
-    if (!reqCourtId || !reqCaseTypeId) { setReqError('Choose a court and a case type.'); return }
-    setSending(true)
-    setReqError('')
-    try {
-      await sendClientRequest({ email: reqEmail, court_id: Number(reqCourtId), case_type_id: Number(reqCaseTypeId), message: reqMessage || undefined })
-      closeAdd()
-      setToast('Client request sent.')
-      setTimeout(() => setToast(null), 2200)
-    } catch (err) {
-      setReqError(err instanceof Error ? err.message : 'Failed to send request.')
-    } finally {
-      setSending(false)
-    }
-  }
+  useEffect(() => {
+    if (!toast) return
+    window.history.replaceState({}, '')
+    const timer = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   const searchLower = search.toLowerCase()
   const filtered = clients
@@ -153,7 +120,7 @@ export default function ClientsPage() {
           <select value={sort} onChange={(e) => setSort(e.target.value as (typeof SORTS)[number])} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
             {SORTS.map((s) => <option key={s} value={s}>Sort By: {s}</option>)}
           </select>
-          <div className={styles.primaryChip} onClick={openAdd}><Icon name="plus" size={15} color="#FFFFFF" /> Add Client</div>
+          <div className={styles.primaryChip} onClick={() => navigate('/clients/new')}><Icon name="plus" size={15} color="#FFFFFF" /> Add Client</div>
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading clients…</div>}
@@ -210,60 +177,6 @@ export default function ClientsPage() {
         )}
 
         {toast && <div className={styles.toast}>{toast}</div>}
-
-        {addOpen && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={closeAdd}>
-            <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 24, width: 380, boxShadow: '0 20px 48px rgba(0,0,0,.2)' }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 16, fontWeight: 700, color: '#2A2118', marginBottom: 4 }}>Add Client</div>
-              <div style={{ fontSize: 12.5, color: MUTED, marginBottom: 16 }}>Send a request to represent this client. They'll see it in their notifications and can accept or decline.</div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Client email</div>
-                  <input
-                    type="email"
-                    placeholder="client@example.com"
-                    value={reqEmail}
-                    onChange={(e) => setReqEmail(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }}
-                  />
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Court</div>
-                  <select value={reqCourtId} onChange={(e) => setReqCourtId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
-                    <option value="">Select a court…</option>
-                    {courts.map((c) => <option key={c.court_id} value={c.court_id}>{c.court_name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Case type</div>
-                  <select value={reqCaseTypeId} onChange={(e) => setReqCaseTypeId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
-                    <option value="">Select a case type…</option>
-                    {caseTypes.map((c) => <option key={c.case_type_id} value={c.case_type_id}>{c.case_type_name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Message (optional)</div>
-                  <textarea
-                    value={reqMessage}
-                    onChange={(e) => setReqMessage(e.target.value)}
-                    rows={2}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, resize: 'vertical', fontFamily: 'inherit' }}
-                  />
-                </div>
-
-                {reqError && <div style={{ fontSize: 12.5, color: '#B05C5C' }}>{reqError}</div>}
-
-                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                  <div className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center' }} onClick={closeAdd}>Cancel</div>
-                  <div className={styles.primaryChip} style={{ flex: 1, justifyContent: 'center', opacity: sending ? 0.7 : 1, pointerEvents: sending ? 'none' : 'auto' }} onClick={submitAdd}>
-                    {sending ? 'Sending…' : 'Send Request'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

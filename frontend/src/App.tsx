@@ -12,6 +12,7 @@ import DocumentsListPage from './pages/documents/DocumentsListPage'
 import BillingPage from './pages/billing/BillingPage'
 import HearingsPage from './pages/hearings/HearingsPage'
 import ClientsPage from './pages/clients/ClientsPage'
+import CreateClientPage from './pages/clients/CreateClientPage'
 import JudgementsPage from './pages/judgements/JudgementsPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="/documents" element={<ProtectedRoute><AppLayout><DocumentsListPage /></AppLayout></ProtectedRoute>} />
         <Route path="/billing" element={<ProtectedRoute><AppLayout><BillingPage /></AppLayout></ProtectedRoute>} />
         <Route path="/hearings" element={<ProtectedRoute><AppLayout><HearingsPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/clients/new" element={<ProtectedRoute><AppLayout><CreateClientPage /></AppLayout></ProtectedRoute>} />
         <Route path="/clients" element={<ProtectedRoute><AppLayout><ClientsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/judgements" element={<ProtectedRoute><AppLayout><JudgementsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
