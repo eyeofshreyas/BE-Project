@@ -43,6 +43,16 @@ export default function DocumentsListPage() {
 
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFiltersOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
 
   useEffect(() => {
     Promise.all([listDocuments(), listCases(), listDocumentTypes()])
@@ -240,14 +250,34 @@ export default function DocumentsListPage() {
                 onChange={(e) => setSearch(e.target.value)}
                 style={{ flex: 1, padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
               />
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
-              >
-                <option value="">All types</option>
-                {docTypes.map((t) => <option key={t.document_type_id} value={t.type_name}>{t.type_name}</option>)}
-              </select>
+              <div ref={filterRef} style={{ position: 'relative' }}>
+                <div
+                  className={styles.ghostChip}
+                  onClick={() => setFiltersOpen((o) => !o)}
+                  style={{ borderColor: typeFilter ? PRIMARY : undefined }}
+                >
+                  <Icon name="filter" size={14} color="#6A5C42" /> Filters
+                </div>
+                {filtersOpen && (
+                  <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', background: '#FFFFFF', border: '1px solid #E7DCC6', borderRadius: 12, boxShadow: '0 10px 24px rgba(42,33,24,.12)', padding: 6, width: 180, zIndex: 30 }}>
+                    <div
+                      onClick={() => { setTypeFilter(''); setFiltersOpen(false) }}
+                      style={{ padding: '8px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: !typeFilter ? '#8f6743' : '#2A2118', background: !typeFilter ? '#FBF0D6' : 'transparent' }}
+                    >
+                      All Categories
+                    </div>
+                    {docTypes.map((t) => (
+                      <div
+                        key={t.document_type_id}
+                        onClick={() => { setTypeFilter(t.type_name); setFiltersOpen(false) }}
+                        style={{ padding: '8px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: typeFilter === t.type_name ? '#8f6743' : '#2A2118', background: typeFilter === t.type_name ? '#FBF0D6' : 'transparent' }}
+                      >
+                        {t.type_name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className={styles.tableCard}>
