@@ -5,8 +5,10 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 from supabase_auth.errors import AuthApiError
 
+from postgrest.exceptions import APIError as PostgrestAPIError
+
 from app.middleware import auth
-from app.main import login, LoginRequest
+from app.main import login, signup, LoginRequest, SignupRequest
 
 
 def _fake_supabase(rows_by_table):
@@ -131,6 +133,37 @@ def test_login_reports_unconfirmed_email_distinctly():
             assert "confirm" in e.detail.lower()
 
 
+def test_signup_reports_duplicate_email_distinctly():
+    fake = MagicMock()
+    fake.auth.sign_up.return_value = None
+    fake.table.return_value.insert.return_value.execute.side_effect = PostgrestAPIError({
+        "message": "duplicate key value violates unique constraint \"users_email_key\"",
+        "code": "23505", "hint": None, "details": None,
+    })
+    payload = SignupRequest(email="dup@example.com", password="whatever123", full_name="Dup User", phone="9000000000", role="lawyer")
+    with patch("app.main.supabase", fake):
+        try:
+            signup(payload)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 409
+            assert "already exists" in e.detail.lower()
+
+
+def test_signup_reports_generic_profile_failure_for_other_db_errors():
+    fake = MagicMock()
+    fake.auth.sign_up.return_value = None
+    fake.table.return_value.insert.return_value.execute.side_effect = RuntimeError("db unreachable")
+    payload = SignupRequest(email="new@example.com", password="whatever123", full_name="New User", phone="9000000000", role="lawyer")
+    with patch("app.main.supabase", fake):
+        try:
+            signup(payload)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 500
+            assert "contact support" in e.detail.lower()
+
+
 def test_login_rejects_actually_wrong_password():
     fake = MagicMock()
     fake.auth.sign_in_with_password.side_effect = AuthApiError("Invalid login credentials", 400, "invalid_credentials")
@@ -160,4 +193,6 @@ if __name__ == "__main__":
     test_get_current_user_does_not_logout_on_network_error()
     test_login_reports_unconfirmed_email_distinctly()
     test_login_rejects_actually_wrong_password()
+    test_signup_reports_duplicate_email_distinctly()
+    test_signup_reports_generic_profile_failure_for_other_db_errors()
     print("ok")

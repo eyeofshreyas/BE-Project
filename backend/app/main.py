@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from supabase_auth.errors import AuthApiError
+from postgrest.exceptions import APIError as PostgrestAPIError
 from app.core.config import CORS_ORIGINS, LOG_LEVEL
 from app.db.supabase_client import supabase
 from app.middleware.auth import get_current_user
@@ -132,9 +133,14 @@ def signup(data: SignupRequest):
                     "notification_type": "client_request",
                     "is_read": False,
                 }).execute()
-    except Exception:
+    except PostgrestAPIError as e:
+        if e.code == "23505":
+            raise HTTPException(status_code=409, detail="An account with this email already exists. Try logging in instead.")
         # ponytail: auth account now exists without a profile row if this
         # fails partway; a reconciliation job is the ceiling, not built yet.
+        logger.exception("Profile setup failed after auth signup for %s", data.email)
+        raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
+    except Exception:
         logger.exception("Profile setup failed after auth signup for %s", data.email)
         raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
 
