@@ -133,10 +133,10 @@ export default function JudgementsPage() {
   const totalRelief = reliefRows.reduce((s, j) => s + (j.relief_amount ?? 0), 0)
 
   const statCards = [
-    { label: 'Judgements on Record', value: String(judgements.length).padStart(2, '0'), sub: `${judgements.length} on file`, icon: 'gavel' as const },
-    { label: 'Success Rate', value: `${successRate}%`, sub: `${wonCount} won · ${partWonCount} part-won`, icon: 'bar-chart-2' as const },
-    { label: 'Avg. Time to Judgement', value: `${avgMonths} mo`, sub: 'Filing to pronouncement', icon: 'clock' as const },
-    { label: 'Relief Recovered', value: money(totalRelief), sub: `Across ${reliefRows.length} money decrees`, icon: 'receipt' as const },
+    { label: 'Judgements on Record', value: String(judgements.length).padStart(2, '0'), sub: 'FY 2025-26 to date', icon: 'gavel' as const, pct: 100 },
+    { label: 'Success Rate', value: `${successRate}%`, sub: `${wonCount} won · ${partWonCount} part-won`, icon: 'bar-chart-2' as const, pct: successRate },
+    { label: 'Avg. Time to Judgement', value: `${avgMonths} mo`, sub: 'Filing to pronouncement', icon: 'clock' as const, pct: 100 },
+    { label: 'Relief Recovered', value: money(totalRelief), sub: `Across ${reliefRows.length} money decrees`, icon: 'receipt' as const, pct: 100 },
   ]
 
   return (
@@ -159,6 +159,7 @@ export default function JudgementsPage() {
               </div>
               <div className={styles.statValue}>{s.value}</div>
               <div style={{ fontSize: 11.5, color: MUTED }}>{s.sub}</div>
+              <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${s.pct}%` }} /></div>
             </div>
           ))}
         </div>
