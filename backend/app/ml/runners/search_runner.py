@@ -16,6 +16,7 @@ from search import search  # noqa: E402
 
 
 def main():
+    """Read the query payload from stdin, run `search()`, print results as JSON to stdout."""
     payload = json.loads(sys.stdin.read())
     results = search(payload["query"], top_k_docs=payload.get("top_k", 5))
     print(json.dumps([

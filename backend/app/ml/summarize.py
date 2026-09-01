@@ -1,3 +1,6 @@
+"""AI summarize endpoint: mounted directly in main.py. Shells out to the fine-tuned LoRA
+model running in finetune-summarizer/.venv via subprocess_utils.run_ml_subprocess()."""
+
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,16 +19,21 @@ SUMMARIZE_RUNNER = Path(__file__).resolve().parent / "runners" / "summarize_runn
 
 
 class SummarizeRequest(BaseModel):
+    """Request body: raw text plus an optional document_id to persist the result against."""
     text: str
     document_id: int | None = None
 
 
 class SummarizeResponse(BaseModel):
+    """Response body for a summarize call."""
     summary: str
 
 
 @router.post("/summarize", response_model=SummarizeResponse)
 def summarize_text(data: SummarizeRequest, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Summarize `data.text` via the LoRA model subprocess; if document_id is given, checks case
+    access and upserts the result into ai_summaries. Calls: `ensure_case_access()`,
+    `run_ml_subprocess()`, `supabase.table("ai_summaries").upsert()`."""
     if data.document_id is not None:
         doc_rows = supabase.table("documents").select("case_id").eq("document_id", data.document_id).execute().data
         if not doc_rows:

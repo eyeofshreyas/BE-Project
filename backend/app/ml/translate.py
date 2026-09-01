@@ -1,3 +1,6 @@
+"""AI translate endpoint: mounted directly in main.py. Shells out to the IndicTrans2 model
+running in finetune-summarizer/translation/.venv via subprocess_utils.run_ml_subprocess()."""
+
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,17 +31,22 @@ LANGUAGE_CODES = {
 
 
 class TranslateRequest(BaseModel):
+    """Request body: text, target language (name or raw FLORES code), and optional document_id."""
     text: str
     target_language: str
     document_id: int | None = None
 
 
 class TranslateResponse(BaseModel):
+    """Response body for a translate call."""
     translated_text: str
 
 
 @router.post("/translate", response_model=TranslateResponse)
 def translate_text(data: TranslateRequest, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Translate `data.text` to the target language via the IndicTrans2 subprocess; if
+    document_id is given, checks case access and upserts the result into ai_summaries.
+    Calls: `ensure_case_access()`, `run_ml_subprocess()`, `supabase.table("ai_summaries").upsert()`."""
     target_lang = LANGUAGE_CODES.get(data.target_language.lower(), data.target_language)
 
     if data.document_id is not None:

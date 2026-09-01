@@ -1,3 +1,5 @@
+"""Binds meeting URLs to controllers.meetings functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.meetings import (
     list_meetings,

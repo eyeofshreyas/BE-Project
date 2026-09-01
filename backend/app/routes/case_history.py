@@ -1,3 +1,5 @@
+"""Binds case-history URLs (notes, timeline, status) to controllers.case_history functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.case_history import (
     list_case_notes,

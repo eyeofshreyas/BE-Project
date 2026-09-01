@@ -1,3 +1,5 @@
+"""Controllers for court hearings: list (case-scoped), get, create, update."""
+
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
@@ -10,6 +12,7 @@ HEARINGS_SELECT = (
 
 
 def _to_hearing_summary(row: dict) -> dict:
+    """Shape a raw `hearings` row (joined with cases/clients/judges/courts) into the HearingSummary dict."""
     case = row.get("cases")
     judge = row.get("judges")
     return {
@@ -34,6 +37,7 @@ def _to_hearing_summary(row: dict) -> dict:
 # shared fetch+scope-check used by get_hearing, update_hearing, and
 # create_hearing's return path -- keeps the 404/403 logic in one place.
 def _get_hearing(hearing_id: int, case_ids: set[int] | None = None) -> dict:
+    """Fetch one hearing by ID; 404 if missing, 403 if outside case_ids. Calls: `_to_hearing_summary()`."""
     rows = supabase.table("hearings").select(HEARINGS_SELECT).eq("hearing_id", hearing_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Hearing not found")
@@ -43,6 +47,8 @@ def _get_hearing(hearing_id: int, case_ids: set[int] | None = None) -> dict:
 
 
 def list_hearings(case_id: int | None = None, profile: dict = Depends(get_current_profile)):
+    """List hearings, optionally filtered by case_id, restricted to the caller's scope.
+    Calls: `get_scoped_case_ids()`, `_to_hearing_summary()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None and not case_ids:
         return []
@@ -57,10 +63,13 @@ def list_hearings(case_id: int | None = None, profile: dict = Depends(get_curren
 
 
 def get_hearing(hearing_id: int, profile: dict = Depends(get_current_profile)):
+    """Fetch one hearing, scoped to the caller. Calls: `_get_hearing()`, `get_scoped_case_ids()`."""
     return _get_hearing(hearing_id, get_scoped_case_ids(profile))
 
 
 def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Create a hearing for a case the caller has access to, and update the case's
+    next_hearing_date. Calls: `ensure_case_access()`, `_get_hearing()`."""
     ensure_case_access(data.case_id, profile)
     row = supabase.table("hearings").insert({
         "case_id": data.case_id,
@@ -76,6 +85,8 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
 
 
 def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Update a hearing's status/outcome/notes; also syncs the case's next_hearing_date
+    if provided. Calls: `_get_hearing()`."""
     _get_hearing(hearing_id, get_scoped_case_ids(profile))
 
     updates = {k: v for k, v in data.model_dump().items() if v is not None}

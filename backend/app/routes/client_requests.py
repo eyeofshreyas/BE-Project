@@ -1,3 +1,5 @@
+"""Binds client-request (invite/accept) URLs to controllers.client_requests functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.client_requests import send_client_request, list_client_requests, respond_client_request
 from app.models.client_requests import ClientRequestSummary

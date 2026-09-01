@@ -1,7 +1,10 @@
+"""Pydantic request/response schemas for case notes, timeline events, and status history."""
+
 from pydantic import BaseModel
 
 
 class NoteSummary(BaseModel):
+    """Case note row shaped for list responses."""
     id: int
     case_id: int
     note: str
@@ -10,10 +13,12 @@ class NoteSummary(BaseModel):
 
 
 class NoteCreate(BaseModel):
+    """Request body for adding a case note."""
     note: str
 
 
 class TimelineEvent(BaseModel):
+    """Case timeline entry (auto-logged event) shaped for list responses."""
     id: int
     case_id: int
     event_type: str
@@ -24,6 +29,7 @@ class TimelineEvent(BaseModel):
 
 
 class StatusHistoryEntry(BaseModel):
+    """Case status-change record shaped for list responses."""
     id: int
     case_id: int
     previous_status: str | None
@@ -33,4 +39,5 @@ class StatusHistoryEntry(BaseModel):
 
 
 class StatusChange(BaseModel):
+    """Request body for changing a case's status."""
     new_status: str

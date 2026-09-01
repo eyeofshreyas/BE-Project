@@ -1,3 +1,6 @@
+"""AI similar-case search endpoint: mounted directly in main.py. Shells out to the FAISS +
+sentence-transformers search running in finetune-summarizer/.venv via run_ml_subprocess()."""
+
 from pathlib import Path
 
 from fastapi import APIRouter, Depends
@@ -13,11 +16,13 @@ SEARCH_RUNNER = Path(__file__).resolve().parent / "runners" / "search_runner.py"
 
 
 class SimilarCasesRequest(BaseModel):
+    """Request body: free-text query plus how many results to return."""
     query: str
     top_k: int = 5
 
 
 class SimilarCaseResult(BaseModel):
+    """One similar-case search hit."""
     doc_id: str
     score: float
     excerpt: str
@@ -25,8 +30,10 @@ class SimilarCaseResult(BaseModel):
 
 @router.post("/similar-cases", response_model=list[SimilarCaseResult])
 def similar_cases(data: SimilarCasesRequest, profile: dict = Depends(get_current_profile)):
-    # ponytail: reloads the embedding model + FAISS index on every call (a few
-    # seconds). Fine for now; move to a long-lived worker if latency matters.
+    """Run a semantic similarity search over case documents via the FAISS subprocess.
+    Calls: `run_ml_subprocess()`.
+    ponytail: reloads the embedding model + FAISS index on every call (a few
+    seconds). Fine for now; move to a long-lived worker if latency matters."""
     return run_ml_subprocess(
         [str(FINETUNE_VENV_PYTHON), str(SEARCH_RUNNER)],
         {"query": data.query, "top_k": data.top_k},

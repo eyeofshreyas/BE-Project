@@ -1,3 +1,5 @@
+"""Controllers for meetings and their participants: list, get, create, plus participant management."""
+
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
@@ -13,6 +15,7 @@ PARTICIPANTS_SELECT = "participant_id,meeting_id,user_id,participant_role,users(
 
 
 def _to_meeting_summary(row: dict) -> dict:
+    """Shape a raw `meetings` row (joined with cases/lawyers/users) into the MeetingSummary dict."""
     case = row.get("cases")
     lawyer = row.get("lawyers")
     return {
@@ -34,6 +37,7 @@ def _to_meeting_summary(row: dict) -> dict:
 
 
 def _to_participant_summary(row: dict) -> dict:
+    """Shape a raw `meeting_participants` row (joined with users) into the ParticipantSummary dict."""
     user = row.get("users")
     return {
         "participant_id": row["participant_id"],
@@ -47,6 +51,7 @@ def _to_participant_summary(row: dict) -> dict:
 # shared fetch+scope-check used by get_meeting, list_participants, and
 # add_participant -- keeps the 404/403 logic in one place.
 def _get_meeting(meeting_id: int, case_ids: set[int] | None = None) -> dict:
+    """Fetch one meeting by ID; 404 if missing, 403 if outside case_ids. Calls: `_to_meeting_summary()`."""
     rows = supabase.table("meetings").select(MEETINGS_SELECT).eq("meeting_id", meeting_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Meeting not found")
@@ -56,6 +61,8 @@ def _get_meeting(meeting_id: int, case_ids: set[int] | None = None) -> dict:
 
 
 def list_meetings(case_id: int | None = None, profile: dict = Depends(get_current_profile)):
+    """List meetings, optionally filtered by case_id, restricted to the caller's scope.
+    Calls: `get_scoped_case_ids()`, `_to_meeting_summary()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None and not case_ids:
         return []
@@ -70,10 +77,12 @@ def list_meetings(case_id: int | None = None, profile: dict = Depends(get_curren
 
 
 def get_meeting(meeting_id: int, profile: dict = Depends(get_current_profile)):
+    """Fetch one meeting, scoped to the caller. Calls: `_get_meeting()`, `get_scoped_case_ids()`."""
     return _get_meeting(meeting_id, get_scoped_case_ids(profile))
 
 
 def create_meeting(data: MeetingCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Schedule a meeting for a case the caller has access to. Calls: `ensure_case_access()`, `_get_meeting()`."""
     ensure_case_access(data.case_id, profile)
     row = supabase.table("meetings").insert({
         "case_id": data.case_id,
@@ -90,12 +99,16 @@ def create_meeting(data: MeetingCreate, profile: dict = Depends(require_roles(AD
 
 
 def list_participants(meeting_id: int, profile: dict = Depends(get_current_profile)):
+    """List participants of a meeting the caller has access to.
+    Calls: `_get_meeting()`, `get_scoped_case_ids()`, `_to_participant_summary()`."""
     _get_meeting(meeting_id, get_scoped_case_ids(profile))
     rows = supabase.table("meeting_participants").select(PARTICIPANTS_SELECT).eq("meeting_id", meeting_id).execute().data
     return [_to_participant_summary(row) for row in rows]
 
 
 def add_participant(meeting_id: int, data: ParticipantCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Add a participant to a meeting the caller has access to.
+    Calls: `_get_meeting()`, `get_scoped_case_ids()`, `_to_participant_summary()`."""
     _get_meeting(meeting_id, get_scoped_case_ids(profile))
     row = supabase.table("meeting_participants").insert({
         "meeting_id": meeting_id,

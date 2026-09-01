@@ -1,3 +1,7 @@
+"""Controllers for lawyer-to-client invite requests: send, list (own), and respond
+(accept/decline). Accepting is one of only two code paths that grant case_lawyers access
+(see cases.create_case for the other) -- see docs/BACKEND_ARCHITECTURE.md."""
+
 from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException
@@ -15,6 +19,8 @@ CLIENT_REQUESTS_SELECT = (
 
 
 def _to_summary(row: dict) -> dict:
+    """Shape a raw `client_requests` row (joined with lawyers/clients/courts/case_types)
+    into the ClientRequestSummary dict."""
     lawyer = row.get("lawyers")
     client = row.get("clients")
     court = row.get("courts")
@@ -33,8 +39,10 @@ def _to_summary(row: dict) -> dict:
 
 
 def _generate_case_number(case_type_name: str) -> str:
-    # ponytail: sequence = count of cases already using this prefix, good enough
-    # at this app's scale; move to a DB sequence if concurrent accepts collide.
+    """Build a case number from the case type's letters + year + sequence, for a case
+    created on request acceptance.
+    ponytail: sequence = count of cases already using this prefix, good enough
+    at this app's scale; move to a DB sequence if concurrent accepts collide."""
     prefix = "".join(ch for ch in case_type_name.upper() if ch.isalpha())[:3] or "GEN"
     like_prefix = f"{prefix}{datetime.now(timezone.utc).year}"
     existing = supabase.table("cases").select("case_number").like("case_number", f"{like_prefix}%").execute().data
@@ -42,6 +50,8 @@ def _generate_case_number(case_type_name: str) -> str:
 
 
 def send_client_request(data: ClientRequestCreate, profile: dict = Depends(require_roles(LAWYER))):
+    """Send an invite to a client by email (existing user or not-yet-registered), notify
+    an existing user in-app, and always email a link. Calls: `send_email()`, `_to_summary()`."""
     lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
     if not lawyer_rows:
         raise HTTPException(status_code=400, detail="No lawyer profile for this account")
@@ -89,6 +99,8 @@ def send_client_request(data: ClientRequestCreate, profile: dict = Depends(requi
 
 
 def list_client_requests(profile: dict = Depends(get_current_profile)):
+    """List client requests scoped to the caller: sent ones for a lawyer, received ones for
+    a client, none for anyone else. Calls: `_to_summary()`."""
     query = supabase.table("client_requests").select(CLIENT_REQUESTS_SELECT)
 
     if profile["role_id"] == LAWYER:
@@ -109,6 +121,9 @@ def list_client_requests(profile: dict = Depends(get_current_profile)):
 
 
 def respond_client_request(request_id: int, data: ClientRequestDecision, profile: dict = Depends(require_roles(CLIENT))):
+    """Accept or decline a pending request addressed to the calling client. On accept, creates
+    the case and its case_lawyers grant; either way notifies the lawyer. Calls:
+    `_generate_case_number()`, `_to_summary()`."""
     client_rows = supabase.table("clients").select("client_id").eq("user_id", profile["user_id"]).execute().data
     if not client_rows:
         raise HTTPException(status_code=400, detail="No client profile for this account")

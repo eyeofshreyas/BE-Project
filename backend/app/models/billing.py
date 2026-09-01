@@ -1,7 +1,10 @@
+"""Pydantic request/response schemas for billing: invoices, payments, and matter expenses."""
+
 from pydantic import BaseModel
 
 
 class InvoiceSummary(BaseModel):
+    """Invoice row shaped for list/detail responses."""
     id: int
     invoice_number: str
     case_number: str | None
@@ -15,6 +18,7 @@ class InvoiceSummary(BaseModel):
 
 
 class InvoiceCreate(BaseModel):
+    """Request body for creating an invoice."""
     case_id: int
     invoice_number: str
     amount: float
@@ -26,6 +30,7 @@ class InvoiceCreate(BaseModel):
 
 
 class PaymentSummary(BaseModel):
+    """Payment row shaped for list/detail responses."""
     payment_id: int
     invoice_id: int
     amount: float
@@ -36,6 +41,7 @@ class PaymentSummary(BaseModel):
 
 
 class PaymentCreate(BaseModel):
+    """Request body for recording a payment against an invoice."""
     invoice_id: int
     amount: float
     payment_method: str | None = None
@@ -45,6 +51,7 @@ class PaymentCreate(BaseModel):
 
 
 class ExpenseSummary(BaseModel):
+    """Matter expense row shaped for list/detail responses."""
     id: int
     matter_number: str | None
     expense_type: str
@@ -56,6 +63,7 @@ class ExpenseSummary(BaseModel):
 
 
 class ExpenseCreate(BaseModel):
+    """Request body for logging a matter expense."""
     matter_id: int
     expense_type: str
     description: str | None = None

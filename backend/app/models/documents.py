@@ -1,7 +1,10 @@
+"""Pydantic request/response schemas for uploaded documents and AI-generated summaries."""
+
 from pydantic import BaseModel
 
 
 class DocumentSummary(BaseModel):
+    """Document row shaped for list responses."""
     id: int
     file_name: str
     mime_type: str
@@ -14,10 +17,12 @@ class DocumentSummary(BaseModel):
 
 
 class DownloadUrl(BaseModel):
+    """Signed URL response for downloading a document."""
     url: str
 
 
 class AiSummary(BaseModel):
+    """AI-generated document summary, translation, and extracted metadata."""
     summary_text: str
     translated_text: str | None
     keywords: str | None

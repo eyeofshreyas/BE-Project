@@ -1,3 +1,6 @@
+"""Single chokepoint for shelling out to an ML runner script in its own venv (see summarize.py,
+translate.py, similar_cases.py). Handles timeout -> 504 and failure -> 500 mapping."""
+
 import json
 import logging
 import subprocess

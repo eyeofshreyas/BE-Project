@@ -18,6 +18,8 @@ from translate import load_model, translate  # noqa: E402
 
 
 def main():
+    """Read the text+target_lang payload from stdin. Calls: `load_model()`, `translate()`;
+    prints {"translated_text": ...} to stdout."""
     payload = json.loads(sys.stdin.read())
     model, tokenizer, ip = load_model()
     result = translate(payload["text"], payload["target_lang"], model, tokenizer, ip)

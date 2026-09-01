@@ -1,3 +1,5 @@
+"""Pydantic request/response schemas for case judgements."""
+
 from typing import Literal
 from pydantic import BaseModel
 
@@ -5,6 +7,7 @@ Outcome = Literal["Favourable", "Partly Favourable", "Against", "Settled"]
 
 
 class JudgementSummary(BaseModel):
+    """Judgement row shaped for list/detail responses."""
     id: int
     case_id: int
     case_number: str | None
@@ -23,6 +26,7 @@ class JudgementSummary(BaseModel):
 
 
 class JudgementCreate(BaseModel):
+    """Request body for recording a judgement."""
     case_id: int
     citation: str
     court: str

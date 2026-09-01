@@ -1,3 +1,5 @@
+"""Binds admin user-management URLs to controllers.users functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.users import list_users, set_user_status
 from app.models.users import UserSummary

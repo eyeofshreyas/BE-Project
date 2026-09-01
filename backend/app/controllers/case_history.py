@@ -1,3 +1,5 @@
+"""Controllers for case notes, timeline events, and status history/changes."""
+
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, ensure_case_access
@@ -9,6 +11,7 @@ STATUS_HISTORY_SELECT = "history_id,case_id,previous_status,current_status,chang
 
 
 def _to_note(row: dict) -> dict:
+    """Shape a raw `case_notes` row (joined with lawyers/users) into the NoteSummary dict."""
     lawyer = row.get("lawyers")
     return {
         "id": row["note_id"],
@@ -20,6 +23,7 @@ def _to_note(row: dict) -> dict:
 
 
 def _to_timeline_event(row: dict) -> dict:
+    """Shape a raw `case_timeline` row into the TimelineEvent dict."""
     user = row.get("users")
     return {
         "id": row["timeline_id"],
@@ -33,6 +37,7 @@ def _to_timeline_event(row: dict) -> dict:
 
 
 def _to_status_history(row: dict) -> dict:
+    """Shape a raw `case_status_history` row into the StatusHistoryEntry dict."""
     user = row.get("users")
     return {
         "id": row["history_id"],
@@ -45,12 +50,14 @@ def _to_status_history(row: dict) -> dict:
 
 
 def list_case_notes(case_id: int, profile: dict = Depends(get_current_profile)):
+    """List notes for a case the caller has access to. Calls: `ensure_case_access()`, `_to_note()`."""
     ensure_case_access(case_id, profile)
     rows = supabase.table("case_notes").select(NOTES_SELECT).eq("case_id", case_id).order("created_at", desc=True).execute().data
     return [_to_note(row) for row in rows]
 
 
 def add_case_note(case_id: int, data: NoteCreate, profile: dict = Depends(require_roles(LAWYER))):
+    """Add a note to a case as the calling lawyer. Calls: `ensure_case_access()`, `_to_note()`."""
     ensure_case_access(case_id, profile)
     lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
     if not lawyer_rows:
@@ -66,18 +73,24 @@ def add_case_note(case_id: int, data: NoteCreate, profile: dict = Depends(requir
 
 
 def list_case_timeline(case_id: int, profile: dict = Depends(get_current_profile)):
+    """List timeline events for a case the caller has access to.
+    Calls: `ensure_case_access()`, `_to_timeline_event()`."""
     ensure_case_access(case_id, profile)
     rows = supabase.table("case_timeline").select(TIMELINE_SELECT).eq("case_id", case_id).order("created_at", desc=True).execute().data
     return [_to_timeline_event(row) for row in rows]
 
 
 def list_status_history(case_id: int, profile: dict = Depends(get_current_profile)):
+    """List status-change history for a case the caller has access to.
+    Calls: `ensure_case_access()`, `_to_status_history()`."""
     ensure_case_access(case_id, profile)
     rows = supabase.table("case_status_history").select(STATUS_HISTORY_SELECT).eq("case_id", case_id).order("changed_at", desc=True).execute().data
     return [_to_status_history(row) for row in rows]
 
 
 def change_case_status(case_id: int, data: StatusChange, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Update a case's status, and record both a status-history row and a timeline event.
+    Calls: `ensure_case_access()`, `_to_status_history()`."""
     ensure_case_access(case_id, profile)
     case_rows = supabase.table("cases").select("status").eq("case_id", case_id).execute().data
     if not case_rows:

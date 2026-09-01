@@ -1,3 +1,5 @@
+"""Binds document URLs to controllers.documents functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.documents import list_documents, get_document_summary, upload_document, get_document_download_url, delete_document
 from app.models.documents import DocumentSummary, AiSummary, DownloadUrl

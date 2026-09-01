@@ -1,3 +1,5 @@
+"""SMTP email sending helper used for notification emails throughout the app."""
+
 import logging
 import smtplib
 from email.message import EmailMessage

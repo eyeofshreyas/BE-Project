@@ -1,3 +1,8 @@
+"""FastAPI app entrypoint: builds the app, adds CORS, mounts every domain's APIRouter
+(app.routes.*, plus the ML routers under app.ml.*), and defines auth routes
+(signup/login/forgot-password) and the /protected demo route directly. See
+docs/BACKEND_ARCHITECTURE.md for the request lifecycle."""
+
 import logging
 from typing import Literal
 
@@ -64,6 +69,7 @@ ROLE_IDS = {"lawyer": 2, "client": 3}
 
 # --- Schemas ---
 class SignupRequest(BaseModel):
+    """Request body for /signup: account credentials plus role-specific profile fields."""
     email: EmailStr
     password: str
     full_name: str
@@ -76,19 +82,25 @@ class SignupRequest(BaseModel):
     preferred_language: str | None = None
 
 class LoginRequest(BaseModel):
+    """Request body for /login."""
     email: EmailStr
     password: str
 
 class ForgotPasswordRequest(BaseModel):
+    """Request body for /forgot-password."""
     email: EmailStr
 
 # --- Routes ---
 @app.get("/")
 def read_root():
+    """Health-check root endpoint."""
     return {"message": "LexFlow backend running"}
 
 @app.post("/signup", dependencies=[Depends(rate_limit(5, 60))])
 def signup(data: SignupRequest):
+    """Create a Supabase Auth account, then a LexFlow `users` row and role-specific profile
+    (lawyer/client); for a client signup, backfills any pending client_requests invites sent
+    to this email before the account existed. Calls: `supabase.auth.sign_up()`."""
     try:
         supabase.auth.sign_up({
             "email": data.email,
@@ -148,6 +160,8 @@ def signup(data: SignupRequest):
 
 @app.post("/login", dependencies=[Depends(rate_limit(10, 60))])
 def login(data: LoginRequest):
+    """Authenticate against Supabase Auth and return tokens plus the LexFlow profile row.
+    Calls: `supabase.auth.sign_in_with_password()`."""
     try:
         result = supabase.auth.sign_in_with_password({
             "email": data.email,
@@ -170,6 +184,7 @@ def login(data: LoginRequest):
 
 @app.post("/forgot-password", dependencies=[Depends(rate_limit(5, 60))])
 def forgot_password(data: ForgotPasswordRequest):
+    """Trigger a Supabase Auth password-reset email. Calls: `supabase.auth.reset_password_for_email()`."""
     try:
         supabase.auth.reset_password_for_email(data.email)
         return {"message": "Password reset email sent. Check your inbox."}
@@ -183,4 +198,5 @@ def forgot_password(data: ForgotPasswordRequest):
 # checks the LexFlow profile row and its is_active flag.
 @app.get("/protected")
 def protected_route(current_user=Depends(get_current_user)):
+    """Demo route proving raw token auth works. Calls: `get_current_user()`."""
     return {"message": f"Hello {current_user.email}, you're authenticated!"}

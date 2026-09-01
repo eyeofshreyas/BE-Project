@@ -1,3 +1,5 @@
+"""Loads app configuration (Supabase, CORS, SMTP) from environment variables via .env."""
+
 import os
 
 from dotenv import load_dotenv
@@ -6,6 +8,7 @@ load_dotenv()
 
 
 def _require(name: str) -> str:
+    """Return env var `name` or raise RuntimeError if unset/empty. Used for required settings below."""
     value = os.getenv(name)
     if not value:
         raise RuntimeError(f"Missing required environment variable: {name}")

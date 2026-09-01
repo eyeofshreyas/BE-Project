@@ -1,3 +1,5 @@
+"""Binds case URLs to controllers.cases functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.cases import create_case, list_cases, unassign_lawyer
 from app.models.cases import CaseSummary

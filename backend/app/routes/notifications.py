@@ -1,3 +1,5 @@
+"""Binds notification URLs to controllers.notifications functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.notifications import list_notifications, mark_read, mark_all_read
 from app.models.notifications import NotificationSummary

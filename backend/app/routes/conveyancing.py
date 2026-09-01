@@ -1,3 +1,5 @@
+"""Binds conveyancing matter URLs to controllers.conveyancing functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.conveyancing import (
     conveyancing_summary,

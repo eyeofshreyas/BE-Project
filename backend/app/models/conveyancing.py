@@ -1,7 +1,10 @@
+"""Pydantic request/response schemas for conveyancing matters (property transactions)."""
+
 from pydantic import BaseModel
 
 
 class Stats(BaseModel):
+    """Aggregate conveyancing counts shown on the summary dashboard."""
     active_matters: int
     pending_registrations: int
     completed_registrations: int
@@ -9,11 +12,13 @@ class Stats(BaseModel):
 
 
 class StatusCount(BaseModel):
+    """Count of matters grouped by a status label."""
     label: str
     count: int
 
 
 class MatterSummary(BaseModel):
+    """Conveyancing matter row shaped for list responses."""
     matter_id: int
     case_id: int | None
     number: str
@@ -27,12 +32,14 @@ class MatterSummary(BaseModel):
 
 
 class ConveyancingSummary(BaseModel):
+    """Combined dashboard payload: stats, status breakdown, and recent matters."""
     stats: Stats
     status_breakdown: list[StatusCount]
     recent_matters: list[MatterSummary]
 
 
 class Property(BaseModel):
+    """Property details attached to a conveyancing matter."""
     property_id: int
     property_name: str
     address: str
@@ -46,6 +53,7 @@ class Property(BaseModel):
 
 
 class DueDiligence(BaseModel):
+    """Due-diligence checklist state for a matter."""
     diligence_id: int
     title_clear: bool | None
     tax_verified: bool | None
@@ -57,6 +65,7 @@ class DueDiligence(BaseModel):
 
 
 class DueDiligenceUpdate(BaseModel):
+    """Request body for updating a matter's due-diligence checklist."""
     title_clear: bool | None = None
     tax_verified: bool | None = None
     encumbrance_checked: bool | None = None
@@ -65,6 +74,7 @@ class DueDiligenceUpdate(BaseModel):
 
 
 class ProgressStage(BaseModel):
+    """One stage in a matter's registration progress pipeline."""
     progress_id: int
     stage_name: str
     stage_order: int
@@ -74,6 +84,7 @@ class ProgressStage(BaseModel):
 
 
 class PropertyRegistration(BaseModel):
+    """Registration office record for a matter."""
     registration_id: int
     office_name: str | None
     registration_number: str | None
@@ -85,6 +96,7 @@ class PropertyRegistration(BaseModel):
 
 
 class MatterDocument(BaseModel):
+    """Document attached to a matter, with verification state."""
     matter_document_id: int
     document_id: int
     file_name: str | None
@@ -94,6 +106,7 @@ class MatterDocument(BaseModel):
 
 
 class MatterDetail(BaseModel):
+    """Full matter detail response: property, due diligence, progress, registration, and documents."""
     matter_id: int
     matter_number: str
     matter_type: str | None

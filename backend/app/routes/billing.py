@@ -1,3 +1,5 @@
+"""Binds billing URLs (invoices, payments, expenses) to controllers.billing functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.billing import (
     list_invoices,

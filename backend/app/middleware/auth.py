@@ -1,3 +1,6 @@
+"""Auth/authorization dependency chain: token verification, profile lookup, role checks, and
+per-case access checks. See docs/BACKEND_ARCHITECTURE.md for the full call-chain diagram."""
+
 import logging
 
 from fastapi import Depends, Header, HTTPException
@@ -12,6 +15,8 @@ CLIENT = 3
 
 
 def get_current_user(authorization: str = Header(...)):
+    """Verify the Bearer token against Supabase Auth. 401 if rejected, 503 if Supabase Auth is
+    unreachable. Calls: `supabase.auth.get_user()`. Used directly only by main.py's /protected route."""
     token = authorization.replace("Bearer ", "")
     try:
         user = supabase.auth.get_user(token)
@@ -26,6 +31,8 @@ def get_current_user(authorization: str = Header(...)):
 
 
 def get_current_profile(current_user=Depends(get_current_user)):
+    """Look up the LexFlow `users` row for the verified user's email; 401 if none, 403 if inactive.
+    Calls: `get_current_user()`. The dependency almost every route uses."""
     rows = supabase.table("users").select("user_id,role_id,full_name,email,is_active").eq("email", current_user.email).execute().data
     if not rows:
         raise HTTPException(status_code=401, detail="No LexFlow profile for this account")
@@ -35,6 +42,8 @@ def get_current_profile(current_user=Depends(get_current_user)):
 
 
 def require_roles(*allowed_role_ids: int):
+    """Build a FastAPI dependency that 403s unless the caller's role_id is in allowed_role_ids.
+    Checks *what* the caller is, not *which* records they may touch. Calls: `get_current_profile()`."""
     def dependency(profile: dict = Depends(get_current_profile)):
         if profile["role_id"] not in allowed_role_ids:
             raise HTTPException(status_code=403, detail="You don't have permission to perform this action")

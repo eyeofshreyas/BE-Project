@@ -1,3 +1,5 @@
+"""Binds judgement URLs to controllers.judgements functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.judgements import list_judgements, create_judgement
 from app.models.judgements import JudgementSummary

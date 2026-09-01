@@ -1,7 +1,10 @@
+"""Pydantic request/response schemas for cases."""
+
 from pydantic import BaseModel
 
 
 class CaseCreate(BaseModel):
+    """Request body for creating a case."""
     case_type_id: int
     case_title: str
     client_id: int
@@ -12,6 +15,7 @@ class CaseCreate(BaseModel):
 
 
 class CaseSummary(BaseModel):
+    """Case row shaped for list/detail responses, joined with client/lawyer/court/type info."""
     id: str
     case_id: int
     case_title: str | None

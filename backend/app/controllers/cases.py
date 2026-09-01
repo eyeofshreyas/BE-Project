@@ -1,3 +1,5 @@
+"""Controllers for cases: list (scoped), create, and unassign-lawyer."""
+
 from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException
@@ -15,6 +17,7 @@ CASES_SELECT = (
 
 
 def _active_case_lawyer(case_lawyers: list[dict]) -> dict | None:
+    """Return the first case_lawyers entry with is_active=True and a joined lawyer, or None."""
     for cl in case_lawyers:
         if cl.get("is_active") and cl.get("lawyers"):
             return cl
@@ -22,6 +25,8 @@ def _active_case_lawyer(case_lawyers: list[dict]) -> dict | None:
 
 
 def _to_case_summary(row: dict) -> dict:
+    """Shape a raw `cases` row (joined with clients/courts/case_types/case_lawyers) into
+    the CaseSummary dict. Calls: `_active_case_lawyer()`."""
     active_lawyer = _active_case_lawyer(row["case_lawyers"])
     return {
         "id": row["case_number"],
@@ -43,6 +48,7 @@ def _to_case_summary(row: dict) -> dict:
 
 
 def list_cases(profile: dict = Depends(get_current_profile)):
+    """List cases visible to the caller. Calls: `get_scoped_case_ids()`, `_to_case_summary()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None and not case_ids:
         return []
@@ -55,8 +61,9 @@ def list_cases(profile: dict = Depends(get_current_profile)):
 
 
 def _generate_case_number(case_type_name: str) -> str:
-    # ponytail: sequence = count of cases already using this prefix, same
-    # scheme as client_requests._generate_case_number.
+    """Build a case number like "CIV2026001" from the case type's letters + year + sequence.
+    ponytail: sequence = count of cases already using this prefix, same
+    scheme as client_requests._generate_case_number."""
     prefix = "".join(ch for ch in case_type_name.upper() if ch.isalpha())[:3] or "GEN"
     like_prefix = f"{prefix}{datetime.now(timezone.utc).year}"
     existing = supabase.table("cases").select("case_number").like("case_number", f"{like_prefix}%").execute().data
@@ -64,6 +71,9 @@ def _generate_case_number(case_type_name: str) -> str:
 
 
 def create_case(data: CaseCreate, profile: dict = Depends(require_roles(LAWYER))):
+    """Create a case for a client who has accepted this lawyer's client_requests invite,
+    assign the lawyer as Primary, and optionally seed a case note. Calls:
+    `_generate_case_number()`, `_to_case_summary()`."""
     lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
     if not lawyer_rows:
         raise HTTPException(status_code=400, detail="No lawyer profile for this account")

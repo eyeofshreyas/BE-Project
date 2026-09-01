@@ -1,3 +1,5 @@
+"""Binds hearing URLs to controllers.hearings functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.hearings import (
     list_hearings,

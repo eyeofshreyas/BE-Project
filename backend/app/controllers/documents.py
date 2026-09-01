@@ -1,3 +1,6 @@
+"""Controllers for case documents: list, upload (to Supabase Storage), delete (soft),
+download URL, and fetching an AI-generated summary."""
+
 import uuid
 
 from fastapi import Depends, File, Form, HTTPException, UploadFile
@@ -13,6 +16,7 @@ DOCUMENTS_SELECT = (
 
 
 def _to_document_summary(row: dict, has_summary: bool = False) -> dict:
+    """Shape a raw `documents` row (joined with document_types/cases/users) into the DocumentSummary dict."""
     return {
         "id": row["document_id"],
         "file_name": row["file_name"],
@@ -27,6 +31,8 @@ def _to_document_summary(row: dict, has_summary: bool = False) -> dict:
 
 
 def list_documents(profile: dict = Depends(get_current_profile)):
+    """List non-deleted documents visible to the caller, flagging which already have an AI summary.
+    Calls: `get_scoped_case_ids()`, `_to_document_summary()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None and not case_ids:
         return []
@@ -47,6 +53,7 @@ def list_documents(profile: dict = Depends(get_current_profile)):
 
 
 def delete_document(document_id: int, profile: dict = Depends(get_current_profile)):
+    """Soft-delete a document (sets is_deleted=True) the caller has access to. Calls: `ensure_case_access()`."""
     rows = supabase.table("documents").select("case_id").eq("document_id", document_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -55,14 +62,15 @@ def delete_document(document_id: int, profile: dict = Depends(get_current_profil
     return {"message": "Document deleted"}
 
 
-# case_id is bound from the URL path (routes/documents.py's
-# /cases/{case_id}/documents), not the multipart body.
 def upload_document(
     case_id: int,
     document_type_id: int = Form(...),
     file: UploadFile = File(...),
     profile: dict = Depends(get_current_profile),
 ):
+    """Upload a file to Supabase Storage under case-{case_id}/ and record it in `documents`.
+    case_id is bound from the URL path (routes/documents.py's /cases/{case_id}/documents), not
+    the multipart body. Calls: `ensure_case_access()`, `_to_document_summary()`."""
     ensure_case_access(case_id, profile)
 
     content = file.file.read()
@@ -87,6 +95,8 @@ def upload_document(
 
 
 def get_document_download_url(document_id: int, profile: dict = Depends(get_current_profile)):
+    """Return a short-lived signed Supabase Storage URL for a document the caller has access to.
+    Calls: `get_scoped_case_ids()`."""
     case_ids = get_scoped_case_ids(profile)
     rows = supabase.table("documents").select("case_id,file_path").eq("document_id", document_id).execute().data
     if not rows:
@@ -99,6 +109,8 @@ def get_document_download_url(document_id: int, profile: dict = Depends(get_curr
 
 
 def get_document_summary(document_id: int, profile: dict = Depends(get_current_profile)):
+    """Return the latest AI-generated summary/translation for a document the caller has access to;
+    404 if none exists yet. Calls: `get_scoped_case_ids()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None:
         doc_rows = supabase.table("documents").select("case_id").eq("document_id", document_id).execute().data

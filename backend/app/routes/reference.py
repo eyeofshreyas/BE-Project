@@ -1,3 +1,5 @@
+"""Binds reference/lookup-data URLs to controllers.reference functions. No logic."""
+
 from fastapi import APIRouter
 from app.controllers.reference import list_roles, list_case_types, list_courts, list_judges, list_document_types
 from app.models.reference import Role, CaseType, Court, Judge, DocumentType

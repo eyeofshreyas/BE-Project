@@ -1,3 +1,5 @@
+"""Controllers for billing: invoices, payments, and conveyancing-matter expenses."""
+
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
@@ -17,6 +19,7 @@ EXPENSES_SELECT = (
 
 
 def _to_expense_summary(row: dict) -> dict:
+    """Shape a raw `miscellaneous_expenses` row (joined with matters/users) into the ExpenseSummary dict."""
     matter = row.get("conveyancing_matters")
     creator = row.get("users")
     return {
@@ -32,6 +35,7 @@ def _to_expense_summary(row: dict) -> dict:
 
 
 def _invoice_status_for(total_paid: float, total_amount: float) -> str:
+    """Derive payment_status ("Paid"/"Partially Paid"/"Pending") from amount paid vs. owed."""
     if total_paid >= total_amount:
         return "Paid"
     if total_paid > 0:
@@ -40,6 +44,7 @@ def _invoice_status_for(total_paid: float, total_amount: float) -> str:
 
 
 def _to_invoice_summary(row: dict) -> dict:
+    """Shape a raw `invoices` row (joined with cases/clients) into the InvoiceSummary dict."""
     case = row.get("cases")
     return {
         "id": row["invoice_id"],
@@ -58,6 +63,7 @@ def _to_invoice_summary(row: dict) -> dict:
 # shared fetch+scope-check used by get_invoice, list_invoice_payments, and
 # create_payment so each doesn't reimplement the 404/403 checks.
 def _get_invoice(invoice_id: int, case_ids: set[int] | None = None) -> dict:
+    """Fetch one invoice by ID; 404 if missing, 403 if outside case_ids. Calls: `_to_invoice_summary()`."""
     rows = supabase.table("invoices").select(INVOICES_SELECT).eq("invoice_id", invoice_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -67,6 +73,7 @@ def _get_invoice(invoice_id: int, case_ids: set[int] | None = None) -> dict:
 
 
 def list_invoices(profile: dict = Depends(get_current_profile)):
+    """List invoices for cases in the caller's scope. Calls: `get_scoped_case_ids()`, `_to_invoice_summary()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None and not case_ids:
         return []
@@ -79,10 +86,12 @@ def list_invoices(profile: dict = Depends(get_current_profile)):
 
 
 def get_invoice(invoice_id: int, profile: dict = Depends(get_current_profile)):
+    """Fetch one invoice, scoped to the caller. Calls: `_get_invoice()`, `get_scoped_case_ids()`."""
     return _get_invoice(invoice_id, get_scoped_case_ids(profile))
 
 
 def send_invoice_reminder(invoice_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Notify the invoice's client (in-app) that payment is due. Calls: `ensure_case_access()`."""
     rows = supabase.table("invoices").select(
         "invoice_number,total_amount,case_id,cases(client_id,case_number)"
     ).eq("invoice_id", invoice_id).execute().data
@@ -112,6 +121,7 @@ def send_invoice_reminder(invoice_id: int, profile: dict = Depends(require_roles
 
 
 def create_invoice(data: InvoiceCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Create an invoice for a case the caller has access to. Calls: `ensure_case_access()`, `_get_invoice()`."""
     ensure_case_access(data.case_id, profile)
     row = supabase.table("invoices").insert({
         "case_id": data.case_id,
@@ -128,11 +138,14 @@ def create_invoice(data: InvoiceCreate, profile: dict = Depends(require_roles(AD
 
 
 def list_invoice_payments(invoice_id: int, profile: dict = Depends(get_current_profile)):
+    """List payments for an invoice the caller has access to. Calls: `_get_invoice()`, `get_scoped_case_ids()`."""
     _get_invoice(invoice_id, get_scoped_case_ids(profile))
     return supabase.table("payments").select(PAYMENTS_SELECT).eq("invoice_id", invoice_id).order("payment_date", desc=True).execute().data
 
 
 def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Record a payment against an invoice the caller has access to, then recompute and persist
+    the invoice's payment_status. Calls: `_get_invoice()`, `get_scoped_case_ids()`, `_invoice_status_for()`."""
     _get_invoice(data.invoice_id, get_scoped_case_ids(profile))
     payment = supabase.table("payments").insert(data.model_dump()).execute().data[0]
 
@@ -147,6 +160,8 @@ def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(AD
 
 
 def list_expenses(matter_id: int | None = None, profile: dict = Depends(get_current_profile)):
+    """List matter expenses, optionally filtered by matter_id, restricted to the caller's scope.
+    Calls: `get_scoped_case_ids()`, `_to_expense_summary()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None and not case_ids:
         return []
@@ -163,6 +178,8 @@ def list_expenses(matter_id: int | None = None, profile: dict = Depends(get_curr
 
 
 def create_expense(data: ExpenseCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Log an expense for a matter whose owning case the caller has access to.
+    Calls: `ensure_case_access()`, `_to_expense_summary()`."""
     matter_rows = supabase.table("conveyancing_matters").select("case_id").eq("matter_id", data.matter_id).execute().data
     if not matter_rows:
         raise HTTPException(status_code=404, detail="Matter not found")

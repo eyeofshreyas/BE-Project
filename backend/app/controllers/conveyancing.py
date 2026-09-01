@@ -1,3 +1,6 @@
+"""Controllers for conveyancing (property transaction) matters: dashboard summary, matter
+detail, due-diligence updates, and registration progress."""
+
 from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException
@@ -15,6 +18,7 @@ MATTERS_SELECT = (
 
 
 def _registration_date(row: dict) -> str | None:
+    """Extract the registration_date from a matter row's joined property_registrations."""
     regs = row.get("property_registrations")
     if not regs:
         return None
@@ -23,6 +27,7 @@ def _registration_date(row: dict) -> str | None:
 
 
 def _active_matter_lawyer(case_lawyers: list[dict]) -> str | None:
+    """Return the active assigned lawyer's full name from a matter's joined case_lawyers, or None."""
     for cl in case_lawyers or []:
         if cl.get("is_active") and cl.get("lawyers"):
             return cl["lawyers"]["users"]["full_name"]
@@ -33,6 +38,9 @@ PENDING_STATUSES = {"Pending", "Registration Scheduled"}
 
 
 def conveyancing_summary(profile: dict = Depends(get_current_profile)):
+    """Build the conveyancing dashboard: stats, status breakdown, and up to 500 recent matters,
+    all scoped to the caller. Calls: `get_scoped_case_ids()`, `_active_matter_lawyer()`,
+    `_registration_date()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None and not case_ids:
         rows = []
@@ -90,6 +98,8 @@ def conveyancing_summary(profile: dict = Depends(get_current_profile)):
 
 
 def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profile)):
+    """Fetch a matter's full detail: property, due diligence, progress stages, registration,
+    and documents. 404 if missing, 403 if outside the caller's scope. Calls: `get_scoped_case_ids()`."""
     matter_rows = supabase.table("conveyancing_matters").select("*").eq("matter_id", matter_id).execute().data
     if not matter_rows:
         raise HTTPException(status_code=404, detail="Matter not found")
@@ -147,9 +157,9 @@ def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profil
     }
 
 
-# matters aren't scoped directly -- resolve to the owning case_id and
-# defer to auth.ensure_case_access, same as documents/hearings/meetings do.
 def _ensure_matter_access(matter_id: int, profile: dict) -> None:
+    """Resolve matter_id to its owning case_id and defer to `ensure_case_access()` -- matters
+    aren't scoped directly, same pattern as documents/hearings/meetings. 404 if matter missing."""
     matter_rows = supabase.table("conveyancing_matters").select("case_id").eq("matter_id", matter_id).execute().data
     if not matter_rows:
         raise HTTPException(status_code=404, detail="Matter not found")
@@ -157,6 +167,7 @@ def _ensure_matter_access(matter_id: int, profile: dict) -> None:
 
 
 def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Update a matter's due-diligence checklist fields. Calls: `_ensure_matter_access()`."""
     _ensure_matter_access(matter_id, profile)
 
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -171,6 +182,8 @@ def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict
 
 
 def complete_progress_stage(matter_id: int, progress_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Mark one registration-progress stage complete and recompute the matter's
+    completion_percentage from all stages. Calls: `_ensure_matter_access()`."""
     _ensure_matter_access(matter_id, profile)
 
     rows = supabase.table("registration_progress").update({

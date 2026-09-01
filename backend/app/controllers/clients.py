@@ -1,3 +1,6 @@
+"""Controller for listing clients, scoped by role: all clients for admins, only clients
+on cases the lawyer is actively assigned to via case_lawyers for lawyers."""
+
 from fastapi import Depends
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, require_roles
@@ -8,6 +11,7 @@ ACTIVE_STATUSES = {"Open", "In Progress"}
 
 
 def _to_client_summary(row: dict, active_cases: int, status: str, pending_amount: float) -> dict:
+    """Shape a raw `clients` row (joined with users) plus derived counts into the ClientSummary dict."""
     user = row["users"]
     return {
         "id": row["client_id"],
@@ -23,6 +27,8 @@ def _to_client_summary(row: dict, active_cases: int, status: str, pending_amount
 
 
 def list_clients(profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """List clients visible to the caller (all for admin, case-linked for lawyer), each with
+    computed active-case count, status, and pending invoice amount. Calls: `_to_client_summary()`."""
     if profile["role_id"] == ADMIN:
         client_rows = supabase.table("clients").select(CLIENTS_SELECT).execute().data
     else:

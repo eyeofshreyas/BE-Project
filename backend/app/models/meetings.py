@@ -1,7 +1,10 @@
+"""Pydantic request/response schemas for meetings and their participants."""
+
 from pydantic import BaseModel
 
 
 class MeetingSummary(BaseModel):
+    """Meeting row shaped for list/detail responses."""
     id: int
     case_id: int
     case_number: str | None
@@ -19,6 +22,7 @@ class MeetingSummary(BaseModel):
 
 
 class MeetingCreate(BaseModel):
+    """Request body for scheduling a meeting."""
     case_id: int
     conducted_by: int
     meeting_title: str | None = None
@@ -30,6 +34,7 @@ class MeetingCreate(BaseModel):
 
 
 class ParticipantSummary(BaseModel):
+    """Meeting participant row shaped for list responses."""
     participant_id: int
     meeting_id: int
     user_id: int
@@ -38,5 +43,6 @@ class ParticipantSummary(BaseModel):
 
 
 class ParticipantCreate(BaseModel):
+    """Request body for adding a participant to a meeting."""
     user_id: int
     participant_role: str | None = None

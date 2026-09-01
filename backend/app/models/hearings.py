@@ -1,7 +1,10 @@
+"""Pydantic request/response schemas for court hearings."""
+
 from pydantic import BaseModel
 
 
 class HearingSummary(BaseModel):
+    """Hearing row shaped for list/detail responses, joined with case/court/judge info."""
     id: int
     case_id: int
     case_number: str | None
@@ -20,6 +23,7 @@ class HearingSummary(BaseModel):
 
 
 class HearingCreate(BaseModel):
+    """Request body for scheduling a hearing."""
     case_id: int
     judge_id: int
     hearing_date: str
@@ -29,6 +33,7 @@ class HearingCreate(BaseModel):
 
 
 class HearingUpdate(BaseModel):
+    """Request body for updating a hearing's outcome/status."""
     hearing_status: str | None = None
     hearing_outcome: str | None = None
     next_hearing_date: str | None = None

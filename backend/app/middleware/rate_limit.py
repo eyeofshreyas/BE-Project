@@ -1,3 +1,5 @@
+"""Per-route, per-client-IP sliding-window rate limiting dependency."""
+
 import time
 from collections import defaultdict
 from threading import Lock
@@ -16,6 +18,7 @@ def rate_limit(max_requests: int, window_seconds: float):
     worker/replica.
     """
     def dependency(request: Request) -> None:
+        """Reject with 429 if this path+client-IP has hit max_requests within window_seconds."""
         key = f"{request.url.path}:{request.client.host if request.client else 'unknown'}"
         now = time.monotonic()
         with _lock:

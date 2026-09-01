@@ -19,6 +19,8 @@ from summarize_long import load_model, summarize  # noqa: E402
 
 
 def main():
+    """Read the text payload from stdin. Calls: `load_model()`, `summarize()`;
+    prints {"summary": ...} to stdout."""
     payload = json.loads(sys.stdin.read())
     model, tokenizer = load_model()
     result = summarize(model, tokenizer, payload["text"])
