@@ -62,4 +62,6 @@ class ExpenseCreate(BaseModel):
     amount: float
     expense_date: str
     receipt_document_id: int | None = None
-    created_by: int
+    # ignored server-side (set from the authenticated profile) -- kept
+    # optional so old clients that still send it don't break.
+    created_by: int | None = None
