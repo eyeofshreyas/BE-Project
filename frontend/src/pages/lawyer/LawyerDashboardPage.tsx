@@ -1,3 +1,4 @@
+/** Lawyer-role dashboard rendered by `DashboardPage` for `role_id === 2`. Aggregates cases, hearings, clients, invoices, and documents into stat cards and a 12-month filing chart. */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listCases, listHearings, listClients, listInvoices, listDocuments } from '../../api/client'
@@ -29,6 +30,7 @@ function dateBadge(iso: string) {
   return { day: String(d.getDate()).padStart(2, '0'), month: MONTH_LABELS[d.getMonth()].toUpperCase() }
 }
 
+/** Fetches cases/hearings/clients/invoices/documents in parallel and derives all stat/chart figures client-side; "New Case"/"Upload Document" navigate elsewhere. */
 export default function LawyerDashboardPage() {
   const navigate = useNavigate()
   const profile = loadProfile()

@@ -1,3 +1,4 @@
+/** `/cases` route: role-dispatches to `StaffCasesView` (lawyer/admin, filterable table) or `ClientCasesView` (client, stats + progress cards). */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listCases, listHearings, listCaseTimeline } from '../../api/client'
@@ -51,6 +52,7 @@ export default function CasesListPage() {
   return <StaffCasesView />
 }
 
+/** Loads all cases via `listCases()`; supports search + status-tab filtering; row click and "New Case" navigate to `/cases/:caseId` and `/cases/new`. */
 function StaffCasesView() {
   const navigate = useNavigate()
   const [cases, setCases] = useState<CaseSummary[]>([])
@@ -150,6 +152,12 @@ function StaffCasesView() {
   )
 }
 
+/**
+ * Loads the client's cases (`listCases()`), hearings (`listHearings()`) for
+ * the "next hearing" stat, and each case's timeline (`listCaseTimeline()`)
+ * to build a flattened "Recent Updates" feed. Renders stat cards + a
+ * progress-bar card per case.
+ */
 function ClientCasesView() {
   const navigate = useNavigate()
   const [cases, setCases] = useState<CaseSummary[]>([])

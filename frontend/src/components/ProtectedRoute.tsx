@@ -1,3 +1,4 @@
+/** Route guard used by `App.tsx` to wrap gated routes: redirects to `/login` with no session, or `/conveyancing` when `requireAdmin` fails. */
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import type { UserProfile } from '../types/api'

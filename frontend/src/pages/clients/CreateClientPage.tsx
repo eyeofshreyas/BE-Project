@@ -1,3 +1,8 @@
+/**
+ * `/clients/new` route: builds an individual/organization client profile and an
+ * initial matter, then sends an invite email via `sendClientRequest()` -- no
+ * client record is created directly; the client is added once they accept.
+ */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listCourts, listCaseTypes, sendClientRequest } from '../../api/client'
@@ -21,6 +26,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
 
 const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }
 
+/** Loads courts/case types for the matter section; `reviewAndConfirm` validates and opens a confirm dialog, `submit` calls `sendClientRequest()` and navigates to `/clients`. */
 export default function CreateClientPage() {
   const navigate = useNavigate()
   const [courts, setCourts] = useState<CourtOption[]>([])

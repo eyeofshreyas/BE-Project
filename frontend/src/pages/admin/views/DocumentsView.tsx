@@ -1,3 +1,4 @@
+/** Admin console "Documents" tab: table of all uploaded documents (`listDocuments()`) with an inline expandable AI summary row (`getDocumentSummary()`). */
 import { Fragment, useEffect, useState } from 'react'
 import { Icon } from '../../../components/icons'
 import { C } from '../../../components/theme'
@@ -7,6 +8,7 @@ import styles from '../../../components/AppShell.module.css'
 
 const DOC_COLUMNS = ['File', 'Type', 'Case', 'Uploaded By', 'Upload Date', 'Actions']
 
+/** Fetches all documents via `listDocuments()`; clicking the sparkles icon toggles and lazily loads that row's AI summary via `getDocumentSummary()`. */
 export default function DocumentsView() {
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [loading, setLoading] = useState(true)

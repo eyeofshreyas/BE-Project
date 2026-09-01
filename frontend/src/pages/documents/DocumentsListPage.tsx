@@ -1,3 +1,4 @@
+/** `/documents` route: full document library with drag-drop upload, AI-summary cards, search/type filtering, and a detail table. Uses `DocumentPreviewModal` for inline preview. */
 import { useEffect, useRef, useState } from 'react'
 import {
   listDocuments, getDocumentSummary, getDocumentDownloadUrl, deleteDocument,
@@ -23,6 +24,13 @@ function formatSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+/**
+ * Loads documents/cases/document-types in parallel (`listDocuments()`,
+ * `listCases()`, `listDocumentTypes()`). Upload picks a file then confirms
+ * case+type before calling `uploadDocument()`; row actions call
+ * `getDocumentSummary()`, `getDocumentDownloadUrl()`/`openPreview` (via
+ * `DocumentPreviewModal`), and `deleteDocument()`.
+ */
 export default function DocumentsListPage() {
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [cases, setCases] = useState<CaseSummary[]>([])

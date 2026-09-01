@@ -1,3 +1,4 @@
+/** `/cases/:caseId` route: full case detail with notes, timeline, meetings, and documents (preview via `DocumentPreviewModal`). Role controls which actions (status change, unassign, add note, upload) are shown. */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -39,6 +40,12 @@ function formatDate(iso: string) {
   return formatDateWith(iso, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
+/**
+ * Loads all cases via `listCases()` and finds this one by `caseId` (there's
+ * no single-case GET endpoint), plus notes/timeline/documents/meetings in
+ * parallel. Wires up note-adding, status change, lawyer unassign, meeting
+ * scheduling, and document upload/preview/download handlers below.
+ */
 export default function CaseDetailPage() {
   const { caseId } = useParams()
   const navigate = useNavigate()
@@ -186,6 +193,7 @@ export default function CaseDetailPage() {
 
   const [previewDoc, setPreviewDoc] = useState<DocumentSummary | null>(null)
 
+  /** Dispatches on mime type: previewable types open `DocumentPreviewModal`, others go straight to `downloadDocument()`. */
   function openDocument(d: DocumentSummary) {
     if (isPreviewable(d.mime_type)) setPreviewDoc(d)
     else downloadDocument(d.id)

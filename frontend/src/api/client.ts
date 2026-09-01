@@ -1,3 +1,9 @@
+/**
+ * Single point of contact with the FastAPI backend. No component calls
+ * `fetch` directly -- every endpoint is a thin named wrapper here around
+ * `request()`, which attaches auth headers, retries idempotent GETs, and
+ * handles session expiry (401) globally.
+ */
 import type {
   LoginResponse,
   SignupPayload,
@@ -25,11 +31,17 @@ import type {
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
+/** Reads the bearer token from `localStorage` (`lexflow_token`) and builds the Authorization header, if present. */
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('lexflow_token')
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+/**
+ * Core fetch wrapper: attaches `authHeaders()`, retries a GET once on
+ * network error/5xx, and on 401 clears the session and hard-redirects to
+ * `/login` (never resolves in that case). All other helpers below call this.
+ */
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // GET is idempotent, so it's safe to silently retry once on a transient
   // network blip or 5xx -- POST/PATCH never retry here, to avoid double-submitting.
@@ -69,6 +81,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   throw new Error('Request failed')
 }
 
+/** Thin verb wrappers around `request()` for JSON POST/PATCH/GET, multipart POST, and DELETE. */
 async function post<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, {
     method: 'POST',

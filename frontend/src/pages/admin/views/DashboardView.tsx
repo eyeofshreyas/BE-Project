@@ -1,3 +1,4 @@
+/** Admin console "Dashboard" tab: static overview stats, activity feed, and system notifications list/detail view. All data here is hardcoded, not fetched from the API. */
 import { useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C } from '../../../components/theme'
@@ -39,6 +40,11 @@ const ACTIVITY_DEFS = [
   { title: 'Hearing Scheduled', desc: 'CASE-2022 hearing set for 25 Aug 2026', time: 'Yesterday', icon: 'calendar' as const },
 ]
 
+/**
+ * Renders `quickActions` (passed from `AdminConsolePage`), an overview stat
+ * grid, recent-activity feed, and a master/detail system-notifications panel
+ * (click a row to expand `detail` on the right). Static demo data only.
+ */
 export default function DashboardView({ quickActions }: { quickActions: QuickAction[] }) {
   const [selectedNotif, setSelectedNotif] = useState<number | null>(null)
   const detail = selectedNotif != null ? SYSTEM_NOTIFS[selectedNotif] : null

@@ -1,3 +1,4 @@
+/** `/judgements` route: list of pronounced judgements with derived stats (success rate, avg. time, relief), search/outcome filtering, and an "Add Judgement" modal form. */
 import { useEffect, useState } from 'react'
 import { listJudgements, createJudgement, listCases } from '../../api/client'
 import type { JudgementSummary, JudgementOutcome, CaseSummary } from '../../types/api'
@@ -26,6 +27,7 @@ function monthsBetween(a: string, b: string) {
   return diffDays / 30.44
 }
 
+/** Loads judgements (`listJudgements()`) and cases (`listCases()`, for the form's case picker); `submitForm` validates and calls `createJudgement()`. */
 export default function JudgementsPage() {
   const [judgements, setJudgements] = useState<JudgementSummary[]>([])
   const [cases, setCases] = useState<CaseSummary[]>([])

@@ -1,3 +1,4 @@
+/** Client-role dashboard rendered by `DashboardPage` for `role_id === 3`. Aggregates cases, hearings, invoices, documents, notifications, and pending lawyer requests into stat cards and panels. */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -55,6 +56,11 @@ function dueLabel(iso: string) {
   return `${-days}d overdue`
 }
 
+/**
+ * Fetches cases/hearings/invoices/documents/notifications/client-requests in
+ * parallel and derives all stat-card figures from them. Calls: `respondToRequest`
+ * (accept/decline via `respondClientRequest()`), `openDocument` (via `getDocumentDownloadUrl()`).
+ */
 export default function ClientDashboardPage() {
   const navigate = useNavigate()
   const [profile] = useState<UserProfile | null>(loadProfile)

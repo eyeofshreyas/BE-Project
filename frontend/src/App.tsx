@@ -19,6 +19,12 @@ import SettingsPage from './pages/settings/SettingsPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/AppLayout'
 
+/**
+ * Single top-level route table for the SPA. Gated routes are wrapped in
+ * `ProtectedRoute` (redirects unauthenticated/unauthorized users); most are
+ * further wrapped in `AppLayout` for the sidebar/topbar shell -- `/admin`
+ * and `/settings` opt out since they render their own chrome.
+ */
 export default function App() {
   return (
     <BrowserRouter>

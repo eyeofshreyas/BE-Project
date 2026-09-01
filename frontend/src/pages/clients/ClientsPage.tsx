@@ -1,3 +1,4 @@
+/** `/clients` route (lawyer/admin): searchable/sortable/filterable client list. Reads an optional `location.state.toast` (set by `CreateClientPage` after navigating here). */
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { listClients } from '../../api/client'
@@ -23,6 +24,7 @@ function moneyRound(n: number) {
   return `₹${Math.round(n).toLocaleString()}`
 }
 
+/** Loads all clients via `listClients()`; supports search, status filter, and sort; "Add Client" navigates to `/clients/new`. */
 export default function ClientsPage() {
   const navigate = useNavigate()
   const location = useLocation()

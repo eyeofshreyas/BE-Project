@@ -1,3 +1,4 @@
+/** Admin console "Analytics" tab: case status donut, growth bar chart, AI usage line chart, and service-health cards. All data here is static/hardcoded, not fetched from the API. */
 import { Icon, type IconName } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
 import styles from '../../../components/AppShell.module.css'
@@ -52,6 +53,7 @@ const AI_STATUS: { label: string; status: 'Healthy' | 'Warning'; uptime: string;
 
 const STATUS_COLOR = { Healthy: C.success, Warning: C.warning }
 
+/** Renders the case-status donut, monthly growth bars, AI usage sparkline, document insight cards, and AI/system health cards. Static demo data, no props. */
 export default function AnalyticsView() {
   return (
     <>

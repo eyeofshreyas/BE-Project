@@ -1,3 +1,4 @@
+/** `/settings` route: renders its own topbar/sidebar shell (opts out of `AppLayout`). All fields are local `useState` only -- nothing here is persisted via the API. */
 import { useState } from 'react'
 import logo from '../../assets/logo.svg'
 import styles from './SettingsPage.module.css'
@@ -31,6 +32,7 @@ const MENU = [
   { key: 'security', label: 'Security', icon: <Icon name="shield" size={17} /> },
 ]
 
+/** Small controlled on/off switch used by `ToggleRow` throughout this page. */
 function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
   return (
     <div
@@ -51,6 +53,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+/** Labeled row pairing a title/description with a `Toggle`; used for every on/off setting on this page. */
 function ToggleRow({ icon, title, desc, value, onChange, last }: { icon?: React.ReactNode; title: string; desc?: string; value: boolean; onChange: () => void; last?: boolean }) {
   return (
     <div className={last ? styles.rowLast : styles.rowBorder}>
@@ -66,6 +69,13 @@ function ToggleRow({ icon, title, desc, value, onChange, last }: { icon?: React.
   )
 }
 
+/**
+ * Sidebar-tabbed settings shell; `showGeneral`/`showProfile`/etc. flags mean
+ * the "General" tab renders several cards at once (Profile, Regional,
+ * Security, Notifications, AI, Workspace) while other tabs show one card
+ * each. `saveChanges`/`cancelChanges` only clear the local `dirty` flag and
+ * toast -- no backend call.
+ */
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState('general')
   const [searchQuery, setSearchQuery] = useState('')

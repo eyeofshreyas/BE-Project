@@ -1,3 +1,4 @@
+/** Shared color palette (`C`) and style helpers for the admin console (`AdminConsolePage` and `admin/views/*`). */
 import type { CSSProperties } from 'react'
 
 export const C = {
@@ -12,6 +13,7 @@ export const C = {
   danger: '#EF5350',
 }
 
+/** Builds a translucent pill background (color + 12% alpha) with matching text color, for status badges. */
 export function pillStyle(color: string): CSSProperties {
   return { color, background: color + '1f' }
 }

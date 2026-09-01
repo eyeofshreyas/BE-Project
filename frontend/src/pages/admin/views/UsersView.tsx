@@ -1,3 +1,4 @@
+/** Admin console "Users" tab: table of all users (`listUsers()`) with a suspend/reactivate toggle (`setUserStatus()`). */
 import { useEffect, useState } from 'react'
 import { Icon } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
@@ -13,6 +14,7 @@ function initialsOf(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
+/** Fetches all users via `listUsers()`; the ban/check-circle action calls `setUserStatus()` to suspend/reactivate a user and patches it into local state. */
 export default function UsersView() {
   const [users, setUsers] = useState<UserSummary[]>([])
   const [loading, setLoading] = useState(true)

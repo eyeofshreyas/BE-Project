@@ -1,3 +1,4 @@
+/** `/cases/new` route: multi-field new-case form (type, client search, court, description, drag-drop file upload). */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listCourts, listCaseTypes, listClients, listDocumentTypes, createCase, uploadDocument } from '../../api/client'
@@ -34,6 +35,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }
 
+/**
+ * Loads reference data (`listCourts()`, `listCaseTypes()`, `listClients()`,
+ * `listDocumentTypes()`) on mount, then on submit calls `createCase()`
+ * followed by `uploadDocument()` per attached file (see `submit`'s comment
+ * for why upload is a second step) and navigates to the new case's detail page.
+ */
 export default function CreateCasePage() {
   const navigate = useNavigate()
   const [courts, setCourts] = useState<CourtOption[]>([])

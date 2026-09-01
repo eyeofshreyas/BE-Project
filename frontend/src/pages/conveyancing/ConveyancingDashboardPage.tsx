@@ -1,3 +1,4 @@
+/** `/conveyancing` route: role-dispatches to `StaffConveyancingView` (lawyer/admin) or `ClientConveyancingView`, both driven by `getConveyancingSummary()`. */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getConveyancingSummary, listCourts, listCaseTypes, sendClientRequest, listAllMeetings } from '../../api/client'
@@ -61,12 +62,19 @@ function formatDate(iso: string) {
   return formatDateWith(iso, { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+/** Reads the session profile and renders `ClientConveyancingView` for clients, `StaffConveyancingView` otherwise. */
 export default function ConveyancingDashboardPage() {
   const profile = loadProfile()
   if (profile?.role_id === 3) return <ClientConveyancingView />
   return <StaffConveyancingView />
 }
 
+/**
+ * Loads `getConveyancingSummary()` (stats, status donut, matters list) and
+ * `listAllMeetings()` (for upcoming appointments); supports matter
+ * search/type/status filtering with pagination, and an "Add Client" modal
+ * that calls `sendClientRequest()`.
+ */
 function StaffConveyancingView() {
   const navigate = useNavigate()
   const [toast, setToast] = useState<string | null>(null)
@@ -390,6 +398,7 @@ function StaffConveyancingView() {
   )
 }
 
+/** Client's own conveyancing matters: loads `getConveyancingSummary()` and renders stat cards + a read-only matters table (row links to `/cases/:caseId` when linked). */
 function ClientConveyancingView() {
   const navigate = useNavigate()
   const [summary, setSummary] = useState<ConveyancingSummary | null>(null)

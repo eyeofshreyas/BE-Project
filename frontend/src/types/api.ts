@@ -1,3 +1,4 @@
+/** Shared TypeScript shapes for backend request/response payloads, consumed by `api/client.ts` and pages/components throughout the app. */
 export interface UserProfile {
   user_id: number
   role_id: number

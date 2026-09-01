@@ -1,3 +1,4 @@
+/** Role picker at `/role-selection` shown before signup. Purely cosmetic: the chosen role is not passed on to `SignUpPage` (which asks again). */
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'

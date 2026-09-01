@@ -1,3 +1,4 @@
+/** `/hearings` route: role-dispatches to `StaffHearingsView` (list/month toggle, cancel action) or `ClientHearingsView` (read-only calendar). Shares `buildMonthCells()` for the calendar grid. */
 import { useEffect, useMemo, useState } from 'react'
 import { listHearings, updateHearingStatus } from '../../api/client'
 import type { HearingSummary, UserProfile } from '../../types/api'
@@ -35,6 +36,7 @@ function daysFromToday(dateStr: string) {
   return diff
 }
 
+/** Builds a padded (Sun-start) grid of day numbers for `viewDate`'s month, plus its label, for the month-view calendar in both `StaffHearingsView` and `ClientHearingsView`. */
 function buildMonthCells(viewDate: Date) {
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
@@ -47,12 +49,14 @@ function buildMonthCells(viewDate: Date) {
   return { year, month, monthLabel, cells, trailingEmpty }
 }
 
+/** Reads the session profile and renders `ClientHearingsView` for clients, `StaffHearingsView` otherwise. */
 export default function HearingsPage() {
   const profile = loadProfile()
   if (profile?.role_id === 3) return <ClientHearingsView />
   return <StaffHearingsView />
 }
 
+/** Loads hearings via `listHearings()`; toggles between a List table (with cancel via `updateHearingStatus()`) and a Month calendar grid. */
 function StaffHearingsView() {
   const [hearings, setHearings] = useState<HearingSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -220,6 +224,7 @@ function StaffHearingsView() {
   )
 }
 
+/** Loads hearings via `listHearings()` and renders read-only stat cards plus a month calendar grid (no cancel action). */
 function ClientHearingsView() {
   const [hearings, setHearings] = useState<HearingSummary[]>([])
   const [loading, setLoading] = useState(true)

@@ -1,3 +1,4 @@
+/** Admin console "Settings" tab: tabbed profile/security/platform/appearance/about panels backed entirely by local state (no API persistence -- "Save" just calls `onSave`). */
 import { useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C } from '../../../components/theme'
@@ -11,6 +12,7 @@ const MENU: { key: string; label: string; icon: IconName }[] = [
   { key: 'about', label: 'About', icon: 'info' },
 ]
 
+/** Small controlled on/off switch (sliding dot) used throughout this view's toggle rows. */
 function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
   return (
     <div className={styles.toggleTrack} style={{ width: 40, height: 22, background: value ? C.primary : C.border, justifyContent: value ? 'flex-end' : 'flex-start' }} onClick={onChange}>
@@ -19,6 +21,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
   )
 }
 
+/** Left-nav-switched settings panels, all driven by local `useState` (no backend calls); "Save Changes" invokes `onSave` (parent shows a toast). */
 export default function SettingsView({ onSave }: { onSave: () => void }) {
   const [tab, setTab] = useState('profile')
   const [fullName, setFullName] = useState('Priya Nair')

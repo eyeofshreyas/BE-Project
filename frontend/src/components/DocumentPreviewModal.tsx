@@ -1,3 +1,4 @@
+/** Modal that inline-previews a document (image/video/PDF), used by `DocumentsListPage` and `CaseDetailPage`. */
 import { useEffect, useState } from 'react'
 import { getDocumentDownloadUrl } from '../api/client'
 import { Icon } from './icons'
@@ -10,6 +11,11 @@ export function isPreviewable(mimeType: string) {
   return mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType === 'application/pdf'
 }
 
+/**
+ * Full-screen overlay modal that fetches a signed download URL via
+ * `getDocumentDownloadUrl()` and renders an image/video/iframe(PDF) preview
+ * based on `mimeType`, plus a download link and close button.
+ */
 export default function DocumentPreviewModal({ documentId, fileName, mimeType, onClose }: { documentId: number; fileName: string; mimeType: string; onClose: () => void }) {
   const [url, setUrl] = useState('')
   const [error, setError] = useState('')

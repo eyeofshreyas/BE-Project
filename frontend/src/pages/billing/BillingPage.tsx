@@ -1,3 +1,4 @@
+/** `/billing` route: role-dispatches to a lawyer-facing management view (`StaffBillingView`) or a read-only client view (`ClientInvoicesView`). */
 import { useEffect, useState } from 'react'
 import { listInvoices, createInvoice, createPayment, sendInvoiceReminder, listCases, listInvoicePayments } from '../../api/client'
 import type { InvoiceSummary, CaseSummary, PaymentSummary, UserProfile } from '../../types/api'
@@ -36,6 +37,7 @@ function moneyRound(n: number) {
   return `₹${Math.round(n).toLocaleString()}`
 }
 
+/** Derives the badge status shown for an invoice: backend `payment_status`, upgraded to "Overdue" if unpaid and past `due_date`. */
 function displayStatus(inv: InvoiceSummary): string {
   const today = new Date().toISOString().slice(0, 10)
   if (inv.payment_status !== 'Paid' && inv.due_date && inv.due_date < today) return 'Overdue'
@@ -51,12 +53,20 @@ function withinTimeFilter(issueDate: string, filter: (typeof TIME_FILTERS)[numbe
   return d.getFullYear() === now.getFullYear()
 }
 
+/** Reads the session profile and renders `ClientInvoicesView` for clients, `StaffBillingView` (lawyer/admin) otherwise. */
 export default function BillingPage() {
   const profile = loadProfile()
   if (profile?.role_id === CLIENT) return <ClientInvoicesView />
   return <StaffBillingView />
 }
 
+/**
+ * Lawyer/admin invoice management: loads invoices via `listInvoices()`
+ * (and cases via `listCases()` for the generate-invoice form), with
+ * search/status/time filtering, invoice creation (`createInvoice()`),
+ * full-payment recording (`createPayment()`), and reminders
+ * (`sendInvoiceReminder()`). Non-lawyers see the table read-only.
+ */
 function StaffBillingView() {
   const profile = loadProfile()
   const canManage = profile?.role_id === LAWYER
@@ -367,6 +377,7 @@ const TXN_STATUS_STYLE: Record<string, [string, string]> = {
 }
 const TXN_DEFAULT_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
 
+/** Client-facing invoice view: loads invoices (`listInvoices()`) plus each one's payments (`listInvoicePayments()`) to compute totals, progress, and a recent-transactions list. Read-only; pay/download actions are disabled placeholders. */
 function ClientInvoicesView() {
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([])
   const [paymentsByInvoice, setPaymentsByInvoice] = useState<Map<number, PaymentSummary[]>>(new Map())

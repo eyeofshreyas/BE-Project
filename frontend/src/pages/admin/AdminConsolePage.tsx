@@ -1,3 +1,8 @@
+/**
+ * Self-contained admin console shell for `/admin` (renders its own sidebar/topbar
+ * rather than `AppLayout`). Owns the active-tab state and switches between the
+ * `views/*` components; loads notifications via `listNotifications()`.
+ */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
@@ -43,6 +48,12 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
   { key: 'analytics', label: 'Analytics', icon: 'pie-chart' },
 ]
 
+/**
+ * Renders admin sidebar nav + topbar, and swaps in `DashboardView`, `UsersView`,
+ * `CasesView`, `DocumentsView`, `ReportsView`, `AnalyticsView`, or `SettingsView`
+ * based on `activePage`. Handles notification read/logout, and shows a toast
+ * (e.g. after `SettingsView` saves).
+ */
 export default function AdminConsolePage() {
   const [activePage, setActivePage] = useState<PageKey>('dashboard')
   const [notifOpen, setNotifOpen] = useState(false)

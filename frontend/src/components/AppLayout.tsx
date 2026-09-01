@@ -1,3 +1,4 @@
+/** Shell rendered around every `AppLayout`-wrapped route: role-dependent sidebar nav + topbar (search, notifications, profile menu). */
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -50,6 +51,12 @@ function initialsOf(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
+/**
+ * Sidebar (role-dependent `LAWYER_NAV`/`CLIENT_NAV`) + topbar wrapper for
+ * gated pages. Loads notifications via `listNotifications()`, marks them
+ * read via `markNotificationRead()` on click, and handles logout by
+ * clearing the session and navigating to `/login`.
+ */
 export default function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()

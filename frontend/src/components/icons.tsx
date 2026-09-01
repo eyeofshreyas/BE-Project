@@ -1,3 +1,4 @@
+/** The app's single icon set: one `Icon` component switching over inline SVGs by name. Used throughout instead of hand-rolled local icon components. */
 type Props = { name: IconName; size?: number; color?: string; strokeWidth?: number }
 
 export type IconName =
@@ -8,6 +9,7 @@ export type IconName =
   | 'trash-2' | 'mail' | 'phone' | 'shield' | 'palette' | 'info' | 'x' | 'gavel' | 'clock' | 'filter'
   | 'home' | 'more-horizontal'
 
+/** Renders a stroke SVG icon selected by `name`; `size`/`color`/`strokeWidth` are the only customization points. */
 export function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 1.8 }: Props) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
   switch (name) {

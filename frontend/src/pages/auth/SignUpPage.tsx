@@ -1,3 +1,4 @@
+/** Signup form at `/signup`. Does not auto-login -- on success it redirects to `/login`, not into the app. */
 import { useState, type CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
@@ -52,6 +53,7 @@ const STRENGTH_META = [
 
 type FocusName = 'fullName' | 'phone' | 'email' | 'password' | 'confirm' | 'bar' | 'practice' | 'years' | 'language' | 'address' | null
 
+/** Renders the role-toggled signup form (extra fields for lawyer vs client); validates locally then calls `handleSubmit` -> `signup()`. */
 export default function SignUpPage() {
   const navigate = useNavigate()
   const [role, setRole] = useState<'lawyer' | 'client'>('lawyer')
@@ -86,6 +88,7 @@ export default function SignUpPage() {
   })
   const mkFocus = (name: FocusName) => () => setFocused(name)
 
+  /** Validates all fields (role-dependent), then calls `signup()` and redirects to `/login` on success. */
   async function handleSubmit() {
     if (!fullName.trim()) { setError('Enter your full name.'); return }
     if (!isValidEmail(email)) { setError('Enter a valid email address.'); return }

@@ -1,3 +1,4 @@
+/** Public marketing page at `/`. Static content only, no API calls; scroll-spies its own sections to highlight the active nav link. */
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
@@ -63,6 +64,11 @@ const FOOTER_COLS = [
   { title: 'Connect', links: ['LinkedIn', 'Twitter'] },
 ]
 
+/**
+ * Renders the marketing nav, hero, challenges/features/why/onboarding
+ * sections and footer. Uses an `IntersectionObserver` on the section refs
+ * to track `activeSection` for the nav underline as the user scrolls.
+ */
 export default function LandingPage() {
   const [activeSection, setActiveSection] = useState('challenges')
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})

@@ -1,3 +1,4 @@
+/** Admin console "Cases" tab: table of every case on the platform, loaded via `listCases()`. */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '../../../components/icons'
@@ -14,6 +15,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 const PRIORITY_COLORS: Record<string, string> = { High: C.danger, Medium: C.warning, Low: C.success }
 
+/** Fetches all cases via `listCases()` and renders them as a status/priority-badged table; "View" navigates to `/cases/:caseId`. */
 export default function CasesView() {
   const navigate = useNavigate()
   const [cases, setCases] = useState<CaseSummary[]>([])

@@ -1,3 +1,4 @@
+/** Admin console "Reports" tab: static report-library cards and admin shortcut tiles. No API calls; buttons/tiles are non-functional placeholders. */
 import { Icon, type IconName } from '../../../components/icons'
 import { C } from '../../../components/theme'
 import styles from '../../../components/AppShell.module.css'
@@ -16,6 +17,7 @@ const SHORTCUTS: { label: string; icon: IconName }[] = [
   { label: 'Backup Database', icon: 'database' }, { label: 'Send Notifications', icon: 'bell' },
 ]
 
+/** Renders the static `REPORTS` card grid and `SHORTCUTS` tile grid; no props, no data fetching. */
 export default function ReportsView() {
   return (
     <>

@@ -1,3 +1,4 @@
+/** Login form at `/login`. The only place session keys (`lexflow_token`/`lexflow_profile`) get written -- see `handleSubmit`. */
 import { useState, type CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import logoWhite from '../../assets/logo-white.svg'
@@ -109,6 +110,7 @@ function isValidEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 }
 
+/** Renders the split-screen login form; validates locally then calls `login()`/`forgotPassword()`. Calls: `handleSubmit`, `handleForgotPassword`. */
 export default function LoginPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
@@ -127,6 +129,7 @@ export default function LoginPage() {
     boxShadow: focused === name ? '0 0 0 3px rgba(176,141,62,.14)' : 'none',
   })
 
+  /** Validates the email field then calls `forgotPassword()`, showing the result as a toast. */
   async function handleForgotPassword() {
     if (!email || !isValidEmail(email)) { setError('Enter your email above first, then click "Forgot password?".'); return }
     setError('')
@@ -138,6 +141,7 @@ export default function LoginPage() {
     }
   }
 
+  /** Validates fields, calls `login()`, writes the session to `localStorage`, then navigates to `/admin` (role 1) or `/dashboard`. */
   async function handleSubmit() {
     if (!email || !isValidEmail(email)) { setError('Enter a valid email address.'); return }
     if (!password || password.length < 6) { setError('Password must be at least 6 characters.'); return }
