@@ -1,5 +1,10 @@
+import logging
+
 from fastapi import Depends, Header, HTTPException
+from supabase_auth.errors import AuthApiError
 from app.db.supabase_client import supabase
+
+logger = logging.getLogger(__name__)
 
 ADMIN = 1
 LAWYER = 2
@@ -11,8 +16,13 @@ def get_current_user(authorization: str = Header(...)):
     try:
         user = supabase.auth.get_user(token)
         return user.user
-    except Exception:
+    except AuthApiError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+    except Exception:
+        # Supabase Auth was unreachable (network blip, timeout) -- this is not
+        # proof the token is invalid, so don't force a logout for it.
+        logger.exception("Failed to reach Supabase Auth while validating token")
+        raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable. Please try again.")
 
 
 def get_current_profile(current_user=Depends(get_current_user)):
