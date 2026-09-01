@@ -1,7 +1,9 @@
-from fastapi import Depends
+from datetime import datetime, timezone
+
+from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
-from app.models.cases import CaseSummary
+from app.models.cases import CaseCreate, CaseSummary
 
 CASES_SELECT = (
     "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,"
@@ -50,6 +52,61 @@ def list_cases(profile: dict = Depends(get_current_profile)):
         query = query.in_("case_id", list(case_ids))
     rows = query.order("case_id").execute().data
     return [_to_case_summary(row) for row in rows]
+
+
+def _generate_case_number(case_type_name: str) -> str:
+    # ponytail: sequence = count of cases already using this prefix, same
+    # scheme as client_requests._generate_case_number.
+    prefix = "".join(ch for ch in case_type_name.upper() if ch.isalpha())[:3] or "GEN"
+    like_prefix = f"{prefix}{datetime.now(timezone.utc).year}"
+    existing = supabase.table("cases").select("case_number").like("case_number", f"{like_prefix}%").execute().data
+    return f"{like_prefix}{len(existing) + 1:03d}"
+
+
+def create_case(data: CaseCreate, profile: dict = Depends(require_roles(LAWYER))):
+    lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
+    if not lawyer_rows:
+        raise HTTPException(status_code=400, detail="No lawyer profile for this account")
+
+    # ponytail: mirrors respond_client_request's consent gate -- a lawyer may
+    # only open a case for a client who accepted their client_requests invite.
+    accepted_request = supabase.table("client_requests").select("request_id") \
+        .eq("lawyer_id", lawyer_rows[0]["lawyer_id"]).eq("client_id", data.client_id).eq("status", "accepted") \
+        .execute().data
+    if not accepted_request:
+        raise HTTPException(status_code=403, detail="You don't have an accepted client relationship with this client")
+
+    case_type_rows = supabase.table("case_types").select("case_type_name").eq("case_type_id", data.case_type_id).execute().data
+    if not case_type_rows:
+        raise HTTPException(status_code=400, detail="Unknown case type")
+
+    case_row = supabase.table("cases").insert({
+        "case_number": _generate_case_number(case_type_rows[0]["case_type_name"]),
+        "case_title": data.case_title,
+        "client_id": data.client_id,
+        "court_id": data.court_id,
+        "case_type_id": data.case_type_id,
+        "status": "Open",
+        "priority": data.priority,
+        "next_hearing_date": data.next_hearing_date,
+    }).execute().data[0]
+
+    supabase.table("case_lawyers").insert({
+        "case_id": case_row["case_id"],
+        "lawyer_id": lawyer_rows[0]["lawyer_id"],
+        "assigned_role": "Primary",
+        "is_active": True,
+    }).execute()
+
+    if data.description:
+        supabase.table("case_notes").insert({
+            "case_id": case_row["case_id"],
+            "lawyer_id": lawyer_rows[0]["lawyer_id"],
+            "note": data.description,
+        }).execute()
+
+    row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_row["case_id"]).execute().data[0]
+    return _to_case_summary(row)
 
 
 def unassign_lawyer(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
