@@ -1,4 +1,10 @@
-backend/venv/
+backend/.venv/
 backend/.env
-backend/__pycache__/
+__pycache__/
 *.pyc
+.pytest_cache/
+design-concepts/
+docs/superpowers/
+LexFlow UI Mockups (4)/
+graphify-out/
+logs/
