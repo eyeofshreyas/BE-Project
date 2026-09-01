@@ -17,8 +17,8 @@ def run_ml_subprocess(cmd: list[str], payload: dict, *, cwd: str | None = None, 
         logger.error("ML subprocess timed out after %ss (cmd=%s)", timeout, cmd)
         raise HTTPException(status_code=504, detail="ML processing timed out. Please try again.")
 
-    if proc.returncode != 0:
+    lines = proc.stdout.strip().splitlines()
+    if proc.returncode != 0 or not lines:
         logger.error("ML subprocess failed (cmd=%s): %s", cmd, proc.stderr[-2000:])
         raise HTTPException(status_code=500, detail="ML processing failed. Please try again or contact support.")
-    last_line = proc.stdout.strip().splitlines()[-1]
-    return json.loads(last_line)
+    return json.loads(lines[-1])
