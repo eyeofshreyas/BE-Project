@@ -1,6 +1,6 @@
 import { Icon, type IconName } from '../../../components/icons'
-import { C } from '../theme'
-import styles from '../adminShared.module.css'
+import { C } from '../../../components/theme'
+import styles from '../../../components/AppShell.module.css'
 
 const REPORTS: { label: string; desc: string; icon: IconName }[] = [
   { label: 'Case Reports', desc: 'Filing trends and case outcomes', icon: 'scale' },

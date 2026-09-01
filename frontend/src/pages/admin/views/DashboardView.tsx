@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
-import { C } from '../theme'
-import styles from '../adminShared.module.css'
+import { C } from '../../../components/theme'
+import styles from '../../../components/AppShell.module.css'
 
 type QuickAction = { label: string; icon: 'user-plus' | 'plus' | 'file-text'; primary?: boolean; onClick: () => void }
 

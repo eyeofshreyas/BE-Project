@@ -1,6 +1,6 @@
 import { Icon, type IconName } from '../../../components/icons'
-import { C, pillStyle } from '../theme'
-import styles from '../adminShared.module.css'
+import { C, pillStyle } from '../../../components/theme'
+import styles from '../../../components/AppShell.module.css'
 
 const DONUT_SLICES = [
   { label: 'Active', pct: 45, color: C.primary },

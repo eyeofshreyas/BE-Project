@@ -82,6 +82,25 @@
   white-space: nowrap;
 }
 
+.navRowDisabled {
+  composes: navRow;
+  cursor: default;
+  opacity: .5;
+}
+
+.soonPill {
+  margin-left: auto;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #93826d;
+  background: #E7DCC6;
+  padding: 2px 7px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+
 .sidebarFooter {
   border-top: 1px solid #E7DCC6;
   padding-top: 10px;

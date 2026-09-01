@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
-import { C } from '../theme'
-import styles from '../adminShared.module.css'
+import { C } from '../../../components/theme'
+import styles from '../../../components/AppShell.module.css'
 
 const MENU: { key: string; label: string; icon: IconName }[] = [
   { key: 'profile', label: 'Profile', icon: 'user' },

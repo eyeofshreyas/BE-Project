@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Icon } from '../../../components/icons'
-import { C, pillStyle } from '../theme'
+import { C, pillStyle } from '../../../components/theme'
 import { listCases } from '../../../api/client'
 import type { CaseSummary } from '../../../types/api'
-import styles from '../adminShared.module.css'
+import styles from '../../../components/AppShell.module.css'
 
 const CASE_COLUMNS = ['Case ID', 'Client', 'Assigned Lawyer', 'Court', 'Status', 'Next Hearing', 'Priority', 'Actions']
 
@@ -14,6 +15,7 @@ const STATUS_COLORS: Record<string, string> = {
 const PRIORITY_COLORS: Record<string, string> = { High: C.danger, Medium: C.warning, Low: C.success }
 
 export default function CasesView() {
+  const navigate = useNavigate()
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -57,7 +59,7 @@ export default function CasesView() {
                     <td className={styles.td}><span className={styles.pill} style={pillStyle(PRIORITY_COLORS[row.priority] ?? C.muted)}>{row.priority}</span></td>
                     <td className={styles.td}>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <span className={styles.actionBtn} title="View"><Icon name="eye" size={15} color="#6A5C42" /></span>
+                        <span className={styles.actionBtn} title="View" onClick={() => navigate(`/cases/${row.case_id}`)}><Icon name="eye" size={15} color="#6A5C42" /></span>
                         <span className={styles.actionBtn} title="Assign Lawyer"><Icon name="user-plus" size={15} color="#6A5C42" /></span>
                         <span className={styles.actionBtn} title="View Documents"><Icon name="file-text" size={15} color="#6A5C42" /></span>
                       </div>
