@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import logoWhite from '../../assets/logo-white.svg'
-import { login } from '../../api/client'
+import { login, forgotPassword } from '../../api/client'
 import styles from './LoginPage.module.css'
 
 const PRIMARY = '#B08D3E'
@@ -127,6 +127,17 @@ export default function LoginPage() {
     boxShadow: focused === name ? '0 0 0 3px rgba(176,141,62,.14)' : 'none',
   })
 
+  async function handleForgotPassword() {
+    if (!email || !isValidEmail(email)) { setError('Enter your email above first, then click "Forgot password?".'); return }
+    setError('')
+    try {
+      const result = await forgotPassword(email)
+      setToast(result.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Password reset failed.')
+    }
+  }
+
   async function handleSubmit() {
     if (!email || !isValidEmail(email)) { setError('Enter a valid email address.'); return }
     if (!password || password.length < 6) { setError('Password must be at least 6 characters.'); return }
@@ -137,7 +148,8 @@ export default function LoginPage() {
       localStorage.setItem('lexflow_token', result.access_token)
       if (result.profile) localStorage.setItem('lexflow_profile', JSON.stringify(result.profile))
       setToast('Signed in — redirecting to your dashboard…')
-      setTimeout(() => navigate(result.profile?.role_id === 1 ? '/admin' : '/conveyancing'), 900)
+      const dest = result.profile?.role_id === 1 ? '/admin' : '/dashboard'
+      setTimeout(() => navigate(dest), 900)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed.')
       setLoading(false)
@@ -198,7 +210,7 @@ export default function LoginPage() {
             <div>
               <div className={styles.labelRow}>
                 <div className={styles.label}>Password</div>
-                <a href="#" onClick={(e) => e.preventDefault()} className={styles.forgotLink}>Forgot password?</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleForgotPassword() }} className={styles.forgotLink}>Forgot password?</a>
               </div>
               <div style={wrapStyle('password')}>
                 <LockIcon />
