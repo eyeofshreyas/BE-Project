@@ -1,5 +1,6 @@
 # ponytail self-check for unassign_lawyer's access guard -- a lawyer must
 # only be able to unassign themselves from a case they're actively on.
+"""Tests for the cases domain: case creation's consent gate and lawyer unassignment."""
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -33,6 +34,7 @@ def _fake_supabase(assigned_case_ids: set[int], case_row: dict):
 
 
 def test_unassign_lawyer_denied_for_unassigned_lawyer():
+    """Verifies a lawyer with no active `case_lawyers` row for the case cannot unassign themselves; raises 403. Exercises: `POST /cases/{id}/unassign` (`cases.unassign_lawyer()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1, "full_name": "Test Lawyer"}
     fake = _fake_supabase(assigned_case_ids=set(), case_row={})
     with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
@@ -44,6 +46,7 @@ def test_unassign_lawyer_denied_for_unassigned_lawyer():
 
 
 def test_unassign_lawyer_allowed_for_assigned_lawyer():
+    """Verifies an actively-assigned lawyer can unassign themselves, which flips their `case_lawyers` row's is_active to False. Exercises: `POST /cases/{id}/unassign` (`cases.unassign_lawyer()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1, "full_name": "Test Lawyer"}
     case_row = {
         "case_id": 42, "case_number": "C001", "case_title": "x", "filing_date": None, "created_at": None, "status": "Open",
@@ -91,6 +94,7 @@ def _case_create_payload():
 
 
 def test_create_case_denied_without_accepted_request():
+    """Verifies a lawyer cannot open a case for a client with no accepted `client_requests` row; raises 403. Exercises: `POST /cases` (`cases.create_case()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1, "full_name": "Test Lawyer"}
     fake = _fake_supabase_for_create(accepted_request_rows=[], case_row={})
     with patch("app.controllers.cases.supabase", fake):
@@ -102,6 +106,7 @@ def test_create_case_denied_without_accepted_request():
 
 
 def test_create_case_allowed_with_accepted_request():
+    """Verifies a lawyer can open a case once the client has an accepted `client_requests` row. Exercises: `POST /cases` (`cases.create_case()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1, "full_name": "Test Lawyer"}
     case_row = {
         "case_id": 42, "case_number": "CIV2026001", "case_title": "Test matter", "filing_date": None,

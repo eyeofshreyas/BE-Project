@@ -1,6 +1,7 @@
 # ponytail self-check for the case-scoping fix on meetings writes -- a lawyer
 # scoped to case 10 must not be able to create a meeting, or add a
 # participant to a meeting, on case 20.
+"""Tests for the meetings domain: case-scoping on meeting creation and participant addition."""
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -28,6 +29,7 @@ LAWYER_SCOPED_TO_CASE_10 = {"lawyers": [{"lawyer_id": 5}], "case_lawyers": [{"ca
 
 
 def test_create_meeting_rejects_out_of_scope_case():
+    """Verifies a lawyer scoped to case 10 cannot create a meeting for case 20; raises 403. Exercises: `POST /meetings` (`meetings.create_meeting()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)):
         try:
@@ -38,6 +40,7 @@ def test_create_meeting_rejects_out_of_scope_case():
 
 
 def test_add_participant_rejects_meeting_on_out_of_scope_case():
+    """Verifies adding a participant to a meeting whose case is out of scope raises 403, via a mocked meeting lookup. Exercises: `POST /meetings/{id}/participants` (`meetings.add_participant()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     meeting_row = {"meeting_id": 99, "case_id": 20}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \

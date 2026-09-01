@@ -1,5 +1,6 @@
 # ponytail self-check for list_clients -- a lawyer must only see clients
 # from their own actively-assigned cases, not the whole firm's roster.
+"""Tests for the clients domain: the lawyer-scoped client listing."""
 from unittest.mock import MagicMock, patch
 
 from app.middleware import auth
@@ -32,6 +33,7 @@ def _fake_supabase(lawyer_id: int, case_ids: list[int], case_rows: list[dict], c
 
 
 def test_lawyer_with_no_cases_sees_no_clients():
+    """Verifies a lawyer with no assigned cases gets an empty client list. Exercises: `GET /clients` (`clients.list_clients()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     fake = _fake_supabase(5, [], [], [], [])
     with patch("app.controllers.clients.supabase", fake):
@@ -39,6 +41,7 @@ def test_lawyer_with_no_cases_sees_no_clients():
 
 
 def test_lawyer_sees_only_their_clients_with_active_case_counts():
+    """Verifies the client list is built from the lawyer's own cases, with active-case counts and pending-invoice totals joined in. Exercises: `GET /clients` (`clients.list_clients()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     client_row = {
         "client_id": 7, "address": "1 Main St", "preferred_language": "English",

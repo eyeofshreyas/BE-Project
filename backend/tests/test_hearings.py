@@ -1,5 +1,6 @@
 # ponytail self-check for the case-scoping fix on hearings writes -- a lawyer
 # scoped to case 10 must not be able to create/update a hearing on case 20.
+"""Tests for the hearings domain: case-scoping on hearing creation and updates."""
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -27,6 +28,7 @@ LAWYER_SCOPED_TO_CASE_10 = {"lawyers": [{"lawyer_id": 5}], "case_lawyers": [{"ca
 
 
 def test_create_hearing_rejects_out_of_scope_case():
+    """Verifies a lawyer scoped to case 10 cannot create a hearing for case 20; raises 403. Exercises: `POST /hearings` (`hearings.create_hearing()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)):
         try:
@@ -37,6 +39,7 @@ def test_create_hearing_rejects_out_of_scope_case():
 
 
 def test_update_hearing_rejects_hearing_on_out_of_scope_case():
+    """Verifies updating a hearing whose case is out of scope raises 403, via a mocked hearing lookup. Exercises: `PATCH /hearings/{id}` (`hearings.update_hearing()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     hearing_row = {"hearing_id": 99, "case_id": 20}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \

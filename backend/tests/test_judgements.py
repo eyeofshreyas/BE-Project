@@ -1,6 +1,7 @@
 # ponytail self-check for list_judgements -- a lawyer must only see
 # judgements for cases they're actively assigned to, and the summary
 # transform must pull case_number/case_title/filing_date off the join.
+"""Tests for the judgements domain: the lawyer-scoped judgement listing and its case-field join."""
 from unittest.mock import MagicMock, patch
 
 from app.middleware import auth
@@ -29,6 +30,7 @@ def _fake_supabase(lawyer_id: int, case_ids: list[int], judgement_rows: list[dic
 
 
 def test_lawyer_with_no_cases_sees_no_judgements():
+    """Verifies a lawyer with no assigned cases gets an empty judgement list. Exercises: `GET /judgements` (`judgements.list_judgements()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     fake = _fake_supabase(5, [], [])
     with patch("app.controllers.judgements.supabase", fake), patch("app.middleware.auth.supabase", fake):
@@ -36,6 +38,7 @@ def test_lawyer_with_no_cases_sees_no_judgements():
 
 
 def test_summary_pulls_case_fields_from_join():
+    """Verifies the judgement summary copies case_number/case_title/filing_date and relief_amount from the joined `cases` row. Exercises: `GET /judgements` (`judgements.list_judgements()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     row = {
         "judgement_id": 3, "case_id": 10, "citation": "2026 SCC OnLine Bom 412",

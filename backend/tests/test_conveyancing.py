@@ -1,6 +1,7 @@
 # ponytail self-check for the case-scoping fix on conveyancing writes -- a
 # lawyer scoped to case 10 must not be able to update due-diligence or
 # progress on a matter that belongs to case 20.
+"""Tests for the conveyancing domain: case-scoping on matter writes (due diligence, progress stages)."""
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -29,6 +30,7 @@ MATTER_ON_CASE_20 = {"conveyancing_matters": [{"matter_id": 5, "case_id": 20}]}
 
 
 def test_update_due_diligence_rejects_matter_on_out_of_scope_case():
+    """Verifies updating due diligence on a matter whose case is out of scope raises 403, via a mocked matter lookup. Exercises: `PATCH /conveyancing/matters/{id}/due-diligence` (`conveyancing.update_due_diligence()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
          patch("app.controllers.conveyancing.supabase", _fake_supabase(MATTER_ON_CASE_20)):
@@ -40,6 +42,7 @@ def test_update_due_diligence_rejects_matter_on_out_of_scope_case():
 
 
 def test_complete_progress_stage_rejects_matter_on_out_of_scope_case():
+    """Verifies completing a progress stage on a matter whose case is out of scope raises 403, via a mocked matter lookup. Exercises: `POST /conveyancing/matters/{id}/stages/{stage_id}/complete` (`conveyancing.complete_progress_stage()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
          patch("app.controllers.conveyancing.supabase", _fake_supabase(MATTER_ON_CASE_20)):

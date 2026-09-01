@@ -2,6 +2,7 @@
 # create_payment relies on to keep invoices in sync) and for the case-scoping
 # fix on billing writes -- a lawyer scoped to case 10 must not be able to
 # invoice, pay, or expense against case 20.
+"""Tests for the billing domain: invoice/payment/expense creation, reminders, and payment-status math."""
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -35,6 +36,7 @@ LAWYER_SCOPED_TO_CASE_10 = {"lawyers": [{"lawyer_id": 5}], "case_lawyers": [{"ca
 
 
 def test_create_invoice_rejects_out_of_scope_case():
+    """Verifies a lawyer scoped to case 10 cannot create an invoice for case 20; raises 403. Exercises: `POST /invoices` (`billing.create_invoice()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)):
         try:
@@ -48,6 +50,7 @@ def test_create_invoice_rejects_out_of_scope_case():
 
 
 def test_create_payment_rejects_invoice_on_out_of_scope_case():
+    """Verifies a payment against an invoice whose case is out of the lawyer's scope raises 403, via a mocked invoice lookup. Exercises: `POST /payments` (`billing.create_payment()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     invoice_row = {"invoice_id": 7, "case_id": 20}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
@@ -60,6 +63,7 @@ def test_create_payment_rejects_invoice_on_out_of_scope_case():
 
 
 def test_create_expense_rejects_matter_on_out_of_scope_case():
+    """Verifies an expense against a conveyancing matter whose case is out of scope raises 403, via a mocked matter lookup. Exercises: `POST /expenses` (`billing.create_expense()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     matter_row = {"matter_id": 3, "case_id": 20}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
@@ -75,6 +79,7 @@ def test_create_expense_rejects_matter_on_out_of_scope_case():
 
 
 def test_send_invoice_reminder_rejects_invoice_on_out_of_scope_case():
+    """Verifies sending a reminder for an out-of-scope invoice's case raises 403, via a mocked invoice lookup. Exercises: `POST /invoices/{id}/remind` (`billing.send_invoice_reminder()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     invoice_row = {"invoice_number": "INV-1", "total_amount": 100, "case_id": 20, "cases": {"client_id": 9, "case_number": "LX-1"}}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
@@ -87,6 +92,7 @@ def test_send_invoice_reminder_rejects_invoice_on_out_of_scope_case():
 
 
 def test_send_invoice_reminder_notifies_the_client_user():
+    """Verifies a reminder for an in-scope invoice inserts a notification for the invoice's client user. Exercises: `POST /invoices/{id}/remind` (`billing.send_invoice_reminder()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     invoice_row = {"invoice_number": "INV-1", "total_amount": 100, "case_id": 10, "cases": {"client_id": 9, "case_number": "LX-1"}}
     client_row = {"user_id": 42}
@@ -120,18 +126,22 @@ def test_send_invoice_reminder_notifies_the_client_user():
 
 
 def test_no_payments_is_pending():
+    """Verifies zero payments against an invoice total yields "Pending". Exercises: `billing._invoice_status_for()`."""
     assert _invoice_status_for(0, 1000) == "Pending"
 
 
 def test_partial_payment_is_partially_paid():
+    """Verifies a payment amount below the invoice total yields "Partially Paid". Exercises: `billing._invoice_status_for()`."""
     assert _invoice_status_for(400, 1000) == "Partially Paid"
 
 
 def test_full_payment_is_paid():
+    """Verifies a payment amount matching the invoice total yields "Paid". Exercises: `billing._invoice_status_for()`."""
     assert _invoice_status_for(1000, 1000) == "Paid"
 
 
 def test_overpayment_is_paid():
+    """Verifies a payment amount exceeding the invoice total still yields "Paid". Exercises: `billing._invoice_status_for()`."""
     assert _invoice_status_for(1200, 1000) == "Paid"
 
 

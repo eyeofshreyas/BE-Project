@@ -1,6 +1,7 @@
 # ponytail self-check for respond_client_request's ownership/status guards --
 # a client must not be able to accept/decline a request addressed to someone
 # else, or one that's already been responded to.
+"""Tests for the client-requests domain: sending invites and responding to them (accept/decline)."""
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -32,6 +33,7 @@ def _fake_supabase(client_id: int, request_row: dict, lawyer_user_id: int = 5):
 
 
 def test_respond_rejects_request_addressed_to_someone_else():
+    """Verifies a client cannot respond to a request whose client_id doesn't match their own; raises 403. Exercises: `POST /client-requests/{id}/respond` (`client_requests.respond_client_request()`)."""
     profile = {"role_id": auth.CLIENT, "user_id": 1, "full_name": "Test Client"}
     request_row = {"request_id": 1, "client_id": 99, "status": "pending"}
     with patch("app.controllers.client_requests.supabase", _fake_supabase(7, request_row)):
@@ -43,6 +45,7 @@ def test_respond_rejects_request_addressed_to_someone_else():
 
 
 def test_respond_rejects_already_answered_request():
+    """Verifies responding to a request whose status is no longer "pending" raises 400. Exercises: `POST /client-requests/{id}/respond` (`client_requests.respond_client_request()`)."""
     profile = {"role_id": auth.CLIENT, "user_id": 1, "full_name": "Test Client"}
     request_row = {"request_id": 1, "client_id": 7, "status": "accepted"}
     with patch("app.controllers.client_requests.supabase", _fake_supabase(7, request_row)):
@@ -54,6 +57,7 @@ def test_respond_rejects_already_answered_request():
 
 
 def test_respond_notifies_lawyer_on_decline():
+    """Verifies declining a request inserts a notification for the request's lawyer (resolved via the lawyer's user_id). Exercises: `POST /client-requests/{id}/respond` (`client_requests.respond_client_request()`)."""
     profile = {"role_id": auth.CLIENT, "user_id": 1, "full_name": "Test Client"}
     request_row = {
         "request_id": 1, "client_id": 7, "lawyer_id": 3, "status": "pending",
@@ -71,6 +75,7 @@ def test_respond_notifies_lawyer_on_decline():
 def test_respond_marks_request_declined_and_creates_no_case():
     # the actual "reject" side-effect: request status flips to declined and,
     # unlike accept, no case/case_lawyers row is ever created.
+    """Verifies declining sets status to "declined" with a responded_at timestamp and never touches the `cases` table. Exercises: `POST /client-requests/{id}/respond` (`client_requests.respond_client_request()`)."""
     profile = {"role_id": auth.CLIENT, "user_id": 1, "full_name": "Test Client"}
     request_row = {
         "request_id": 1, "client_id": 7, "lawyer_id": 3, "status": "pending",
@@ -116,6 +121,7 @@ def _fake_supabase_for_send(request_row: dict, existing_user: dict | None = None
 
 
 def test_send_client_request_emails_invitee_with_no_account():
+    """Verifies inviting an email with no existing `users` row sends an invite email instead of a notification. Exercises: `POST /client-requests` (`client_requests.send_client_request()`)."""
     profile = {"user_id": 1, "full_name": "Test Lawyer"}
     request_row = {
         "request_id": 1, "invite_email": "new@client.com", "message": None, "status": "pending",
@@ -130,6 +136,7 @@ def test_send_client_request_emails_invitee_with_no_account():
 
 
 def test_send_client_request_notifies_existing_client():
+    """Verifies inviting an email that matches an existing client user inserts an in-app notification instead of an email. Exercises: `POST /client-requests` (`client_requests.send_client_request()`)."""
     profile = {"user_id": 1, "full_name": "Test Lawyer"}
     request_row = {
         "request_id": 1, "invite_email": None, "message": None, "status": "pending",
