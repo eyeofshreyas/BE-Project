@@ -44,6 +44,8 @@ def _to_participant_summary(row: dict) -> dict:
     }
 
 
+# shared fetch+scope-check used by get_meeting, list_participants, and
+# add_participant -- keeps the 404/403 logic in one place.
 def _get_meeting(meeting_id: int, case_ids: set[int] | None = None) -> dict:
     rows = supabase.table("meetings").select(MEETINGS_SELECT).eq("meeting_id", meeting_id).execute().data
     if not rows:

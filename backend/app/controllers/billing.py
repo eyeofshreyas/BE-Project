@@ -55,6 +55,8 @@ def _to_invoice_summary(row: dict) -> dict:
     }
 
 
+# shared fetch+scope-check used by get_invoice, list_invoice_payments, and
+# create_payment so each doesn't reimplement the 404/403 checks.
 def _get_invoice(invoice_id: int, case_ids: set[int] | None = None) -> dict:
     rows = supabase.table("invoices").select(INVOICES_SELECT).eq("invoice_id", invoice_id).execute().data
     if not rows:

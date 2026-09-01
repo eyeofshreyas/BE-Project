@@ -178,6 +178,9 @@ def forgot_password(data: ForgotPasswordRequest):
         raise HTTPException(status_code=400, detail="Could not process password reset. Check the email address and try again.")
 
 # --- Protected route example ---
+# the only route using raw get_current_user -- everything else depends on
+# get_current_profile/require_roles (middleware/auth.py) instead, which also
+# checks the LexFlow profile row and its is_active flag.
 @app.get("/protected")
 def protected_route(current_user=Depends(get_current_user)):
     return {"message": f"Hello {current_user.email}, you're authenticated!"}

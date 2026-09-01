@@ -147,6 +147,8 @@ def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profil
     }
 
 
+# matters aren't scoped directly -- resolve to the owning case_id and
+# defer to auth.ensure_case_access, same as documents/hearings/meetings do.
 def _ensure_matter_access(matter_id: int, profile: dict) -> None:
     matter_rows = supabase.table("conveyancing_matters").select("case_id").eq("matter_id", matter_id).execute().data
     if not matter_rows:

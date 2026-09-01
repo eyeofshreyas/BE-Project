@@ -55,6 +55,8 @@ def delete_document(document_id: int, profile: dict = Depends(get_current_profil
     return {"message": "Document deleted"}
 
 
+# case_id is bound from the URL path (routes/documents.py's
+# /cases/{case_id}/documents), not the multipart body.
 def upload_document(
     case_id: int,
     document_type_id: int = Form(...),

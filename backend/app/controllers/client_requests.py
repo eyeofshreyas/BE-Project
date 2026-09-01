@@ -132,6 +132,9 @@ def respond_client_request(request_id: int, data: ClientRequestDecision, profile
         notif_title = "Client request declined"
         notif_message = f"{profile['full_name']} declined your client request."
     else:
+        # this is the only other place (besides cases.create_case, which
+        # requires an accepted row here) that inserts a case_lawyers grant --
+        # keep both consent gates in sync if this logic changes.
         case_type_rows = supabase.table("case_types").select("case_type_name").eq("case_type_id", request_row["case_type_id"]).execute().data
         case_type_name = case_type_rows[0]["case_type_name"] if case_type_rows else "General"
 

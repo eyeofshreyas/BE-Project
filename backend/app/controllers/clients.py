@@ -26,6 +26,10 @@ def list_clients(profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     if profile["role_id"] == ADMIN:
         client_rows = supabase.table("clients").select(CLIENTS_SELECT).execute().data
     else:
+        # a lawyer's visible clients = clients on cases they're actively
+        # assigned to via case_lawyers -- that assignment is only ever
+        # created by client_requests.respond_client_request (client accepts)
+        # or cases.create_case (requires an accepted request first).
         lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
         if not lawyer_rows:
             return []

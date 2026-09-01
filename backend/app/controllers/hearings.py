@@ -31,6 +31,8 @@ def _to_hearing_summary(row: dict) -> dict:
     }
 
 
+# shared fetch+scope-check used by get_hearing, update_hearing, and
+# create_hearing's return path -- keeps the 404/403 logic in one place.
 def _get_hearing(hearing_id: int, case_ids: set[int] | None = None) -> dict:
     rows = supabase.table("hearings").select(HEARINGS_SELECT).eq("hearing_id", hearing_id).execute().data
     if not rows:
