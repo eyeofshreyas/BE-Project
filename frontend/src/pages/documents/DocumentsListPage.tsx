@@ -5,6 +5,7 @@ import {
 } from '../../api/client'
 import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption } from '../../types/api'
 import { Icon } from '../../components/icons'
+import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import shellStyles from '../../components/AppShell.module.css'
@@ -82,6 +83,13 @@ export default function DocumentsListPage() {
     } catch {
       tab?.close()
     }
+  }
+
+  const [previewDoc, setPreviewDoc] = useState<DocumentSummary | null>(null)
+
+  function openPreview(d: DocumentSummary) {
+    if (isPreviewable(d.mime_type)) setPreviewDoc(d)
+    else openDocument(d.id)
   }
 
   async function removeDocument(id: number) {
@@ -185,12 +193,12 @@ export default function DocumentsListPage() {
                 textAlign: 'center', cursor: 'pointer', background: dragOver ? '#FBF7EE' : '#FFFFFF',
               }}
             >
-              <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={(e) => pickFile(e.target.files?.[0])} />
+              <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,image/*,video/*" style={{ display: 'none' }} onChange={(e) => pickFile(e.target.files?.[0])} />
               <div style={{ width: 44, height: 44, borderRadius: 12, background: '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
                 <Icon name="download" size={20} color={PRIMARY} strokeWidth={1.8} />
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#2A2118' }}>Drop a PDF here, or click to browse</div>
-              <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>AI will extract, summarize, and index it automatically</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#2A2118' }}>Drop a file here, or click to browse</div>
+              <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>PDF, Word, images, or video · AI will summarize and index PDFs automatically</div>
             </div>
 
             {pendingFile && (
@@ -223,7 +231,7 @@ export default function DocumentsListPage() {
                         <Icon name="file-text" size={16} color={PRIMARY} />
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file_name}</div>
+                        <div onClick={() => openPreview(d)} style={{ fontSize: 13, fontWeight: 600, color: '#2A2118', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{d.file_name}</div>
                         <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{d.case_number ?? '—'} · {formatDate(d.upload_date)}</div>
                       </div>
                     </div>
@@ -296,7 +304,7 @@ export default function DocumentsListPage() {
                 <tbody>
                   {filteredDocuments.map((d) => (
                     <tr key={d.id} className={styles.tr}>
-                      <td className={styles.tdClient}>{d.file_name}</td>
+                      <td className={styles.tdClient} onClick={() => openPreview(d)} style={{ cursor: 'pointer' }}>{d.file_name}</td>
                       <td className={styles.td}>{d.document_type ?? '—'}</td>
                       <td className={styles.tdMono}>{d.case_number ?? '—'}</td>
                       <td className={styles.td}>{formatDate(d.upload_date)}</td>
@@ -319,6 +327,15 @@ export default function DocumentsListPage() {
           </>
         )}
       </div>
+
+      {previewDoc && (
+        <DocumentPreviewModal
+          documentId={previewDoc.id}
+          fileName={previewDoc.file_name}
+          mimeType={previewDoc.mime_type}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
     </div>
   )
 }

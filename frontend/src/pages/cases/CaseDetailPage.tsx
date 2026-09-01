@@ -6,6 +6,7 @@ import {
 } from '../../api/client'
 import type { CaseSummary, NoteSummary, TimelineEvent, DocumentSummary, MeetingSummary, DocumentTypeOption, UserProfile } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
+import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
 const PRIMARY = '#B08D3E'
@@ -183,6 +184,13 @@ export default function CaseDetailPage() {
     }
   }
 
+  const [previewDoc, setPreviewDoc] = useState<DocumentSummary | null>(null)
+
+  function openDocument(d: DocumentSummary) {
+    if (isPreviewable(d.mime_type)) setPreviewDoc(d)
+    else downloadDocument(d.id)
+  }
+
   if (loading) return <div className={styles.page}><div className={styles.wrap}><div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading case…</div></div></div>
   if (error || !caseInfo) return (
     <div className={styles.page}>
@@ -344,7 +352,7 @@ export default function CaseDetailPage() {
               )}
               <div className={styles.quickActionsList}>
                 {documents.map((d) => (
-                  <div key={d.id} className={styles.quickAction} onClick={() => downloadDocument(d.id)}>
+                  <div key={d.id} className={styles.quickAction} onClick={() => openDocument(d)}>
                     <span>{d.file_name}</span>
                   </div>
                 ))}
@@ -356,6 +364,15 @@ export default function CaseDetailPage() {
 
         {toast && <div className={styles.toast}>{toast}</div>}
       </div>
+
+      {previewDoc && (
+        <DocumentPreviewModal
+          documentId={previewDoc.id}
+          fileName={previewDoc.file_name}
+          mimeType={previewDoc.mime_type}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
     </div>
   )
 }
