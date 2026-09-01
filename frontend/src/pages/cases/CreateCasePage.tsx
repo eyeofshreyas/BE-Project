@@ -98,6 +98,10 @@ export default function CreateCasePage() {
     setSaving(true)
     setError('')
     try {
+      // Two backend calls, not one: POST /cases needs to return case_id before
+      // any file can be attached via POST /cases/:id/documents. Uploads run
+      // after case creation succeeds and use Promise.allSettled so one bad
+      // file doesn't block the others or lose the already-created case.
       const created = await createCase({
         case_type_id: Number(caseTypeId),
         case_title: caseName.trim(),

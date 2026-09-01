@@ -4,6 +4,8 @@ import { Icon } from './icons'
 
 const MUTED = '#8C7C5E'
 
+// Callers (DocumentsListPage, CaseDetailPage) check this before rendering
+// the modal -- anything else (Word docs, etc.) skips straight to download.
 export function isPreviewable(mimeType: string) {
   return mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType === 'application/pdf'
 }

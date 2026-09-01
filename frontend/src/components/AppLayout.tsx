@@ -35,6 +35,8 @@ const CLIENT_NAV: NavDef[] = [
   { label: 'Invoices', icon: 'receipt', path: '/billing' },
 ]
 
+// Same read-and-parse as ProtectedRoute.tsx's loadProfile -- duplicated
+// per-file across the app rather than shared, see that file's note.
 function loadProfile(): UserProfile | null {
   try {
     const raw = localStorage.getItem('lexflow_profile')

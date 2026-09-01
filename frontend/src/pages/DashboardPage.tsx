@@ -11,6 +11,9 @@ function loadProfile(): UserProfile | null {
   }
 }
 
+// Entry point for the /dashboard route (see App.tsx) -- not a page in its own
+// right, just a role-based switch, so it stays flat instead of nesting under
+// pages/lawyer or pages/client like the views it renders.
 export default function DashboardPage() {
   const profile = loadProfile()
   if (profile?.role_id === 2) return <LawyerDashboardPage />

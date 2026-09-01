@@ -145,6 +145,8 @@ export default function LoginPage() {
     setError('')
     try {
       const result = await login(email, password)
+      // Session source of truth: every loadProfile()/ProtectedRoute check and
+      // api/client.ts's authHeaders() read these same two keys back.
       localStorage.setItem('lexflow_token', result.access_token)
       if (result.profile) localStorage.setItem('lexflow_profile', JSON.stringify(result.profile))
       setToast('Signed in — redirecting to your dashboard…')

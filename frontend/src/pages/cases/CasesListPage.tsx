@@ -42,6 +42,9 @@ function loadProfile(): UserProfile | null {
   }
 }
 
+// Same role-based split pattern as DashboardPage.tsx: one route, two
+// completely different views (client sees their own cases read-only,
+// lawyer/admin get filters, bulk actions, and "New Case").
 export default function CasesListPage() {
   const profile = loadProfile()
   if (profile?.role_id === 3) return <ClientCasesView />
