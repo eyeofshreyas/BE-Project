@@ -1,7 +1,8 @@
 """
 Builds a FAISS similarity index over the IN-Abs judgment corpus for the
-Similar Case Discovery feature. No training -- Sentence-Transformers is
-a pretrained embedding model; this just embeds documents and indexes them.
+Similar Case Discovery feature. No training -- InLegalBert is a pretrained
+legal-domain BERT (via sentence-transformers' auto mean-pooling wrapper);
+this just embeds documents and indexes them.
 
 Chunked (not one vector per whole document): a single vector for a
 multi-thousand-word judgment loses too much detail for good retrieval,
@@ -26,7 +27,7 @@ CORPUS_DIRS = [
     HERE / "../data_prep/raw/dataset/IN-Abs/train-data/judgement",
     HERE / "../data_prep/raw/dataset/IN-Abs/test-data/judgement",
 ]
-MODEL_NAME = "all-MiniLM-L6-v2"
+MODEL_NAME = "law-ai/InLegalBert"
 CHUNK_WORDS = 200
 
 

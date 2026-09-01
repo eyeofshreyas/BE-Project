@@ -14,7 +14,7 @@ import faiss
 from sentence_transformers import SentenceTransformer
 
 HERE = Path(__file__).parent
-MODEL_NAME = "all-MiniLM-L6-v2"
+MODEL_NAME = "law-ai/InLegalBert"
 TOP_K_CHUNKS = 20  # cast a wide net over chunks, then collapse to top documents
 TOP_K_DOCS = 5
 

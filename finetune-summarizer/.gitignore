@@ -6,3 +6,5 @@ data_prep/raw/
 data_prep/data/*.jsonl
 similar_cases/index.faiss
 similar_cases/metadata.json
+CLAUDE.md
+.claude/

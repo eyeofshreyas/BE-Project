@@ -106,7 +106,7 @@ Both built and verified end-to-end below. Neither involves training — both use
 
 | | |
 |---|---|
-| Model | `all-MiniLM-L6-v2` (Sentence-Transformers) — pretrained, used only for embedding |
+| Model | `law-ai/InLegalBert` — pretrained on Indian legal text (statutes + judgments), loaded via sentence-transformers' auto mean-pooling wrapper, used only for embedding |
 | Corpus | All IN-Abs judgments already on disk (train + test), chunked to 200 words each so long judgments get multiple vectors instead of one lossy whole-document vector |
 | Index | FAISS `IndexFlatIP` over L2-normalized embeddings (= cosine similarity) |
 | Scale | **159,492 chunk vectors** across the corpus |
