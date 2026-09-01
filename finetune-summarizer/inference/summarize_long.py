@@ -35,6 +35,8 @@ Combine the following section summaries of an Indian Supreme Court judgment into
 
 
 def load_model():
+    """Loads the 4-bit base model and applies the LoRA adapter from ADAPTER_DIR (produced by
+    `finetune.finetune_llama_lora.main()`), switched into inference mode."""
     from unsloth import FastLanguageModel  # must import before trl/transformers/peft
     from peft import PeftModel
 
@@ -47,17 +49,21 @@ def load_model():
 
 
 def chunk_by_tokens(tokenizer, text, max_tokens=CHUNK_TOKENS):
+    """Splits text into a list of decoded substrings, each at most max_tokens tokens long."""
     ids = tokenizer(text, add_special_tokens=False)["input_ids"]
     return [tokenizer.decode(ids[i:i + max_tokens]) for i in range(0, len(ids), max_tokens)]
 
 
 def generate(model, tokenizer, prompt, max_new_tokens=220):
+    """Runs greedy generation on a single prompt and returns the decoded completion text."""
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LENGTH).to(model.device)
     out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
     return tokenizer.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True).strip()
 
 
 def summarize(model, tokenizer, judgment_text):
+    """Map-reduce summarization: chunks judgment_text, generates a headnote per chunk, then (if more than one
+    chunk) reduces those chunk summaries into a single final headnote. Calls: `chunk_by_tokens()`, `generate()`."""
     chunks = chunk_by_tokens(tokenizer, judgment_text)
     if len(chunks) == 1:
         return generate(model, tokenizer, MAP_PROMPT.format(text=chunks[0]))
@@ -68,6 +74,7 @@ def summarize(model, tokenizer, judgment_text):
 
 
 def _demo():
+    """Self-check for `chunk_by_tokens()` using a fake whitespace tokenizer, no GPU/model needed."""
     # smallest runnable check for the chunking split logic -- no GPU/model needed
     class FakeTokenizer:
         def __call__(self, text, add_special_tokens=False):

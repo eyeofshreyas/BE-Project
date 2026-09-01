@@ -26,11 +26,14 @@ PROMPT = """### Instruction:
 
 
 def load_test_set():
+    """Loads the JSONL test split produced by `data_prep.prepare_in_abs.main()` into a list of dicts."""
     with open(TEST_FILE) as f:
         return [json.loads(line) for line in f]
 
 
 def generate(model, tokenizer, example, max_new_tokens=256):
+    """Formats a test example into the eval PROMPT (no reference summary), runs greedy generation, and
+    returns the decoded completion text."""
     prompt = PROMPT.format(**example)
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LENGTH).to(model.device)
     out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
@@ -39,12 +42,16 @@ def generate(model, tokenizer, example, max_new_tokens=256):
 
 
 def score(predictions, references):
+    """Computes the mean ROUGE-L F-measure across paired predictions and reference summaries."""
     scorer = rouge_scorer.RougeScorer(["rougeL"], use_stemmer=True)
     scores = [scorer.score(ref, pred)["rougeL"].fmeasure for pred, ref in zip(predictions, references)]
     return sum(scores) / len(scores)
 
 
 def main() -> None:
+    """Loads the test set, generates summaries with both the raw base model and the LoRA-adapted model
+    (from ../finetune/lora_adapter, produced by `finetune.finetune_llama_lora.main()`), scores each against
+    references, and prints the ROUGE-L comparison. Calls: `load_test_set()`, `generate()`, `score()`."""
     test_set = load_test_set()
     references = [ex["output"] for ex in test_set]
 

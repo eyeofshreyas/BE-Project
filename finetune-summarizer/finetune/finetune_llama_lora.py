@@ -34,6 +34,8 @@ PROMPT_TEMPLATE = """### Instruction:
 
 
 def add_text_column(dataset, tokenizer):
+    """Precomputes a flat "text" column by rendering each example through PROMPT_TEMPLATE plus the EOS token,
+    for SFTConfig's default dataset_text_field (avoids a formatting_func map bug, see comment below)."""
     # A `formatting_func` here silently dropped the dataset to 8 rows on this
     # unsloth/trl version (some batched-map interaction bug) -- precomputing
     # a plain "text" column and using SFTConfig's default dataset_text_field
@@ -44,6 +46,9 @@ def add_text_column(dataset, tokenizer):
 
 
 def main() -> None:
+    """Loads the 4-bit base model, attaches a LoRA adapter, loads the JSONL pairs produced by
+    `data_prep.prepare_in_abs.main()`, formats them via `add_text_column()`, runs Unsloth's SFTTrainer,
+    and saves the adapter + tokenizer to OUTPUT_DIR (consumed later by `inference.summarize_long`)."""
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=MODEL_NAME,
         max_seq_length=MAX_SEQ_LENGTH,

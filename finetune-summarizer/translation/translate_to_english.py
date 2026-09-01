@@ -22,6 +22,8 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def load_model():
+    """Loads the IndicTrans2 indic-en distilled 200M checkpoint + tokenizer (fp16 on GPU) and an
+    IndicProcessor for pre/post-processing translation batches."""
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
     model = AutoModelForSeq2SeqLM.from_pretrained(
         MODEL_NAME, trust_remote_code=True, low_cpu_mem_usage=True,
@@ -34,6 +36,9 @@ def load_model():
 
 
 def translate_to_english(text, src_lang, model, tokenizer, ip):
+    """Translates a non-English document from src_lang into English via beam search, so it can be fed
+    into the English-only fine-tuned summarizer (`inference.summarize_long`). Mirrors
+    `translate.translate()` in the opposite direction, using the model/tokenizer/processor from `load_model()`."""
     batch = ip.preprocess_batch([text], src_lang=src_lang, tgt_lang=TGT_LANG)
     inputs = tokenizer(
         batch, truncation=True, padding="longest", return_tensors="pt", return_attention_mask=True,

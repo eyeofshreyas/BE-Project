@@ -32,11 +32,14 @@ CHUNK_WORDS = 200
 
 
 def chunk_words(text, chunk_size=CHUNK_WORDS):
+    """Splits text into a list of whitespace-joined chunks of chunk_size words each."""
     words = text.split()
     return [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
 
 
 def load_corpus():
+    """Reads every judgment file under CORPUS_DIRS (train + test IN-Abs judgments) and splits each into
+    word chunks. Calls: `chunk_words()`. Returns a flat list of (doc_id, chunk_text) tuples."""
     docs = []  # list of (doc_id, chunk_text)
     for corpus_dir in CORPUS_DIRS:
         for path in sorted(corpus_dir.glob("*")):
@@ -49,6 +52,9 @@ def load_corpus():
 
 
 def main() -> None:
+    """Loads and chunks the corpus, embeds every chunk with InLegalBert, builds a cosine-similarity
+    (L2-normalized inner-product) FAISS index, and writes index.faiss + metadata.json for
+    `similar_cases.search` to query. Calls: `load_corpus()`."""
     docs = load_corpus()
     print(f"Loaded {len(docs)} chunks from {len(set(d for d, _ in docs))} documents")
 

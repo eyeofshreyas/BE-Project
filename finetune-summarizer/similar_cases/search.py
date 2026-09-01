@@ -20,6 +20,9 @@ TOP_K_DOCS = 5
 
 
 def search(query_text, top_k_docs=TOP_K_DOCS):
+    """Embeds query_text, finds its TOP_K_CHUNKS nearest chunk vectors in the FAISS index built by
+    `build_index.main()`, collapses those to each document's best-scoring chunk, and returns the
+    top_k_docs highest-scoring (doc_id, (score, chunk_text)) pairs."""
     index = faiss.read_index(str(HERE / "index.faiss"))
     metadata = json.load(open(HERE / "metadata.json"))
 

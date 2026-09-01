@@ -28,6 +28,7 @@ MAX_INPUT_CHARS = 4000  # ~1000 words, keeps prompt+judgment+summary under the 2
 
 
 def download_and_extract() -> None:
+    """Streams the IN-Abs zip from Zenodo into RAW_DIR and extracts it, unless RAW_DIR is already populated."""
     zip_path = RAW_DIR / "dataset.zip"
     if RAW_DIR.exists() and any(RAW_DIR.iterdir()):
         print(f"{RAW_DIR} already populated, skipping download.")
@@ -48,6 +49,7 @@ def download_and_extract() -> None:
 
 
 def find_split_dir(root: Path, name_hint: str) -> Path:
+    """Recursively finds the first directory under root whose name contains name_hint (case-insensitive)."""
     # ponytail: zip's internal nesting isn't documented precisely, so search for it
     # instead of hardcoding a path that might be one level off.
     matches = [p for p in root.rglob("*") if p.is_dir() and name_hint.lower() in p.name.lower()]
@@ -57,6 +59,8 @@ def find_split_dir(root: Path, name_hint: str) -> Path:
 
 
 def build_pairs(split_root: Path) -> list[dict]:
+    """Pairs each judgment file with its matching summary file under split_root and builds instruction-tuning
+    records (truncating judgment text to MAX_INPUT_CHARS). Calls: `find_split_dir()`."""
     judgement_dir = find_split_dir(split_root, "judgement")
     summary_dir = find_split_dir(split_root, "summary")
 
@@ -74,6 +78,9 @@ def build_pairs(split_root: Path) -> list[dict]:
 
 
 def main() -> None:
+    """Downloads+extracts the dataset, builds train/test instruction pairs restricted to the IN-Abs split, writes
+    them to data/{train,test}.jsonl, and sanity-checks the resulting counts.
+    Calls: `download_and_extract()`, `find_split_dir()`, `build_pairs()`."""
     download_and_extract()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
