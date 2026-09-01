@@ -6,6 +6,7 @@ export type IconName =
   | 'chevron-down' | 'plus' | 'download' | 'receipt' | 'banknote' | 'alert-triangle'
   | 'check-circle' | 'database' | 'server' | 'hard-drive' | 'eye' | 'edit' | 'ban'
   | 'trash-2' | 'mail' | 'phone' | 'shield' | 'palette' | 'info' | 'x' | 'gavel' | 'clock' | 'filter'
+  | 'home' | 'more-horizontal'
 
 export function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 1.8 }: Props) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
@@ -48,5 +49,7 @@ export function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 1.
     case 'gavel': return <svg {...common}><path d="M14 4l6 6" /><path d="M4 14l6 6" /><path d="M9.5 8.5l-6 6" /><path d="M15.5 2.5l6 6" /><path d="M10.5 13.5L18 6" /><path d="M2 22h10" /></svg>
     case 'clock': return <svg {...common}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l3.5 2" /></svg>
     case 'filter': return <svg {...common}><path d="M4 5h16l-6 8v6l-4-2v-4z" /></svg>
+    case 'home': return <svg {...common}><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></svg>
+    case 'more-horizontal': return <svg {...common}><circle cx={5} cy={12} r={1.4} fill={color} /><circle cx={12} cy={12} r={1.4} fill={color} /><circle cx={19} cy={12} r={1.4} fill={color} /></svg>
   }
 }

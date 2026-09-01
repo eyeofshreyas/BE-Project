@@ -20,6 +20,7 @@ import type {
   ClientSummary,
   JudgementSummary,
   JudgementCreatePayload,
+  CaseCreatePayload,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -110,6 +111,10 @@ export function forgotPassword(email: string) {
 
 export function listCases() {
   return get<CaseSummary[]>('/cases')
+}
+
+export function createCase(payload: CaseCreatePayload) {
+  return post<CaseSummary>('/cases', payload)
 }
 
 export function getConveyancingSummary() {

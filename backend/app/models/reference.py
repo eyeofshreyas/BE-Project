@@ -28,3 +28,9 @@ class Judge(BaseModel):
     designation: str | None
     court_id: int
     court_name: str | None
+
+
+class DocumentType(BaseModel):
+    document_type_id: int
+    type_name: str
+    description: str | None

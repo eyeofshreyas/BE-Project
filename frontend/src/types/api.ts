@@ -45,6 +45,16 @@ export interface CaseSummary {
   priority: string
 }
 
+export interface CaseCreatePayload {
+  case_type_id: number
+  case_title: string
+  client_id: number
+  court_id: number
+  priority: string
+  next_hearing_date?: string
+  description?: string
+}
+
 export interface NoteSummary {
   id: number
   case_id: number

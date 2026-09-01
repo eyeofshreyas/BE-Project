@@ -79,7 +79,7 @@ function StaffCasesView() {
             <div className={styles.title}>Cases</div>
             <div className={styles.subtitle}>{cases.length} total · {activeCount} active</div>
           </div>
-          <div className={styles.primaryChip} onClick={() => navigate('/conveyancing')}><Icon name="plus" size={15} color="#FFFFFF" /> New Case</div>
+          <div className={styles.primaryChip} onClick={() => navigate('/cases/new')}><Icon name="plus" size={15} color="#FFFFFF" /> New Case</div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

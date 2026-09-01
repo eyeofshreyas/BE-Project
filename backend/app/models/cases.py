@@ -1,6 +1,16 @@
 from pydantic import BaseModel
 
 
+class CaseCreate(BaseModel):
+    case_type_id: int
+    case_title: str
+    client_id: int
+    court_id: int
+    priority: str = "Medium"
+    next_hearing_date: str | None = None
+    description: str | None = None
+
+
 class CaseSummary(BaseModel):
     id: str
     case_id: int

@@ -1,7 +1,7 @@
 from fastapi import Depends
 from app.db.supabase_client import supabase
 from app.middleware.auth import get_current_profile
-from app.models.reference import CaseType, Court, Role, Judge
+from app.models.reference import CaseType, Court, Role, Judge, DocumentType
 
 
 def list_roles(profile: dict = Depends(get_current_profile)):
@@ -14,6 +14,10 @@ def list_case_types(profile: dict = Depends(get_current_profile)):
 
 def list_courts(profile: dict = Depends(get_current_profile)):
     return supabase.table("courts").select("*").order("court_name").execute().data
+
+
+def list_document_types(profile: dict = Depends(get_current_profile)):
+    return supabase.table("document_types").select("*").order("type_name").execute().data
 
 
 def list_judges(profile: dict = Depends(get_current_profile)):

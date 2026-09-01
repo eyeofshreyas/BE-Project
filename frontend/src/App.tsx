@@ -8,6 +8,7 @@ import ConveyancingDashboardPage from './pages/conveyancing/ConveyancingDashboar
 import DashboardPage from './pages/DashboardPage'
 import CaseDetailPage from './pages/cases/CaseDetailPage'
 import CasesListPage from './pages/cases/CasesListPage'
+import CreateCasePage from './pages/cases/CreateCasePage'
 import DocumentsListPage from './pages/documents/DocumentsListPage'
 import BillingPage from './pages/billing/BillingPage'
 import HearingsPage from './pages/hearings/HearingsPage'
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminConsolePage /></ProtectedRoute>} />
         <Route path="/conveyancing" element={<ProtectedRoute><AppLayout><ConveyancingDashboardPage /></AppLayout></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/cases/new" element={<ProtectedRoute><AppLayout><CreateCasePage /></AppLayout></ProtectedRoute>} />
         <Route path="/cases/:caseId" element={<ProtectedRoute><AppLayout><CaseDetailPage /></AppLayout></ProtectedRoute>} />
         <Route path="/cases" element={<ProtectedRoute><AppLayout><CasesListPage /></AppLayout></ProtectedRoute>} />
         <Route path="/documents" element={<ProtectedRoute><AppLayout><DocumentsListPage /></AppLayout></ProtectedRoute>} />
