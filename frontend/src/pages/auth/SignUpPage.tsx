@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
 import { signup } from '../../api/client'
 import styles from './SignUpPage.module.css'
+import { Icon } from '../../components/icons'
 
 const PRIMARY = '#B08D3E'
 const BORDER = '#E7DCC6'
@@ -12,21 +13,13 @@ const BG = '#FCF9F3'
 
 const iconProps = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: MUTED, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
 
-const UserIcon = () => <svg {...iconProps}><circle cx={12} cy={8} r={4} /><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" /></svg>
-const MailIcon = () => <svg {...iconProps}><rect x={3} y={5} width={18} height={14} rx={2} /><path d="M3 6l9 7 9-7" /></svg>
-const PhoneIcon = () => <svg {...iconProps}><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C9.5 19 5 14.5 5 8a2 2 0 0 1 1-2z" /></svg>
 const LockIcon = () => <svg {...iconProps}><rect x={4} y={11} width={16} height={9} rx={2} /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-const ShieldIcon = () => <svg {...iconProps}><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /><path d="M9 12l2 2 4-4" /></svg>
-const ScaleIcon = () => <svg {...iconProps}><path d="M12 3v18" /><path d="M7 6h10" /><path d="M4 6l3 6a3 3 0 0 0 6 0L10 6" /><path d="M14 6l3 6a3 3 0 0 0 6 0L20 6" /></svg>
 const ClockIcon = () => <svg {...iconProps}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l4 2" /></svg>
 const LanguagesIcon = () => <svg {...iconProps}><circle cx={12} cy={12} r={9} /><path d="M3 12h18" /><path d="M12 3a15 15 0 0 1 0 18" /><path d="M12 3a15 15 0 0 0 0 18" /></svg>
 const MapPinIcon = () => <svg {...iconProps}><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z" /><circle cx={12} cy={9.5} r={2.3} /></svg>
-const ChevronIcon = () => <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
 const AlertIcon = () => <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#EF5350" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={9} /><path d="M12 8v5" /><path d="M12 16h.01" /></svg>
 const ArrowIcon = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
 const CheckIcon = () => <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-const BriefcaseIcon = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={3} y={8} width={18} height={12} rx={2} /><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-const UsersIcon = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx={9} cy={8} r={3} /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><circle cx={17} cy={9} r={2.5} /><path d="M21 20c0-2.5-1.8-4.6-4.2-5.4" /></svg>
 const EyeIcon = ({ off }: { off: boolean }) => off ? (
   <svg {...iconProps}><path d="M2 12s3.5-7 10-7c1.8 0 3.4.5 4.7 1.2M22 12s-3.5 7-10 7c-1.8 0-3.4-.5-4.7-1.2" /><path d="M3 3l18 18" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>
 ) : (
@@ -142,10 +135,10 @@ export default function SignUpPage() {
               <div className={styles.label}>I am a</div>
               <div className={styles.roleToggle}>
                 <div className={styles.roleOption} style={{ background: isLawyer ? '#FFFFFF' : 'transparent', color: isLawyer ? TEXT : MUTED, boxShadow: isLawyer ? '0 1px 2px rgba(42,33,24,.08)' : 'none' }} onClick={() => setRole('lawyer')}>
-                  <BriefcaseIcon /><span>Lawyer</span>
+                  <Icon name="briefcase" size={15} /><span>Lawyer</span>
                 </div>
                 <div className={styles.roleOption} style={{ background: !isLawyer ? '#FFFFFF' : 'transparent', color: !isLawyer ? TEXT : MUTED, boxShadow: !isLawyer ? '0 1px 2px rgba(42,33,24,.08)' : 'none' }} onClick={() => setRole('client')}>
-                  <UsersIcon /><span>Client</span>
+                  <Icon name="users" size={15} /><span>Client</span>
                 </div>
               </div>
             </div>
@@ -153,17 +146,17 @@ export default function SignUpPage() {
             <div className={styles.row2}>
               <div>
                 <div className={styles.label}>Full Name</div>
-                <div style={wrapStyle('fullName')}><UserIcon /><input placeholder="Adv. Meera Kulkarni" value={fullName} onChange={(e) => setFullName(e.target.value)} onFocus={mkFocus('fullName')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                <div style={wrapStyle('fullName')}><Icon name="user" size={16} color={MUTED} /><input placeholder="Adv. Meera Kulkarni" value={fullName} onChange={(e) => setFullName(e.target.value)} onFocus={mkFocus('fullName')} onBlur={mkFocus(null)} className={styles.input} /></div>
               </div>
               <div>
                 <div className={styles.label}>Phone Number</div>
-                <div style={wrapStyle('phone')}><PhoneIcon /><input placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} onFocus={mkFocus('phone')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                <div style={wrapStyle('phone')}><Icon name="phone" size={16} color={MUTED} /><input placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} onFocus={mkFocus('phone')} onBlur={mkFocus(null)} className={styles.input} /></div>
               </div>
             </div>
 
             <div>
               <div className={styles.label}>Email Address</div>
-              <div style={wrapStyle('email')}><MailIcon /><input type="email" placeholder="you@lawfirm.com" value={email} onChange={(e) => { setEmail(e.target.value); setError('') }} onFocus={mkFocus('email')} onBlur={mkFocus(null)} className={styles.input} /></div>
+              <div style={wrapStyle('email')}><Icon name="mail" size={16} color={MUTED} /><input type="email" placeholder="you@lawfirm.com" value={email} onChange={(e) => { setEmail(e.target.value); setError('') }} onFocus={mkFocus('email')} onBlur={mkFocus(null)} className={styles.input} /></div>
             </div>
 
             <div className={styles.row2}>
@@ -204,17 +197,17 @@ export default function SignUpPage() {
                 <div className={styles.sectionTitle}>Lawyer Details</div>
                 <div>
                   <div className={styles.label}>Bar Council Registration Number</div>
-                  <div style={wrapStyle('bar')}><ShieldIcon /><input placeholder="e.g. D/1234/2015" value={barNumber} onChange={(e) => setBarNumber(e.target.value)} onFocus={mkFocus('bar')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                  <div style={wrapStyle('bar')}><Icon name="shield" size={16} color={MUTED} /><input placeholder="e.g. D/1234/2015" value={barNumber} onChange={(e) => setBarNumber(e.target.value)} onFocus={mkFocus('bar')} onBlur={mkFocus(null)} className={styles.input} /></div>
                 </div>
                 <div className={styles.row2}>
                   <div>
                     <div className={styles.label}>Practice Area</div>
                     <div style={wrapStyle('practice')}>
-                      <ScaleIcon />
+                      <Icon name="scale" size={16} color={MUTED} />
                       <select value={practiceArea} onChange={(e) => setPracticeArea(e.target.value)} className={styles.select}>
                         {PRACTICE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
-                      <ChevronIcon />
+                      <Icon name="chevron-down" size={14} color={MUTED} />
                     </div>
                   </div>
                   <div>
@@ -233,7 +226,7 @@ export default function SignUpPage() {
                     <select value={preferredLanguage} onChange={(e) => setPreferredLanguage(e.target.value)} className={styles.select}>
                       {LANGUAGE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                     </select>
-                    <ChevronIcon />
+                    <Icon name="chevron-down" size={14} color={MUTED} />
                   </div>
                 </div>
                 <div>
