@@ -75,7 +75,7 @@ export default function RecordPaymentPage() {
         {loadError && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{loadError}</div>}
 
         {invoice && (
-          <div className={styles.panelCard}>
+          <div className={styles.panelCard} style={{ maxWidth: 640 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: '#F1E4C3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -88,7 +88,7 @@ export default function RecordPaymentPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 640 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Invoice</div>
                 <div style={{ border: '1.5px solid #E7DCC6', borderRadius: 9, padding: '9px 12px', fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>
