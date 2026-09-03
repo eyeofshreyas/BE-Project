@@ -180,19 +180,18 @@ export default function ClientsPage() {
                     <a href={`mailto:${c.email}`} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, textDecoration: 'none' }} title="Email">
                       <Icon name="mail" size={14} />
                     </a>
-                    {c.pending_amount > 0 ? (
-                      <div
-                        onClick={() => payLoadingId === null && openRecordPayment(c)}
-                        style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'pointer', opacity: payLoadingId === c.id ? 0.5 : 1 }}
-                        title="Record Payment"
-                      >
-                        <Icon name="banknote" size={14} />
-                      </div>
-                    ) : (
-                      <div style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'default' }} title="Client documents coming soon">
-                        <Icon name="file-text" size={14} />
-                      </div>
-                    )}
+                    <div
+                      onClick={() => c.pending_amount > 0 && payLoadingId === null && openRecordPayment(c)}
+                      style={{
+                        width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED,
+                        cursor: c.pending_amount > 0 ? 'pointer' : 'default',
+                        opacity: c.pending_amount === 0 ? 0.4 : payLoadingId === c.id ? 0.5 : 1,
+                      }}
+                      title={c.pending_amount > 0 ? 'Record Payment' : 'No outstanding balance'}
+                    >
+                      <Icon name="banknote" size={14} />
+                    </div>
                     <div style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'default' }} title="Client schedule coming soon">
                       <Icon name="calendar" size={14} />
                     </div>
