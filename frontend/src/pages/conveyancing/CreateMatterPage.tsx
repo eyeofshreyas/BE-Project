@@ -35,10 +35,12 @@ const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box'
 /**
  * Loads `listClients()` for the client search on mount, then on submit calls
  * `createMatter()` (matter_type doubles as transaction_type server-side; the
- * matter_number is generated on the backend) and navigates back to `/conveyancing`.
- * Priority and Responsible Lawyer are collected but not yet persisted -- the
- * `conveyancing_matters` schema has no columns for them and a lawyer isn't
- * assignable without a linked case, which this simplified flow skips.
+ * matter_number is generated on the backend, along with a lightweight case
+ * that carries the client/priority -- `cases.client_id` is required) and
+ * navigates back to `/conveyancing`. Client selection is required for that
+ * reason even though the mockup doesn't mark it so. Responsible Lawyer is
+ * decorative: the backend assigns whoever is creating the matter instead,
+ * since there's no accessible lawyer-directory endpoint for non-admins.
  */
 export default function CreateMatterPage() {
   const navigate = useNavigate()
@@ -76,6 +78,7 @@ export default function CreateMatterPage() {
 
   async function submit() {
     if (!matterName.trim()) { setError('Enter a matter name.'); return }
+    if (!clientId) { setError('Search and select a client for this matter.'); return }
 
     setSaving(true)
     setError('')
@@ -83,7 +86,8 @@ export default function CreateMatterPage() {
       const created = await createMatter({
         matter_name: matterName.trim(),
         matter_type: matterType,
-        client_id: clientId ? Number(clientId) : undefined,
+        client_id: Number(clientId),
+        priority,
         property_address: propertyAddress.trim() || undefined,
         property_type: propertyType,
         title_number: titleNumber.trim() || undefined,
@@ -151,7 +155,7 @@ export default function CreateMatterPage() {
 
           <SectionTitle>Client</SectionTitle>
 
-          <Field label="Select Client">
+          <Field label="Select Client" required>
             <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ position: 'relative', flex: 1 }} onBlur={() => setTimeout(() => setClientDropdownOpen(false), 120)}>
                 <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', gap: 8 }}>

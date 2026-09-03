@@ -77,7 +77,8 @@ export interface TimelineEvent {
 export interface MatterCreatePayload {
   matter_name: string
   matter_type: string
-  client_id?: number
+  client_id: number
+  priority: string
   property_address?: string
   property_type?: string
   title_number?: string

@@ -106,10 +106,13 @@ class MatterDocument(BaseModel):
 
 
 class MatterCreate(BaseModel):
-    """Request body for creating a conveyancing matter from the Create New Matter form."""
+    """Request body for creating a conveyancing matter from the Create New Matter form. `cases`
+    requires a client/court/case_type, so `client_id` is mandatory here even though the form's
+    other fields are optional -- create_matter() opens a lightweight case under the hood."""
     matter_name: str
     matter_type: str
-    client_id: int | None = None
+    client_id: int
+    priority: str = "Medium"
     property_address: str | None = None
     property_type: str | None = None
     title_number: str | None = None

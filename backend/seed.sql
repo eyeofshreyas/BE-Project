@@ -386,3 +386,92 @@ where mt.matter_number = 'MAT-2026-001'
 and not exists (
   select 1 from matter_documents where matter_documents.matter_id = mt.matter_id and matter_documents.document_id = d.document_id
 );
+
+-- Extra matters (numbered *-101.. to stay clear of app-generated MAT-2026-00N
+-- numbers) so the dashboard table/filters have more than one row to page
+-- through. conveyancing_matters.case_id and properties.address are NOT
+-- NULL, so each gets its own lightweight case, same shape create_matter()
+-- opens for a matter created via the "New Matter" form.
+
+insert into properties (property_name, address, city, state, property_type, survey_number, market_value, land_area, builtup_area)
+select * from (values
+  ('Smith Residence', '12 Baker Street', 'Bengaluru', 'Karnataka', 'Residential', 'SY-201', 6500000.00, 2200.00, 1600.00),
+  ('Acme Corp Block B', 'Whitefield Industrial Area', 'Bengaluru', 'Karnataka', 'Commercial', 'SY-330', 22000000.00, 8000.00, 6500.00),
+  ('Williams Apartment', '7 Residency Road', 'Bengaluru', 'Karnataka', 'Residential', 'SY-410', 9800000.00, 1500.00, 1200.00),
+  ('Chen Off-Plan Unit', 'Sarjapur Road Phase 2', 'Bengaluru', 'Karnataka', 'Residential', 'SY-512', 7200000.00, 1300.00, 1050.00),
+  ('Unit 8', '8 Commercial Street', 'Bengaluru', 'Karnataka', 'Commercial', 'SY-88', 4300000.00, 900.00, 750.00),
+  ('Smith Family Trust Property', 'Trust Estate, Jayanagar', 'Bengaluru', 'Karnataka', 'Residential', 'SY-777', 15000000.00, 3200.00, 2400.00)
+) as v(property_name, address, city, state, property_type, survey_number, market_value, land_area, builtup_area)
+where not exists (select 1 from properties where properties.property_name = v.property_name);
+
+insert into cases (case_number, case_title, client_id, court_id, case_type_id, status, priority)
+select v.case_number, v.case_title, cl.client_id, co.court_id, ct.case_type_id, 'Open', v.priority
+from (values
+  ('PROP2026101', 'Smith Residence', 'neha.kulkarni@example.com', 'High'),
+  ('PROP2026102', 'Acme Corp Block B', 'vikram.shah@example.com', 'Medium'),
+  ('PROP2026103', 'Williams Apartment', 'ritu.desai@example.com', 'Medium'),
+  ('PROP2026104', 'Chen Off-Plan Unit', 'neha.kulkarni@example.com', 'Low'),
+  ('PROP2026105', 'Unit 8', 'vikram.shah@example.com', 'Medium'),
+  ('PROP2026106', 'Smith Family Trust Property', 'ritu.desai@example.com', 'Low')
+) as v(case_number, case_title, client_email, priority)
+join clients cl on cl.user_id = (select user_id from users where email = v.client_email)
+join courts co on co.court_name = 'Sub-Registrar Office, Indiranagar'
+join case_types ct on ct.case_type_name = 'Property'
+where not exists (select 1 from cases where cases.case_number = v.case_number);
+
+insert into case_lawyers (case_id, lawyer_id, assigned_role, is_active)
+select ca.case_id, la.lawyer_id, 'Primary', true
+from (values
+  ('PROP2026101', 'rohan.mehta@example.com'),
+  ('PROP2026102', 'priya.nair@example.com'),
+  ('PROP2026103', 'karan.verma@example.com'),
+  ('PROP2026104', 'rohan.mehta@example.com'),
+  ('PROP2026105', 'priya.nair@example.com'),
+  ('PROP2026106', 'karan.verma@example.com')
+) as v(case_number, lawyer_email)
+join cases ca on ca.case_number = v.case_number
+join lawyers la on la.user_id = (select user_id from users where email = v.lawyer_email)
+where not exists (
+  select 1 from case_lawyers where case_lawyers.case_id = ca.case_id and case_lawyers.lawyer_id = la.lawyer_id
+);
+
+insert into conveyancing_matters (case_id, property_id, matter_number, matter_type, transaction_type, registration_status, completion_percentage, expected_completion_date)
+select ca.case_id, p.property_id, v.matter_number, v.matter_type, v.transaction_type, v.registration_status, v.completion_percentage, v.expected_completion_date::date
+from (values
+  ('PROP2026101', 'Smith Residence', 'MAT-2026-101', 'Residential Sale', 'Sale', 'Documents Pending', 20, '2026-11-05'),
+  ('PROP2026102', 'Acme Corp Block B', 'MAT-2026-102', 'Commercial Lease', 'Lease', 'Drafting', 10, '2026-11-20'),
+  ('PROP2026103', 'Williams Apartment', 'MAT-2026-103', 'Residential Purchase', 'Purchase', 'Lodged', 70, '2026-10-10'),
+  ('PROP2026104', 'Chen Off-Plan Unit', 'MAT-2026-104', 'Off-the-Plan Purchase', 'Purchase', 'Drafting', 15, '2027-02-01'),
+  ('PROP2026105', 'Unit 8', 'MAT-2026-105', 'Mortgage', 'Mortgage', 'Registered', 100, '2026-08-01'),
+  ('PROP2026106', 'Smith Family Trust Property', 'MAT-2026-106', 'Trust Deed', 'Trust Deed', 'Registration Scheduled', 50, null)
+) as v(case_number, property_name, matter_number, matter_type, transaction_type, registration_status, completion_percentage, expected_completion_date)
+join cases ca on ca.case_number = v.case_number
+join properties p on p.property_name = v.property_name
+where not exists (select 1 from conveyancing_matters where conveyancing_matters.matter_number = v.matter_number);
+
+insert into conveyancing_parties (matter_id, party_name, role)
+select mt.matter_id, v.party_name, v.role
+from (values
+  ('MAT-2026-101', 'Smith, J. & E.', 'Buyer'),
+  ('MAT-2026-102', 'Acme Corp Ltd.', 'Lessee'),
+  ('MAT-2026-103', 'Williams, T.', 'Buyer'),
+  ('MAT-2026-104', 'Chen, L.', 'Buyer'),
+  ('MAT-2026-105', 'David Miller', 'Borrower'),
+  ('MAT-2026-106', 'Smith Family Trust', 'Trustee')
+) as v(matter_number, party_name, role)
+join conveyancing_matters mt on mt.matter_number = v.matter_number
+where not exists (
+  select 1 from conveyancing_parties where conveyancing_parties.matter_id = mt.matter_id and conveyancing_parties.party_name = v.party_name
+);
+
+insert into property_registrations (matter_id, office_name, registration_date, registration_status)
+select mt.matter_id, 'Sub-Registrar Office, Indiranagar', v.registration_date::date, v.registration_status
+from (values
+  ('MAT-2026-101', '2026-10-12', 'Documents Pending'),
+  ('MAT-2026-102', '2026-10-15', 'Drafting'),
+  ('MAT-2026-103', '2026-10-20', 'Lodged'),
+  ('MAT-2026-104', '2026-11-05', 'Drafting'),
+  ('MAT-2026-105', '2026-11-10', 'Registered')
+) as v(matter_number, registration_date, registration_status)
+join conveyancing_matters mt on mt.matter_number = v.matter_number
+where not exists (select 1 from property_registrations where property_registrations.matter_id = mt.matter_id);
