@@ -29,6 +29,9 @@ const CalendarIcon = () => <svg {...iconProps}><rect x={3} y={4} width={18} heig
 const FilterIcon = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
 const PlusIcon = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><line x1={12} y1={5} x2={12} y2={19} /><line x1={5} y1={12} x2={19} y2={12} /></svg>
 const ChevronRightIcon = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+const TransferIcon = () => <svg {...iconProps} width={16} height={16}><path d="M4 8h13" /><polyline points="13 4 17 8 13 12" /><path d="M20 16H7" /><polyline points="11 12 7 16 11 20" /></svg>
+const KeyIcon = () => <svg {...iconProps} width={16} height={16}><circle cx={8} cy={15} r={4} /><path d="M11 12l9-9" /><path d="M17 6l3 3" /><path d="M14 9l2 2" /></svg>
+const CloseIcon = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><line x1={18} y1={6} x2={6} y2={18} /><line x1={6} y1={6} x2={18} y2={18} /></svg>
 
 const DONUT_COLORS = [PRIMARY, '#D9822B', '#4CAF50', '#5C8AB0', '#9E5CB0', '#B05C5C']
 
@@ -46,6 +49,21 @@ const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
 
 const QUICK_ACTIONS = ['Schedule Registration', 'Upload Documents', 'Request Settlement Funds']
 const MATTERS_PAGE_SIZE = 6
+
+const FILTER_STATUSES: { label: string; dot: string }[] = [
+  { label: 'Drafting', dot: '#6A5C42' },
+  { label: 'Pending', dot: '#B87F1E' },
+  { label: 'Lodged', dot: '#5C8AB0' },
+  { label: 'Completed', dot: '#2E9E58' },
+]
+const FILTER_MATTER_TYPES: { label: string; icon: React.ReactNode }[] = [
+  { label: 'Sale', icon: <Icon name="home" size={16} color="#6A5C42" /> },
+  { label: 'Purchase', icon: <Icon name="briefcase" size={16} color="#6A5C42" /> },
+  { label: 'Transfer', icon: <TransferIcon /> },
+  { label: 'Mortgage', icon: <Icon name="home" size={16} color="#6A5C42" /> },
+  { label: 'Lease', icon: <KeyIcon /> },
+]
+const FILTER_DATE_RANGES = ['Today', 'This Week', 'This Month']
 
 function relativeDateTime(iso: string) {
   const d = new Date(iso)
@@ -72,8 +90,10 @@ export default function ConveyancingDashboardPage() {
 /**
  * Loads `getConveyancingSummary()` (stats, status donut, matters list) and
  * `listAllMeetings()` (for upcoming appointments); supports matter
- * search/type/status filtering with pagination, and a "New Matter"
- * button that navigates to `/conveyancing/matters/new`.
+ * search/type/status filtering with pagination, a "New Matter" button
+ * that navigates to `/conveyancing/matters/new`, and a "Filter" popover
+ * (status/matter type feed the real search filters; priority/date
+ * created are display-only, matters carry no such fields yet).
  */
 function StaffConveyancingView() {
   const navigate = useNavigate()
@@ -88,6 +108,12 @@ function StaffConveyancingView() {
   const [typeFilter, setTypeFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
   const [page, setPage] = useState(1)
+
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [draftStatus, setDraftStatus] = useState('All')
+  const [draftType, setDraftType] = useState('All')
+  const [draftPriority, setDraftPriority] = useState<'Low' | 'Medium' | 'High'>('Medium')
+  const [draftDateRange, setDraftDateRange] = useState<string | null>(null)
 
   useEffect(() => {
     getConveyancingSummary()
@@ -107,6 +133,26 @@ function StaffConveyancingView() {
   function fireAction(label: string) {
     setToast(`${label}…`)
     setTimeout(() => setToast(null), 1800)
+  }
+
+  function openFilters() {
+    setDraftStatus(statusFilter)
+    setDraftType(typeFilter)
+    setFilterOpen(true)
+  }
+
+  function clearFilters() {
+    setDraftStatus('All')
+    setDraftType('All')
+    setDraftPriority('Medium')
+    setDraftDateRange(null)
+  }
+
+  function applyFilters() {
+    setStatusFilter(draftStatus)
+    setTypeFilter(draftType)
+    setPage(1)
+    setFilterOpen(false)
   }
 
   const total = summary?.status_breakdown.reduce((sum, s) => sum + s.count, 0) ?? 0
@@ -154,9 +200,88 @@ function StaffConveyancingView() {
             <div className={styles.title}>Conveyancing Dashboard</div>
             <div className={styles.subtitle}>Today's conveyancing metrics and critical tasks.</div>
           </div>
-          <div className={styles.headerActions}>
-            <div className={styles.ghostChip}><FilterIcon /><span>Filter</span></div>
+          <div className={styles.headerActions} style={{ position: 'relative' }}>
+            <div className={styles.ghostChip} onClick={openFilters}><FilterIcon /><span>Filter</span></div>
             <div className={styles.primaryChip} onClick={() => navigate('/conveyancing/matters/new')}><PlusIcon /><span>New Matter</span></div>
+
+            {filterOpen && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setFilterOpen(false)} />
+                <div style={{ position: 'absolute', top: 'calc(100% + 10px)', left: 0, width: 380, background: '#FFFBF2', borderRadius: 20, boxShadow: '0 20px 48px rgba(0,0,0,.18)', padding: 22, zIndex: 41 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 17, fontWeight: 700, color: '#2A2118' }}>Filters</div>
+                      <div style={{ fontSize: 12.5, color: MUTED, marginTop: 2 }}>Refine your view</div>
+                    </div>
+                    <div onClick={() => setFilterOpen(false)} style={{ cursor: 'pointer', padding: 2 }}><CloseIcon /></div>
+                  </div>
+                  <div style={{ height: 1, background: '#E7DCC6', margin: '14px 0' }} />
+
+                  <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Status</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+                    <div
+                      onClick={() => setDraftStatus('All')}
+                      style={{ padding: '7px 16px', borderRadius: 20, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', color: draftStatus === 'All' ? '#FFFFFF' : '#6A5C42', background: draftStatus === 'All' ? PRIMARY_DARK : '#FFFFFF', border: `1px solid ${draftStatus === 'All' ? PRIMARY_DARK : '#E7DCC6'}` }}
+                    >
+                      All
+                    </div>
+                    {FILTER_STATUSES.map((s) => (
+                      <div
+                        key={s.label}
+                        onClick={() => setDraftStatus(s.label)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 20, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: draftStatus === s.label ? '#FFFFFF' : '#6A5C42', background: draftStatus === s.label ? PRIMARY_DARK : '#FFFFFF', border: `1px solid ${draftStatus === s.label ? PRIMARY_DARK : '#E7DCC6'}` }}
+                      >
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: draftStatus === s.label ? '#FFFFFF' : s.dot }} />{s.label}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Matter Type</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 18 }}>
+                    {FILTER_MATTER_TYPES.map((t) => {
+                      const selected = draftType === t.label
+                      return (
+                        <div
+                          key={t.label}
+                          onClick={() => setDraftType(selected ? 'All' : t.label)}
+                          style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: selected ? '#FBF0D6' : '#FFFFFF', border: `1.5px solid ${selected ? '#B08D3E' : '#E7DCC6'}` }}
+                        >
+                          {t.icon}
+                          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#2A2118' }}>{t.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Priority</div>
+                  <div style={{ display: 'flex', gap: 6, background: '#F1E9D6', borderRadius: 9, padding: 4, marginBottom: 18 }}>
+                    {(['Low', 'Medium', 'High'] as const).map((p) => (
+                      <div key={p} onClick={() => setDraftPriority(p)} style={{ flex: 1, textAlign: 'center', padding: '7px 0', borderRadius: 7, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: draftPriority === p ? '#2A2118' : MUTED, background: draftPriority === p ? '#FFFFFF' : 'transparent' }}>
+                        {p}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Date Created</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                    {FILTER_DATE_RANGES.map((d) => (
+                      <div
+                        key={d}
+                        onClick={() => setDraftDateRange(draftDateRange === d ? null : d)}
+                        style={{ padding: '7px 14px', borderRadius: 20, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: draftDateRange === d ? '#FFFFFF' : '#6A5C42', background: draftDateRange === d ? PRIMARY_DARK : '#FFFFFF', border: `1px solid ${draftDateRange === d ? PRIMARY_DARK : '#E7DCC6'}` }}
+                      >
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div onClick={clearFilters} style={{ fontSize: 12.5, fontWeight: 600, color: MUTED, cursor: 'pointer' }}>Clear All</div>
+                    <div className={styles.primaryChip} onClick={applyFilters}>Apply Filters</div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
