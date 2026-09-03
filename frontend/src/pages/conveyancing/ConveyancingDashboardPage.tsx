@@ -80,6 +80,19 @@ function formatDate(iso: string) {
   return formatDateWith(iso, { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+/** Page numbers to render around `current`, with '...' gaps -- always keeps 1, `total`, and current±1. */
+function paginationRange(total: number, current: number): (number | '...')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages = new Set([1, 2, total - 1, total, current - 1, current, current + 1])
+  const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b)
+  const out: (number | '...')[] = []
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push('...')
+    out.push(p)
+  })
+  return out
+}
+
 /** Reads the session profile and renders `ClientConveyancingView` for clients, `StaffConveyancingView` otherwise. */
 export default function ConveyancingDashboardPage() {
   const profile = loadProfile()
@@ -382,7 +395,7 @@ function StaffConveyancingView() {
                     <th className={styles.th}>Matter Type</th>
                     <th className={styles.th}>Reg Date</th>
                     <th className={styles.th}>Status</th>
-                    <th className={styles.th}></th>
+                    <th className={styles.th}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -417,9 +430,13 @@ function StaffConveyancingView() {
                   <span style={{ fontSize: 12.5, color: MUTED }}>Showing {pageStart + 1} to {Math.min(pageStart + MATTERS_PAGE_SIZE, filteredMatters.length)} of {filteredMatters.length} entries</span>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <div className={styles.ghostChip} style={{ padding: '6px 12px', opacity: currentPage === 1 ? .5 : 1, cursor: currentPage === 1 ? 'default' : 'pointer' }} onClick={() => currentPage > 1 && setPage(currentPage - 1)}>Previous</div>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                      <div key={p} onClick={() => setPage(p)} style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', background: p === currentPage ? PRIMARY_DARK : 'transparent', color: p === currentPage ? '#FFFFFF' : '#6A5C42' }}>{p}</div>
-                    ))}
+                    {paginationRange(totalPages, currentPage).map((p, i) =>
+                      p === '...' ? (
+                        <div key={`gap-${i}`} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, color: MUTED }}>…</div>
+                      ) : (
+                        <div key={p} onClick={() => setPage(p)} style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', background: p === currentPage ? PRIMARY_DARK : 'transparent', color: p === currentPage ? '#FFFFFF' : '#6A5C42' }}>{p}</div>
+                      )
+                    )}
                     <div className={styles.ghostChip} style={{ padding: '6px 12px', opacity: currentPage === totalPages ? .5 : 1, cursor: currentPage === totalPages ? 'default' : 'pointer' }} onClick={() => currentPage < totalPages && setPage(currentPage + 1)}>Next</div>
                   </div>
                 </div>
