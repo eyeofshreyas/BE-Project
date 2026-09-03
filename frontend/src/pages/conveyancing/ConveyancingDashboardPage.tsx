@@ -93,6 +93,36 @@ function paginationRange(total: number, current: number): (number | '...')[] {
   return out
 }
 
+/** Chevron-button dropdown styled to match the filter popovers, used for the matter-type/status selects. */
+function Dropdown({ value, options, labelFor, onChange }: { value: string; options: string[]; labelFor: (v: string) => string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ position: 'relative' }}>
+      <div className={styles.dropdownBtn} onClick={() => setOpen((o) => !o)}>
+        <span>{labelFor(value)}</span>
+        <Icon name="chevron-down" size={13} color={MUTED} />
+      </div>
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
+          <div className={styles.dropdownMenu}>
+            {options.map((o) => (
+              <div
+                key={o}
+                className={styles.dropdownItem}
+                style={{ fontWeight: value === o ? 700 : 500 }}
+                onClick={() => { onChange(o); setOpen(false) }}
+              >
+                {labelFor(o)}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 /** Reads the session profile and renders `ClientConveyancingView` for clients, `StaffConveyancingView` otherwise. */
 export default function ConveyancingDashboardPage() {
   const profile = loadProfile()
@@ -376,12 +406,18 @@ function StaffConveyancingView() {
                 onChange={(e) => { setSearch(e.target.value); setPage(1) }}
                 style={{ flex: 1, minWidth: 220, padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
               />
-              <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13, background: '#FFFFFF' }}>
-                {matterTypes.map((t) => <option key={t} value={t}>{t === 'All' ? 'All Matter Types' : t}</option>)}
-              </select>
-              <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13, background: '#FFFFFF' }}>
-                {matterStatuses.map((s) => <option key={s} value={s}>{s === 'All' ? 'All Statuses' : s}</option>)}
-              </select>
+              <Dropdown
+                value={typeFilter}
+                options={matterTypes}
+                labelFor={(t) => (t === 'All' ? 'All Matter Types' : t)}
+                onChange={(v) => { setTypeFilter(v); setPage(1) }}
+              />
+              <Dropdown
+                value={statusFilter}
+                options={matterStatuses}
+                labelFor={(s) => (s === 'All' ? 'All Statuses' : s)}
+                onChange={(v) => { setStatusFilter(v); setPage(1) }}
+              />
               <div className={styles.primaryChip} onClick={() => navigate('/conveyancing/matters/new')}><PlusIcon /><span>New Matter</span></div>
             </div>
 
