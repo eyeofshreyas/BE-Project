@@ -131,7 +131,7 @@ export default function ClientsPage() {
               const [color, bg] = STATUS_STYLE_MAP[c.status] || ['#6A5C42', '#EFEAE1']
               return (
                 <div key={c.id} style={{ background: '#FFFFFF', border: '1px solid #E7DCC6', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: '50%', background: PRIMARY_DARK, color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, fontFamily: "'Poppins', sans-serif", flexShrink: 0 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#F1E4C3', color: PRIMARY_DARK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, fontFamily: "'Poppins', sans-serif", flexShrink: 0 }}>
                     {initialsOf(c.full_name)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -152,20 +152,20 @@ export default function ClientsPage() {
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <div style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#B8AB8A', opacity: .5, cursor: 'default' }} title="Client profile coming soon">
+                    <div style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'default' }} title="Client profile coming soon">
                       <Icon name="eye" size={14} />
                     </div>
-                    <a href={`mailto:${c.email}`} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, textDecoration: 'none' }} title="Email">
+                    <a href={`mailto:${c.email}`} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, textDecoration: 'none' }} title="Email">
                       <Icon name="mail" size={14} />
                     </a>
-                    <div style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#B8AB8A', opacity: .5, cursor: 'default' }} title="Client documents coming soon">
+                    <div style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'default' }} title="Client documents coming soon">
                       <Icon name="file-text" size={14} />
                     </div>
-                    <div style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#B8AB8A', opacity: .5, cursor: 'default' }} title="Client schedule coming soon">
+                    <div style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'default' }} title="Client schedule coming soon">
                       <Icon name="calendar" size={14} />
                     </div>
                   </div>
-                  <div className={styles.darkBtn} style={{ opacity: .5, cursor: 'default' }} title="Client profile coming soon">Details</div>
+                  <div className={styles.darkBtn} style={{ cursor: 'default' }} title="Client profile coming soon">DETAILS</div>
                 </div>
               )
             })}
