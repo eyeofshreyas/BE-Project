@@ -72,7 +72,7 @@ export default function ConveyancingDashboardPage() {
 /**
  * Loads `getConveyancingSummary()` (stats, status donut, matters list) and
  * `listAllMeetings()` (for upcoming appointments); supports matter
- * search/type/status filtering with pagination, and an "Add New Matter"
+ * search/type/status filtering with pagination, and a "New Matter"
  * button that navigates to `/conveyancing/matters/new`.
  */
 function StaffConveyancingView() {
@@ -156,7 +156,7 @@ function StaffConveyancingView() {
           </div>
           <div className={styles.headerActions}>
             <div className={styles.ghostChip}><FilterIcon /><span>Filter</span></div>
-            <div className={styles.primaryChip} onClick={() => navigate('/conveyancing/matters/new')}><PlusIcon /><span>Add New Matter</span></div>
+            <div className={styles.primaryChip} onClick={() => navigate('/conveyancing/matters/new')}><PlusIcon /><span>New Matter</span></div>
           </div>
         </div>
 
