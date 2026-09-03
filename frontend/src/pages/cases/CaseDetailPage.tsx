@@ -1,14 +1,22 @@
-/** `/cases/:caseId` route: full case detail with notes, timeline, meetings, and documents (preview via `DocumentPreviewModal`). Role controls which actions (status change, unassign, add note, upload) are shown. */
-import { useEffect, useState } from 'react'
+/** `/cases/:caseId` route: full case detail with an AI-generated case summary, notes (with
+ * optional checklists), timeline, meetings, and documents (preview via `DocumentPreviewModal`).
+ * Role controls which actions (status change, unassign, add/edit note, upload) are shown. */
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  listCases, listCaseNotes, addCaseNote, listCaseTimeline, changeCaseStatus, listDocuments,
-  listMeetings, createMeeting, listDocumentTypes, uploadDocument, getDocumentDownloadUrl, unassignLawyer,
+  listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
+  listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
+  unassignLawyer, getCaseAiSummary, generateCaseAiSummary,
 } from '../../api/client'
-import type { CaseSummary, NoteSummary, TimelineEvent, DocumentSummary, MeetingSummary, DocumentTypeOption, UserProfile } from '../../types/api'
+import type {
+  CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
+  DocumentTypeOption, UserProfile, CaseAiSummary,
+} from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
+import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
+import { Dropdown } from '../conveyancing/ConveyancingDashboardPage'
 
 const PRIMARY = '#B08D3E'
 const MUTED = '#8C7C5E'
@@ -18,6 +26,10 @@ const LAWYER = 2
 const CLIENT = 3
 
 const STATUS_OPTIONS = ['Open', 'In Progress', 'Pending', 'Completed', 'Closed']
+const STATUS_LABELS: Record<string, string> = { Open: 'Active' }
+function statusLabel(s: string) {
+  return STATUS_LABELS[s] ?? s
+}
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
   Completed: ['#2E9E58', '#E4F5EA'],
   Closed: ['#2E9E58', '#E4F5EA'],
@@ -26,6 +38,8 @@ const STATUS_STYLE_MAP: Record<string, [string, string]> = {
   Pending: ['#B87F1E', '#FFF2E0'],
 }
 const PRIORITY_COLORS: Record<string, string> = { High: '#B05C5C', Medium: '#B87F1E', Low: '#2E9E58' }
+
+const inputStyle = { padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }
 
 function loadProfile(): UserProfile | null {
   try {
@@ -40,11 +54,18 @@ function formatDate(iso: string) {
   return formatDateWith(iso, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
+function formatDay(iso: string) {
+  return formatDateWith(iso, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+type NoteForm = { id: number | null; title: string; note: string; checklist: ChecklistItem[] }
+const BLANK_FORM: NoteForm = { id: null, title: '', note: '', checklist: [] }
+
 /**
  * Loads all cases via `listCases()` and finds this one by `caseId` (there's
- * no single-case GET endpoint), plus notes/timeline/documents/meetings in
- * parallel. Wires up note-adding, status change, lawyer unassign, meeting
- * scheduling, and document upload/preview/download handlers below.
+ * no single-case GET endpoint), plus notes/timeline/documents/meetings/AI-summary in
+ * parallel. Wires up note CRUD (incl. checklist + pin), status change, lawyer unassign,
+ * meeting scheduling, AI summary generation, and document upload/preview/download.
  */
 export default function CaseDetailPage() {
   const { caseId } = useParams()
@@ -52,7 +73,7 @@ export default function CaseDetailPage() {
   const profile = loadProfile()
   const canManage = profile?.role_id === LAWYER || profile?.role_id === ADMIN
   const canAddNote = profile?.role_id === LAWYER
-  const canUploadDocs = profile?.role_id === CLIENT
+  const canUploadDocs = profile?.role_id === CLIENT || profile?.role_id === LAWYER
 
   const [caseInfo, setCaseInfo] = useState<CaseSummary | null>(null)
   const [notes, setNotes] = useState<NoteSummary[]>([])
@@ -65,17 +86,25 @@ export default function CaseDetailPage() {
 
   const [newNote, setNewNote] = useState('')
   const [addingNote, setAddingNote] = useState(false)
+  const [noteSearch, setNoteSearch] = useState('')
+  const [noteForm, setNoteForm] = useState<NoteForm | null>(null)
+  const [checklistDraft, setChecklistDraft] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
+
+  const [aiSummary, setAiSummary] = useState<CaseAiSummary | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+
   const [statusSaving, setStatusSaving] = useState(false)
   const [unassigning, setUnassigning] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
-  const [meetingTitle, setMeetingTitle] = useState('')
-  const [meetingDate, setMeetingDate] = useState('')
-  const [scheduling, setScheduling] = useState(false)
+  const meetingsRef = useRef<HTMLDivElement>(null)
+  const documentsRef = useRef<HTMLDivElement>(null)
 
   const [uploadTypeId, setUploadTypeId] = useState('')
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadFormOpen, setUploadFormOpen] = useState(false)
 
   const numericCaseId = Number(caseId)
 
@@ -94,6 +123,7 @@ export default function CaseDetailPage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load this case.'))
       .finally(() => setLoading(false))
     if (canUploadDocs) listDocumentTypes().then(setDocumentTypes).catch(() => {})
+    getCaseAiSummary(numericCaseId).then(setAiSummary).catch(() => setAiSummary(null))
   }, [numericCaseId, canUploadDocs])
 
   function showToast(msg: string) {
@@ -115,6 +145,77 @@ export default function CaseDetailPage() {
     }
   }
 
+  function addChecklistDraftItem() {
+    if (!checklistDraft.trim() || !noteForm) return
+    setNoteForm({ ...noteForm, checklist: [...noteForm.checklist, { text: checklistDraft.trim(), checked: false }] })
+    setChecklistDraft('')
+  }
+
+  async function saveNoteForm() {
+    if (!noteForm || !noteForm.note.trim()) return
+    setSavingNote(true)
+    try {
+      const title = noteForm.title.trim()
+      const note = noteForm.note.trim()
+      const checklist = noteForm.checklist.length ? noteForm.checklist : undefined
+      if (noteForm.id === null) {
+        const created = await addCaseNote(numericCaseId, note, { title: title || undefined, checklist })
+        setNotes((prev) => [created, ...prev])
+      } else {
+        const updated = await updateCaseNote(numericCaseId, noteForm.id, { title: title || null, note, checklist: checklist ?? null })
+        setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)))
+      }
+      setNoteForm(null)
+      setChecklistDraft('')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save note.')
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  async function togglePin(n: NoteSummary) {
+    try {
+      const updated = await updateCaseNote(numericCaseId, n.id, { pinned: !n.pinned })
+      setNotes((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update note.')
+    }
+  }
+
+  async function toggleChecklistItem(n: NoteSummary, index: number) {
+    if (!n.checklist) return
+    const checklist = n.checklist.map((item, i) => (i === index ? { ...item, checked: !item.checked } : item))
+    try {
+      const updated = await updateCaseNote(numericCaseId, n.id, { checklist })
+      setNotes((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update checklist.')
+    }
+  }
+
+  async function removeNote(noteId: number) {
+    if (!window.confirm('Delete this note?')) return
+    try {
+      await deleteCaseNote(numericCaseId, noteId)
+      setNotes((prev) => prev.filter((n) => n.id !== noteId))
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to delete note.')
+    }
+  }
+
+  async function generateSummary() {
+    setAiLoading(true)
+    try {
+      const result = await generateCaseAiSummary(numericCaseId)
+      setAiSummary(result)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to generate AI summary.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   async function updateStatus(newStatus: string) {
     if (!caseInfo || newStatus === caseInfo.status) return
     setStatusSaving(true)
@@ -128,6 +229,11 @@ export default function CaseDetailPage() {
     } finally {
       setStatusSaving(false)
     }
+  }
+
+  function closeCase() {
+    if (!window.confirm('Close this case?')) return
+    updateStatus('Closed')
   }
 
   async function unassign() {
@@ -144,26 +250,6 @@ export default function CaseDetailPage() {
     }
   }
 
-  async function scheduleMeeting() {
-    if (!caseInfo?.lawyer_id || !meetingTitle.trim() || !meetingDate) return
-    setScheduling(true)
-    try {
-      const created = await createMeeting({
-        case_id: numericCaseId,
-        conducted_by: caseInfo.lawyer_id,
-        meeting_title: meetingTitle.trim(),
-        meeting_date: meetingDate,
-      })
-      setMeetings((prev) => [created, ...prev])
-      setMeetingTitle('')
-      setMeetingDate('')
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to schedule meeting.')
-    } finally {
-      setScheduling(false)
-    }
-  }
-
   async function submitUpload() {
     if (!uploadFile || !uploadTypeId) return
     setUploading(true)
@@ -172,6 +258,7 @@ export default function CaseDetailPage() {
       setDocuments((prev) => [...prev, created])
       setUploadFile(null)
       setUploadTypeId('')
+      setUploadFormOpen(false)
       showToast('Document uploaded.')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to upload document.')
@@ -210,88 +297,82 @@ export default function CaseDetailPage() {
   )
 
   const [statusColor, statusBg] = STATUS_STYLE_MAP[caseInfo.status] || ['#6A5C42', '#EFEAE1']
+  const filteredNotes = notes
+    .filter((n) => !noteSearch.trim() || `${n.title ?? ''} ${n.note}`.toLowerCase().includes(noteSearch.trim().toLowerCase()))
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned))
 
   return (
     <div className={styles.page}>
       <div className={styles.wrap}>
-        <div className={styles.ghostChip} style={{ width: 'fit-content' }} onClick={() => navigate(-1)}>← Back</div>
+        <div style={{ background: '#FBF6EA', border: '1px solid #E7DCC6', borderRadius: 20, padding: '22px 26px 26px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 16, borderBottom: '1px solid #E7DCC6' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: MUTED, cursor: 'pointer' }} onClick={() => navigate(-1)}>Back to Cases</div>
+            <span style={{ cursor: 'pointer', display: 'flex' }} onClick={() => navigate(-1)}><Icon name="x" size={16} color={MUTED} /></span>
+          </div>
 
-        <div className={styles.header}>
-          <div>
-            <div className={styles.title}>{caseInfo.id}</div>
-            <div className={styles.subtitle}>{caseInfo.court ?? 'No court assigned'}</div>
-          </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <span className={styles.statusBadge} style={{ color: statusColor, background: statusBg }}>{caseInfo.status}</span>
-            <span className={styles.statusBadge} style={{ color: PRIORITY_COLORS[caseInfo.priority] ?? '#6A5C42', background: '#EFEAE1' }}>{caseInfo.priority} priority</span>
-          </div>
-        </div>
-
-        <div className={styles.statCards}>
-          <div className={styles.statCard} style={{ gap: 4 }}>
-            <div className={styles.statLabel}>Client</div>
-            <div className={styles.statValue} style={{ fontSize: 16 }}>{caseInfo.client ?? '—'}</div>
-          </div>
-          <div className={styles.statCard} style={{ gap: 4 }}>
-            <div className={styles.statLabel}>Lawyer</div>
-            <div className={styles.statValue} style={{ fontSize: 16 }}>{caseInfo.lawyer ?? 'Not yet assigned'}</div>
-            {canManage && caseInfo.lawyer && (
-              <div
-                onClick={() => !unassigning && unassign()}
-                style={{ fontSize: 11.5, fontWeight: 600, color: '#B05C5C', cursor: 'pointer', opacity: unassigning ? 0.6 : 1 }}
-              >
-                {unassigning ? 'Removing…' : 'Unassign'}
-              </div>
-            )}
-          </div>
-          <div className={styles.statCard} style={{ gap: 4 }}>
-            <div className={styles.statLabel}>Next Hearing</div>
-            <div className={styles.statValue} style={{ fontSize: 16 }}>{caseInfo.hearing ?? '—'}</div>
-          </div>
-          {canManage && (
-            <div className={styles.statCard} style={{ gap: 8 }}>
-              <div className={styles.statLabel}>Change Status</div>
-              <select
-                value={caseInfo.status}
-                disabled={statusSaving}
-                onChange={(e) => updateStatus(e.target.value)}
-                style={{ padding: '7px 10px', borderRadius: 8, border: '1.5px solid #E7DCC6', fontSize: 13, background: '#FFFFFF' }}
-              >
-                {[caseInfo.status, ...STATUS_OPTIONS.filter((s) => s !== caseInfo.status)].map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+          <div style={{ padding: '16px 0', borderBottom: '1px solid #E7DCC6' }}>
+            <div className={styles.statLabel}>{caseInfo.id}</div>
+            <div className={styles.title} style={{ fontSize: 20, marginTop: 2 }}>{caseInfo.case_title ?? caseInfo.court ?? 'No court assigned'}</div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+              <span className={styles.statusBadge} style={{ color: statusColor, background: statusBg }}>{statusLabel(caseInfo.status)}</span>
+              <span className={styles.statusBadge} style={{ color: PRIORITY_COLORS[caseInfo.priority] ?? '#6A5C42', background: '#EFEAE1' }}>{caseInfo.priority} priority</span>
             </div>
-          )}
-        </div>
+          </div>
 
-        <div className={styles.midGrid}>
+          <div className={styles.midGrid} style={{ paddingTop: 20 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div className={styles.panelCard}>
-              <div className={styles.panelTitle}>Case Notes</div>
-              {canAddNote && (
-                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                  <input
-                    value={newNote}
-                    onChange={(e) => setNewNote(e.target.value)}
-                    placeholder="Add a note for this case…"
-                    style={{ flex: 1, padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }}
-                    onKeyDown={(e) => e.key === 'Enter' && submitNote()}
-                  />
-                  <div className={styles.primaryChip} style={{ opacity: addingNote ? 0.7 : 1 }} onClick={submitNote}>{addingNote ? 'Adding…' : 'Add'}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 20 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div className={styles.statLabel}>Client</div>
+                <div className={styles.statValue} style={{ fontSize: 16 }}>{caseInfo.client ?? '—'}</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div className={styles.statLabel}>Type</div>
+                <div className={styles.statValue} style={{ fontSize: 16 }}>{caseInfo.case_type ?? '—'}</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div className={styles.statLabel}>Next Hearing</div>
+                <div className={styles.statValue} style={{ fontSize: 16 }}>{caseInfo.hearing ?? '—'}</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div className={styles.statLabel}>Lawyer</div>
+                <div className={styles.statValue} style={{ fontSize: 16 }}>{caseInfo.lawyer ?? 'Not yet assigned'}</div>
+                {canManage && caseInfo.lawyer && (
+                  <div
+                    onClick={() => !unassigning && unassign()}
+                    style={{ fontSize: 11.5, fontWeight: 600, color: '#B05C5C', cursor: 'pointer', opacity: unassigning ? 0.6 : 1 }}
+                  >
+                    {unassigning ? 'Removing…' : 'Unassign'}
+                  </div>
+                )}
+              </div>
+              {canManage && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div className={styles.statLabel}>Change Status</div>
+                  <Dropdown value={caseInfo.status} options={STATUS_OPTIONS} labelFor={statusLabel} onChange={(s) => !statusSaving && updateStatus(s)} />
                 </div>
               )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {notes.map((n) => (
-                  <div key={n.id} style={{ padding: '10px 14px', border: '1px solid #E7DCC6', borderRadius: 10 }}>
-                    <div style={{ fontSize: 13.5, color: '#2A2118' }}>{n.note}</div>
-                    <div style={{ fontSize: 11.5, color: MUTED, marginTop: 5 }}>{n.lawyer_name ?? 'Lawyer'} · {formatDate(n.created_at)}</div>
-                  </div>
-                ))}
-                {notes.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No notes yet.</div>}
-              </div>
             </div>
 
             <div className={styles.panelCard}>
-              <div className={styles.panelTitle}>Timeline</div>
+              <div className={styles.panelTitle} style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Icon name="sparkles" size={15} color={PRIMARY} /> AI Summary</div>
+              {aiSummary ? (
+                <div style={{ fontSize: 13.5, color: '#2A2118', lineHeight: 1.55 }}>
+                  <div>{aiSummary.summary_text}</div>
+                  {aiSummary.related_cases.length > 0 && (
+                    <div style={{ marginTop: 8, color: MUTED, fontSize: 12.5 }}>
+                      AI flags this as related to {aiSummary.related_cases.length} prior precedent{aiSummary.related_cases.length > 1 ? 's' : ''} on file: {aiSummary.related_cases.map((r) => r.doc_id).join(', ')}
+                    </div>
+                  )}
+                  <div style={{ marginTop: 8, color: MUTED, fontSize: 11.5 }}>Generated {formatDate(aiSummary.generated_at)}</div>
+                </div>
+              ) : (
+                <div style={{ color: MUTED, fontSize: 13 }}>No AI summary generated yet.</div>
+              )}
+            </div>
+
+            <div>
+              <div className={styles.panelTitle}>Case Timeline</div>
               <div className={styles.timeline}>
                 {timeline.map((t) => (
                   <div key={t.id} className={styles.timelineItem}>
@@ -305,28 +386,8 @@ export default function CaseDetailPage() {
               </div>
             </div>
 
-            <div className={styles.panelCard}>
-              <div className={styles.panelTitle}>Meetings</div>
-              {canManage && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-                  <input
-                    value={meetingTitle}
-                    onChange={(e) => setMeetingTitle(e.target.value)}
-                    placeholder="Meeting title"
-                    style={{ padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }}
-                  />
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input
-                      type="datetime-local"
-                      value={meetingDate}
-                      onChange={(e) => setMeetingDate(e.target.value)}
-                      style={{ flex: 1, padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }}
-                    />
-                    <div className={styles.primaryChip} style={{ opacity: scheduling ? 0.7 : 1 }} onClick={scheduleMeeting}>{scheduling ? 'Scheduling…' : 'Schedule'}</div>
-                  </div>
-                  {!caseInfo.lawyer_id && <div style={{ fontSize: 12, color: '#B05C5C' }}>No lawyer assigned to this case yet — can't schedule.</div>}
-                </div>
-              )}
+            <div ref={meetingsRef}>
+              <div className={styles.panelTitle}>Meetings & Hearings</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {meetings.map((m) => (
                   <div key={m.id} style={{ padding: '10px 14px', border: '1px solid #E7DCC6', borderRadius: 10 }}>
@@ -337,12 +398,10 @@ export default function CaseDetailPage() {
                 {meetings.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No meetings scheduled.</div>}
               </div>
             </div>
-          </div>
 
-          <div className={styles.sideCol}>
-            <div className={styles.panelCard}>
-              <div className={styles.panelTitle}>Documents</div>
-              {canUploadDocs && (
+            <div ref={documentsRef}>
+              <div className={styles.panelTitle}>Uploaded Documents</div>
+              {canUploadDocs && uploadFormOpen && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
                   <select
                     value={uploadTypeId}
@@ -353,20 +412,144 @@ export default function CaseDetailPage() {
                     {documentTypes.map((t) => <option key={t.document_type_id} value={t.document_type_id}>{t.type_name}</option>)}
                   </select>
                   <input type="file" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12.5 }} />
-                  <div className={styles.primaryChip} style={{ opacity: uploading || !uploadFile || !uploadTypeId ? 0.6 : 1, justifyContent: 'center' }} onClick={submitUpload}>
-                    {uploading ? 'Uploading…' : 'Upload'}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div className={styles.primaryChip} style={{ opacity: uploading || !uploadFile || !uploadTypeId ? 0.6 : 1, justifyContent: 'center', flex: 1 }} onClick={submitUpload}>
+                      {uploading ? 'Uploading…' : 'Upload'}
+                    </div>
+                    <div className={styles.ghostChip} onClick={() => setUploadFormOpen(false)}>Cancel</div>
                   </div>
                 </div>
               )}
               <div className={styles.quickActionsList}>
                 {documents.map((d) => (
                   <div key={d.id} className={styles.quickAction} onClick={() => openDocument(d)}>
-                    <span>{d.file_name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Icon name="file-text" size={18} color={MUTED} />
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{d.file_name}</div>
+                        <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{formatDay(d.upload_date)}</div>
+                      </div>
+                    </div>
+                    <span className={styles.statusBadge} style={d.has_summary ? { color: '#2E9E58', background: '#E4F5EA' } : { color: '#B87F1E', background: '#FFF2E0' }}>
+                      {d.has_summary ? 'Completed' : 'Pending'}
+                    </span>
                   </div>
                 ))}
                 {documents.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No documents yet.</div>}
               </div>
             </div>
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className={styles.primaryChip} style={{ opacity: aiLoading ? 0.7 : 1 }} onClick={() => !aiLoading && generateSummary()}>
+                <Icon name="sparkles" size={15} color="#FFFFFF" /> {aiLoading ? 'Generating…' : aiSummary ? 'Regenerate AI Summary' : 'Generate AI Summary'}
+              </div>
+              {canUploadDocs && (
+                <div className={styles.ghostChip} onClick={() => { setUploadFormOpen(true); documentsRef.current?.scrollIntoView({ behavior: 'smooth' }) }}><Icon name="file-text" size={15} /> Upload Docs</div>
+              )}
+              {canManage && (
+                <div className={styles.ghostChip} onClick={() => meetingsRef.current?.scrollIntoView({ behavior: 'smooth' })}><Icon name="calendar" size={15} /> Schedule Hearing</div>
+              )}
+              {canManage && caseInfo.status !== 'Closed' && (
+                <div style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, color: '#B05C5C', cursor: 'pointer' }} onClick={closeCase}>Close Case</div>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.sideCol}>
+            <div>
+              <div className={styles.panelTitle}>Case Notes & Legal Observations</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1.5px solid #E7DCC6', borderRadius: 9, padding: '9px 12px', marginBottom: 10 }}>
+                <Icon name="search" size={15} color="#A38F66" />
+                <input
+                  value={noteSearch}
+                  onChange={(e) => setNoteSearch(e.target.value)}
+                  placeholder="Search notes…"
+                  style={{ border: 'none', outline: 'none', fontSize: 13.5, background: 'transparent', flex: 1, fontFamily: 'inherit' }}
+                />
+              </div>
+              {canAddNote && (
+                <>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                    <input
+                      value={newNote}
+                      onChange={(e) => setNewNote(e.target.value)}
+                      placeholder="Quick note… press Enter"
+                      style={{ ...inputStyle, flex: 1 }}
+                      onKeyDown={(e) => e.key === 'Enter' && submitNote()}
+                    />
+                    <div className={styles.primaryChip} style={{ opacity: addingNote ? 0.7 : 1 }} onClick={submitNote}>{addingNote ? '…' : '+'}</div>
+                  </div>
+                  {noteForm === null ? (
+                    <div className={styles.primaryChip} style={{ justifyContent: 'center', marginBottom: 14 }} onClick={() => setNoteForm(BLANK_FORM)}>
+                      <Icon name="plus" size={15} color="#FFFFFF" /> Add New Note
+                    </div>
+                  ) : (
+                    <div style={{ border: '1.5px solid #E7DCC6', borderRadius: 10, padding: 12, marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <input value={noteForm.title} onChange={(e) => setNoteForm({ ...noteForm, title: e.target.value })} placeholder="Title (optional)" style={inputStyle} />
+                      <textarea value={noteForm.note} onChange={(e) => setNoteForm({ ...noteForm, note: e.target.value })} placeholder="Note content…" rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {noteForm.checklist.map((item, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                            <span>• {item.text}</span>
+                            <span style={{ marginLeft: 'auto', color: '#B05C5C', cursor: 'pointer', fontSize: 12 }} onClick={() => setNoteForm({ ...noteForm, checklist: noteForm.checklist.filter((_, j) => j !== i) })}>remove</span>
+                          </div>
+                        ))}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input
+                            value={checklistDraft}
+                            onChange={(e) => setChecklistDraft(e.target.value)}
+                            placeholder="Checklist item…"
+                            style={{ ...inputStyle, flex: 1 }}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addChecklistDraftItem())}
+                          />
+                          <div className={styles.ghostChip} onClick={addChecklistDraftItem}>+ item</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <div className={styles.primaryChip} style={{ opacity: savingNote ? 0.7 : 1 }} onClick={saveNoteForm}>{savingNote ? 'Saving…' : 'Save'}</div>
+                        <div className={styles.ghostChip} onClick={() => { setNoteForm(null); setChecklistDraft('') }}>Cancel</div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {filteredNotes.map((n) => (
+                  <div key={n.id} style={{ padding: '10px 14px', border: '1px solid #E7DCC6', borderRadius: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#2A2118', flex: 1 }}>{n.title ?? 'Note'}</div>
+                      {canAddNote && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span style={{ cursor: 'pointer', display: 'flex' }} onClick={() => togglePin(n)} title="Pin">
+                            <Icon name="star" size={14} color={n.pinned ? PRIMARY : '#C9BC9E'} />
+                          </span>
+                          <span style={{ cursor: 'pointer', display: 'flex' }} onClick={() => setNoteForm({ id: n.id, title: n.title ?? '', note: n.note, checklist: n.checklist ?? [] })} title="Edit">
+                            <Icon name="edit" size={14} color={MUTED} />
+                          </span>
+                          <span style={{ cursor: 'pointer', display: 'flex' }} onClick={() => removeNote(n.id)} title="Delete">
+                            <Icon name="trash-2" size={14} color="#B05C5C" />
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 13.5, color: '#2A2118', marginTop: 4 }}>{n.note}</div>
+                    {n.checklist && n.checklist.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                        {n.checklist.map((item, i) => (
+                          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: item.checked ? MUTED : '#2A2118', textDecoration: item.checked ? 'line-through' : 'none', cursor: canAddNote ? 'pointer' : 'default' }}>
+                            <input type="checkbox" checked={item.checked} disabled={!canAddNote} onChange={() => toggleChecklistItem(n, i)} />
+                            {item.text}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11.5, color: MUTED, marginTop: 6 }}>{n.lawyer_name ?? 'Lawyer'} · {formatDate(n.created_at)}</div>
+                  </div>
+                ))}
+                {filteredNotes.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No notes yet.</div>}
+              </div>
+            </div>
+          </div>
           </div>
         </div>
 

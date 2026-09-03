@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.case_history import change_case_status, add_case_note
-from app.models.case_history import StatusChange, NoteCreate
+from app.controllers.case_history import change_case_status, add_case_note, update_case_note, delete_case_note
+from app.models.case_history import StatusChange, NoteCreate, NoteUpdate
 
 
 def _fake_supabase(rows_by_table):
@@ -48,7 +48,33 @@ def test_add_case_note_rejects_out_of_scope_case():
             assert e.status_code == 403
 
 
+def test_update_case_note_rejects_out_of_scope_case():
+    """Verifies a lawyer scoped to case 10 cannot edit a note on case 20; raises 403. Exercises: `PATCH /cases/{id}/notes/{note_id}` (`case_history.update_case_note()`)."""
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    lawyer_scoped_to_case_10 = {"lawyers": [{"lawyer_id": 5}], "case_lawyers": [{"case_id": 10}]}
+    with patch("app.middleware.auth.supabase", _fake_supabase(lawyer_scoped_to_case_10)):
+        try:
+            update_case_note(20, 1, NoteUpdate(pinned=True), profile)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 403
+
+
+def test_delete_case_note_rejects_out_of_scope_case():
+    """Verifies a lawyer scoped to case 10 cannot delete a note on case 20; raises 403. Exercises: `DELETE /cases/{id}/notes/{note_id}` (`case_history.delete_case_note()`)."""
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    lawyer_scoped_to_case_10 = {"lawyers": [{"lawyer_id": 5}], "case_lawyers": [{"case_id": 10}]}
+    with patch("app.middleware.auth.supabase", _fake_supabase(lawyer_scoped_to_case_10)):
+        try:
+            delete_case_note(20, 1, profile)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 403
+
+
 if __name__ == "__main__":
     test_change_case_status_rejects_out_of_scope_case()
     test_add_case_note_rejects_out_of_scope_case()
+    test_update_case_note_rejects_out_of_scope_case()
+    test_delete_case_note_rejects_out_of_scope_case()
     print("ok")

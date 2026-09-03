@@ -3,9 +3,9 @@
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, ensure_case_access
-from app.models.case_history import NoteSummary, NoteCreate, TimelineEvent, StatusHistoryEntry, StatusChange
+from app.models.case_history import NoteSummary, NoteCreate, NoteUpdate, TimelineEvent, StatusHistoryEntry, StatusChange
 
-NOTES_SELECT = "note_id,case_id,note,created_at,lawyers(users(full_name))"
+NOTES_SELECT = "note_id,case_id,title,note,checklist,pinned,created_at,lawyers(users(full_name))"
 TIMELINE_SELECT = "timeline_id,case_id,event_type,event_title,event_description,created_at,users(full_name)"
 STATUS_HISTORY_SELECT = "history_id,case_id,previous_status,current_status,changed_at,users(full_name)"
 
@@ -16,7 +16,10 @@ def _to_note(row: dict) -> dict:
     return {
         "id": row["note_id"],
         "case_id": row["case_id"],
+        "title": row.get("title"),
         "note": row["note"],
+        "checklist": row.get("checklist"),
+        "pinned": row.get("pinned") or False,
         "created_at": row["created_at"],
         "lawyer_name": lawyer["users"]["full_name"] if lawyer else None,
     }
@@ -67,9 +70,31 @@ def add_case_note(case_id: int, data: NoteCreate, profile: dict = Depends(requir
         "case_id": case_id,
         "lawyer_id": lawyer_rows[0]["lawyer_id"],
         "note": data.note,
+        "title": data.title,
+        "checklist": [item.model_dump() for item in data.checklist] if data.checklist is not None else None,
     }).execute().data[0]
     rows = supabase.table("case_notes").select(NOTES_SELECT).eq("note_id", row["note_id"]).execute().data
     return _to_note(rows[0])
+
+
+def update_case_note(case_id: int, note_id: int, data: NoteUpdate, profile: dict = Depends(require_roles(LAWYER))):
+    """Edit a case note's title/text/checklist/pinned state. Calls: `ensure_case_access()`, `_to_note()`."""
+    ensure_case_access(case_id, profile)
+    fields = data.model_dump(exclude_unset=True)
+    if not fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    supabase.table("case_notes").update(fields).eq("note_id", note_id).eq("case_id", case_id).execute()
+    rows = supabase.table("case_notes").select(NOTES_SELECT).eq("note_id", note_id).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return _to_note(rows[0])
+
+
+def delete_case_note(case_id: int, note_id: int, profile: dict = Depends(require_roles(LAWYER))):
+    """Delete a case note. Calls: `ensure_case_access()`."""
+    ensure_case_access(case_id, profile)
+    supabase.table("case_notes").delete().eq("note_id", note_id).eq("case_id", case_id).execute()
+    return {"message": "Note deleted"}
 
 
 def list_case_timeline(case_id: int, profile: dict = Depends(get_current_profile)):

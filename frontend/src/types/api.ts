@@ -56,12 +56,32 @@ export interface CaseCreatePayload {
   description?: string
 }
 
+export interface ChecklistItem {
+  text: string
+  checked: boolean
+}
+
 export interface NoteSummary {
   id: number
   case_id: number
+  title: string | null
   note: string
+  checklist: ChecklistItem[] | null
+  pinned: boolean
   created_at: string
   lawyer_name: string | null
+}
+
+export interface RelatedCase {
+  doc_id: string
+  score: number
+}
+
+export interface CaseAiSummary {
+  case_id: number
+  summary_text: string
+  related_cases: RelatedCase[]
+  generated_at: string
 }
 
 export interface TimelineEvent {
