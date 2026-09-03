@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
-from app.models.conveyancing import Stats, StatusCount, MatterSummary, ConveyancingSummary, Property, DueDiligence, DueDiligenceUpdate, ProgressStage, PropertyRegistration, MatterDocument, MatterDetail
+from app.models.conveyancing import Stats, StatusCount, MatterSummary, ConveyancingSummary, Property, DueDiligence, DueDiligenceUpdate, ProgressStage, PropertyRegistration, MatterDocument, MatterDetail, MatterCreate
 
 MATTERS_SELECT = (
     "matter_id,matter_number,matter_type,transaction_type,registration_status,completion_percentage,case_id,"
@@ -95,6 +95,47 @@ def conveyancing_summary(profile: dict = Depends(get_current_profile)):
             for r in rows[:500]
         ],
     }
+
+
+def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Create a conveyancing matter: a `properties` row from the address/type/value fields, a
+    `conveyancing_matters` row with an auto-generated matter_number, and (if a client was picked)
+    a `conveyancing_parties` row linking them in as the Client. Not attached to a case, so
+    completion tracking / due-diligence / lawyer assignment all start empty."""
+    year = datetime.now(timezone.utc).year
+    # ponytail: matter_number = count+1, fine at this app's traffic; move to a
+    # DB sequence if concurrent creates ever race for the same number.
+    count = len(supabase.table("conveyancing_matters").select("matter_id").execute().data)
+    matter_number = f"MAT-{year}-{count + 1:03d}"
+
+    property_row = supabase.table("properties").insert({
+        "property_name": data.matter_name,
+        "address": data.property_address,
+        "property_type": data.property_type,
+        "survey_number": data.title_number,
+        "market_value": data.sale_value,
+    }).execute().data[0]
+
+    matter_row = supabase.table("conveyancing_matters").insert({
+        "property_id": property_row["property_id"],
+        "matter_number": matter_number,
+        "matter_type": data.matter_type,
+        "transaction_type": data.matter_type,
+        "registration_status": "Pending",
+        "completion_percentage": 0,
+        "expected_completion_date": data.target_settlement_date,
+    }).execute().data[0]
+
+    if data.client_id:
+        client_rows = supabase.table("clients").select("users(full_name)").eq("client_id", data.client_id).execute().data
+        if client_rows:
+            supabase.table("conveyancing_parties").insert({
+                "matter_id": matter_row["matter_id"],
+                "party_name": client_rows[0]["users"]["full_name"],
+                "role": "Client",
+            }).execute()
+
+    return {"matter_id": matter_row["matter_id"], "matter_number": matter_number}
 
 
 def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profile)):

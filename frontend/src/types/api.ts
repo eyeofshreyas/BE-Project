@@ -74,6 +74,22 @@ export interface TimelineEvent {
   created_by: string | null
 }
 
+export interface MatterCreatePayload {
+  matter_name: string
+  matter_type: string
+  client_id?: number
+  property_address?: string
+  property_type?: string
+  title_number?: string
+  sale_value?: number
+  target_settlement_date?: string
+}
+
+export interface MatterCreated {
+  matter_id: number
+  matter_number: string
+}
+
 export interface ConveyancingSummary {
   stats: {
     active_matters: number

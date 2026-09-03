@@ -105,6 +105,24 @@ class MatterDocument(BaseModel):
     verified_by: str | None
 
 
+class MatterCreate(BaseModel):
+    """Request body for creating a conveyancing matter from the Create New Matter form."""
+    matter_name: str
+    matter_type: str
+    client_id: int | None = None
+    property_address: str | None = None
+    property_type: str | None = None
+    title_number: str | None = None
+    sale_value: float | None = None
+    target_settlement_date: str | None = None
+
+
+class MatterCreated(BaseModel):
+    """Response after creating a matter."""
+    matter_id: int
+    matter_number: str
+
+
 class MatterDetail(BaseModel):
     """Full matter detail response: property, due diligence, progress, registration, and documents."""
     matter_id: int

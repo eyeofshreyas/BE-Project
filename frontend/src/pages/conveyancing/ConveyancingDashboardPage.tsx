@@ -1,8 +1,8 @@
 /** `/conveyancing` route: role-dispatches to `StaffConveyancingView` (lawyer/admin) or `ClientConveyancingView`, both driven by `getConveyancingSummary()`. */
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { getConveyancingSummary, listCourts, listCaseTypes, sendClientRequest, listAllMeetings } from '../../api/client'
-import type { ConveyancingSummary, CourtOption, CaseTypeOption, MeetingSummary, UserProfile } from '../../types/api'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { getConveyancingSummary, listAllMeetings } from '../../api/client'
+import type { ConveyancingSummary, MeetingSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from './ConveyancingDashboardPage.module.css'
@@ -72,12 +72,13 @@ export default function ConveyancingDashboardPage() {
 /**
  * Loads `getConveyancingSummary()` (stats, status donut, matters list) and
  * `listAllMeetings()` (for upcoming appointments); supports matter
- * search/type/status filtering with pagination, and an "Add Client" modal
- * that calls `sendClientRequest()`.
+ * search/type/status filtering with pagination, and an "Add New Matter"
+ * button that navigates to `/conveyancing/matters/new`.
  */
 function StaffConveyancingView() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
+  const location = useLocation()
+  const [toast, setToast] = useState<string | null>((location.state as { toast?: string } | null)?.toast ?? null)
   const [summary, setSummary] = useState<ConveyancingSummary | null>(null)
   const [meetings, setMeetings] = useState<MeetingSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -88,16 +89,6 @@ function StaffConveyancingView() {
   const [statusFilter, setStatusFilter] = useState('All')
   const [page, setPage] = useState(1)
 
-  const [addClientOpen, setAddClientOpen] = useState(false)
-  const [courts, setCourts] = useState<CourtOption[]>([])
-  const [caseTypes, setCaseTypes] = useState<CaseTypeOption[]>([])
-  const [reqEmail, setReqEmail] = useState('')
-  const [reqCourtId, setReqCourtId] = useState('')
-  const [reqCaseTypeId, setReqCaseTypeId] = useState('')
-  const [reqMessage, setReqMessage] = useState('')
-  const [reqError, setReqError] = useState('')
-  const [sending, setSending] = useState(false)
-
   useEffect(() => {
     getConveyancingSummary()
       .then(setSummary)
@@ -106,42 +97,16 @@ function StaffConveyancingView() {
     listAllMeetings().then(setMeetings).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (!toast) return
+    window.history.replaceState({}, '')
+    const timer = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(timer)
+  }, [toast])
+
   function fireAction(label: string) {
     setToast(`${label}…`)
     setTimeout(() => setToast(null), 1800)
-  }
-
-  function openAddClient() {
-    setAddClientOpen(true)
-    setReqError('')
-    if (courts.length === 0) listCourts().then(setCourts).catch(() => {})
-    if (caseTypes.length === 0) listCaseTypes().then(setCaseTypes).catch(() => {})
-  }
-
-  function closeAddClient() {
-    setAddClientOpen(false)
-    setReqEmail('')
-    setReqCourtId('')
-    setReqCaseTypeId('')
-    setReqMessage('')
-    setReqError('')
-  }
-
-  async function submitAddClient() {
-    if (!reqEmail) { setReqError('Enter the client\'s email address.'); return }
-    if (!reqCourtId || !reqCaseTypeId) { setReqError('Choose a court and a case type.'); return }
-    setSending(true)
-    setReqError('')
-    try {
-      await sendClientRequest({ email: reqEmail, court_id: Number(reqCourtId), case_type_id: Number(reqCaseTypeId), message: reqMessage || undefined })
-      closeAddClient()
-      setToast('Client request sent.')
-      setTimeout(() => setToast(null), 2200)
-    } catch (err) {
-      setReqError(err instanceof Error ? err.message : 'Failed to send request.')
-    } finally {
-      setSending(false)
-    }
   }
 
   const total = summary?.status_breakdown.reduce((sum, s) => sum + s.count, 0) ?? 0
@@ -191,7 +156,7 @@ function StaffConveyancingView() {
           </div>
           <div className={styles.headerActions}>
             <div className={styles.ghostChip}><FilterIcon /><span>Filter</span></div>
-            <div className={styles.primaryChip} onClick={openAddClient}><PlusIcon /><span>Add Client</span></div>
+            <div className={styles.primaryChip} onClick={() => navigate('/conveyancing/matters/new')}><PlusIcon /><span>Add New Matter</span></div>
           </div>
         </div>
 
@@ -279,7 +244,7 @@ function StaffConveyancingView() {
               <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13, background: '#FFFFFF' }}>
                 {matterStatuses.map((s) => <option key={s} value={s}>{s === 'All' ? 'All Statuses' : s}</option>)}
               </select>
-              <div className={styles.primaryChip} style={{ opacity: .5, cursor: 'default' }} title="Matter creation coming soon"><PlusIcon /><span>New Matter</span></div>
+              <div className={styles.primaryChip} onClick={() => navigate('/conveyancing/matters/new')}><PlusIcon /><span>New Matter</span></div>
             </div>
 
             <div className={styles.tableCard}>
@@ -340,59 +305,6 @@ function StaffConveyancingView() {
 
         {toast && <div className={styles.toast}>{toast}</div>}
 
-        {addClientOpen && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={closeAddClient}>
-            <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 24, width: 380, boxShadow: '0 20px 48px rgba(0,0,0,.2)' }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 16, fontWeight: 700, color: '#2A2118', marginBottom: 4 }}>Add Client</div>
-              <div style={{ fontSize: 12.5, color: MUTED, marginBottom: 16 }}>Send a request to represent this client. They'll see it in their notifications and can accept or decline.</div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Client email</div>
-                  <input
-                    type="email"
-                    placeholder="client@example.com"
-                    value={reqEmail}
-                    onChange={(e) => setReqEmail(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }}
-                  />
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Court</div>
-                  <select value={reqCourtId} onChange={(e) => setReqCourtId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
-                    <option value="">Select a court…</option>
-                    {courts.map((c) => <option key={c.court_id} value={c.court_id}>{c.court_name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Case type</div>
-                  <select value={reqCaseTypeId} onChange={(e) => setReqCaseTypeId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
-                    <option value="">Select a case type…</option>
-                    {caseTypes.map((c) => <option key={c.case_type_id} value={c.case_type_id}>{c.case_type_name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Message (optional)</div>
-                  <textarea
-                    value={reqMessage}
-                    onChange={(e) => setReqMessage(e.target.value)}
-                    rows={2}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, resize: 'vertical', fontFamily: 'inherit' }}
-                  />
-                </div>
-
-                {reqError && <div style={{ fontSize: 12.5, color: '#B05C5C' }}>{reqError}</div>}
-
-                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                  <div className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center' }} onClick={closeAddClient}>Cancel</div>
-                  <div className={styles.primaryChip} style={{ flex: 1, justifyContent: 'center', opacity: sending ? 0.7 : 1, pointerEvents: sending ? 'none' : 'auto' }} onClick={submitAddClient}>
-                    {sending ? 'Sending…' : 'Send Request'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
