@@ -94,8 +94,8 @@ function paginationRange(total: number, current: number): (number | '...')[] {
   return out
 }
 
-/** Chevron-button dropdown styled to match the filter popovers, used for the matter-type/status selects. */
-function Dropdown({ value, options, labelFor, onChange }: { value: string; options: string[]; labelFor: (v: string) => string; onChange: (v: string) => void }) {
+/** Chevron-button dropdown styled to match the filter popovers, used for the matter-type/status selects. Exported for reuse by ClientsPage. */
+export function Dropdown({ value, options, labelFor, onChange }: { value: string; options: string[]; labelFor: (v: string) => string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false)
   return (
     <div style={{ position: 'relative' }}>

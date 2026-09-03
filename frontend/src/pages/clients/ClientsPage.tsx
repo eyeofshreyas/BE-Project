@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { listClients } from '../../api/client'
 import type { ClientSummary } from '../../types/api'
 import { Icon } from '../../components/icons'
+import { Dropdown } from '../conveyancing/ConveyancingDashboardPage'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
 const MUTED = '#8C7C5E'
@@ -116,12 +117,8 @@ export default function ClientsPage() {
             onChange={(e) => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: 220, padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
           />
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
-            {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select value={sort} onChange={(e) => setSort(e.target.value as (typeof SORTS)[number])} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
-            {SORTS.map((s) => <option key={s} value={s}>Sort By: {s}</option>)}
-          </select>
+          <Dropdown value={statusFilter} options={STATUSES} labelFor={(s) => s} onChange={setStatusFilter} />
+          <Dropdown value={sort} options={[...SORTS]} labelFor={(s) => `Sort By: ${s}`} onChange={(v) => setSort(v as (typeof SORTS)[number])} />
           <div className={styles.primaryChip} onClick={() => navigate('/clients/new')}><Icon name="plus" size={15} color="#FFFFFF" /> Add Client</div>
         </div>
 
