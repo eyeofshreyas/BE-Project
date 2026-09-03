@@ -2,9 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { listClients, listInvoices } from '../../api/client'
-import type { ClientSummary, InvoiceSummary } from '../../types/api'
+import type { ClientSummary } from '../../types/api'
 import { Icon } from '../../components/icons'
-import RecordPaymentModal from '../../components/RecordPaymentModal'
 import { Dropdown } from '../conveyancing/ConveyancingDashboardPage'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
@@ -38,7 +37,6 @@ export default function ClientsPage() {
   const [sort, setSort] = useState<(typeof SORTS)[number]>('Newest')
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>((location.state as { toast?: string } | null)?.toast ?? null)
-  const [payInv, setPayInv] = useState<InvoiceSummary | null>(null)
   const [payLoadingId, setPayLoadingId] = useState<number | null>(null)
 
   useEffect(() => {
@@ -58,7 +56,7 @@ export default function ClientsPage() {
     try {
       const invoices = await listInvoices()
       const unpaid = invoices.find((inv) => inv.client === c.full_name && inv.payment_status !== 'Paid')
-      if (unpaid) setPayInv(unpaid)
+      if (unpaid) navigate(`/billing/invoices/${unpaid.id}/record-payment`, { state: { from: '/clients' } })
       else showToast('No outstanding invoice found for this client.')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to load invoices.')
@@ -207,14 +205,6 @@ export default function ClientsPage() {
         )}
 
         {toast && <div className={styles.toast}>{toast}</div>}
-
-        {payInv && (
-          <RecordPaymentModal
-            invoice={payInv}
-            onClose={() => setPayInv(null)}
-            onSaved={() => { listClients().then(setClients); showToast('Payment recorded.') }}
-          />
-        )}
       </div>
     </div>
   )

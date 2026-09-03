@@ -1,9 +1,9 @@
 /** `/billing` route: role-dispatches to a lawyer-facing management view (`StaffBillingView`) or a read-only client view (`ClientInvoicesView`). */
 import { useEffect, useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { listInvoices, createInvoice, sendInvoiceReminder, listCases, listInvoicePayments } from '../../api/client'
 import type { InvoiceSummary, CaseSummary, PaymentSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
-import RecordPaymentModal from '../../components/RecordPaymentModal'
 import { formatDate } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
@@ -65,10 +65,12 @@ export default function BillingPage() {
  * Lawyer/admin invoice management: loads invoices via `listInvoices()`
  * (and cases via `listCases()` for the generate-invoice form), with
  * search/status/time filtering, invoice creation (`createInvoice()`),
- * payment recording via `RecordPaymentModal`, and reminders
- * (`sendInvoiceReminder()`). Non-lawyers see the table read-only.
+ * payment recording via `/billing/invoices/:invoiceId/record-payment`, and
+ * reminders (`sendInvoiceReminder()`). Non-lawyers see the table read-only.
  */
 function StaffBillingView() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const profile = loadProfile()
   const canManage = profile?.role_id === LAWYER
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([])
@@ -78,7 +80,7 @@ function StaffBillingView() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [timeFilter, setTimeFilter] = useState<(typeof TIME_FILTERS)[number]>('All Time')
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>((location.state as { toast?: string } | null)?.toast ?? null)
 
   const [genOpen, setGenOpen] = useState(false)
   const [genCaseId, setGenCaseId] = useState('')
@@ -90,12 +92,18 @@ function StaffBillingView() {
   const [saving, setSaving] = useState(false)
 
   const [remindingId, setRemindingId] = useState<number | null>(null)
-  const [payInv, setPayInv] = useState<InvoiceSummary | null>(null)
 
   useEffect(() => {
     refresh()
     if (canManage) listCases().then(setCases).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    window.history.replaceState({}, '')
+    const timer = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   function refresh() {
     setLoading(true)
@@ -284,7 +292,7 @@ function StaffBillingView() {
                             )}
                             {inv.payment_status !== 'Paid' && (
                               <div
-                                onClick={() => setPayInv(inv)}
+                                onClick={() => navigate(`/billing/invoices/${inv.id}/record-payment`)}
                                 style={{ fontSize: 11.5, fontWeight: 600, color: '#6A5C42', border: '1px solid #E7DCC6', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                               >
                                 Record Payment
@@ -350,9 +358,6 @@ function StaffBillingView() {
           </div>
         )}
 
-        {payInv && (
-          <RecordPaymentModal invoice={payInv} onClose={() => setPayInv(null)} onSaved={() => { refresh(); showToast('Payment recorded.') }} />
-        )}
       </div>
     </div>
   )

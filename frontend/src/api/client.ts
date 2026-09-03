@@ -17,6 +17,8 @@ import type {
   CaseTypeOption,
   ClientRequestSummary,
   NoteSummary,
+  ChecklistItem,
+  CaseAiSummary,
   TimelineEvent,
   DocumentTypeOption,
   MeetingSummary,
@@ -188,8 +190,24 @@ export function listCaseNotes(caseId: number) {
   return get<NoteSummary[]>(`/cases/${caseId}/notes`)
 }
 
-export function addCaseNote(caseId: number, note: string) {
-  return post<NoteSummary>(`/cases/${caseId}/notes`, { note })
+export function addCaseNote(caseId: number, note: string, extra?: { title?: string; checklist?: ChecklistItem[] }) {
+  return post<NoteSummary>(`/cases/${caseId}/notes`, { note, ...extra })
+}
+
+export function updateCaseNote(caseId: number, noteId: number, changes: Partial<Pick<NoteSummary, 'title' | 'note' | 'checklist' | 'pinned'>>) {
+  return patch<NoteSummary>(`/cases/${caseId}/notes/${noteId}`, changes)
+}
+
+export function deleteCaseNote(caseId: number, noteId: number) {
+  return del<{ message: string }>(`/cases/${caseId}/notes/${noteId}`)
+}
+
+export function getCaseAiSummary(caseId: number) {
+  return get<CaseAiSummary>(`/cases/${caseId}/ai-summary`)
+}
+
+export function generateCaseAiSummary(caseId: number) {
+  return post<CaseAiSummary>(`/cases/${caseId}/ai-summary`, {})
 }
 
 export function listCaseTimeline(caseId: number) {
@@ -206,6 +224,10 @@ export function unassignLawyer(caseId: number) {
 
 export function listInvoices() {
   return get<InvoiceSummary[]>('/billing/invoices')
+}
+
+export function getInvoice(invoiceId: number) {
+  return get<InvoiceSummary>(`/billing/invoices/${invoiceId}`)
 }
 
 export function createInvoice(payload: { case_id: number; invoice_number: string; amount: number; tax?: number; total_amount: number; issue_date: string; due_date?: string }) {
