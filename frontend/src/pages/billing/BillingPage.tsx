@@ -1,8 +1,9 @@
 /** `/billing` route: role-dispatches to a lawyer-facing management view (`StaffBillingView`) or a read-only client view (`ClientInvoicesView`). */
 import { useEffect, useState } from 'react'
-import { listInvoices, createInvoice, createPayment, sendInvoiceReminder, listCases, listInvoicePayments } from '../../api/client'
+import { listInvoices, createInvoice, sendInvoiceReminder, listCases, listInvoicePayments } from '../../api/client'
 import type { InvoiceSummary, CaseSummary, PaymentSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
+import RecordPaymentModal from '../../components/RecordPaymentModal'
 import { formatDate } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
@@ -28,7 +29,6 @@ const STATUS_STYLE_MAP: Record<string, [string, string]> = {
 }
 const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
 const TIME_FILTERS = ['All Time', 'This Month', 'This Quarter', 'This Year'] as const
-const PAYMENT_METHODS = ['Cash', 'Cheque / DD', 'In-Person Bank Transfer', 'POS Terminal']
 
 function money(n: number) {
   return `₹${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -65,7 +65,7 @@ export default function BillingPage() {
  * Lawyer/admin invoice management: loads invoices via `listInvoices()`
  * (and cases via `listCases()` for the generate-invoice form), with
  * search/status/time filtering, invoice creation (`createInvoice()`),
- * full-payment recording (`createPayment()`), and reminders
+ * payment recording via `RecordPaymentModal`, and reminders
  * (`sendInvoiceReminder()`). Non-lawyers see the table read-only.
  */
 function StaffBillingView() {
@@ -90,14 +90,7 @@ function StaffBillingView() {
   const [saving, setSaving] = useState(false)
 
   const [remindingId, setRemindingId] = useState<number | null>(null)
-
   const [payInv, setPayInv] = useState<InvoiceSummary | null>(null)
-  const [payAmount, setPayAmount] = useState('')
-  const [payMethod, setPayMethod] = useState(PAYMENT_METHODS[0])
-  const [payReference, setPayReference] = useState('')
-  const [payDate, setPayDate] = useState('')
-  const [payError, setPayError] = useState('')
-  const [paySaving, setPaySaving] = useState(false)
 
   useEffect(() => {
     refresh()
@@ -155,39 +148,6 @@ function StaffBillingView() {
     }
   }
 
-  function openPayModal(inv: InvoiceSummary) {
-    setPayInv(inv)
-    setPayAmount(inv.total_amount.toFixed(2))
-    setPayMethod(PAYMENT_METHODS[0])
-    setPayReference('')
-    setPayDate(new Date().toISOString().slice(0, 10))
-    setPayError('')
-  }
-
-  async function submitPayment() {
-    if (!payInv) return
-    const amount = Number(payAmount)
-    if (!amount || amount <= 0) { setPayError('Enter a valid amount.'); return }
-    if (!payDate) { setPayError('Choose a payment date.'); return }
-    setPaySaving(true)
-    setPayError('')
-    try {
-      await createPayment({
-        invoice_id: payInv.id,
-        amount,
-        payment_method: payMethod,
-        transaction_reference: payReference.trim() || undefined,
-        payment_date: payDate,
-      })
-      refresh()
-      setPayInv(null)
-      showToast('Payment recorded.')
-    } catch (err) {
-      setPayError(err instanceof Error ? err.message : 'Failed to record payment.')
-    } finally {
-      setPaySaving(false)
-    }
-  }
 
   async function remind(inv: InvoiceSummary) {
     setRemindingId(inv.id)
@@ -324,7 +284,7 @@ function StaffBillingView() {
                             )}
                             {inv.payment_status !== 'Paid' && (
                               <div
-                                onClick={() => openPayModal(inv)}
+                                onClick={() => setPayInv(inv)}
                                 style={{ fontSize: 11.5, fontWeight: 600, color: '#6A5C42', border: '1px solid #E7DCC6', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                               >
                                 Record Payment
@@ -391,85 +351,7 @@ function StaffBillingView() {
         )}
 
         {payInv && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={() => setPayInv(null)}>
-            <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 24, width: 440, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 20px 48px rgba(0,0,0,.2)' }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 16, fontWeight: 700, color: '#2A2118', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icon name="banknote" size={16} color={PRIMARY} /> Record Manual Payment
-                </div>
-                <div onClick={() => setPayInv(null)} style={{ cursor: 'pointer', color: MUTED }}><Icon name="x" size={16} /></div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Invoice</div>
-                  <div style={{ border: '1.5px solid #E7DCC6', borderRadius: 9, padding: '9px 12px', fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>
-                    {payInv.invoice_number} — {payInv.client ?? 'No client'} — {money(payInv.total_amount)} due
-                  </div>
-                  <div style={{ fontSize: 11.5, color: MUTED, marginTop: 4 }}>
-                    {payInv.client ?? '—'} · {payInv.case_number ?? '—'} · Outstanding {money(payInv.total_amount)} of {money(payInv.total_amount)}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Payment Amount Received (₹)</div>
-                  <input
-                    type="number" min="0" value={payAmount} onChange={(e) => setPayAmount(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }}
-                  />
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    <div className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => setPayAmount(payInv.total_amount.toFixed(2))}>Pay Full Balance</div>
-                    <div className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => setPayAmount((payInv.total_amount / 2).toFixed(2))}>50% Partial Payment</div>
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Payment Method</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {PAYMENT_METHODS.map((m) => (
-                      <div
-                        key={m}
-                        onClick={() => setPayMethod(m)}
-                        style={{
-                          textAlign: 'center', padding: '10px 8px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-                          background: payMethod === m ? PRIMARY : '#FFFFFF',
-                          color: payMethod === m ? '#FFFFFF' : '#2A2118',
-                          border: `1.5px solid ${payMethod === m ? PRIMARY : '#E7DCC6'}`,
-                        }}
-                      >
-                        {m}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Transaction Reference / Receipt No.</div>
-                  <input
-                    value={payReference} onChange={(e) => setPayReference(e.target.value)} placeholder="e.g. RCPT-4821 or cheque no."
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Payment Date</div>
-                  <input
-                    type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }}
-                  />
-                </div>
-
-                {payError && <div style={{ fontSize: 12.5, color: '#B05C5C' }}>{payError}</div>}
-
-                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                  <div className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center' }} onClick={() => setPayInv(null)}>Cancel</div>
-                  <div className={styles.primaryChip} style={{ flex: 1, justifyContent: 'center', opacity: paySaving ? 0.7 : 1, pointerEvents: paySaving ? 'none' : 'auto' }} onClick={submitPayment}>
-                    {paySaving ? 'Saving…' : 'Save Payment'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <RecordPaymentModal invoice={payInv} onClose={() => setPayInv(null)} onSaved={() => { refresh(); showToast('Payment recorded.') }} />
         )}
       </div>
     </div>

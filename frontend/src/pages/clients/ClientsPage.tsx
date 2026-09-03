@@ -1,9 +1,10 @@
 /** `/clients` route (lawyer/admin): searchable/sortable/filterable client list. Reads an optional `location.state.toast` (set by `CreateClientPage` after navigating here). */
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { listClients } from '../../api/client'
-import type { ClientSummary } from '../../types/api'
+import { listClients, listInvoices } from '../../api/client'
+import type { ClientSummary, InvoiceSummary } from '../../types/api'
 import { Icon } from '../../components/icons'
+import RecordPaymentModal from '../../components/RecordPaymentModal'
 import { Dropdown } from '../conveyancing/ConveyancingDashboardPage'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
@@ -37,6 +38,8 @@ export default function ClientsPage() {
   const [sort, setSort] = useState<(typeof SORTS)[number]>('Newest')
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>((location.state as { toast?: string } | null)?.toast ?? null)
+  const [payInv, setPayInv] = useState<InvoiceSummary | null>(null)
+  const [payLoadingId, setPayLoadingId] = useState<number | null>(null)
 
   useEffect(() => {
     listClients()
@@ -44,6 +47,25 @@ export default function ClientsPage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load clients.'))
       .finally(() => setLoading(false))
   }, [])
+
+  function showToast(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  async function openRecordPayment(c: ClientSummary) {
+    setPayLoadingId(c.id)
+    try {
+      const invoices = await listInvoices()
+      const unpaid = invoices.find((inv) => inv.client === c.full_name && inv.payment_status !== 'Paid')
+      if (unpaid) setPayInv(unpaid)
+      else showToast('No outstanding invoice found for this client.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to load invoices.')
+    } finally {
+      setPayLoadingId(null)
+    }
+  }
 
   useEffect(() => {
     if (!toast) return
@@ -158,9 +180,19 @@ export default function ClientsPage() {
                     <a href={`mailto:${c.email}`} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, textDecoration: 'none' }} title="Email">
                       <Icon name="mail" size={14} />
                     </a>
-                    <div style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'default' }} title="Client documents coming soon">
-                      <Icon name="file-text" size={14} />
-                    </div>
+                    {c.pending_amount > 0 ? (
+                      <div
+                        onClick={() => payLoadingId === null && openRecordPayment(c)}
+                        style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'pointer', opacity: payLoadingId === c.id ? 0.5 : 1 }}
+                        title="Record Payment"
+                      >
+                        <Icon name="banknote" size={14} />
+                      </div>
+                    ) : (
+                      <div style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'default' }} title="Client documents coming soon">
+                        <Icon name="file-text" size={14} />
+                      </div>
+                    )}
                     <div style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'default' }} title="Client schedule coming soon">
                       <Icon name="calendar" size={14} />
                     </div>
@@ -176,6 +208,14 @@ export default function ClientsPage() {
         )}
 
         {toast && <div className={styles.toast}>{toast}</div>}
+
+        {payInv && (
+          <RecordPaymentModal
+            invoice={payInv}
+            onClose={() => setPayInv(null)}
+            onSaved={() => { listClients().then(setClients); showToast('Payment recorded.') }}
+          />
+        )}
       </div>
     </div>
   )
