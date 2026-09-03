@@ -64,6 +64,7 @@ const FILTER_MATTER_TYPES: { label: string; icon: React.ReactNode }[] = [
   { label: 'Lease', icon: <KeyIcon /> },
 ]
 const FILTER_DATE_RANGES = ['Today', 'This Week', 'This Month']
+const MATTER_TYPE_OPTIONS = ['Residential Sale', 'Commercial Lease', 'Residential Purchase', 'Off-the-Plan Purchase', 'Mortgage', 'Trust Deed']
 
 function relativeDateTime(iso: string) {
   const d = new Date(iso)
@@ -222,7 +223,7 @@ function StaffConveyancingView() {
     .slice(0, 5)
 
   const matters = summary?.recent_matters ?? []
-  const matterTypes = ['All', ...new Set(matters.map((m) => m.type))]
+  const matterTypes = ['All', ...new Set([...MATTER_TYPE_OPTIONS, ...matters.map((m) => m.type)])]
   const matterStatuses = ['All', ...new Set(matters.map((m) => m.status))]
   const searchLower = search.toLowerCase()
   const filteredMatters = matters.filter((m) =>
