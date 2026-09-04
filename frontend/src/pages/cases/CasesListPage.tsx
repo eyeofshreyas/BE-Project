@@ -163,6 +163,7 @@ function ClientCasesView() {
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [hearings, setHearings] = useState<HearingSummary[]>([])
   const [updates, setUpdates] = useState<TimelineEvent[]>([])
+  const [latestByCase, setLatestByCase] = useState<Record<number, TimelineEvent>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
@@ -173,7 +174,11 @@ function ClientCasesView() {
         setCases(c)
         setHearings(h)
         Promise.all(c.map((cs) => listCaseTimeline(cs.case_id).catch(() => [] as TimelineEvent[])))
-          .then((lists) => setUpdates(lists.flat().sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6)))
+          .then((lists) => {
+            setUpdates(lists.flat().sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6))
+            // timeline rows come back newest-first, so index 0 per case is its latest event
+            setLatestByCase(Object.fromEntries(lists.filter((l) => l.length > 0).map((l) => [l[0].case_id, l[0]])))
+          })
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load your cases.'))
       .finally(() => setLoading(false))
@@ -264,7 +269,13 @@ function ClientCasesView() {
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 16 }}>
+                        {latestByCase[c.case_id] ? (
+                          <div style={{ fontSize: 12, color: MUTED, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#B08D3E', flexShrink: 0 }} />
+                            {latestByCase[c.case_id].event_title}
+                          </div>
+                        ) : <div />}
                         <div className={styles.darkBtn} onClick={() => navigate(`/cases/${c.case_id}`)}>View Details →</div>
                       </div>
                     </div>
@@ -280,10 +291,13 @@ function ClientCasesView() {
                   <div className={styles.panelTitle}>Recent Updates</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     {updates.map((u) => (
-                      <div key={u.id} style={{ borderTop: '1px solid #F1E9D9', paddingTop: 12 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>{u.event_title}</div>
-                        {u.event_description && <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>{u.event_description}</div>}
-                        <div style={{ fontSize: 11, color: '#A38F66', marginTop: 4 }}>{timeAgo(u.created_at)}</div>
+                      <div key={u.id} style={{ display: 'flex', gap: 8, borderTop: '1px solid #F1E9D9', paddingTop: 12 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#B08D3E', marginTop: 6, flexShrink: 0 }} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>{u.event_title}</div>
+                          {u.event_description && <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>{u.event_description}</div>}
+                          <div style={{ fontSize: 11, color: '#A38F66', marginTop: 4, textTransform: 'uppercase', letterSpacing: '.02em' }}>{timeAgo(u.created_at)}</div>
+                        </div>
                       </div>
                     ))}
                     {updates.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No recent activity.</div>}
