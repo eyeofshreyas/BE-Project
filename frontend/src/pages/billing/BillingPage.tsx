@@ -275,13 +275,58 @@ const TXN_STATUS_STYLE: Record<string, [string, string]> = {
 }
 const TXN_DEFAULT_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
 
-/** Client-facing invoice view: loads invoices (`listInvoices()`) plus each one's payments (`listInvoicePayments()`) to compute totals, progress, and a recent-transactions list. Read-only; pay/download actions are disabled placeholders. */
+/** Client-facing invoice view: loads invoices (`listInvoices()`) plus each one's payments (`listInvoicePayments()`) to compute totals, progress, and a recent-transactions list. Download opens a printable summary via `downloadInvoice()`; Pay Now / Download All have no backing payment gateway or bulk export yet, so they just toast. */
+/** Opens a new tab with a minimal printable invoice summary and triggers the browser's print dialog (save-as-PDF) -- invoices have no stored line items, only the totals in `InvoiceSummary`, so this isn't the itemized letterhead from GenerateInvoicePage. */
+function downloadInvoice(inv: InvoiceSummary) {
+  const win = window.open('', '_blank')
+  if (!win) return
+  const rows = [
+    ['Amount', moneyRound(inv.amount)],
+    ...(inv.tax ? [['Tax', moneyRound(inv.tax)]] : []),
+  ]
+  win.document.write(`<!doctype html><html><head><title>${inv.invoice_number}</title>
+    <style>
+      body{font-family:Georgia,serif;color:#2A2118;padding:48px;max-width:560px;margin:0 auto}
+      .muted{color:#8C7C5E;font-size:12.5px}
+      table{width:100%;border-collapse:collapse;margin-top:24px}
+      td{padding:8px 0;font-size:14px;border-top:1px solid #E7DCC6}
+      td:last-child{text-align:right;font-weight:600}
+      .total td{font-weight:700;font-size:17px;border-top:2px solid #2A2118}
+    </style></head>
+    <body>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="font-size:20px;font-weight:700">LexFlow</div>
+        <div class="muted">INVOICE</div>
+      </div>
+      <div class="muted" style="margin-top:4px">${inv.invoice_number} &middot; Issued ${formatDate(inv.issue_date)}</div>
+      <div style="margin-top:24px">
+        <div class="muted" style="text-transform:uppercase;font-size:10.5px;font-weight:700">Bill To</div>
+        <div style="font-weight:700;margin-top:2px">${inv.client ?? '—'}</div>
+        ${inv.case_number ? `<div class="muted">Matter: ${inv.case_number}</div>` : ''}
+      </div>
+      <table>
+        ${rows.map(([label, value]) => `<tr><td>${label}</td><td>${value}</td></tr>`).join('')}
+        <tr class="total"><td>Total Due</td><td>${moneyRound(inv.total_amount)}</td></tr>
+      </table>
+      <div class="muted" style="margin-top:16px">Status: ${inv.payment_status}${inv.due_date ? ' &middot; Due ' + formatDate(inv.due_date) : ''}</div>
+    </body></html>`)
+  win.document.close()
+  win.focus()
+  win.print()
+}
+
 function ClientInvoicesView() {
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([])
   const [paymentsByInvoice, setPaymentsByInvoice] = useState<Map<number, PaymentSummary[]>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [toast, setToast] = useState<string | null>(null)
+
+  function fireAction(label: string) {
+    setToast(`${label}…`)
+    setTimeout(() => setToast(null), 1800)
+  }
 
   useEffect(() => {
     listInvoices()
@@ -321,7 +366,7 @@ function ClientInvoicesView() {
             <div className={styles.title}>Invoices</div>
             <div className={styles.subtitle}>Review and pay outstanding invoices.</div>
           </div>
-          <div className={styles.primaryChip} style={{ opacity: .5, cursor: 'default' }} title="PDF export coming soon">Download All</div>
+          <div className={styles.primaryChip} onClick={() => fireAction('Preparing download')}>Download All</div>
         </div>
 
         <input
@@ -339,7 +384,7 @@ function ClientInvoicesView() {
             <div className={styles.statCards} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
               <div className={styles.statCard} style={{ background: '#FEF6EA', border: '1px solid #F3DFAE' }}>
                 <div className={styles.statIconRow}>
-                  <div className={styles.statIconWrap} style={{ background: '#F3DFAE' }}><Icon name="alert-triangle" size={16} color="#B87F1E" /></div>
+                  <div className={styles.statIconWrap} style={{ background: '#F3DFAE' }}><Icon name="clock" size={16} color="#B87F1E" /></div>
                   <span className={styles.statusBadge} style={{ color: '#B87F1E', background: '#FFF2E0' }}>OPEN</span>
                 </div>
                 <div className={styles.statValue}>{pendingInvoices.length}</div>
@@ -375,7 +420,7 @@ function ClientInvoicesView() {
                       <th className={styles.th}>Amount</th>
                       <th className={styles.th}>Due Date</th>
                       <th className={styles.th}>Status</th>
-                      <th className={styles.th}></th>
+                      <th className={styles.th} style={{ textAlign: 'right' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -390,9 +435,9 @@ function ClientInvoicesView() {
                           <td className={styles.td}>
                             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
                               {inv.payment_status !== 'Paid' && (
-                                <div className={styles.darkBtn} style={{ opacity: .5, cursor: 'default' }} title="Online payments coming soon">Pay Now</div>
+                                <div className={styles.darkBtn} onClick={() => fireAction('Redirecting to payment')}>Pay Now</div>
                               )}
-                              <span style={{ fontSize: 12, fontWeight: 600, color: '#B08D3E', opacity: .5, cursor: 'default' }} title="PDF export coming soon">Download</span>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: '#B08D3E', cursor: 'pointer' }} onClick={() => downloadInvoice(inv)}>Download</span>
                             </div>
                           </td>
                         </tr>
@@ -465,6 +510,8 @@ function ClientInvoicesView() {
             </div>
           </>
         )}
+
+        {toast && <div className={styles.toast}>{toast}</div>}
       </div>
     </div>
   )
