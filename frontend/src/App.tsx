@@ -18,6 +18,7 @@ import HearingsPage from './pages/hearings/HearingsPage'
 import ClientsPage from './pages/clients/ClientsPage'
 import CreateClientPage from './pages/clients/CreateClientPage'
 import MessagesListPage from './pages/messages/MessagesListPage'
+import MessageThreadPage from './pages/messages/MessageThreadPage'
 import JudgementsPage from './pages/judgements/JudgementsPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -53,6 +54,7 @@ export default function App() {
         <Route path="/clients" element={<ProtectedRoute><AppLayout><ClientsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/judgements" element={<ProtectedRoute><AppLayout><JudgementsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/messages" element={<ProtectedRoute><AppLayout><MessagesListPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/messages/:conversationId" element={<ProtectedRoute><AppLayout><MessageThreadPage /></AppLayout></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
