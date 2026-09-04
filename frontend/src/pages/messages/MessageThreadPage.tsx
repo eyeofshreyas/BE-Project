@@ -41,7 +41,17 @@ export default function MessageThreadPage() {
     let cancelled = false
     function load() {
       getConversation(Number(conversationId))
-        .then((c) => { if (!cancelled) setConversation(c) })
+        .then((c) => {
+          if (cancelled) return
+          setError('')
+          setConversation((prev) => {
+            if (!prev) return c
+            const byId = new Map(prev.messages.map((m) => [m.id, m]))
+            for (const m of c.messages) byId.set(m.id, m)
+            const merged = [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at))
+            return { ...c, messages: merged }
+          })
+        })
         .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load this conversation.') })
     }
     load()
@@ -60,6 +70,7 @@ export default function MessageThreadPage() {
     setDraft('')
     try {
       const message = await sendMessage(Number(conversationId), body)
+      setError('')
       setConversation((prev) => (prev ? { ...prev, messages: [...prev.messages, message] } : prev))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send your message.')
