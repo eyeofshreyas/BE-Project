@@ -107,7 +107,8 @@ export default function ClientDashboardPage() {
   const pendingRequests = clientRequests.filter((r) => r.status === 'pending')
   const activeCases = cases.filter((c) => !CLOSED_STATUSES.has(c.status))
   const completedCases = cases.filter((c) => CLOSED_STATUSES.has(c.status))
-  const scheduledHearings = hearings.filter((h) => h.hearing_status === 'Scheduled')
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const scheduledHearings = hearings.filter((h) => h.hearing_status === 'Scheduled' && h.hearing_date >= todayIso)
   const nextHearing = [...scheduledHearings].sort((a, b) => a.hearing_date.localeCompare(b.hearing_date))[0]
   const pendingInvoices = invoices.filter((i) => i.payment_status !== 'Paid')
   const pendingAmount = pendingInvoices.reduce((sum, i) => sum + i.total_amount, 0)

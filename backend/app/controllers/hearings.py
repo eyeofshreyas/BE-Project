@@ -1,5 +1,7 @@
 """Controllers for court hearings: list (case-scoped), get, create, update."""
 
+from datetime import date
+
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
@@ -32,6 +34,21 @@ def _to_hearing_summary(row: dict) -> dict:
         "next_hearing_date": row["next_hearing_date"],
         "notes": row["notes"],
     }
+
+
+def _sync_next_hearing_date(case_id: int) -> None:
+    """Recompute cases.next_hearing_date as the nearest upcoming Scheduled hearing for
+    case_id, rather than trusting whichever hearing was just created/updated -- a hearing
+    touched out of chronological order (e.g. backfilling a past date) must not overwrite
+    a genuinely later "next" hearing with an earlier or stale one."""
+    rows = (
+        supabase.table("hearings").select("hearing_date")
+        .eq("case_id", case_id).eq("hearing_status", "Scheduled")
+        .gte("hearing_date", date.today().isoformat())
+        .order("hearing_date").limit(1).execute().data
+    )
+    next_date = rows[0]["hearing_date"] if rows else None
+    supabase.table("cases").update({"next_hearing_date": next_date}).eq("case_id", case_id).execute()
 
 
 # shared fetch+scope-check used by get_hearing, update_hearing, and
@@ -69,7 +86,7 @@ def get_hearing(hearing_id: int, profile: dict = Depends(get_current_profile)):
 
 def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     """Create a hearing for a case the caller has access to, and update the case's
-    next_hearing_date. Calls: `ensure_case_access()`, `_get_hearing()`."""
+    next_hearing_date. Calls: `ensure_case_access()`, `_sync_next_hearing_date()`, `_get_hearing()`."""
     ensure_case_access(data.case_id, profile)
     row = supabase.table("hearings").insert({
         "case_id": data.case_id,
@@ -80,13 +97,14 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
         "notes": data.notes,
         "hearing_status": "Scheduled",
     }).execute().data[0]
-    supabase.table("cases").update({"next_hearing_date": data.hearing_date}).eq("case_id", data.case_id).execute()
+    _sync_next_hearing_date(data.case_id)
     return _get_hearing(row["hearing_id"])
 
 
 def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
-    """Update a hearing's status/outcome/notes; also syncs the case's next_hearing_date
-    if provided. Calls: `_get_hearing()`."""
+    """Update a hearing's status/outcome/notes; also re-syncs the case's next_hearing_date
+    since a status change can affect which hearing is now the nearest upcoming one.
+    Calls: `_get_hearing()`, `_sync_next_hearing_date()`."""
     _get_hearing(hearing_id, get_scoped_case_ids(profile))
 
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -97,7 +115,6 @@ def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends
     if not rows:
         raise HTTPException(status_code=404, detail="Hearing not found")
 
-    if data.next_hearing_date is not None:
-        supabase.table("cases").update({"next_hearing_date": data.next_hearing_date}).eq("case_id", rows[0]["case_id"]).execute()
+    _sync_next_hearing_date(rows[0]["case_id"])
 
     return _get_hearing(hearing_id)

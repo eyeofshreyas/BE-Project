@@ -109,8 +109,9 @@ export default function LawyerDashboardPage() {
   const previousCount = monthCounts[10]
   const pctChange = previousCount > 0 ? Math.round(((currentCount - previousCount) / previousCount) * 100) : null
 
+  const todayIso = new Date().toISOString().slice(0, 10)
   const upcomingHearings = [...hearings]
-    .filter((h) => h.hearing_status === 'Scheduled')
+    .filter((h) => h.hearing_status === 'Scheduled' && h.hearing_date >= todayIso)
     .sort((a, b) => a.hearing_date.localeCompare(b.hearing_date))
     .slice(0, 5)
 

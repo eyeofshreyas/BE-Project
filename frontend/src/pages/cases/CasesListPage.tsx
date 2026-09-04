@@ -186,7 +186,8 @@ function ClientCasesView() {
 
   const activeCases = cases.filter((c) => !CLOSED_STATUSES.has(c.status))
   const closedCases = cases.filter((c) => CLOSED_STATUSES.has(c.status))
-  const scheduledHearings = hearings.filter((h) => h.hearing_status === 'Scheduled')
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const scheduledHearings = hearings.filter((h) => h.hearing_status === 'Scheduled' && h.hearing_date >= todayIso)
   const nextHearing = [...scheduledHearings].sort((a, b) => a.hearing_date.localeCompare(b.hearing_date))[0]
 
   const statCards = [
