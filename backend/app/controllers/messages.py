@@ -22,13 +22,13 @@ def _own_lawyer_id(user_id: int) -> int | None:
 
 
 def _relationship_exists(client_id: int, lawyer_id: int) -> bool:
-    """True if this lawyer has ever been assigned to one of this client's cases -- the trust
+    """True if this lawyer is actively assigned to one of this client's cases -- the trust
     boundary for get_or_create_conversation() before it creates a persistent conversation row."""
     case_rows = supabase.table("cases").select("case_id").eq("client_id", client_id).execute().data
     case_ids = [r["case_id"] for r in case_rows]
     if not case_ids:
         return False
-    rows = supabase.table("case_lawyers").select("lawyer_id").in_("case_id", case_ids).eq("lawyer_id", lawyer_id).execute().data
+    rows = supabase.table("case_lawyers").select("lawyer_id").in_("case_id", case_ids).eq("lawyer_id", lawyer_id).eq("is_active", True).execute().data
     return len(rows) > 0
 
 
