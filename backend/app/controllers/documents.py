@@ -94,8 +94,9 @@ def upload_document(
     return _to_document_summary(result)
 
 
-def get_document_download_url(document_id: int, profile: dict = Depends(get_current_profile)):
+def get_document_download_url(document_id: int, download: bool = False, profile: dict = Depends(get_current_profile)):
     """Return a short-lived signed Supabase Storage URL for a document the caller has access to.
+    `download=true` marks the URL as an attachment so the browser saves instead of opening it inline.
     Calls: `get_scoped_case_ids()`."""
     case_ids = get_scoped_case_ids(profile)
     rows = supabase.table("documents").select("case_id,file_path").eq("document_id", document_id).execute().data
@@ -104,7 +105,8 @@ def get_document_download_url(document_id: int, profile: dict = Depends(get_curr
     if case_ids is not None and rows[0]["case_id"] not in case_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this document")
 
-    signed = supabase.storage.from_(DOCUMENTS_BUCKET).create_signed_url(rows[0]["file_path"], 300)
+    options = {"download": True} if download else None
+    signed = supabase.storage.from_(DOCUMENTS_BUCKET).create_signed_url(rows[0]["file_path"], 300, options)
     return {"url": signed["signedURL"]}
 
 

@@ -93,6 +93,15 @@ export default function DocumentsListPage() {
     }
   }
 
+  async function downloadDocument(id: number) {
+    try {
+      const { url } = await getDocumentDownloadUrl(id, true)
+      window.location.href = url
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Failed to download document.')
+    }
+  }
+
   const [previewDoc, setPreviewDoc] = useState<DocumentSummary | null>(null)
 
   function openPreview(d: DocumentSummary) {
@@ -335,7 +344,7 @@ export default function DocumentsListPage() {
                       <td className={styles.td}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                           <div onClick={() => openDocument(d.id)} className={shellStyles.actionBtn} title="Open in browser"><Icon name="globe" size={14} color="#6A5C42" /></div>
-                          <div onClick={() => openDocument(d.id)} className={shellStyles.actionBtn} title="Download"><Icon name="download" size={14} color="#6A5C42" /></div>
+                          <div onClick={() => downloadDocument(d.id)} className={shellStyles.actionBtn} title="Download"><Icon name="download" size={14} color="#6A5C42" /></div>
                           <div onClick={() => openPreview(d)} className={shellStyles.actionBtn} title="Preview"><Icon name="eye" size={14} color="#6A5C42" /></div>
                           <div onClick={() => removeDocument(d.id)} className={shellStyles.actionBtnDanger} title="Delete"><Icon name="trash-2" size={14} color="#B05C5C" /></div>
                         </div>

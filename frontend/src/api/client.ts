@@ -281,8 +281,8 @@ export function deleteDocument(documentId: number) {
   return del<{ message: string }>(`/documents/${documentId}`)
 }
 
-export function getDocumentDownloadUrl(documentId: number) {
-  return get<{ url: string }>(`/documents/${documentId}/download`)
+export function getDocumentDownloadUrl(documentId: number, download = false) {
+  return get<{ url: string }>(`/documents/${documentId}/download${download ? '?download=true' : ''}`)
 }
 
 export function listMeetings(caseId: number) {
