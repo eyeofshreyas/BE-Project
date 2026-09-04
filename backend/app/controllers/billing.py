@@ -1,9 +1,21 @@
-"""Controllers for billing: invoices, payments, and conveyancing-matter expenses."""
+"""Controllers for billing: invoices, payments, Razorpay checkout, and conveyancing-matter expenses."""
 
+import hashlib
+import hmac
+from datetime import datetime, timezone
+
+import httpx
 from fastapi import Depends, HTTPException
+from app.core.config import RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
-from app.models.billing import InvoiceSummary, InvoiceCreate, PaymentSummary, PaymentCreate, ExpenseSummary, ExpenseCreate
+from app.models.billing import (
+    InvoiceSummary, InvoiceCreate, PaymentSummary, PaymentCreate, ExpenseSummary, ExpenseCreate,
+    RazorpayOrder, RazorpayVerify,
+)
+
+RAZORPAY_API = "https://api.razorpay.com/v1"
+RAZORPAY_METHOD_LABELS = {"card": "Credit/Debit Card", "netbanking": "Net Banking", "upi": "UPI", "wallet": "Wallet", "emi": "EMI"}
 
 INVOICES_SELECT = (
     "invoice_id,invoice_number,amount,tax,total_amount,issue_date,due_date,payment_status,remarks,case_id,"
@@ -148,15 +160,92 @@ def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(AD
     the invoice's payment_status. Calls: `_get_invoice()`, `get_scoped_case_ids()`, `_invoice_status_for()`."""
     _get_invoice(data.invoice_id, get_scoped_case_ids(profile))
     payment = supabase.table("payments").insert(data.model_dump()).execute().data[0]
-
-    invoice = supabase.table("invoices").select("total_amount").eq("invoice_id", data.invoice_id).execute().data
-    if invoice:
-        paid = supabase.table("payments").select("amount").eq("invoice_id", data.invoice_id).eq("payment_status", "Completed").execute().data
-        total_paid = sum(p["amount"] for p in paid)
-        new_status = _invoice_status_for(total_paid, invoice[0]["total_amount"])
-        supabase.table("invoices").update({"payment_status": new_status}).eq("invoice_id", data.invoice_id).execute()
-
+    _recompute_invoice_status(data.invoice_id)
     return payment
+
+
+def _recompute_invoice_status(invoice_id: int) -> None:
+    """Recompute and persist an invoice's payment_status from its Completed payments.
+    Calls: `_invoice_status_for()`."""
+    invoice = supabase.table("invoices").select("total_amount").eq("invoice_id", invoice_id).execute().data
+    if not invoice:
+        return
+    paid = supabase.table("payments").select("amount").eq("invoice_id", invoice_id).eq("payment_status", "Completed").execute().data
+    total_paid = sum(p["amount"] for p in paid)
+    new_status = _invoice_status_for(total_paid, invoice[0]["total_amount"])
+    supabase.table("invoices").update({"payment_status": new_status}).eq("invoice_id", invoice_id).execute()
+
+
+def _razorpay_auth() -> tuple[str, str]:
+    """Return (key_id, key_secret) or 500 if Razorpay isn't configured -- see .env.example."""
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=500, detail="Razorpay is not configured on this server.")
+    return RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
+
+
+def create_razorpay_order(invoice_id: int, profile: dict = Depends(get_current_profile)):
+    """Start a Razorpay checkout for an invoice's outstanding balance (total minus Completed
+    payments so far). The client-side Checkout.js modal opens against the returned order_id;
+    `key_id` is Razorpay's public key, safe to hand to the browser. Calls: `_get_invoice()`,
+    `_razorpay_auth()`."""
+    key_id, key_secret = _razorpay_auth()
+    invoice = _get_invoice(invoice_id, get_scoped_case_ids(profile))
+    paid = supabase.table("payments").select("amount").eq("invoice_id", invoice_id).eq("payment_status", "Completed").execute().data
+    due = invoice["total_amount"] - sum(p["amount"] for p in paid)
+    if due <= 0:
+        raise HTTPException(status_code=400, detail="This invoice is already paid.")
+
+    resp = httpx.post(
+        f"{RAZORPAY_API}/orders",
+        auth=(key_id, key_secret),
+        json={"amount": round(due * 100), "currency": "INR", "receipt": invoice["invoice_number"]},
+        timeout=15,
+    )
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Razorpay order creation failed.")
+    order = resp.json()
+    return {"order_id": order["id"], "amount": order["amount"], "currency": order["currency"], "key_id": key_id}
+
+
+def verify_razorpay_payment(invoice_id: int, data: RazorpayVerify, profile: dict = Depends(get_current_profile)):
+    """Verify a completed Razorpay checkout's HMAC signature, confirm the payment was actually
+    captured (fetched from Razorpay, not trusted from the client), then record it as a Completed
+    payment and recompute the invoice's payment_status. Reachable by the paying client (not
+    lawyer/admin-only like create_payment) since Razorpay -- not the caller -- is the source of
+    truth for amount/method here. Calls: `_get_invoice()`, `_razorpay_auth()`,
+    `_recompute_invoice_status()`."""
+    key_id, key_secret = _razorpay_auth()
+    invoice = _get_invoice(invoice_id, get_scoped_case_ids(profile))
+
+    expected_signature = hmac.new(
+        key_secret.encode(), f"{data.razorpay_order_id}|{data.razorpay_payment_id}".encode(), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(expected_signature, data.razorpay_signature):
+        raise HTTPException(status_code=400, detail="Payment verification failed.")
+
+    resp = httpx.get(f"{RAZORPAY_API}/payments/{data.razorpay_payment_id}", auth=(key_id, key_secret), timeout=15)
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Could not confirm payment with Razorpay.")
+    payment = resp.json()
+    if payment.get("order_id") != data.razorpay_order_id or payment.get("status") != "captured":
+        raise HTTPException(status_code=400, detail="Payment was not captured.")
+
+    # idempotency: a retried/double-submitted verify call must not double-record the same
+    # Razorpay payment (e.g. the client re-firing after a dropped response).
+    existing = supabase.table("payments").select(PAYMENTS_SELECT).eq("transaction_reference", data.razorpay_payment_id).execute().data
+    if existing:
+        return existing[0]
+
+    row = supabase.table("payments").insert({
+        "invoice_id": invoice_id,
+        "amount": payment["amount"] / 100,
+        "payment_method": RAZORPAY_METHOD_LABELS.get(payment.get("method"), payment.get("method")),
+        "transaction_reference": data.razorpay_payment_id,
+        "payment_date": datetime.now(timezone.utc).date().isoformat(),
+        "payment_status": "Completed",
+    }).execute().data[0]
+    _recompute_invoice_status(invoice_id)
+    return row
 
 
 def list_expenses(matter_id: int | None = None, profile: dict = Depends(get_current_profile)):

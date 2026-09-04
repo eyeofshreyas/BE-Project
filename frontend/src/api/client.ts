@@ -26,6 +26,7 @@ import type {
   PaymentSummary,
   HearingSummary,
   ClientSummary,
+  RazorpayOrder,
   JudgementSummary,
   JudgementCreatePayload,
   CaseCreatePayload,
@@ -252,6 +253,14 @@ export function listInvoicePayments(invoiceId: number) {
 
 export function createPayment(payload: { invoice_id: number; amount: number; payment_method?: string; transaction_reference?: string; payment_date: string }) {
   return post<PaymentSummary>('/billing/payments', payload)
+}
+
+export function createRazorpayOrder(invoiceId: number) {
+  return post<RazorpayOrder>(`/billing/invoices/${invoiceId}/razorpay-order`, {})
+}
+
+export function verifyRazorpayPayment(invoiceId: number, payload: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
+  return post<PaymentSummary>(`/billing/invoices/${invoiceId}/razorpay-verify`, payload)
 }
 
 export function listHearings() {

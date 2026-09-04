@@ -1,7 +1,7 @@
 /** `/billing` route: role-dispatches to a lawyer-facing management view (`StaffBillingView`) or a read-only client view (`ClientInvoicesView`). */
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { listInvoices, sendInvoiceReminder, listInvoicePayments } from '../../api/client'
+import { listInvoices, sendInvoiceReminder, listInvoicePayments, createRazorpayOrder, verifyRazorpayPayment } from '../../api/client'
 import type { InvoiceSummary, PaymentSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { formatDate } from '../../utils/date'
@@ -9,6 +9,26 @@ import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
 const LAWYER = 2
 const CLIENT = 3
+
+// Razorpay Checkout.js (loaded via a <script> tag in index.html) has no official TS types --
+// this is just the small slice of its constructor options/instance this page actually uses.
+type RazorpayCheckoutOptions = {
+  key: string
+  amount: number
+  currency: string
+  order_id: string
+  name: string
+  description?: string
+  prefill?: { name?: string; email?: string; contact?: string }
+  theme?: { color?: string }
+  handler: (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => void
+  modal?: { ondismiss?: () => void }
+}
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayCheckoutOptions) => { open: () => void }
+  }
+}
 
 function loadProfile(): UserProfile | null {
   try {
@@ -275,7 +295,7 @@ const TXN_STATUS_STYLE: Record<string, [string, string]> = {
 }
 const TXN_DEFAULT_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
 
-/** Client-facing invoice view: loads invoices (`listInvoices()`) plus each one's payments (`listInvoicePayments()`) to compute totals, progress, and a recent-transactions list. Download opens a printable summary via `downloadInvoice()`; Pay Now / Download All have no backing payment gateway or bulk export yet, so they just toast. */
+/** Client-facing invoice view: loads invoices (`listInvoices()`) plus each one's payments (`listInvoicePayments()`) to compute totals, progress, and a recent-transactions list. Pay Now opens Razorpay Checkout via `payInvoice()`; Download opens a printable summary via `downloadInvoice()`; Download All has no bulk export yet, so it just toasts. */
 /** Opens a new tab with a minimal printable invoice summary and triggers the browser's print dialog (save-as-PDF) -- invoices have no stored line items, only the totals in `InvoiceSummary`, so this isn't the itemized letterhead from GenerateInvoicePage. */
 function downloadInvoice(inv: InvoiceSummary) {
   const win = window.open('', '_blank')
@@ -316,28 +336,74 @@ function downloadInvoice(inv: InvoiceSummary) {
 }
 
 function ClientInvoicesView() {
+  const [profile] = useState<UserProfile | null>(loadProfile)
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([])
   const [paymentsByInvoice, setPaymentsByInvoice] = useState<Map<number, PaymentSummary[]>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState<string | null>(null)
+  const [payingId, setPayingId] = useState<number | null>(null)
 
   function fireAction(label: string) {
     setToast(`${label}…`)
     setTimeout(() => setToast(null), 1800)
   }
 
+  function refresh() {
+    return listInvoices().then((invs) => {
+      setInvoices(invs)
+      return Promise.all(invs.map((inv) => listInvoicePayments(inv.id).catch(() => [] as PaymentSummary[])))
+        .then((lists) => setPaymentsByInvoice(new Map(invs.map((inv, i) => [inv.id, lists[i]]))))
+    })
+  }
+
   useEffect(() => {
-    listInvoices()
-      .then((invs) => {
-        setInvoices(invs)
-        return Promise.all(invs.map((inv) => listInvoicePayments(inv.id).catch(() => [] as PaymentSummary[])))
-          .then((lists) => setPaymentsByInvoice(new Map(invs.map((inv, i) => [inv.id, lists[i]]))))
-      })
+    refresh()
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load invoices.'))
       .finally(() => setLoading(false))
   }, [])
+
+  /** Opens Razorpay Checkout for an invoice: creates an order server-side, launches the modal,
+   * and on success posts the payment fields back for signature verification -- see
+   * verify_razorpay_payment() in the backend, which is the one that actually records the
+   * payment (the client-side `handler` firing is not itself proof of payment). */
+  async function payInvoice(inv: InvoiceSummary) {
+    if (!window.Razorpay) {
+      fireAction('Payment gateway failed to load')
+      return
+    }
+    setPayingId(inv.id)
+    try {
+      const order = await createRazorpayOrder(inv.id)
+      const razorpay = new window.Razorpay({
+        key: order.key_id,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.order_id,
+        name: 'LexFlow',
+        description: `Invoice ${inv.invoice_number}`,
+        prefill: { name: profile?.full_name, email: profile?.email, contact: profile?.phone },
+        theme: { color: '#B08D3E' },
+        handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+          try {
+            await verifyRazorpayPayment(inv.id, response)
+            fireAction('Payment received')
+            refresh().catch(() => {})
+          } catch (err) {
+            fireAction(err instanceof Error ? err.message : 'Payment verification failed')
+          } finally {
+            setPayingId(null)
+          }
+        },
+        modal: { ondismiss: () => setPayingId(null) },
+      })
+      razorpay.open()
+    } catch (err) {
+      fireAction(err instanceof Error ? err.message : 'Could not start payment')
+      setPayingId(null)
+    }
+  }
 
   const searchLower = search.toLowerCase()
   const filtered = invoices.filter((inv) =>
@@ -435,7 +501,9 @@ function ClientInvoicesView() {
                           <td className={styles.td}>
                             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
                               {inv.payment_status !== 'Paid' && (
-                                <div className={styles.darkBtn} onClick={() => fireAction('Redirecting to payment')}>Pay Now</div>
+                                <div className={styles.darkBtn} style={{ opacity: payingId === inv.id ? .6 : 1, cursor: payingId === inv.id ? 'default' : 'pointer' }} onClick={() => payingId !== inv.id && payInvoice(inv)}>
+                                  {payingId === inv.id ? 'Processing…' : 'Pay Now'}
+                                </div>
                               )}
                               <span style={{ fontSize: 12, fontWeight: 600, color: '#B08D3E', cursor: 'pointer' }} onClick={() => downloadInvoice(inv)}>Download</span>
                             </div>

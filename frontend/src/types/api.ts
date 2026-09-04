@@ -312,6 +312,13 @@ export interface HearingSummary {
   notes: string | null
 }
 
+export interface RazorpayOrder {
+  order_id: string
+  amount: number
+  currency: string
+  key_id: string
+}
+
 export interface InvoiceSummary {
   id: number
   invoice_number: string

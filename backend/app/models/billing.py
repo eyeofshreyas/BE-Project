@@ -50,6 +50,21 @@ class PaymentCreate(BaseModel):
     payment_status: str = "Completed"
 
 
+class RazorpayOrder(BaseModel):
+    """Response for starting a Razorpay checkout against an invoice's outstanding balance."""
+    order_id: str
+    amount: int
+    currency: str
+    key_id: str
+
+
+class RazorpayVerify(BaseModel):
+    """Request body for verifying a completed Razorpay checkout -- the three fields Checkout.js's success handler receives."""
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
 class ExpenseSummary(BaseModel):
     """Matter expense row shaped for list/detail responses."""
     id: int
