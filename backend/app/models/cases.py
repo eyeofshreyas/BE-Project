@@ -31,3 +31,4 @@ class CaseSummary(BaseModel):
     status: str
     hearing: str | None
     priority: str
+    description: str | None

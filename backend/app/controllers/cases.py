@@ -8,7 +8,7 @@ from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, get_current_p
 from app.models.cases import CaseCreate, CaseSummary
 
 CASES_SELECT = (
-    "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,"
+    "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,description,"
     "clients(users(full_name)),"
     "courts(court_name),"
     "case_types(case_type_name),"
@@ -44,6 +44,7 @@ def _to_case_summary(row: dict) -> dict:
         "status": row["status"],
         "hearing": row["next_hearing_date"],
         "priority": row["priority"],
+        "description": row.get("description"),
     }
 
 
@@ -99,6 +100,7 @@ def create_case(data: CaseCreate, profile: dict = Depends(require_roles(LAWYER))
         "status": "Open",
         "priority": data.priority,
         "next_hearing_date": data.next_hearing_date,
+        "description": data.description,
     }).execute().data[0]
 
     supabase.table("case_lawyers").insert({

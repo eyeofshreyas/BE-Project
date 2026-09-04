@@ -343,6 +343,7 @@ function CaseDetailModal({ caseInfo, latestActivity, onClose }: { caseInfo: Case
           <span className={styles.statusBadge} style={{ color, background: bg, flexShrink: 0 }}>{statusLabel(caseInfo.status)}</span>
         </div>
         <div style={{ fontSize: 19, fontWeight: 700, color: '#2A2118', marginTop: 4 }}>{caseInfo.case_title ?? caseInfo.id}</div>
+        {caseInfo.description && <div style={{ fontSize: 13, color: MUTED, marginTop: 8, lineHeight: 1.5 }}>{caseInfo.description}</div>}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 20 }}>
           {rows.map(([label, value]) => (

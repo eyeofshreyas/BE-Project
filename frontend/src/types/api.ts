@@ -44,6 +44,7 @@ export interface CaseSummary {
   status: string
   hearing: string | null
   priority: string
+  description: string | null
 }
 
 export interface CaseCreatePayload {
