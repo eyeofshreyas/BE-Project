@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   listCases, listHearings, listInvoices, listDocuments, listNotifications,
-  listClientRequests, respondClientRequest, getDocumentDownloadUrl,
+  listClientRequests, respondClientRequest, getDocumentDownloadUrl, getOrCreateConversation,
 } from '../../api/client'
 import type {
   CaseSummary, HearingSummary, InvoiceSummary, DocumentSummary,
@@ -71,6 +71,7 @@ export default function ClientDashboardPage() {
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
   const [clientRequests, setClientRequests] = useState<ClientRequestSummary[]>([])
   const [respondingId, setRespondingId] = useState<number | null>(null)
+  const [messaging, setMessaging] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -101,6 +102,18 @@ export default function ClientDashboardPage() {
       if (tab) tab.location.href = url
     } catch {
       tab?.close()
+    }
+  }
+
+  async function openConversation(lawyerId: number) {
+    setMessaging(true)
+    try {
+      const conversation = await getOrCreateConversation(lawyerId)
+      navigate(`/messages/${conversation.id}`)
+    } catch {
+      // ponytail: silent failure leaves the button clickable again; add a toast if this needs to be louder.
+    } finally {
+      setMessaging(false)
     }
   }
 
@@ -241,8 +254,14 @@ export default function ClientDashboardPage() {
                         {primaryCase.lawyer_phone && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Icon name="phone" size={14} color="#93826d" />{primaryCase.lawyer_phone}</div>}
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                        {primaryCase.lawyer_email ? (
-                          <a href={`mailto:${primaryCase.lawyer_email}`} className={styles.darkBtn} style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>Message</a>
+                        {primaryCase.lawyer_id ? (
+                          <div
+                            className={styles.darkBtn}
+                            style={{ flex: 1, justifyContent: 'center', opacity: messaging ? 0.6 : 1, cursor: messaging ? 'default' : 'pointer' }}
+                            onClick={() => !messaging && openConversation(primaryCase.lawyer_id!)}
+                          >
+                            Message
+                          </div>
                         ) : (
                           <div className={styles.darkBtn} style={{ flex: 1, justifyContent: 'center', opacity: .5 }}>Message</div>
                         )}
