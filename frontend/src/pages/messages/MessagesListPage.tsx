@@ -1,6 +1,6 @@
 /** Conversation list page (route `/messages`): every client-lawyer thread the current user
  * participates in, most recently active first. Click a row to open its thread. */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listConversations, listCases, getOrCreateConversation } from '../../api/client'
 import type { ConversationSummary, CaseSummary, UserProfile } from '../../types/api'
@@ -31,15 +31,15 @@ export default function MessagesListPage() {
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
+  const autoOpened = useRef(false)
 
   const isClient = profile?.role_id === CLIENT_ROLE_ID
 
   useEffect(() => {
-    // Clients get a "start a conversation" entry point here, which needs their
-    // primary case's lawyer -- same pick as ClientDashboardPage's Quick Contact.
-    // Lawyers only ever reply to threads clients opened, so they don't need it.
+    // A client's cases resolve the lawyer to auto-open a chat with below --
+    // same pick as ClientDashboardPage's Quick Contact. Lawyers only ever reply
+    // to threads clients opened, so they don't need it.
     const load = isClient
       ? Promise.all([listConversations(), listCases()])
       : listConversations().then((c) => [c, []] as [ConversationSummary[], CaseSummary[]])
@@ -52,17 +52,19 @@ export default function MessagesListPage() {
 
   const primaryCase = cases.find((c) => c.lawyer_id) ?? null
 
-  async function startConversation(lawyerId: number) {
-    setStarting(true)
-    try {
-      const conversation = await getOrCreateConversation(lawyerId)
-      navigate(`/messages/${conversation.id}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to open your conversation.')
-    } finally {
-      setStarting(false)
-    }
-  }
+  // A client with no threads yet has exactly one place to go, so send them
+  // straight into the chat with their lawyer rather than parking them on an
+  // empty list behind another click. `autoOpened` makes this fire once, so a
+  // failure shows the error instead of retrying forever.
+  useEffect(() => {
+    if (loading || error || autoOpened.current) return
+    if (!isClient || conversations.length > 0 || !primaryCase?.lawyer_id) return
+
+    autoOpened.current = true
+    getOrCreateConversation(primaryCase.lawyer_id)
+      .then((conversation) => navigate(`/messages/${conversation.id}`, { replace: true }))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to open your conversation.'))
+  }, [loading, error, isClient, conversations.length, primaryCase, navigate])
 
   return (
     <div className={styles.page}>
@@ -96,17 +98,8 @@ export default function MessagesListPage() {
               </div>
             ))}
             {conversations.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '28px 0' }}>
-                <div style={{ color: MUTED, fontSize: 13 }}>No conversations yet.</div>
-                {isClient && primaryCase?.lawyer_id && (
-                  <div
-                    className={styles.darkBtn}
-                    style={{ marginTop: 14, opacity: starting ? 0.6 : 1, cursor: starting ? 'default' : 'pointer' }}
-                    onClick={() => !starting && startConversation(primaryCase.lawyer_id!)}
-                  >
-                    Message {primaryCase.lawyer ?? 'your lawyer'}
-                  </div>
-                )}
+              <div style={{ color: MUTED, fontSize: 13, textAlign: 'center', padding: '28px 0' }}>
+                {isClient && primaryCase?.lawyer_id ? 'Opening your chat…' : 'No conversations yet.'}
               </div>
             )}
           </div>
