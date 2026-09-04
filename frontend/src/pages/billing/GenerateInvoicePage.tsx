@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listCases, listClients, createInvoice } from '../../api/client'
-import type { CaseSummary, ClientSummary } from '../../types/api'
+import type { CaseSummary, ClientSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { formatDate } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
@@ -20,6 +20,15 @@ function addDays(iso: string, days: number) {
   const d = new Date(iso)
   d.setDate(d.getDate() + days)
   return d.toISOString().slice(0, 10)
+}
+
+function loadProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
 }
 
 function fieldStyle(): React.CSSProperties {
@@ -50,6 +59,7 @@ export default function GenerateInvoicePage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [invoiceNumber] = useState(() => `INV-${Date.now().toString().slice(-6)}`)
+  const [profile] = useState(loadProfile)
 
   useEffect(() => {
     listClients().then(setClients).catch(() => {})
@@ -264,9 +274,9 @@ export default function GenerateInvoicePage() {
                   <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 17, fontWeight: 700, color: '#2A2118' }}>LexFlow</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, letterSpacing: '.05em' }}>INVOICE</div>
                 </div>
-                <div style={{ fontSize: 11.5, color: PRIMARY, fontWeight: 600, marginTop: 2 }}>{selectedCase?.lawyer ?? 'No lawyer assigned'}</div>
-                <div style={{ fontSize: 11, color: MUTED }}>{selectedCase?.lawyer_phone ?? '—'}</div>
-                <div style={{ fontSize: 11, color: MUTED }}>{selectedCase?.lawyer_email ?? '—'}</div>
+                <div style={{ fontSize: 11.5, color: PRIMARY, fontWeight: 600, marginTop: 2 }}>{profile?.full_name ?? 'No lawyer signed in'}</div>
+                <div style={{ fontSize: 11, color: MUTED }}>{profile?.phone ?? '—'}</div>
+                <div style={{ fontSize: 11, color: MUTED }}>{profile?.email ?? '—'}</div>
                 <div style={{ fontSize: 10.5, color: MUTED, textAlign: 'right', marginTop: -34 }}>
                   <div>{invoiceNumber}</div>
                   <div>{formatDate(invoiceDate)}</div>
