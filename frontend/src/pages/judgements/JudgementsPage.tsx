@@ -321,7 +321,8 @@ function GridCell({ label, value }: { label?: string; value?: React.ReactNode })
 
 function JudgementDetailModal({ judgement: j, onClose }: { judgement: JudgementSummary; onClose: () => void }) {
   const [color, bg] = OUTCOME_STYLE[j.outcome]
-  const timeToJudgement = j.filing_date ? `${Math.round(monthsBetween(j.filing_date, j.judgement_date))} months` : '—'
+  const monthsCount = j.filing_date ? Math.round(monthsBetween(j.filing_date, j.judgement_date)) : null
+  const timeToJudgement = monthsCount != null ? `${monthsCount} month${monthsCount === 1 ? '' : 's'}` : '—'
   const relief = j.relief_amount != null ? money(j.relief_amount) : (j.relief_text ?? '—')
 
   return (
