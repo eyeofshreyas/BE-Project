@@ -18,3 +18,12 @@ create table if not exists messages (
 );
 
 create index if not exists messages_conversation_id_idx on messages(conversation_id);
+
+-- Supabase enables row-level security on newly created tables, which blocks
+-- every write and silently returns zero rows on read. Every other table in this
+-- schema runs with RLS off -- the FastAPI layer is the gatekeeper (see
+-- app/controllers/messages.py's _relationship_exists/_ensure_participant and
+-- app/middleware/auth.py), and the backend is the only thing holding a Supabase
+-- key. Match that here, or conversations can never be created.
+alter table conversations disable row level security;
+alter table messages disable row level security;
