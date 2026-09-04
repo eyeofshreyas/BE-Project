@@ -12,6 +12,8 @@ class JudgementSummary(BaseModel):
     case_id: int
     case_number: str | None
     case_title: str | None
+    client_name: str | None
+    matter_type: str | None
     citation: str
     court: str
     bench: str
@@ -19,6 +21,7 @@ class JudgementSummary(BaseModel):
     filing_date: str | None
     outcome: Outcome
     summary: str
+    reasoning: str | None
     relief_text: str | None
     relief_amount: float | None
     appeal_status: str | None
@@ -34,6 +37,7 @@ class JudgementCreate(BaseModel):
     judgement_date: str
     outcome: Outcome
     summary: str
+    reasoning: str | None = None
     relief_text: str | None = None
     relief_amount: float | None = None
     appeal_status: str | None = None

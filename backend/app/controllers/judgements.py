@@ -6,19 +6,24 @@ from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, get_current_p
 from app.models.judgements import JudgementCreate
 
 JUDGEMENTS_SELECT = (
-    "judgement_id,case_id,citation,court,bench,judgement_date,outcome,summary,"
-    "relief_text,relief_amount,appeal_status,tags,cases(case_number,case_title,filing_date)"
+    "judgement_id,case_id,citation,court,bench,judgement_date,outcome,summary,reasoning,"
+    "relief_text,relief_amount,appeal_status,tags,"
+    "cases(case_number,case_title,filing_date,clients(users(full_name)),case_types(case_type_name))"
 )
 
 
 def _to_judgement_summary(row: dict) -> dict:
-    """Shape a raw `judgements` row (joined with cases) into the JudgementSummary dict."""
+    """Shape a raw `judgements` row (joined with cases/clients/case_types) into the JudgementSummary dict."""
     case = row.get("cases")
+    client = case.get("clients") if case else None
+    case_type = case.get("case_types") if case else None
     return {
         "id": row["judgement_id"],
         "case_id": row["case_id"],
         "case_number": case["case_number"] if case else None,
         "case_title": case["case_title"] if case else None,
+        "client_name": client["users"]["full_name"] if client else None,
+        "matter_type": case_type["case_type_name"] if case_type else None,
         "citation": row["citation"],
         "court": row["court"],
         "bench": row["bench"],
@@ -26,6 +31,7 @@ def _to_judgement_summary(row: dict) -> dict:
         "filing_date": case["filing_date"] if case else None,
         "outcome": row["outcome"],
         "summary": row["summary"],
+        "reasoning": row.get("reasoning"),
         "relief_text": row["relief_text"],
         "relief_amount": row["relief_amount"],
         "appeal_status": row["appeal_status"],

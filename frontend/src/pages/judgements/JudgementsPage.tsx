@@ -36,6 +36,8 @@ export default function JudgementsPage() {
   const [search, setSearch] = useState('')
   const [outcomeFilter, setOutcomeFilter] = useState<'All' | JudgementOutcome>('All')
 
+  const [selected, setSelected] = useState<JudgementSummary | null>(null)
+
   const [formOpen, setFormOpen] = useState(false)
   const [caseId, setCaseId] = useState('')
   const [citation, setCitation] = useState('')
@@ -44,6 +46,7 @@ export default function JudgementsPage() {
   const [judgementDate, setJudgementDate] = useState('')
   const [outcome, setOutcome] = useState<JudgementOutcome>('Favourable')
   const [summary, setSummary] = useState('')
+  const [reasoning, setReasoning] = useState('')
   const [reliefText, setReliefText] = useState('')
   const [reliefAmount, setReliefAmount] = useState('')
   const [appealStatus, setAppealStatus] = useState('')
@@ -73,6 +76,7 @@ export default function JudgementsPage() {
     setJudgementDate('')
     setOutcome('Favourable')
     setSummary('')
+    setReasoning('')
     setReliefText('')
     setReliefAmount('')
     setAppealStatus('')
@@ -96,6 +100,7 @@ export default function JudgementsPage() {
         judgement_date: judgementDate,
         outcome,
         summary: summary.trim(),
+        reasoning: reasoning.trim() || undefined,
         relief_text: reliefText.trim() || undefined,
         relief_amount: reliefAmount ? Number(reliefAmount) : undefined,
         appeal_status: appealStatus.trim() || undefined,
@@ -194,7 +199,7 @@ export default function JudgementsPage() {
             {filtered.map((j) => {
               const [color, bg] = OUTCOME_STYLE[j.outcome]
               return (
-                <div key={j.id} className={styles.panelCard} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div key={j.id} onClick={() => setSelected(j)} className={styles.panelCard} style={{ display: 'flex', flexDirection: 'column', gap: 12, cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                     <div style={{ display: 'flex', gap: 12 }}>
                       <div style={{ width: 38, height: 38, borderRadius: 10, background: '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -266,7 +271,8 @@ export default function JudgementsPage() {
                     {OUTCOMES.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </Field>
-                <Field label="Summary"><textarea value={summary} onChange={(e) => setSummary(e.target.value)} style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} /></Field>
+                <Field label="Summary (held)"><textarea value={summary} onChange={(e) => setSummary(e.target.value)} style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} /></Field>
+                <Field label="Reasoning"><textarea value={reasoning} onChange={(e) => setReasoning(e.target.value)} style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} placeholder="Why the court held what it held…" /></Field>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <div style={{ flex: 1 }}><Field label="Relief (text)"><input value={reliefText} onChange={(e) => setReliefText(e.target.value)} style={inputStyle} placeholder="Suit dismissed with costs" /></Field></div>
                   <div style={{ flex: 1 }}><Field label="Relief amount (₹)"><input type="number" min="0" value={reliefAmount} onChange={(e) => setReliefAmount(e.target.value)} style={inputStyle} /></Field></div>
@@ -286,6 +292,8 @@ export default function JudgementsPage() {
             </div>
           </div>
         )}
+
+        {selected && <JudgementDetailModal judgement={selected} onClose={() => setSelected(null)} />}
       </div>
     </div>
   )
@@ -298,6 +306,78 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>{label}</div>
       {children}
+    </div>
+  )
+}
+
+function GridCell({ label, value }: { label?: string; value?: React.ReactNode }) {
+  return (
+    <div style={{ background: '#FBF7EE', padding: '12px 14px' }}>
+      {label && <div style={{ fontSize: 10.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em' }}>{label}</div>}
+      {value != null && <div style={{ fontSize: 13.5, fontWeight: 700, color: '#2A2118', marginTop: 4 }}>{value}</div>}
+    </div>
+  )
+}
+
+function JudgementDetailModal({ judgement: j, onClose }: { judgement: JudgementSummary; onClose: () => void }) {
+  const [color, bg] = OUTCOME_STYLE[j.outcome]
+  const timeToJudgement = j.filing_date ? `${Math.round(monthsBetween(j.filing_date, j.judgement_date))} months` : '—'
+  const relief = j.relief_amount != null ? money(j.relief_amount) : (j.relief_text ?? '—')
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }} onClick={onClose}>
+      <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 24, width: 620, maxHeight: '86vh', overflowY: 'auto', boxShadow: '0 20px 48px rgba(0,0,0,.2)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 11, background: '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon name="gavel" size={19} color={PRIMARY} />
+            </div>
+            <div>
+              <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 17, fontWeight: 700, color: '#2A2118' }}>{j.case_title ?? j.case_number ?? 'Untitled matter'}</div>
+              <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{j.citation} · Pronounced {formatDate(j.judgement_date)}</div>
+            </div>
+          </div>
+          <span className={styles.statusBadge} style={{ color, background: bg, whiteSpace: 'nowrap' }}>{j.outcome}</span>
+        </div>
+
+        <div style={{ borderTop: '1px solid #F1E9D9', marginTop: 16, paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>Held</div>
+            <div style={{ fontSize: 13.5, color: '#3D3126', lineHeight: 1.5 }}>{j.summary}</div>
+          </div>
+          {j.reasoning && (
+            <div>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>Reasoning</div>
+              <div style={{ fontSize: 13.5, color: '#3D3126', lineHeight: 1.5 }}>{j.reasoning}</div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: '#E7DCC6', border: '1px solid #E7DCC6', borderRadius: 12, overflow: 'hidden', marginTop: 16 }}>
+          <GridCell label="Citation" value={j.citation} />
+          <GridCell label="Court" value={j.court} />
+          <GridCell label="Bench" value={j.bench} />
+          <GridCell label="Pronounced" value={formatDate(j.judgement_date)} />
+          <GridCell label="Case Number" value={j.case_number ?? '—'} />
+          <GridCell label="Client" value={j.client_name ?? '—'} />
+          <GridCell label="Matter Type" value={j.matter_type ?? '—'} />
+          <GridCell label="Relief" value={relief} />
+          <GridCell label="Time to Judgement" value={timeToJudgement} />
+          <GridCell label="Appeal Status" value={j.appeal_status ?? '—'} />
+          <GridCell />
+          <GridCell />
+        </div>
+
+        {j.tags && j.tags.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 16 }}>
+            {j.tags.map((t) => <span key={t} className={styles.ghostChip} style={{ fontSize: 11.5, padding: '4px 10px' }}>{t}</span>)}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #F1E9D9', marginTop: 20, paddingTop: 16 }}>
+          <div className={styles.primaryChip} onClick={onClose}>Close</div>
+        </div>
+      </div>
     </div>
   )
 }

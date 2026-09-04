@@ -185,6 +185,8 @@ export interface JudgementSummary {
   case_id: number
   case_number: string | null
   case_title: string | null
+  client_name: string | null
+  matter_type: string | null
   citation: string
   court: string
   bench: string
@@ -192,6 +194,7 @@ export interface JudgementSummary {
   filing_date: string | null
   outcome: JudgementOutcome
   summary: string
+  reasoning: string | null
   relief_text: string | null
   relief_amount: number | null
   appeal_status: string | null
@@ -206,6 +209,7 @@ export interface JudgementCreatePayload {
   judgement_date: string
   outcome: JudgementOutcome
   summary: string
+  reasoning?: string
   relief_text?: string
   relief_amount?: number
   appeal_status?: string

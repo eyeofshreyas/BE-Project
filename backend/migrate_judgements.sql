@@ -10,6 +10,7 @@ create table if not exists judgements (
   judgement_date date not null,
   outcome text not null check (outcome in ('Favourable', 'Partly Favourable', 'Against', 'Settled')),
   summary text not null,
+  reasoning text,
   relief_text text,
   relief_amount numeric,
   appeal_status text,
