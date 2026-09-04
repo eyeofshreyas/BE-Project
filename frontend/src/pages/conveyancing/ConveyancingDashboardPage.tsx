@@ -217,12 +217,13 @@ function StaffConveyancingView() {
     { label: 'Upcoming Appts', value: String(summary.stats.upcoming_appointments), icon: <CalendarIcon /> },
   ] : []
 
+  const matters = summary?.recent_matters ?? []
+  const conveyancingCaseIds = new Set(matters.map((m) => m.case_id).filter((id): id is number => id != null))
   const upcomingMeetings = [...meetings]
-    .filter((m) => new Date(m.meeting_date).getTime() >= Date.now())
+    .filter((m) => conveyancingCaseIds.has(m.case_id) && new Date(m.meeting_date).getTime() >= Date.now())
     .sort((a, b) => a.meeting_date.localeCompare(b.meeting_date))
     .slice(0, 5)
 
-  const matters = summary?.recent_matters ?? []
   const matterTypes = ['All', ...new Set([...MATTER_TYPE_OPTIONS, ...matters.map((m) => m.type)])]
   const matterStatuses = ['All', ...new Set(matters.map((m) => m.status))]
   const searchLower = search.toLowerCase()

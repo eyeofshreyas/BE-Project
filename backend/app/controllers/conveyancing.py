@@ -34,7 +34,7 @@ def _active_matter_lawyer(case_lawyers: list[dict]) -> str | None:
     return None
 
 COMPLETED_STATUSES = {"Completed", "Registered"}
-PENDING_STATUSES = {"Pending", "Registration Scheduled"}
+PENDING_STATUSES = {"Pending", "Registration Scheduled", "Documents Pending"}
 
 
 def conveyancing_summary(profile: dict = Depends(get_current_profile)):
