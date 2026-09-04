@@ -18,6 +18,7 @@ type NavDef = { label: string; icon: IconName; path?: string }
 
 const LAWYER_NAV: NavDef[] = [
   { label: 'Dashboard', icon: 'grid', path: '/dashboard' },
+  { label: 'Messages', icon: 'message-circle', path: '/messages' },
   { label: 'Conveyancing', icon: 'scale', path: '/conveyancing' },
   { label: 'Cases', icon: 'briefcase', path: '/cases' },
   { label: 'Clients', icon: 'users', path: '/clients' },
@@ -29,6 +30,7 @@ const LAWYER_NAV: NavDef[] = [
 
 const CLIENT_NAV: NavDef[] = [
   { label: 'Dashboard', icon: 'grid', path: '/dashboard' },
+  { label: 'Messages', icon: 'message-circle', path: '/messages' },
   { label: 'My Cases', icon: 'briefcase', path: '/cases' },
   { label: 'Conveyancing', icon: 'scale', path: '/conveyancing' },
   { label: 'Documents', icon: 'file-text', path: '/documents' },
