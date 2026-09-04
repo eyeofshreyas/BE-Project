@@ -34,6 +34,9 @@ import type {
   MatterCreated,
   MatterDetail,
   MatterDocumentSummary,
+  ConversationSummary,
+  ConversationDetail,
+  MessageSummary,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -316,4 +319,20 @@ export function listAllMeetings() {
 
 export function createMeeting(payload: { case_id: number; conducted_by: number; meeting_title: string; meeting_type?: string; meeting_date: string; agenda?: string }) {
   return post<MeetingSummary>('/meetings', payload)
+}
+
+export function listConversations() {
+  return get<ConversationSummary[]>('/messages/conversations')
+}
+
+export function getOrCreateConversation(otherPartyId: number) {
+  return post<ConversationSummary>('/messages/conversations', { other_party_id: otherPartyId })
+}
+
+export function getConversation(conversationId: number) {
+  return get<ConversationDetail>(`/messages/conversations/${conversationId}`)
+}
+
+export function sendMessage(conversationId: number, body: string) {
+  return post<MessageSummary>(`/messages/conversations/${conversationId}/messages`, { body })
 }

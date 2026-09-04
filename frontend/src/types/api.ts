@@ -353,3 +353,27 @@ export interface ClientRequestSummary {
   status: 'pending' | 'accepted' | 'declined'
   created_at: string
 }
+
+export interface MessageSummary {
+  id: number
+  conversation_id: number
+  sender_user_id: number
+  sender_name: string | null
+  body: string
+  created_at: string
+}
+
+export interface ConversationSummary {
+  id: number
+  other_party_name: string | null
+  other_party_role: 'lawyer' | 'client'
+  last_message: string | null
+  last_message_at: string | null
+}
+
+export interface ConversationDetail {
+  id: number
+  other_party_name: string | null
+  other_party_role: 'lawyer' | 'client'
+  messages: MessageSummary[]
+}
