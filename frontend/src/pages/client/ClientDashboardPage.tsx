@@ -110,8 +110,8 @@ export default function ClientDashboardPage() {
     try {
       const conversation = await getOrCreateConversation(lawyerId)
       navigate(`/messages/${conversation.id}`)
-    } catch {
-      // ponytail: silent failure leaves the button clickable again; add a toast if this needs to be louder.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to open your conversation.')
     } finally {
       setMessaging(false)
     }

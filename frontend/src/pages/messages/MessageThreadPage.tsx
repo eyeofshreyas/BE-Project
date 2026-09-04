@@ -39,6 +39,8 @@ export default function MessageThreadPage() {
   useEffect(() => {
     if (!conversationId) return
     let cancelled = false
+    setConversation(null)
+    setError('')
     function load() {
       getConversation(Number(conversationId))
         .then((c) => {
@@ -73,6 +75,7 @@ export default function MessageThreadPage() {
       setError('')
       setConversation((prev) => (prev ? { ...prev, messages: [...prev.messages, message] } : prev))
     } catch (err) {
+      setDraft(body)
       setError(err instanceof Error ? err.message : 'Failed to send your message.')
     } finally {
       setSending(false)
