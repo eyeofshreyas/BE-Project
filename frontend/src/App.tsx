@@ -13,6 +13,7 @@ import CreateCasePage from './pages/cases/CreateCasePage'
 import DocumentsListPage from './pages/documents/DocumentsListPage'
 import BillingPage from './pages/billing/BillingPage'
 import RecordPaymentPage from './pages/billing/RecordPaymentPage'
+import GenerateInvoicePage from './pages/billing/GenerateInvoicePage'
 import HearingsPage from './pages/hearings/HearingsPage'
 import ClientsPage from './pages/clients/ClientsPage'
 import CreateClientPage from './pages/clients/CreateClientPage'
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/cases" element={<ProtectedRoute><AppLayout><CasesListPage /></AppLayout></ProtectedRoute>} />
         <Route path="/documents" element={<ProtectedRoute><AppLayout><DocumentsListPage /></AppLayout></ProtectedRoute>} />
         <Route path="/billing" element={<ProtectedRoute><AppLayout><BillingPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/billing/invoices/generate" element={<ProtectedRoute><AppLayout><GenerateInvoicePage /></AppLayout></ProtectedRoute>} />
         <Route path="/billing/invoices/:invoiceId/record-payment" element={<ProtectedRoute><AppLayout><RecordPaymentPage /></AppLayout></ProtectedRoute>} />
         <Route path="/hearings" element={<ProtectedRoute><AppLayout><HearingsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/clients/new" element={<ProtectedRoute><AppLayout><CreateClientPage /></AppLayout></ProtectedRoute>} />

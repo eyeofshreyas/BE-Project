@@ -1,8 +1,8 @@
 /** `/billing` route: role-dispatches to a lawyer-facing management view (`StaffBillingView`) or a read-only client view (`ClientInvoicesView`). */
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { listInvoices, createInvoice, sendInvoiceReminder, listCases, listInvoicePayments } from '../../api/client'
-import type { InvoiceSummary, CaseSummary, PaymentSummary, UserProfile } from '../../types/api'
+import { listInvoices, sendInvoiceReminder, listInvoicePayments } from '../../api/client'
+import type { InvoiceSummary, PaymentSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { formatDate } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
@@ -62,11 +62,11 @@ export default function BillingPage() {
 }
 
 /**
- * Lawyer/admin invoice management: loads invoices via `listInvoices()`
- * (and cases via `listCases()` for the generate-invoice form), with
- * search/status/time filtering, invoice creation (`createInvoice()`),
- * payment recording via `/billing/invoices/:invoiceId/record-payment`, and
- * reminders (`sendInvoiceReminder()`). Non-lawyers see the table read-only.
+ * Lawyer/admin invoice management: loads invoices via `listInvoices()`, with
+ * search/status/time filtering, invoice generation via the dedicated
+ * `/billing/invoices/generate` page, payment recording via
+ * `/billing/invoices/:invoiceId/record-payment`, and reminders
+ * (`sendInvoiceReminder()`). Non-lawyers see the table read-only.
  */
 function StaffBillingView() {
   const navigate = useNavigate()
@@ -74,7 +74,6 @@ function StaffBillingView() {
   const profile = loadProfile()
   const canManage = profile?.role_id === LAWYER
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([])
-  const [cases, setCases] = useState<CaseSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
@@ -82,20 +81,10 @@ function StaffBillingView() {
   const [timeFilter, setTimeFilter] = useState<(typeof TIME_FILTERS)[number]>('All Time')
   const [toast, setToast] = useState<string | null>((location.state as { toast?: string } | null)?.toast ?? null)
 
-  const [genOpen, setGenOpen] = useState(false)
-  const [genCaseId, setGenCaseId] = useState('')
-  const [genInvoiceNumber, setGenInvoiceNumber] = useState('')
-  const [genAmount, setGenAmount] = useState('')
-  const [genTax, setGenTax] = useState('')
-  const [genDueDate, setGenDueDate] = useState('')
-  const [genError, setGenError] = useState('')
-  const [saving, setSaving] = useState(false)
-
   const [remindingId, setRemindingId] = useState<number | null>(null)
 
   useEffect(() => {
     refresh()
-    if (canManage) listCases().then(setCases).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -117,45 +106,6 @@ function StaffBillingView() {
     setToast(msg)
     setTimeout(() => setToast(null), 2200)
   }
-
-  function openGenerate() {
-    setGenOpen(true)
-    setGenCaseId('')
-    setGenInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`)
-    setGenAmount('')
-    setGenTax('')
-    setGenDueDate('')
-    setGenError('')
-  }
-
-  async function submitGenerate() {
-    const amount = Number(genAmount)
-    const tax = genTax ? Number(genTax) : 0
-    if (!genCaseId) { setGenError('Choose a case.'); return }
-    if (!genInvoiceNumber.trim()) { setGenError('Enter an invoice number.'); return }
-    if (!amount || amount <= 0) { setGenError('Enter a valid amount.'); return }
-    setSaving(true)
-    setGenError('')
-    try {
-      const created = await createInvoice({
-        case_id: Number(genCaseId),
-        invoice_number: genInvoiceNumber.trim(),
-        amount,
-        tax,
-        total_amount: amount + tax,
-        issue_date: new Date().toISOString().slice(0, 10),
-        due_date: genDueDate || undefined,
-      })
-      setInvoices((prev) => [created, ...prev])
-      setGenOpen(false)
-      showToast('Invoice generated.')
-    } catch (err) {
-      setGenError(err instanceof Error ? err.message : 'Failed to generate invoice.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
 
   async function remind(inv: InvoiceSummary) {
     setRemindingId(inv.id)
@@ -195,7 +145,7 @@ function StaffBillingView() {
             <div className={styles.title}>{canManage ? 'Billing & Invoices' : 'Invoices'}</div>
             <div className={styles.subtitle}>{canManage ? 'Track professional fees, GST and collections across every client engagement.' : 'Your invoices and payment status.'}</div>
           </div>
-          {canManage && <div className={styles.primaryChip} onClick={openGenerate}>+ Generate Invoice</div>}
+          {canManage && <div className={styles.primaryChip} onClick={() => navigate('/billing/invoices/generate')}>+ Generate Invoice</div>}
         </div>
 
         <div className={styles.statCards}>
@@ -313,51 +263,6 @@ function StaffBillingView() {
         )}
 
         {toast && <div className={styles.toast}>{toast}</div>}
-
-        {genOpen && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={() => setGenOpen(false)}>
-            <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 24, width: 380, boxShadow: '0 20px 48px rgba(0,0,0,.2)' }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 16, fontWeight: 700, color: '#2A2118', marginBottom: 16 }}>Generate Invoice</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Case</div>
-                  <select value={genCaseId} onChange={(e) => setGenCaseId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
-                    <option value="">Select a case…</option>
-                    {cases.map((c) => <option key={c.case_id} value={c.case_id}>{c.id} — {c.client ?? 'No client'}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Invoice number</div>
-                  <input value={genInvoiceNumber} onChange={(e) => setGenInvoiceNumber(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }} />
-                </div>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Fees</div>
-                    <input type="number" min="0" value={genAmount} onChange={(e) => setGenAmount(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Tax</div>
-                    <input type="number" min="0" value={genTax} onChange={(e) => setGenTax(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }} />
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Due date (optional)</div>
-                  <input type="date" value={genDueDate} onChange={(e) => setGenDueDate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }} />
-                </div>
-
-                {genError && <div style={{ fontSize: 12.5, color: '#B05C5C' }}>{genError}</div>}
-
-                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                  <div className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center' }} onClick={() => setGenOpen(false)}>Cancel</div>
-                  <div className={styles.primaryChip} style={{ flex: 1, justifyContent: 'center', opacity: saving ? 0.7 : 1, pointerEvents: saving ? 'none' : 'auto' }} onClick={submitGenerate}>
-                    {saving ? 'Generating…' : 'Generate'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   )

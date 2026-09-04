@@ -230,7 +230,7 @@ export function getInvoice(invoiceId: number) {
   return get<InvoiceSummary>(`/billing/invoices/${invoiceId}`)
 }
 
-export function createInvoice(payload: { case_id: number; invoice_number: string; amount: number; tax?: number; total_amount: number; issue_date: string; due_date?: string }) {
+export function createInvoice(payload: { case_id: number; invoice_number: string; amount: number; tax?: number; total_amount: number; issue_date: string; due_date?: string; remarks?: string }) {
   return post<InvoiceSummary>('/billing/invoices', payload)
 }
 
