@@ -49,6 +49,7 @@ export default function GenerateInvoicePage() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [invoiceNumber] = useState(() => `INV-${Date.now().toString().slice(-6)}`)
 
   useEffect(() => {
     listClients().then(setClients).catch(() => {})
@@ -110,7 +111,7 @@ export default function GenerateInvoicePage() {
     try {
       await createInvoice({
         case_id: selectedCase.case_id,
-        invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+        invoice_number: invoiceNumber,
         amount: afterDiscount,
         tax: gstAmt,
         total_amount: totalDue,
@@ -263,11 +264,11 @@ export default function GenerateInvoicePage() {
                   <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 17, fontWeight: 700, color: '#2A2118' }}>LexFlow</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, letterSpacing: '.05em' }}>INVOICE</div>
                 </div>
-                <div style={{ fontSize: 11.5, color: PRIMARY, fontWeight: 600, marginTop: 2 }}>Kulkarni &amp; Associates</div>
-                <div style={{ fontSize: 11, color: MUTED }}>14 Fort Chambers, Mumbai 400001</div>
-                <div style={{ fontSize: 11, color: MUTED }}>billing@lexflow.in</div>
+                <div style={{ fontSize: 11.5, color: PRIMARY, fontWeight: 600, marginTop: 2 }}>{selectedCase?.lawyer ?? 'No lawyer assigned'}</div>
+                <div style={{ fontSize: 11, color: MUTED }}>{selectedCase?.lawyer_phone ?? '—'}</div>
+                <div style={{ fontSize: 11, color: MUTED }}>{selectedCase?.lawyer_email ?? '—'}</div>
                 <div style={{ fontSize: 10.5, color: MUTED, textAlign: 'right', marginTop: -34 }}>
-                  <div>{`INV-${new Date(invoiceDate).getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}`}</div>
+                  <div>{invoiceNumber}</div>
                   <div>{formatDate(invoiceDate)}</div>
                 </div>
 
