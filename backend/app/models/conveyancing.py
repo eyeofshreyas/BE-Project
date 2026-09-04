@@ -100,6 +100,7 @@ class MatterDocument(BaseModel):
     matter_document_id: int
     document_id: int
     file_name: str | None
+    mime_type: str | None
     is_required: bool
     is_verified: bool
     verified_by: str | None
@@ -135,6 +136,7 @@ class MatterDetail(BaseModel):
     registration_status: str | None
     completion_percentage: int
     expected_completion_date: str | None
+    created_at: str | None
     property: Property | None
     due_diligence: DueDiligence | None
     progress: list[ProgressStage]

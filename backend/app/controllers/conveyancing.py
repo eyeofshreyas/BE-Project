@@ -195,12 +195,13 @@ def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profil
         lawyer = reg.get("lawyers")
         registration = {**reg, "registered_by": lawyer["users"]["full_name"] if lawyer else None}
 
-    doc_rows = supabase.table("matter_documents").select("*,documents(file_name),lawyers(users(full_name))").eq("matter_id", matter_id).execute().data
+    doc_rows = supabase.table("matter_documents").select("*,documents(file_name,mime_type),lawyers(users(full_name))").eq("matter_id", matter_id).execute().data
     documents = [
         {
             "matter_document_id": d["matter_document_id"],
             "document_id": d["document_id"],
             "file_name": d["documents"]["file_name"] if d.get("documents") else None,
+            "mime_type": d["documents"]["mime_type"] if d.get("documents") else None,
             "is_required": d["is_required"],
             "is_verified": d["is_verified"],
             "verified_by": d["lawyers"]["users"]["full_name"] if d.get("lawyers") else None,
@@ -216,6 +217,7 @@ def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profil
         "registration_status": matter["registration_status"],
         "completion_percentage": matter["completion_percentage"],
         "expected_completion_date": matter["expected_completion_date"],
+        "created_at": matter.get("created_at"),
         "property": property_,
         "due_diligence": due_diligence,
         "progress": progress,

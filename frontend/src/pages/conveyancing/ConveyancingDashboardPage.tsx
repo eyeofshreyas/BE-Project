@@ -1,9 +1,10 @@
 /** `/conveyancing` route: role-dispatches to `StaffConveyancingView` (lawyer/admin) or `ClientConveyancingView`, both driven by `getConveyancingSummary()`. */
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { getConveyancingSummary, listAllMeetings } from '../../api/client'
-import type { ConveyancingSummary, MeetingSummary, UserProfile } from '../../types/api'
+import { getConveyancingSummary, listAllMeetings, getMatterDetail, getDocumentDownloadUrl } from '../../api/client'
+import type { ConveyancingSummary, MeetingSummary, UserProfile, MatterDetail } from '../../types/api'
 import { Icon } from '../../components/icons'
+import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from './ConveyancingDashboardPage.module.css'
 
@@ -492,10 +493,10 @@ function StaffConveyancingView() {
 
 /** Client's own conveyancing matters: loads `getConveyancingSummary()` and renders stat cards + a read-only matters table (row links to `/cases/:caseId` when linked). */
 function ClientConveyancingView() {
-  const navigate = useNavigate()
   const [summary, setSummary] = useState<ConveyancingSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedMatterId, setSelectedMatterId] = useState<number | null>(null)
 
   useEffect(() => {
     getConveyancingSummary()
@@ -567,11 +568,7 @@ function ClientConveyancingView() {
                         <td className={styles.td}>{m.lawyer ?? '—'}</td>
                         <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{m.status}</span></td>
                         <td className={styles.td}>
-                          {m.case_id ? (
-                            <span className={styles.viewAll} onClick={() => navigate(`/cases/${m.case_id}`)}>View Details</span>
-                          ) : (
-                            <span style={{ color: MUTED, fontSize: 12.5 }}>—</span>
-                          )}
+                          <span className={styles.viewAll} onClick={() => setSelectedMatterId(m.matter_id)}>View Details</span>
                         </td>
                       </tr>
                     )
@@ -585,6 +582,167 @@ function ClientConveyancingView() {
           </>
         )}
       </div>
+
+      {selectedMatterId != null && (
+        <MatterDetailModal matterId={selectedMatterId} onClose={() => setSelectedMatterId(null)} />
+      )}
+    </div>
+  )
+}
+
+/** Builds the Overview description from real matter/property/progress fields -- there's no free-text description column, so this reads as one. */
+function matterDescription(m: MatterDetail): string {
+  if (!m.property) return `${m.transaction_type ?? m.matter_type ?? 'Matter'} in progress.`
+  const kind = m.property.property_type ? `${m.property.property_type.toLowerCase()} ` : ''
+  const place = [m.property.address, m.property.city].filter(Boolean).join(', ')
+  const base = `${m.transaction_type ?? m.matter_type ?? 'Transaction'} of ${kind}property at ${place}.`
+  const next = m.progress.find((s) => !s.completed)
+  const tail = next ? ` Currently in the ${next.stage_name} stage.` : m.progress.length > 0 ? ' Registration complete.' : ''
+  return base + tail
+}
+
+function formatArea(property: MatterDetail['property']) {
+  const value = property?.builtup_area ?? property?.land_area
+  return value != null ? `${value.toLocaleString()} sq ft` : '—'
+}
+
+/**
+ * Read-only "View Details" popup opened from a client's conveyancing matter row.
+ * Loads full detail via `getMatterDetail()`: overview, property, registration-progress
+ * stepper, and shared documents (preview/download via the existing document endpoints).
+ * Uploading a requested document isn't wired up yet -- see the disabled button below.
+ */
+function MatterDetailModal({ matterId, onClose }: { matterId: number; onClose: () => void }) {
+  const [matter, setMatter] = useState<MatterDetail | null>(null)
+  const [error, setError] = useState('')
+  const [previewDoc, setPreviewDoc] = useState<{ id: number; fileName: string; mimeType: string } | null>(null)
+
+  useEffect(() => {
+    getMatterDetail(matterId)
+      .then(setMatter)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load this matter.'))
+  }, [matterId])
+
+  async function downloadDoc(documentId: number) {
+    const tab = window.open('', '_blank')
+    try {
+      const { url } = await getDocumentDownloadUrl(documentId)
+      if (tab) tab.location.href = url
+    } catch {
+      tab?.close()
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24 }} onClick={onClose}>
+      <div style={{ background: '#FCF9F3', borderRadius: 18, width: 'min(880px, 100%)', maxHeight: '90vh', overflowY: 'auto', padding: 26, boxShadow: '0 20px 48px rgba(0,0,0,.3)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 19, fontWeight: 700, color: '#2A2118' }}>
+            Matter Details{matter ? `: ${matter.matter_number}` : ''}
+          </div>
+          <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={18} color={MUTED} /></span>
+        </div>
+
+        {!matter && !error && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading matter…</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+
+        {matter && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div className={styles.panelCard}>
+                <div className={styles.panelTitle}>Overview</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em' }}>Description</div>
+                <div style={{ fontSize: 13.5, color: '#2A2118', marginTop: 6, lineHeight: 1.5 }}>{matterDescription(matter)}</div>
+                <div style={{ display: 'flex', gap: 24, marginTop: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em' }}>Initiated</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118', marginTop: 4 }}>{matter.created_at ? formatDate(matter.created_at) : '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em' }}>Target Completion</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118', marginTop: 4 }}>{matter.expected_completion_date ? formatDate(matter.expected_completion_date) : '—'}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.panelCard}>
+                <div className={styles.panelTitle}>Property Details</div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {([
+                    ['Type', matter.property?.property_type ?? '—'],
+                    ['Survey No.', matter.property?.survey_number ?? '—'],
+                    ['Area', formatArea(matter.property)],
+                  ] as [string, string][]).map(([label, value]) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid #F1E9D9', fontSize: 13.5 }}>
+                      <div style={{ color: MUTED }}>{label}</div>
+                      <div style={{ fontWeight: 700, color: '#2A2118' }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div className={styles.panelCard}>
+                <div className={styles.panelTitle}>Registration Progress</div>
+                <div className={styles.timeline}>
+                  {matter.progress.map((s) => (
+                    <div key={s.progress_id} className={styles.timelineItem}>
+                      <span className={styles.timelineDot} style={{ background: s.completed ? PRIMARY_DARK : '#FFFFFF', border: `2px solid ${PRIMARY_DARK}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {s.completed && <Icon name="check-circle" size={9} color="#FFFFFF" strokeWidth={3} />}
+                      </span>
+                      <div className={styles.timelineTitle} style={{ fontWeight: 700 }}>{s.stage_name}</div>
+                      <div className={styles.timelineMeta}>{s.completed ? (s.completed_at ? formatDate(s.completed_at) : 'Completed') : 'Pending'}</div>
+                    </div>
+                  ))}
+                  {matter.progress.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No progress stages yet.</div>}
+                </div>
+              </div>
+
+              <div className={styles.panelCard}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+                  <div className={styles.panelTitle} style={{ marginBottom: 0 }}>Shared Documents</div>
+                  <div className={styles.primaryChip} style={{ opacity: .5, cursor: 'default' }} title="Uploading requested documents is coming soon">
+                    <Icon name="upload-cloud" size={15} color="#FFFFFF" /> Upload Requested Document
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {matter.documents.map((d) => (
+                    <div key={d.matter_document_id} style={{ padding: '10px 14px', border: '1px solid #E7DCC6', borderRadius: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Icon name="file-text" size={17} color={MUTED} />
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>{d.file_name ?? 'Document'}</div>
+                        <span className={styles.statusBadge} style={d.is_verified ? { color: '#2E9E58', background: '#E4F5EA' } : { color: '#B87F1E', background: '#FFF2E0' }}>
+                          {d.is_verified ? 'Verified' : d.is_required ? 'Required' : 'Pending'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
+                        <span
+                          style={{ fontSize: 12.5, fontWeight: 600, color: '#B08D3E', cursor: 'pointer' }}
+                          onClick={() => (d.mime_type && isPreviewable(d.mime_type) ? setPreviewDoc({ id: d.document_id, fileName: d.file_name ?? 'Document', mimeType: d.mime_type }) : downloadDoc(d.document_id))}
+                        >
+                          Preview
+                        </span>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#B08D3E', cursor: 'pointer' }} onClick={() => downloadDoc(d.document_id)}>Download</span>
+                      </div>
+                    </div>
+                  ))}
+                  {matter.documents.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No shared documents yet.</div>}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {previewDoc && (
+        <DocumentPreviewModal
+          documentId={previewDoc.id}
+          fileName={previewDoc.fileName}
+          mimeType={previewDoc.mimeType}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
     </div>
   )
 }

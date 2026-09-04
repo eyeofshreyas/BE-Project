@@ -112,6 +112,52 @@ export interface MatterCreated {
   matter_number: string
 }
 
+export interface MatterProperty {
+  property_id: number
+  property_name: string
+  address: string
+  city: string | null
+  state: string | null
+  property_type: string | null
+  survey_number: string | null
+  market_value: number | null
+  land_area: number | null
+  builtup_area: number | null
+}
+
+export interface MatterProgressStage {
+  progress_id: number
+  stage_name: string
+  stage_order: number
+  completed: boolean
+  completed_at: string | null
+  remarks: string | null
+}
+
+export interface MatterDocumentSummary {
+  matter_document_id: number
+  document_id: number
+  file_name: string | null
+  mime_type: string | null
+  is_required: boolean
+  is_verified: boolean
+  verified_by: string | null
+}
+
+export interface MatterDetail {
+  matter_id: number
+  matter_number: string
+  matter_type: string | null
+  transaction_type: string | null
+  registration_status: string | null
+  completion_percentage: number
+  expected_completion_date: string | null
+  created_at: string | null
+  property: MatterProperty | null
+  progress: MatterProgressStage[]
+  documents: MatterDocumentSummary[]
+}
+
 export interface ConveyancingSummary {
   stats: {
     active_matters: number
