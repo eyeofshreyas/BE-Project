@@ -17,6 +17,10 @@ const STATUS_STYLE_MAP: Record<string, [string, string]> = {
   Pending: ['#B87F1E', '#FFF2E0'],
 }
 const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
+const STATUS_LABELS: Record<string, string> = { Open: 'Active' }
+function statusLabel(s: string) {
+  return STATUS_LABELS[s] ?? s
+}
 const FILTERS = ['All', 'Active', 'Pending', 'Closed']
 const ACTIVE_STATUSES = new Set(['Open', 'In Progress'])
 
@@ -159,7 +163,6 @@ function StaffCasesView() {
  * progress-bar card per case.
  */
 function ClientCasesView() {
-  const navigate = useNavigate()
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [hearings, setHearings] = useState<HearingSummary[]>([])
   const [updates, setUpdates] = useState<TimelineEvent[]>([])
@@ -167,6 +170,7 @@ function ClientCasesView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [selectedCase, setSelectedCase] = useState<CaseSummary | null>(null)
 
   useEffect(() => {
     Promise.all([listCases(), listHearings()])
@@ -276,7 +280,7 @@ function ClientCasesView() {
                             {latestByCase[c.case_id].event_title}
                           </div>
                         ) : <div />}
-                        <div className={styles.darkBtn} onClick={() => navigate(`/cases/${c.case_id}`)}>View Details →</div>
+                        <div className={styles.darkBtn} onClick={() => setSelectedCase(c)}>View Details →</div>
                       </div>
                     </div>
                   )
@@ -307,6 +311,63 @@ function ClientCasesView() {
             </div>
           </>
         )}
+      </div>
+
+      {selectedCase && (
+        <CaseDetailModal
+          caseInfo={selectedCase}
+          latestActivity={latestByCase[selectedCase.case_id]}
+          onClose={() => setSelectedCase(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+/** Lightweight read-only "View Details" popup opened from a client's case card -- not the full `/cases/:caseId` page (that's the lawyer-facing management view). */
+function CaseDetailModal({ caseInfo, latestActivity, onClose }: { caseInfo: CaseSummary; latestActivity?: TimelineEvent; onClose: () => void }) {
+  const [color, bg] = STATUS_STYLE_MAP[caseInfo.status] || DEFAULT_STATUS_STYLE
+  const pct = STATUS_PROGRESS[caseInfo.status] ?? 50
+  const rows: [string, string][] = [
+    ['Court', caseInfo.court ?? '—'],
+    ['Lead Lawyer', caseInfo.lawyer ?? '—'],
+    ['Filed On', caseInfo.filing_date ? formatDate(caseInfo.filing_date) : '—'],
+    ['Next Hearing', caseInfo.hearing ? formatDate(caseInfo.hearing) : '—'],
+  ]
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24 }} onClick={onClose}>
+      <div style={{ background: '#FFFFFF', borderRadius: 18, width: 'min(440px, 100%)', padding: 26, boxShadow: '0 20px 48px rgba(0,0,0,.3)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#B08D3E', fontWeight: 600 }}>{caseInfo.id}</div>
+          <span className={styles.statusBadge} style={{ color, background: bg, flexShrink: 0 }}>{statusLabel(caseInfo.status)}</span>
+        </div>
+        <div style={{ fontSize: 19, fontWeight: 700, color: '#2A2118', marginTop: 4 }}>{caseInfo.case_title ?? caseInfo.id}</div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 20 }}>
+          {rows.map(([label, value]) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13.5 }}>
+              <div style={{ color: MUTED }}>{label}</div>
+              <div style={{ fontWeight: 600, color: '#2A2118' }}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em', fontWeight: 700 }}>
+            <span>Progress</span><span>{pct}%</span>
+          </div>
+          <div className={styles.progressTrack} style={{ marginTop: 8 }}><div className={styles.progressFill} style={{ width: `${pct}%` }} /></div>
+        </div>
+
+        {latestActivity && (
+          <div style={{ fontSize: 12.5, color: MUTED, display: 'flex', alignItems: 'center', gap: 6, marginTop: 14 }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#B08D3E', flexShrink: 0 }} />
+            {latestActivity.event_title}
+          </div>
+        )}
+
+        <div className={styles.darkBtn} style={{ justifyContent: 'center', width: '100%', marginTop: 22, padding: '11px 0' }} onClick={onClose}>Close</div>
       </div>
     </div>
   )
