@@ -1,7 +1,7 @@
 /** `/conveyancing` route: role-dispatches to `StaffConveyancingView` (lawyer/admin) or `ClientConveyancingView`, both driven by `getConveyancingSummary()`. */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { getConveyancingSummary, listAllMeetings, getMatterDetail, getDocumentDownloadUrl } from '../../api/client'
+import { getConveyancingSummary, listAllMeetings, getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument } from '../../api/client'
 import type { ConveyancingSummary, MeetingSummary, UserProfile, MatterDetail } from '../../types/api'
 import { Icon } from '../../components/icons'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
@@ -607,21 +607,40 @@ function formatArea(property: MatterDetail['property']) {
 }
 
 /**
- * Read-only "View Details" popup opened from a client's conveyancing matter row.
- * Loads full detail via `getMatterDetail()`: overview, property, registration-progress
- * stepper, and shared documents (preview/download via the existing document endpoints).
- * Uploading a requested document isn't wired up yet -- see the disabled button below.
+ * "View Details" popup opened from a client's conveyancing matter row. Loads full detail
+ * via `getMatterDetail()`: overview, property, registration-progress stepper, and shared
+ * documents (preview/download via the existing document endpoints, upload via
+ * `uploadMatterDocument()` -- appends the new doc to `matter.documents` on success).
  */
 function MatterDetailModal({ matterId, onClose }: { matterId: number; onClose: () => void }) {
   const [matter, setMatter] = useState<MatterDetail | null>(null)
   const [error, setError] = useState('')
   const [previewDoc, setPreviewDoc] = useState<{ id: number; fileName: string; mimeType: string } | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     getMatterDetail(matterId)
       .then(setMatter)
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load this matter.'))
   }, [matterId])
+
+  async function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploading(true)
+    setUploadError('')
+    try {
+      const created = await uploadMatterDocument(matterId, file)
+      setMatter((prev) => (prev ? { ...prev, documents: [...prev.documents, created] } : prev))
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Failed to upload document.')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   async function downloadDoc(documentId: number) {
     const tab = window.open('', '_blank')
@@ -702,10 +721,12 @@ function MatterDetailModal({ matterId, onClose }: { matterId: number; onClose: (
               <div className={styles.panelCard}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
                   <div className={styles.panelTitle} style={{ marginBottom: 0 }}>Shared Documents</div>
-                  <div className={styles.primaryChip} style={{ opacity: .5, cursor: 'default' }} title="Uploading requested documents is coming soon">
-                    <Icon name="upload-cloud" size={15} color="#FFFFFF" /> Upload Requested Document
+                  <div className={styles.primaryChip} style={{ opacity: uploading ? .6 : 1, cursor: uploading ? 'default' : 'pointer' }} onClick={() => !uploading && fileInputRef.current?.click()}>
+                    <Icon name="upload-cloud" size={15} color="#FFFFFF" /> {uploading ? 'Uploading…' : 'Upload Requested Document'}
                   </div>
+                  <input ref={fileInputRef} type="file" onChange={handleFileChosen} style={{ display: 'none' }} />
                 </div>
+                {uploadError && <div style={{ color: '#B05C5C', fontSize: 12.5, marginBottom: 10 }}>{uploadError}</div>}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {matter.documents.map((d) => (
                     <div key={d.matter_document_id} style={{ padding: '10px 14px', border: '1px solid #E7DCC6', borderRadius: 10 }}>

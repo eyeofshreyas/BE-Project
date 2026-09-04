@@ -1,10 +1,12 @@
 """Controllers for conveyancing (property transaction) matters: dashboard summary, matter
-detail, due-diligence updates, and registration progress."""
+detail, due-diligence updates, registration progress, and shared-document uploads."""
 
+import uuid
 from datetime import datetime, timezone
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, File, HTTPException, UploadFile
 from app.db.supabase_client import supabase
+from app.controllers.documents import DOCUMENTS_BUCKET
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.conveyancing import Stats, StatusCount, MatterSummary, ConveyancingSummary, Property, DueDiligence, DueDiligenceUpdate, ProgressStage, PropertyRegistration, MatterDocument, MatterDetail, MatterCreate
 
@@ -233,6 +235,55 @@ def _ensure_matter_access(matter_id: int, profile: dict) -> None:
     if not matter_rows:
         raise HTTPException(status_code=404, detail="Matter not found")
     ensure_case_access(matter_rows[0]["case_id"], profile)
+
+
+def upload_matter_document(
+    matter_id: int,
+    file: UploadFile = File(...),
+    profile: dict = Depends(get_current_profile),
+):
+    """Upload a file to Supabase Storage and attach it to a matter's Shared Documents list:
+    a `documents` row under the matter's case (client or lawyer -- same access rule as case
+    document uploads, see documents.upload_document) defaulting to the 'Contract' document
+    type since matter uploads have no type picker, plus a `matter_documents` link row.
+    Calls: `_ensure_matter_access()`."""
+    _ensure_matter_access(matter_id, profile)
+    case_id = supabase.table("conveyancing_matters").select("case_id").eq("matter_id", matter_id).execute().data[0]["case_id"]
+
+    content = file.file.read()
+    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
+    storage_path = f"case-{case_id}/{uuid.uuid4().hex}.{ext}"
+    supabase.storage.from_(DOCUMENTS_BUCKET).upload(
+        storage_path, content, {"content-type": file.content_type or "application/octet-stream"}
+    )
+
+    doc_type_rows = supabase.table("document_types").select("document_type_id").eq("type_name", "Contract").execute().data
+    doc_row = supabase.table("documents").insert({
+        "case_id": case_id,
+        "document_type_id": doc_type_rows[0]["document_type_id"] if doc_type_rows else None,
+        "uploaded_by": profile["user_id"],
+        "file_name": file.filename or storage_path,
+        "file_path": storage_path,
+        "file_size": len(content),
+        "mime_type": file.content_type,
+    }).execute().data[0]
+
+    link_row = supabase.table("matter_documents").insert({
+        "matter_id": matter_id,
+        "document_id": doc_row["document_id"],
+        "is_required": False,
+        "is_verified": False,
+    }).execute().data[0]
+
+    return {
+        "matter_document_id": link_row["matter_document_id"],
+        "document_id": doc_row["document_id"],
+        "file_name": doc_row["file_name"],
+        "mime_type": doc_row["mime_type"],
+        "is_required": link_row["is_required"],
+        "is_verified": link_row["is_verified"],
+        "verified_by": None,
+    }
 
 
 def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):

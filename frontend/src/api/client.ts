@@ -32,6 +32,7 @@ import type {
   MatterCreatePayload,
   MatterCreated,
   MatterDetail,
+  MatterDocumentSummary,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -145,6 +146,12 @@ export function createMatter(payload: MatterCreatePayload) {
 
 export function getMatterDetail(matterId: number) {
   return get<MatterDetail>(`/conveyancing/matters/${matterId}`)
+}
+
+export function uploadMatterDocument(matterId: number, file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return postForm<MatterDocumentSummary>(`/conveyancing/matters/${matterId}/documents`, formData)
 }
 
 export function listDocuments() {
