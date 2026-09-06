@@ -280,7 +280,7 @@ export default function MessagesPage() {
                           {g.dayLabel && <div className={styles.dayDivider}>{g.dayLabel}</div>}
                           <div className={`${styles.bubbleGroup} ${g.senderId === profile?.user_id ? styles.mine : styles.theirs}`}>
                             {g.messages.map((m) => (
-                              <div key={m.id} className={styles.bubble}>
+                              <div key={m.id} className={`${styles.bubble} ${m.attachment_url && !m.body ? styles.mediaOnly : ''}`}>
                                 {m.attachment_url && <Attachment message={m} />}
                                 {m.body}
                                 <span className={styles.bubbleTime}>{formatBubbleTime(m.created_at)}</span>

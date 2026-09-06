@@ -306,6 +306,43 @@
   color: rgba(255, 255, 255, .62);
 }
 
+/* An attachment sent without a caption is the message -- wrapping the image or the file
+   card in bubble chrome as well just boxes a box, and pushes the timestamp onto its own
+   line. Drop the chrome and let the attachment stand on its own. */
+/* Specificity note: `.bubbleGroup.mine .bubble` sets the fill with three classes, so this
+   has to match at least as tightly or the bubble keeps its background. */
+.bubbleGroup.mine .bubble.mediaOnly,
+.bubbleGroup.theirs .bubble.mediaOnly {
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.bubble.mediaOnly .attachmentMedia,
+.bubble.mediaOnly .attachmentFile {
+  margin-bottom: 3px;
+}
+
+/* With no caption text for the float to sit beside, it would ride up over the attachment
+   -- put the time on its own right-aligned line under it instead. */
+.bubble.mediaOnly .bubbleTime {
+  float: none;
+  display: block;
+  text-align: right;
+  margin: 0;
+}
+
+.bubbleGroup.mine .bubble.mediaOnly .attachmentFile {
+  background: #8f6743;
+  border-color: #8f6743;
+  color: #FFFFFF;
+}
+
+/* Without the brown bubble behind it, the white-on-brown timestamp would vanish. */
+.bubbleGroup.mine .bubble.mediaOnly .bubbleTime {
+  color: #A2916F;
+}
+
 .emptyThread {
   color: #8C7C5E;
   font-size: 13px;
