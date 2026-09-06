@@ -2,6 +2,7 @@
 threads, read one thread's messages, and post a new message. Every read/write is scoped to
 conversations the caller is a participant in -- see `_ensure_participant()`."""
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -18,6 +19,8 @@ MESSAGES_SELECT = (
     "id,conversation_id,sender_user_id,body,created_at,"
     "attachment_path,attachment_name,attachment_type,attachment_size,users(full_name)"
 )
+
+logger = logging.getLogger(__name__)
 
 # Attachments share the documents bucket rather than getting one of their own, so no extra
 # bucket has to be provisioned -- see migrate_message_reads_and_attachments.sql.
@@ -265,9 +268,15 @@ def send_message(
 
         ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
         storage_path = f"conversation-{conversation_id}/{uuid.uuid4().hex}.{ext}"
-        supabase.storage.from_(ATTACHMENTS_BUCKET).upload(
-            storage_path, content, {"content-type": file.content_type or "application/octet-stream"}
-        )
+        try:
+            supabase.storage.from_(ATTACHMENTS_BUCKET).upload(
+                storage_path, content, {"content-type": file.content_type or "application/octet-stream"}
+            )
+        except Exception as err:
+            # Storage rejecting the file is a bad request, not a server crash -- surface why
+            # so the composer can show it instead of a bare "failed to send".
+            logger.warning("Attachment upload failed for conversation %s: %s", conversation_id, err)
+            raise HTTPException(status_code=400, detail=f"Couldn't upload that file: {err}")
         record |= {
             "attachment_path": storage_path,
             "attachment_name": file.filename or storage_path,
