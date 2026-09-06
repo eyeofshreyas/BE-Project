@@ -34,10 +34,12 @@ Python 3.11 instead:
 
 Usage:
     python3 translate.py "text to translate" hin_Deva
+    python3 translate.py --self-check      # number-preservation asserts, no model load
 Target language codes (FLORES-200 style), a few common ones:
     hin_Deva (Hindi), mar_Deva (Marathi), tam_Taml (Tamil),
     tel_Telu (Telugu), ben_Beng (Bengali), guj_Gujr (Gujarati)
 """
+import re
 import sys
 
 import torch
@@ -63,6 +65,50 @@ def load_model():
     return model, tokenizer, ip
 
 
+def restore_numbers(source, translated):
+    """Copies the numbers in `source` over the numbers in `translated`, positionally.
+
+    IndicTrans2 (and InLegalTrans with it) corrupts digits: "Section 302" comes back as 303 in
+    4 of 6 target languages. In a legal summary that is not cosmetic -- IPC 302 and 303 are
+    different offences -- and the model gives no way to protect them, so the source numbers are
+    treated as ground truth and pasted back. Also covers dates, case numbers and amounts.
+    `\d` is Unicode-aware, so native-script digits (Devanagari, etc.) are matched too.
+
+    Raises ValueError if the counts differ -- then there is no safe positional mapping, and
+    failing is better than silently emitting the wrong section number."""
+    src_nums = re.findall(r"\d+", source)
+    out_nums = re.findall(r"\d+", translated)
+    if len(src_nums) != len(out_nums):
+        raise ValueError(
+            f"translation changed how many numbers there are ({len(src_nums)} in the source, "
+            f"{len(out_nums)} in the output); refusing to guess which number maps to which"
+        )
+    remaining = iter(src_nums)
+    return re.sub(r"\d+", lambda _: next(remaining), translated)
+
+
+def _self_check():
+    """Asserts restore_numbers() on the real observed failure plus its edge cases."""
+    # the actual bug: InLegalTrans renders "Section 302" as Marathi "कलम 303"
+    assert restore_numbers("under Section 302 of the IPC", "कलम 303 अन्वये") == "कलम 302 अन्वये"
+    # several numbers keep their order
+    assert restore_numbers("Section 302 on 5 March 2019", "धारा 303 ... 6 ... 2018") == "धारा 302 ... 5 ... 2019"
+    # correct translations are left alone
+    assert restore_numbers("Section 302", "धारा 302") == "धारा 302"
+    # no numbers at all is a no-op
+    assert restore_numbers("the appeal is allowed", "अपील मंजूर की जाती है") == "अपील मंजूर की जाती है"
+    # native-script digits are matched by \d too
+    assert restore_numbers("Section 302", "धारा ३०३") == "धारा 302"
+    # a dropped number is refused, not guessed
+    try:
+        restore_numbers("Sections 302 and 34", "धारा 303")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError on a number-count mismatch")
+    print("self-check OK")
+
+
 def translate(text, tgt_lang, model, tokenizer, ip):
     """Translates a single English text string (e.g. a case summary) into tgt_lang via beam search,
     using the model/tokenizer/processor returned by `load_model()`."""
@@ -77,10 +123,13 @@ def translate(text, tgt_lang, model, tokenizer, ip):
         )
 
     decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-    return ip.postprocess_batch(decoded, lang=tgt_lang)[0]
+    return restore_numbers(text, ip.postprocess_batch(decoded, lang=tgt_lang)[0])
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 2 and sys.argv[1] == "--self-check":
+        _self_check()
+        sys.exit(0)
     if len(sys.argv) < 3:
         print('Usage: python3 translate.py "text to translate" hin_Deva')
         sys.exit(1)
