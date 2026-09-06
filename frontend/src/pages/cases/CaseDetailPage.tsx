@@ -50,6 +50,10 @@ function loadProfile(): UserProfile | null {
   }
 }
 
+function initialsOf(name: string) {
+  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+}
+
 function formatDate(iso: string) {
   return formatDateWith(iso, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
@@ -461,11 +465,6 @@ export default function CaseDetailPage() {
               {canUploadDocs && (
                 <div className={styles.ghostChip} onClick={() => { setUploadFormOpen(true); documentsRef.current?.scrollIntoView({ behavior: 'smooth' }) }}><Icon name="file-text" size={15} /> Upload Docs</div>
               )}
-              {canMessage && caseInfo.client_id && (
-                <div className={styles.ghostChip} style={{ opacity: messaging ? 0.6 : 1 }} onClick={() => !messaging && messageClient()}>
-                  <Icon name="message-circle" size={15} /> {messaging ? 'Opening…' : 'Message Client'}
-                </div>
-              )}
               {canManage && (
                 <div className={styles.ghostChip} onClick={() => meetingsRef.current?.scrollIntoView({ behavior: 'smooth' })}><Icon name="calendar" size={15} /> Schedule Hearing</div>
               )}
@@ -476,6 +475,39 @@ export default function CaseDetailPage() {
           </div>
 
           <div className={styles.sideCol}>
+            {canMessage && caseInfo.client && (
+              <div className={styles.panelCard}>
+                <div className={styles.panelTitle}>Client</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: PRIMARY, color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                    {initialsOf(caseInfo.client)}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>{caseInfo.client}</div>
+                    <div style={{ fontSize: 11.5, color: MUTED }}>Client</div>
+                  </div>
+                </div>
+                {(caseInfo.client_email || caseInfo.client_phone) && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14, fontSize: 12.5, color: '#6A5C42' }}>
+                    {caseInfo.client_email && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Icon name="mail" size={14} color="#93826d" />{caseInfo.client_email}</div>}
+                    {caseInfo.client_phone && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Icon name="phone" size={14} color="#93826d" />{caseInfo.client_phone}</div>}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                  <div
+                    className={styles.darkBtn}
+                    style={{ flex: 1, justifyContent: 'center', opacity: messaging || !caseInfo.client_id ? 0.6 : 1, cursor: messaging || !caseInfo.client_id ? 'default' : 'pointer' }}
+                    onClick={() => !messaging && messageClient()}
+                  >
+                    <Icon name="message-circle" size={14} color="#FFFFFF" /> {messaging ? 'Opening…' : 'Message'}
+                  </div>
+                  {caseInfo.client_phone && (
+                    <a href={`tel:${caseInfo.client_phone}`} className={styles.darkBtn} style={{ flex: 1, justifyContent: 'center', background: '#FFFFFF', color: '#2A2118', border: '1px solid #E7DCC6', textDecoration: 'none' }}>Call</a>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div>
               <div className={styles.panelTitle}>Case Notes & Legal Observations</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1.5px solid #E7DCC6', borderRadius: 9, padding: '9px 12px', marginBottom: 10 }}>

@@ -36,6 +36,8 @@ export interface CaseSummary {
   created_at: string | null
   client: string | null
   client_id: number | null
+  client_email: string | null
+  client_phone: string | null
   lawyer_id: number | null
   lawyer: string | null
   lawyer_email: string | null
