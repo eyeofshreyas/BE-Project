@@ -6,7 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
-  unassignLawyer, getCaseAiSummary, generateCaseAiSummary,
+  unassignLawyer, getCaseAiSummary, generateCaseAiSummary, getOrCreateConversation,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
@@ -73,6 +73,7 @@ export default function CaseDetailPage() {
   const profile = loadProfile()
   const canManage = profile?.role_id === LAWYER || profile?.role_id === ADMIN
   const canAddNote = profile?.role_id === LAWYER
+  const canMessage = profile?.role_id === LAWYER
   const canUploadDocs = profile?.role_id === CLIENT || profile?.role_id === LAWYER
 
   const [caseInfo, setCaseInfo] = useState<CaseSummary | null>(null)
@@ -96,6 +97,7 @@ export default function CaseDetailPage() {
 
   const [statusSaving, setStatusSaving] = useState(false)
   const [unassigning, setUnassigning] = useState(false)
+  const [messaging, setMessaging] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
   const meetingsRef = useRef<HTMLDivElement>(null)
@@ -234,6 +236,19 @@ export default function CaseDetailPage() {
   function closeCase() {
     if (!window.confirm('Close this case?')) return
     updateStatus('Closed')
+  }
+
+  async function messageClient() {
+    if (!caseInfo?.client_id) return
+    setMessaging(true)
+    try {
+      const conversation = await getOrCreateConversation(caseInfo.client_id)
+      navigate(`/messages/${conversation.id}`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to open conversation.')
+    } finally {
+      setMessaging(false)
+    }
   }
 
   async function unassign() {
@@ -445,6 +460,11 @@ export default function CaseDetailPage() {
               </div>
               {canUploadDocs && (
                 <div className={styles.ghostChip} onClick={() => { setUploadFormOpen(true); documentsRef.current?.scrollIntoView({ behavior: 'smooth' }) }}><Icon name="file-text" size={15} /> Upload Docs</div>
+              )}
+              {canMessage && caseInfo.client_id && (
+                <div className={styles.ghostChip} style={{ opacity: messaging ? 0.6 : 1 }} onClick={() => !messaging && messageClient()}>
+                  <Icon name="message-circle" size={15} /> {messaging ? 'Opening…' : 'Message Client'}
+                </div>
               )}
               {canManage && (
                 <div className={styles.ghostChip} onClick={() => meetingsRef.current?.scrollIntoView({ behavior: 'smooth' })}><Icon name="calendar" size={15} /> Schedule Hearing</div>

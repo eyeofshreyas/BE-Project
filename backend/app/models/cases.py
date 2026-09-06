@@ -22,6 +22,7 @@ class CaseSummary(BaseModel):
     filing_date: str | None
     created_at: str | None
     client: str | None
+    client_id: int | None
     lawyer_id: int | None
     lawyer: str | None
     lawyer_email: str | None

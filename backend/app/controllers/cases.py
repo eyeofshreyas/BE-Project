@@ -9,6 +9,7 @@ from app.models.cases import CaseCreate, CaseSummary
 
 CASES_SELECT = (
     "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,description,"
+    "client_id,"
     "clients(users(full_name)),"
     "courts(court_name),"
     "case_types(case_type_name),"
@@ -35,6 +36,7 @@ def _to_case_summary(row: dict) -> dict:
         "filing_date": row["filing_date"],
         "created_at": row["created_at"],
         "client": row["clients"]["users"]["full_name"] if row["clients"] else None,
+        "client_id": row["client_id"],
         "lawyer": active_lawyer["lawyers"]["users"]["full_name"] if active_lawyer else None,
         "lawyer_id": active_lawyer["lawyer_id"] if active_lawyer else None,
         "lawyer_email": active_lawyer["lawyers"]["users"]["email"] if active_lawyer else None,
