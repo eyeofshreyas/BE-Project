@@ -51,70 +51,40 @@ graph LR
 
 ## 2. Backend Module Map
 
+Every domain is the same three files (`routes/` -> `controllers/` -> `models/`) and every
+controller talks to Supabase directly — the full per-domain file map is the table at the end
+of [`BACKEND_ARCHITECTURE.md`](./BACKEND_ARCHITECTURE.md). Drawing "controller reads/writes
+Postgres" 15 times says nothing, so only the edges that *aren't* that are drawn here.
+
 ```mermaid
-graph TD
-    subgraph AuthUsers["Auth / Users"]
-        auth["auth.py\nget_current_user, get_current_profile,\nrequire_roles, ensure_case_access"]
-        users["users.py\nGET /users, PATCH /users/:id/status"]
-        mainpy["main.py\nPOST /signup, /login, /forgot-password"]
-    end
-
-    subgraph CaseDomain["Cases / Billing / History"]
-        cases["cases.py\nGET/POST /cases, unassign-lawyer"]
-        billing["billing.py\ninvoices, payments, expenses,\nrazorpay-order / razorpay-verify"]
-        history["case_history.py\nnotes (title/checklist/pinned),\ntimeline, status-history"]
-        caseai["case_ai_summary.py\nGET/POST /cases/:id/ai-summary"]
-    end
-
-    subgraph ClientDomain["Clients / Messaging"]
-        clients["clients.py\nGET /clients"]
-        creq["client_requests.py\ninvite / accept"]
-        msgs["messages.py\nconversations, messages,\nunread markers, attachments"]
-    end
-
-    judge["judgements.py\nGET/POST /judgements"]
-
-    subgraph Scheduling["Hearings / Meetings"]
+graph LR
+    subgraph Controllers["app/controllers/*"]
+        plain["cases, case_history, clients,\nclient_requests, conveyancing,\njudgements, meetings, notifications,\nreference, users + main.py auth"]
         hearings["hearings.py"]
-        meetings["meetings.py"]
+        docs["documents.py"]
+        billing["billing.py"]
+        msgs["messages.py"]
+        caseai["case_ai_summary.py"]
     end
 
-    conv["conveyancing.py\nmatters, due-diligence, progress"]
-    docs["documents.py\nlist docs, fetch AI summary"]
-    notif["notifications.py"]
-    ref["reference.py\nroles, case_types, courts, judges"]
-
-    subgraph MLRoutes["ML (/ai/*)"]
-        summarize["ml/summarize.py"]
-        translate["ml/translate.py"]
-        similar["ml/similar_cases.py"]
+    subgraph MLRoutes["app/ml/* (/ai/*)"]
+        summarize["summarize.py"]
+        translate["translate.py"]
+        similar["similar_cases.py"]
     end
 
-    DB[("Supabase tables")]
-    RZP["Razorpay API"]
+    DB[("Supabase Postgres")]
     Storage[("Supabase Storage\ndocuments bucket")]
+    RZP["Razorpay API"]
 
-    mainpy --> DB
-    auth --> DB
-    users --> DB
-    cases --> DB
-    billing --> DB
-    billing --> RZP
-    history --> DB
+    plain --> DB
+    hearings -->|"also syncs cases.next_hearing_date"| DB
+    docs -->|"upload + signed URLs"| Storage
+    billing -->|"create order,\nverify captured payment"| RZP
+    msgs -->|"attachments under\nconversation-{id}/"| Storage
     caseai -->|"upsert case_ai_summaries"| DB
-    caseai -->|"reuses summarize + search runners"| summarize
-    clients --> DB
-    creq --> DB
-    judge --> DB
-    msgs --> DB
-    msgs -->|"upload/sign attachments\nunder conversation-{id}/"| Storage
-    hearings -->|"syncs cases.next_hearing_date"| DB
-    meetings --> DB
-    conv --> DB
-    docs --> DB
-    docs --> Storage
-    notif --> DB
-    ref --> DB
+    caseai -->|"reuses both runners"| summarize
+    caseai --> similar
     summarize -->|"upsert ai_summaries"| DB
     translate -->|"upsert ai_summaries"| DB
     similar -.->|"read-only, no DB write"| DB
