@@ -117,9 +117,10 @@ Both built and verified end-to-end below. Neither involves training — both use
 
 | | |
 |---|---|
-| Model | `ai4bharat/indictrans2-en-indic-dist-200M` — pretrained English→Indic translation, distilled 200M variant (fits comfortably vs. the 1B version) |
+| Model | `law-ai/InLegalTrans-En2Indic-1B` — IndicTrans2-1B fine-tuned by Law-AI on **MILPaC**, an Indian legal parallel corpus. Legal-domain tuning buys a large gain on legal text: per its model card, EN→HI BLEU 41.0 → 56.9, EN→MR 25.2 → 44.4, EN→BN 25.4 → 45.8 (vs. stock IndicTrans2-1B; the gain over the *distilled* 200M this replaced is larger still). Previously `ai4bharat/indictrans2-en-indic-dist-200M`. |
+| VRAM | Measured on the RTX 3050 (4GB): **2.31GB peak reserved** (2.22GB allocated), vs 0.50GB for the old 200M — fits with ~1.7GB headroom. Requires loading in fp16 via `torch_dtype` at `from_pretrained` time; the old `.to(cuda)` then `.half()` order pushes 4.5GB of fp32 weights onto the card first and OOMs. |
 | Script | `translation/translate.py` |
-| Access | This model is **gated** on Hugging Face — requires an HF account, accepting the model's terms on its page, and an `HF_TOKEN` |
+| Access | `law-ai/InLegalTrans-En2Indic-1B` itself is ungated (MIT), but it ships weights only — its `auto_map` delegates the config/model/tokenizer classes to `ai4bharat/indictrans2-en-indic-1B`, which **is** gated. So this needs that repo's terms accepted on HF (a separate acceptance from the `-dist-200M` repos), plus an `HF_TOKEN` |
 | Environment | **Needs its own Python 3.11 venv**, separate from finetune/eval's. IndicTrans2's custom model code and `IndicTransToolkit` have transformers-version requirements that conflict with the bleeding-edge `transformers` unsloth needs (broke on `transformers==5.5.0`) and with each other below `4.38`. `transformers==4.38.0` + `accelerate` + `IndicTransToolkit` is the version that satisfies both. See `translation/requirements.txt` and the setup note at the top of `translate.py`. |
 | Verified | Translated a real fine-tuned-model summary to Hindi — grammatically correct, meaning preserved (minor model-quality slip on one numeral, not a pipeline issue):<br>*"अपीलार्थी को धारा 305, आई. पी. सी. के तहत दोषी ठहराया गया और मौत की सजा सुनाई गई। उच्च न्यायालय ने दोषसिद्धि और सजा की पुष्टि की।..."* |
 

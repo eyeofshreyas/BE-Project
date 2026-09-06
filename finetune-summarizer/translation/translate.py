@@ -1,10 +1,19 @@
 """
 Translates AI-generated case summaries into the client's preferred Indian
-language via IndicTrans2 (AI4Bharat) -- a pretrained translation model,
-used at inference time only, no training involved.
+language via InLegalTrans (Law-AI) -- IndicTrans2-1B fine-tuned on MILPaC,
+an Indian legal parallel corpus. Pretrained, inference only, no training here.
 
-Uses the distilled 200M checkpoint (not the 1B one) to fit comfortably on
-a 4GB GPU. Summaries are short (a few sentences), so this skips the heavy
+Legal-domain fine-tune, so it beats stock IndicTrans2 substantially on legal
+text (per its model card, EN-to-HI BLEU 41.0 -> 56.9, EN-to-MR 25.2 -> 44.4).
+Custom model code and the tokenizer both come from the ai4bharat 1B repo --
+the law-ai repo only ships weights and auto_maps the classes back to it. That
+repo is gated, so it needs its terms accepted on HF once (same as the dist
+repos), on top of HF_TOKEN.
+
+Loaded in fp16 at from_pretrained time, not with a .half() after .to(cuda):
+1.12B params in fp32 is ~4.5GB and OOMs the 4GB card on the way in. Measured
+peak on an RTX 3050 (4GB): 2.31GB reserved, vs 0.50GB for the old 200M.
+Summaries are short (a few sentences), so this skips the heavy
 sentence-segmentation dependencies (mosestokenizer/indicnlp) that
 AI4Bharat's own example uses for long multi-paragraph documents, and
 passes the whole summary as one batch item instead -- fine for short
@@ -35,20 +44,20 @@ import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from IndicTransToolkit.processor import IndicProcessor
 
-MODEL_NAME = "ai4bharat/indictrans2-en-indic-dist-200M"
+MODEL_NAME = "law-ai/InLegalTrans-En2Indic-1B"
+TOKENIZER_NAME = "ai4bharat/indictrans2-en-indic-1B"  # law-ai repo has no tokenizer script of its own
 SRC_LANG = "eng_Latn"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def load_model():
-    """Loads the IndicTrans2 distilled 200M checkpoint + tokenizer (fp16 on GPU) and an IndicProcessor
+    """Loads the InLegalTrans 1B checkpoint + IndicTrans2 tokenizer (fp16 on GPU) and an IndicProcessor
     for pre/post-processing translation batches."""
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME, trust_remote_code=True)
+    dtype = torch.float16 if DEVICE == "cuda" else torch.float32
     model = AutoModelForSeq2SeqLM.from_pretrained(
-        MODEL_NAME, trust_remote_code=True, low_cpu_mem_usage=True,
+        MODEL_NAME, trust_remote_code=True, low_cpu_mem_usage=True, torch_dtype=dtype,
     ).to(DEVICE)
-    if DEVICE == "cuda":
-        model.half()
     model.eval()
     ip = IndicProcessor(inference=True)
     return model, tokenizer, ip
