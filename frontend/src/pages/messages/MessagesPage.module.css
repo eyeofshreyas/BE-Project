@@ -203,10 +203,7 @@
   flex-direction: column;
 }
 
-/* Pushes the conversation down so it rests just above the composer instead of
-   floating at the top of a tall empty pane. */
 .msgStack {
-  margin-top: auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
