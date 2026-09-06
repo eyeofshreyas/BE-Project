@@ -495,14 +495,16 @@ export default function CaseDetailPage() {
                 )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
                   <div
-                    className={styles.darkBtn}
+                    className={styles.primaryChip}
                     style={{ flex: 1, justifyContent: 'center', opacity: messaging || !caseInfo.client_id ? 0.6 : 1, cursor: messaging || !caseInfo.client_id ? 'default' : 'pointer' }}
                     onClick={() => !messaging && messageClient()}
                   >
-                    <Icon name="message-circle" size={14} color="#FFFFFF" /> {messaging ? 'Opening…' : 'Message'}
+                    <Icon name="message-circle" size={15} color="#FFFFFF" /> {messaging ? 'Opening…' : 'Message'}
                   </div>
                   {caseInfo.client_phone && (
-                    <a href={`tel:${caseInfo.client_phone}`} className={styles.darkBtn} style={{ flex: 1, justifyContent: 'center', background: '#FFFFFF', color: '#2A2118', border: '1px solid #E7DCC6', textDecoration: 'none' }}>Call</a>
+                    <a href={`tel:${caseInfo.client_phone}`} className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
+                      <Icon name="phone" size={15} color={MUTED} /> Call
+                    </a>
                   )}
                 </div>
               </div>
