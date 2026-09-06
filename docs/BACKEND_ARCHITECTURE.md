@@ -194,6 +194,7 @@ into `case_ai_summaries`.
 | Users (admin) | `routes/users.py` | `controllers/users.py` | `models/users.py` |
 | Notifications | `routes/notifications.py` | `controllers/notifications.py` | `models/notifications.py` |
 | AI: similar cases | mounted in `main.py` from `app/ml/similar_cases.py` | same file (`app/ml/similar_cases.py`) | inline Pydantic models in that file |
+| AI: case search (own cases) | mounted in `main.py` from `app/ml/case_search.py` | same file | inline models in that file |
 | AI: summarize | mounted in `main.py` from `app/ml/summarize.py` | same file | inline models in that file |
 | AI: translate | mounted in `main.py` from `app/ml/translate.py` | same file | inline models in that file |
 | Auth (signup/login/forgot-password) | defined directly in `main.py` | `main.py` | inline Pydantic models in `main.py` |

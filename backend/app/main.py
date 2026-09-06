@@ -22,6 +22,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+from app.ml.case_search import router as case_search_router
 from app.ml.similar_cases import router as similar_cases_router
 from app.ml.summarize import router as summarize_router
 from app.ml.translate import router as translate_router
@@ -49,6 +50,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(case_search_router)
 app.include_router(similar_cases_router)
 app.include_router(summarize_router)
 app.include_router(translate_router)

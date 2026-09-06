@@ -16,7 +16,7 @@ graph LR
 
     subgraph Backend["FastAPI Backend (backend/app/main.py)"]
         API["REST routers\n(cases, billing, hearings, meetings,\nconveyancing, documents, judgements,\nmessages, users, ...)"]
-        AI["/ai/* routers\n(summarize, translate, similar-cases)"]
+        AI["/ai/* routers\n(summarize, translate,\nsimilar-cases, case-search)"]
     end
 
     DB[("Supabase\nPostgres + Auth + Storage")]
@@ -71,6 +71,7 @@ graph LR
         summarize["summarize.py"]
         translate["translate.py"]
         similar["similar_cases.py"]
+        casesearch["case_search.py"]
     end
 
     DB[("Supabase Postgres")]
@@ -88,6 +89,7 @@ graph LR
     summarize -->|"upsert ai_summaries"| DB
     translate -->|"upsert ai_summaries"| DB
     similar -.->|"read-only, no DB write"| DB
+    casesearch -.->|"read-only, scoped to\nthe caller's own cases"| DB
 ```
 
 ---
@@ -242,9 +244,9 @@ sequenceDiagram
 
 ---
 
-## 6. ML Runtime Flows (`/ai/summarize`, `/ai/translate`, `/ai/similar-cases`)
+## 6. ML Runtime Flows (`/ai/summarize`, `/ai/translate`, `/ai/similar-cases`, `/ai/case-search`)
 
-Same shape for all three — one subprocess call into a separate venv, with a **model reload on every request** (noted `ponytail:` in `summarize.py` / `translate.py` / `similar_cases.py` — current tradeoff, upgrade path is a long-lived worker process).
+Same shape for all four — one subprocess call into a separate venv, with a **model reload on every request** (noted `ponytail:` in `summarize.py` / `translate.py` / `similar_cases.py` — current tradeoff, upgrade path is a long-lived worker process).
 
 ```mermaid
 sequenceDiagram
@@ -255,7 +257,7 @@ sequenceDiagram
     participant M as Model / FAISS index
     participant DB as Supabase
 
-    C->>AI: POST /ai/summarize|translate|similar-cases
+    C->>AI: POST /ai/summarize|translate|similar-cases|case-search
     AI->>U: run_ml_subprocess(cmd, payload)
     U->>P: spawn subprocess, write JSON to stdin
     P->>M: load model / FAISS index
@@ -290,14 +292,20 @@ flowchart TD
         idx --> search["similar_cases/search.py\n(used by search_runner.py)"]
     end
 
+    subgraph OwnCases["Own-case search"]
+        live[("cases + case_ai_summaries\n(live, access-scoped)")] --> cs["runners/case_search_runner.py\nInLegalBert, one vector per case"]
+        cs --> rank["cosine rank, no persisted index\n(always fresh)"]
+    end
+
     subgraph Translation
-        pre["ai4bharat/indictrans2-*-dist-200M\n(pretrained, gated HF models)"] --> tr["translation/translate.py\n(used by translate_runner.py)"]
+        pre["law-ai/InLegalTrans-En2Indic-1B\nai4bharat/indictrans2-indic-en-dist-200M"] --> tr["translation/translate.py\n(used by translate_runner.py)"]
     end
 
     %% invisible links: stack the three independent pipelines instead of
     %% letting them render side by side in one very wide row
     ev ~~~ corpus
-    search ~~~ pre
+    search ~~~ live
+    rank ~~~ pre
 ```
 
 ---

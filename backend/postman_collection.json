@@ -77,6 +77,37 @@
       "name": "Ai",
       "item": [
         {
+          "name": "Case Search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/case-search",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai",
+                "case-search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"string\",\n  \"top_k\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "Similar Cases",
           "request": {
             "method": "POST",
