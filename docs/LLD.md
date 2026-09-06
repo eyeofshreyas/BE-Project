@@ -142,7 +142,15 @@ case. It runs its own two guards on top of `get_current_profile`:
 
 ## 4. Data Model (inferred from query field names — not a live schema dump)
 
+Split into three views — one 30-entity diagram rendered too wide to read.
+
+**Core: identity, cases, scheduling**
+
 ```mermaid
+---
+config:
+  layout: elk
+---
 erDiagram
     ROLES ||--o{ USERS : "role_id"
     USERS ||--o| LAWYERS : "profile"
@@ -152,21 +160,41 @@ erDiagram
     CASES ||--o{ CASE_LAWYERS : "handled by"
     CASE_TYPES ||--o{ CASES : categorizes
     COURTS ||--o{ CASES : "heard at"
-    JUDGES ||--o{ HEARINGS : presides
     CASES ||--o{ HEARINGS : has
+    JUDGES ||--o{ HEARINGS : presides
     CASES ||--o{ MEETINGS : has
     MEETINGS ||--o{ MEETING_PARTICIPANTS : includes
+```
+
+**Per-case artifacts: documents, history, AI, judgements, billing**
+
+```mermaid
+---
+config:
+  layout: elk
+---
+erDiagram
     CASES ||--o{ DOCUMENTS : attached
     DOCUMENT_TYPES ||--o{ DOCUMENTS : categorizes
     DOCUMENTS ||--o| AI_SUMMARIES : "summary/translation"
-    CASES ||--o{ INVOICES : billed
-    INVOICES ||--o{ PAYMENTS : "paid via"
-    CASES ||--o{ MISCELLANEOUS_EXPENSES : incurs
     CASES ||--o{ CASE_NOTES : has
     CASES ||--o{ CASE_TIMELINE : logs
     CASES ||--o{ CASE_STATUS_HISTORY : audits
     CASES ||--o| CASE_AI_SUMMARIES : "case-level AI summary"
     CASES ||--o{ JUDGEMENTS : "decided by"
+    CASES ||--o{ INVOICES : billed
+    INVOICES ||--o{ PAYMENTS : "paid via"
+    CASES ||--o{ MISCELLANEOUS_EXPENSES : incurs
+```
+
+**Messaging, conveyancing, notifications**
+
+```mermaid
+---
+config:
+  layout: elk
+---
+erDiagram
     CLIENTS ||--o{ CONVERSATIONS : "party to"
     LAWYERS ||--o{ CONVERSATIONS : "party to"
     CONVERSATIONS ||--o{ MESSAGES : contains
@@ -265,6 +293,11 @@ flowchart TD
     subgraph Translation
         pre["ai4bharat/indictrans2-*-dist-200M\n(pretrained, gated HF models)"] --> tr["translation/translate.py\n(used by translate_runner.py)"]
     end
+
+    %% invisible links: stack the three independent pipelines instead of
+    %% letting them render side by side in one very wide row
+    ev ~~~ corpus
+    search ~~~ pre
 ```
 
 ---
@@ -318,7 +351,7 @@ flowchart TD
 ## 10. Frontend Data Flow (Admin Console)
 
 ```mermaid
-flowchart TD
+flowchart LR
     mount(["AdminConsolePage mounts"]) --> tabstate["activePage state\n(Dashboard/Users/Cases/Documents/Reports/Analytics/Settings)"]
     tabstate --> dash["DashboardView\n(static, no API)"]
     tabstate --> usersv["UsersView\nlistUsers(), setUserStatus()"]
@@ -328,7 +361,7 @@ flowchart TD
     tabstate --> analyticsv["AnalyticsView\n(static, no API)"]
     tabstate --> settingsv["SettingsView\n(local form state only)"]
 
-    usersv --> api["src/lib/api.ts\nfetch + Bearer header from localStorage"]
+    usersv --> api["src/api/client.ts\nfetch + Bearer header from localStorage"]
     casesv --> api
     docsv --> api
     api --> backend["FastAPI backend"]

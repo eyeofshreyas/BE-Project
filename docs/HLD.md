@@ -33,6 +33,10 @@ graph TD
 ## 2. Major Subsystems
 
 ```mermaid
+---
+config:
+  layout: elk
+---
 graph LR
     subgraph FE["Frontend (React/Vite)"]
         Auth_FE["Auth & role-based routing"]
@@ -170,7 +174,7 @@ graph TD
 ## 6. Design Principles Observed
 
 - **Thin backend, isolated ML** — the API process has zero ML dependencies; all inference runs out-of-process in dependency-isolated venvs, invoked via subprocess.
-- **Two-layer authorization** — role check (what a user is) is separate from object-level ownership check (which cases they may touch), added after an audit found the gap.
+- **Layered authorization** — role check (what a user is) is separate from object-level ownership check (which cases they may touch), added after an audit found the gap. Messaging, which has no case to scope to, adds a third path: a client↔lawyer relationship check plus a per-conversation participant check.
 - **Supabase as the single source of truth** — no local DB; Postgres, Auth and file Storage all come from Supabase, and RLS stays off everywhere because the FastAPI layer is the only thing holding a Supabase key.
 - **Polling, not realtime** — messaging (thread poll, unread badge) uses plain interval polling rather than websockets/Supabase Realtime; documented as a current tradeoff, not a constraint.
 - **Money is verified server-side** — Razorpay checkout succeeds in the browser, but the payment row is only written after the backend re-checks the HMAC signature *and* re-fetches the payment from Razorpay.
