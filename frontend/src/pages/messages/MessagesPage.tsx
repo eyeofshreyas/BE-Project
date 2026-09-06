@@ -1,13 +1,12 @@
 /** Messages (routes `/messages` and `/messages/:conversationId`): a single split view --
  * every thread the current user participates in on the left, the selected thread's bubbles
  * and composer on the right. Replaces the old separate list/thread pages. */
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { listConversations, listCases, getOrCreateConversation, getConversation, sendMessage } from '../../api/client'
 import type { ConversationSummary, ConversationDetail, CaseSummary, UserProfile, MessageSummary } from '../../types/api'
 import { formatDate, timeAgo } from '../../utils/date'
 import { Icon } from '../../components/icons'
-import pageStyles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import styles from './MessagesPage.module.css'
 
 const MUTED = '#8C7C5E'
@@ -168,22 +167,14 @@ export default function MessagesPage() {
   const groups = conversation ? groupMessages(conversation.messages) : []
 
   return (
-    <div className={pageStyles.page} style={{ height: '100%', minHeight: 0, boxSizing: 'border-box' }}>
-      <div className={pageStyles.wrap} style={{ height: '100%', minHeight: 0 }}>
-        <div className={pageStyles.header} style={{ flexShrink: 0 }}>
-          <div>
-            <div className={pageStyles.title}>Messages</div>
-            <div className={pageStyles.subtitle}>Conversations with your lawyers and clients.</div>
-          </div>
-        </div>
+    <div className={styles.page}>
+      {listError && <div className={styles.pageError}>{listError}</div>}
 
-        {listError && <div style={{ color: '#B05C5C', fontSize: 13.5 }}>{listError}</div>}
-
-        {!listError && (
+      {!listError && (
           <div className={styles.split}>
             <div className={styles.threadList}>
               <div className={styles.threadListHead}>
-                <div className={styles.threadListTitle}>Threads</div>
+                <div className={styles.threadListTitle}>Messages</div>
                 <div className={styles.threadListCount}>{loadingList ? 'Loading…' : `${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`}</div>
               </div>
               {conversations.length > 1 && (
@@ -215,7 +206,10 @@ export default function MessagesPage() {
 
             <div className={styles.chatPane}>
               {!conversationId || !conversation ? (
-                <div className={styles.chatEmpty}>{loadingList || conversationId ? 'Loading…' : 'Select a conversation.'}</div>
+                <div className={styles.chatEmpty}>
+                  <div className={styles.chatEmptyIcon}><Icon name="message-circle" size={21} color={MUTED} /></div>
+                  {loadingList || conversationId ? 'Loading…' : 'No conversation selected.'}
+                </div>
               ) : (
                 <>
                   <div className={styles.chatHead}>
@@ -227,20 +221,26 @@ export default function MessagesPage() {
                   </div>
 
                   <div className={styles.msgScroll}>
-                    {threadError && <div style={{ color: '#B05C5C', fontSize: 13 }}>{threadError}</div>}
-                    {groups.map((g, i) => (
-                      <div key={i}>
-                        {g.dayLabel && <div className={styles.dayDivider}>{g.dayLabel}</div>}
-                        <div className={`${styles.bubbleGroup} ${g.senderId === profile?.user_id ? styles.mine : styles.theirs}`}>
-                          {g.messages.map((m) => <div key={m.id} className={styles.bubble}>{m.body}</div>)}
-                          <div className={styles.groupTime}>{formatBubbleTime(g.messages[g.messages.length - 1].created_at)}</div>
-                        </div>
-                      </div>
-                    ))}
-                    {conversation.messages.length === 0 && (
-                      <div style={{ color: MUTED, fontSize: 13, textAlign: 'center', padding: '28px 0' }}>No messages yet — say hello.</div>
-                    )}
-                    <div ref={bottomRef} />
+                    <div className={styles.msgStack}>
+                      {threadError && <div style={{ color: '#B05C5C', fontSize: 13 }}>{threadError}</div>}
+                      {groups.map((g, i) => (
+                        <Fragment key={i}>
+                          {g.dayLabel && <div className={styles.dayDivider}>{g.dayLabel}</div>}
+                          <div className={`${styles.bubbleGroup} ${g.senderId === profile?.user_id ? styles.mine : styles.theirs}`}>
+                            {g.messages.map((m) => (
+                              <div key={m.id} className={styles.bubble}>
+                                {m.body}
+                                <span className={styles.bubbleTime}>{formatBubbleTime(m.created_at)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </Fragment>
+                      ))}
+                      {conversation.messages.length === 0 && (
+                        <div className={styles.emptyThread}>No messages yet — say hello.</div>
+                      )}
+                      <div ref={bottomRef} />
+                    </div>
                   </div>
 
                   <div className={styles.composer}>
@@ -260,8 +260,7 @@ export default function MessagesPage() {
               )}
             </div>
           </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }
