@@ -88,6 +88,22 @@
   opacity: .5;
 }
 
+.navBadge {
+  margin-left: auto;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #B08D3E;
+  color: #FFFFFF;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 19px;
+  text-align: center;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 .soonPill {
   margin-left: auto;
   font-size: 9.5px;

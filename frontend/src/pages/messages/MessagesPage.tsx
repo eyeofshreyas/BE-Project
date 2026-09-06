@@ -43,6 +43,12 @@ function formatBubbleTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
 /** Groups consecutive same-sender messages, and marks where a new calendar day starts, so the
  * thread renders as stacked bubbles under one timestamp with day dividers -- not a fresh
  * timestamp under every line. */
@@ -63,6 +69,40 @@ function groupMessages(messages: MessageSummary[]) {
   return groups
 }
 
+/** Renders a message's attachment by kind: images inline, video in a player, anything else
+ * as a download row. Opening the file in a new tab is the same signed URL either way. */
+function Attachment({ message }: { message: MessageSummary }) {
+  const { attachment_url: url, attachment_name: name, attachment_type: type, attachment_size: size } = message
+  if (!url) return null
+
+  if (type?.startsWith('image/')) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className={styles.attachmentMedia}>
+        <img src={url} alt={name ?? 'Attachment'} />
+      </a>
+    )
+  }
+
+  if (type?.startsWith('video/')) {
+    return (
+      <div className={styles.attachmentMedia}>
+        <video src={url} controls preload="metadata" />
+      </div>
+    )
+  }
+
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className={styles.attachmentFile}>
+      <Icon name="file-text" size={18} color="currentColor" />
+      <span className={styles.attachmentFileMeta}>
+        <span className={styles.attachmentFileName}>{name ?? 'Attachment'}</span>
+        {size != null && <span className={styles.attachmentFileSize}>{formatSize(size)}</span>}
+      </span>
+      <Icon name="download" size={15} color="currentColor" />
+    </a>
+  )
+}
+
 export default function MessagesPage() {
   const { conversationId } = useParams<{ conversationId: string }>()
   const navigate = useNavigate()
@@ -80,7 +120,9 @@ export default function MessagesPage() {
   const [threadError, setThreadError] = useState('')
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const [attachment, setAttachment] = useState<File | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const load = isClient
@@ -124,6 +166,9 @@ export default function MessagesPage() {
         .then((c) => {
           if (cancelled) return
           setThreadError('')
+          // The backend marks the thread read on open; mirror that in the rail so the
+          // badge clears without waiting for a full list refresh.
+          setConversations((prev) => prev.map((x) => (x.id === Number(conversationId) ? { ...x, unread_count: 0 } : x)))
           setConversation((prev) => {
             if (!prev) return c
             const byId = new Map(prev.messages.map((m) => [m.id, m]))
@@ -145,16 +190,20 @@ export default function MessagesPage() {
 
   async function handleSend() {
     const body = draft.trim()
-    if (!body || !conversationId) return
+    if ((!body && !attachment) || !conversationId) return
+    const file = attachment
     setSending(true)
     setDraft('')
+    setAttachment(null)
     try {
-      const message = await sendMessage(Number(conversationId), body)
+      const message = await sendMessage(Number(conversationId), body, file)
       setThreadError('')
       setConversation((prev) => (prev ? { ...prev, messages: [...prev.messages, message] } : prev))
-      setConversations((prev) => prev.map((c) => (c.id === Number(conversationId) ? { ...c, last_message: message.body, last_message_at: message.created_at } : c)))
+      const preview = message.body || message.attachment_name || 'Attachment'
+      setConversations((prev) => prev.map((c) => (c.id === Number(conversationId) ? { ...c, last_message: preview, last_message_at: message.created_at } : c)))
     } catch (err) {
       setDraft(body)
+      setAttachment(file)
       setThreadError(err instanceof Error ? err.message : 'Failed to send your message.')
     } finally {
       setSending(false)
@@ -193,9 +242,12 @@ export default function MessagesPage() {
                     <div className={styles.avatar}>{c.other_party_name ? initialsOf(c.other_party_name) : '—'}</div>
                     <div className={styles.threadMeta}>
                       <div className={styles.threadName}>{c.other_party_name ?? 'Unknown'}</div>
-                      <div className={styles.threadPreview}>{c.last_message ?? 'No messages yet'}</div>
+                      <div className={`${styles.threadPreview} ${c.unread_count > 0 ? styles.unreadPreview : ''}`}>{c.last_message ?? 'No messages yet'}</div>
                     </div>
-                    {c.last_message_at && <div className={styles.threadTime}>{timeAgo(c.last_message_at)}</div>}
+                    <div className={styles.threadEnd}>
+                      {c.last_message_at && <div className={styles.threadTime}>{timeAgo(c.last_message_at)}</div>}
+                      {c.unread_count > 0 && <div className={styles.unreadBadge}>{c.unread_count > 99 ? '99+' : c.unread_count}</div>}
+                    </div>
                   </div>
                 ))}
                 {!loadingList && filteredConversations.length === 0 && (
@@ -229,6 +281,7 @@ export default function MessagesPage() {
                           <div className={`${styles.bubbleGroup} ${g.senderId === profile?.user_id ? styles.mine : styles.theirs}`}>
                             {g.messages.map((m) => (
                               <div key={m.id} className={styles.bubble}>
+                                {m.attachment_url && <Attachment message={m} />}
                                 {m.body}
                                 <span className={styles.bubbleTime}>{formatBubbleTime(m.created_at)}</span>
                               </div>
@@ -243,17 +296,39 @@ export default function MessagesPage() {
                     </div>
                   </div>
 
-                  <div className={styles.composer}>
-                    <input
-                      className={styles.composerInput}
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-                      placeholder={`Write a message to ${conversation.other_party_name ?? '...'}`}
-                      disabled={sending}
-                    />
-                    <div className={styles.sendBtn} style={{ opacity: sending ? 0.6 : 1 }} onClick={() => !sending && handleSend()}>
-                      <Icon name="send" size={17} color="#FFFFFF" />
+                  <div className={styles.composerWrap}>
+                    {attachment && (
+                      <div className={styles.pendingAttachment}>
+                        <Icon name="paperclip" size={14} color={MUTED} />
+                        <span className={styles.pendingName}>{attachment.name}</span>
+                        <span className={styles.pendingSize}>{formatSize(attachment.size)}</span>
+                        <span className={styles.pendingRemove} title="Remove" onClick={() => setAttachment(null)}>
+                          <Icon name="x" size={14} color={MUTED} />
+                        </span>
+                      </div>
+                    )}
+                    <div className={styles.composer}>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        hidden
+                        accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                        onChange={(e) => { setAttachment(e.target.files?.[0] ?? null); e.target.value = '' }}
+                      />
+                      <div className={styles.attachBtn} title="Attach an image, video, or document" onClick={() => fileInputRef.current?.click()}>
+                        <Icon name="paperclip" size={17} color={MUTED} />
+                      </div>
+                      <input
+                        className={styles.composerInput}
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+                        placeholder={attachment ? 'Add a message (optional)…' : `Write a message to ${conversation.other_party_name ?? '...'}`}
+                        disabled={sending}
+                      />
+                      <div className={styles.sendBtn} style={{ opacity: sending ? 0.6 : 1 }} onClick={() => !sending && handleSend()}>
+                        <Icon name="send" size={17} color="#FFFFFF" />
+                      </div>
                     </div>
                   </div>
                 </>

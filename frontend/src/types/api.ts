@@ -392,6 +392,11 @@ export interface MessageSummary {
   sender_name: string | null
   body: string
   created_at: string
+  /** Set only on messages carrying a file; the URL is a short-lived signed Storage link. */
+  attachment_url: string | null
+  attachment_name: string | null
+  attachment_type: string | null
+  attachment_size: number | null
 }
 
 export interface ConversationSummary {
@@ -400,6 +405,7 @@ export interface ConversationSummary {
   other_party_role: 'lawyer' | 'client'
   last_message: string | null
   last_message_at: string | null
+  unread_count: number
 }
 
 export interface ConversationDetail {

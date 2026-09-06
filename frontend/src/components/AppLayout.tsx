@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import logo from '../assets/logo.svg'
 import { Icon, type IconName } from './icons'
 import { C } from './theme'
-import { listNotifications, markNotificationRead } from '../api/client'
+import { listNotifications, markNotificationRead, listConversations } from '../api/client'
 import type { UserProfile, NotificationSummary } from '../types/api'
 import { timeAgo } from '../utils/date'
 import styles from './AppShell.module.css'
@@ -13,6 +13,7 @@ import styles from './AppShell.module.css'
 const ROLE_LABELS: Record<number, string> = { 2: 'Lawyer', 3: 'Client' }
 const BRAND_SUB_LABELS: Record<number, string> = { 2: 'Legal Intelligence', 3: 'Client Portal' }
 const NOTIF_COLORS: Record<string, string> = { Hearing: C.warning, Payment: C.success, Document: C.primary }
+const UNREAD_POLL_MS = 30000
 
 type NavDef = { label: string; icon: IconName; path?: string }
 
@@ -66,10 +67,24 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
   const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [unreadMessages, setUnreadMessages] = useState(0)
 
   useEffect(() => {
     listNotifications().then(setNotifications).catch(() => {})
   }, [])
+
+  // Unread message count for the Messages nav badge. Polled so it stays live while the
+  // user is on other pages -- the Messages page itself clears it on open.
+  useEffect(() => {
+    function load() {
+      listConversations()
+        .then((rows) => setUnreadMessages(rows.reduce((sum, c) => sum + c.unread_count, 0)))
+        .catch(() => {})
+    }
+    load()
+    const interval = setInterval(load, UNREAD_POLL_MS)
+    return () => clearInterval(interval)
+  }, [location.pathname])
 
   function openNotification(n: NotificationSummary) {
     if (!n.is_read) {
@@ -119,6 +134,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               <div key={item.label} className={styles.navRow} style={{ background: active ? '#E9DCC8' : 'transparent' }} onClick={() => navigate(item.path!)} title={item.label}>
                 <span className={styles.navIcon}><Icon name={item.icon} size={18} color={active ? C.primaryDark : '#93826d'} /></span>
                 <span className={styles.navLabel} style={{ fontWeight: active ? 600 : 500, color: active ? C.text : '#6A5C42' }}>{item.label}</span>
+                {item.path === '/messages' && unreadMessages > 0 && (
+                  <span className={styles.navBadge}>{unreadMessages > 99 ? '99+' : unreadMessages}</span>
+                )}
               </div>
             )
           })}

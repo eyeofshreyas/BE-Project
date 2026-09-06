@@ -337,6 +337,11 @@ export function getConversation(conversationId: number) {
   return get<ConversationDetail>(`/messages/conversations/${conversationId}`)
 }
 
-export function sendMessage(conversationId: number, body: string) {
-  return post<MessageSummary>(`/messages/conversations/${conversationId}/messages`, { body })
+/** Sends a message with optional file attachment -- multipart, so text and file share one endpoint. */
+export function sendMessage(conversationId: number, body: string, file?: File | null) {
+  const formData = new FormData()
+  formData.append('body', body)
+  if (file) formData.append('file', file)
+  return postForm<MessageSummary>(`/messages/conversations/${conversationId}/messages`, formData)
 }
+
