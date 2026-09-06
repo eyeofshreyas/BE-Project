@@ -50,7 +50,7 @@ def test_unassign_lawyer_allowed_for_assigned_lawyer():
     profile = {"role_id": auth.LAWYER, "user_id": 1, "full_name": "Test Lawyer"}
     case_row = {
         "case_id": 42, "case_number": "C001", "case_title": "x", "filing_date": None, "created_at": None, "status": "Open",
-        "priority": "Medium", "next_hearing_date": None, "clients": None, "courts": None, "case_types": None,
+        "priority": "Medium", "next_hearing_date": None, "client_id": 99, "clients": None, "courts": None, "case_types": None,
         "case_lawyers": [],
     }
     fake = _fake_supabase(assigned_case_ids={42}, case_row=case_row)
@@ -111,7 +111,7 @@ def test_create_case_allowed_with_accepted_request():
     case_row = {
         "case_id": 42, "case_number": "CIV2026001", "case_title": "Test matter", "filing_date": None,
         "created_at": None, "status": "Open", "priority": "Medium", "next_hearing_date": None,
-        "clients": None, "courts": None, "case_types": None, "case_lawyers": [],
+        "client_id": 99, "clients": None, "courts": None, "case_types": None, "case_lawyers": [],
     }
     fake = _fake_supabase_for_create(accepted_request_rows=[{"request_id": 1}], case_row=case_row)
     with patch("app.controllers.cases.supabase", fake):

@@ -10,7 +10,7 @@ from fastapi import HTTPException
 
 from app.middleware import auth
 from app.controllers.messages import get_or_create_conversation, get_conversation, send_message
-from app.models.messages import ConversationCreate, MessageCreate
+from app.models.messages import ConversationCreate
 
 
 def _fake_supabase_for_get_or_create(client_id=7, cases=None, case_lawyers=None, conversations=None):
@@ -112,7 +112,7 @@ def test_send_message_rejects_non_participant():
     fake = _fake_supabase_for_conversation(row, client_id=7)
     with patch("app.controllers.messages.supabase", fake):
         try:
-            send_message(1, MessageCreate(body="hi"), profile)
+            send_message(1, body="hi", profile=profile)
             assert False, "expected HTTPException"
         except HTTPException as e:
             assert e.status_code == 403
