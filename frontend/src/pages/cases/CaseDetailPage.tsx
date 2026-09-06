@@ -373,7 +373,7 @@ export default function CaseDetailPage() {
               )}
             </div>
 
-            <div className={styles.panelCard}>
+            <div className={styles.panelCard} style={{ background: 'transparent' }}>
               <div className={styles.panelTitle} style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Icon name="sparkles" size={15} color={PRIMARY} /> AI Summary</div>
               {aiSummary ? (
                 <div style={{ fontSize: 13.5, color: '#2A2118', lineHeight: 1.55 }}>
@@ -476,7 +476,7 @@ export default function CaseDetailPage() {
 
           <div className={styles.sideCol}>
             {canMessage && caseInfo.client && (
-              <div className={styles.panelCard}>
+              <div className={styles.panelCard} style={{ background: 'transparent' }}>
                 <div className={styles.panelTitle}>Client</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 40, height: 40, borderRadius: '50%', background: PRIMARY, color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
