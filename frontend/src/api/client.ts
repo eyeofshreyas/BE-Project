@@ -166,6 +166,10 @@ export function getDocumentSummary(documentId: number) {
   return get<AiSummary>(`/documents/${documentId}/summary`)
 }
 
+export function summarizeDocument(documentId: number, text: string) {
+  return post<{ summary: string }>('/ai/summarize', { text, document_id: documentId })
+}
+
 export function listUsers(role?: string) {
   return get<UserSummary[]>(role ? `/users?role=${encodeURIComponent(role)}` : '/users')
 }

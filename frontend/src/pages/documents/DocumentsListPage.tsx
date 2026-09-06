@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   listDocuments, getDocumentSummary, getDocumentDownloadUrl, deleteDocument,
-  listCases, listDocumentTypes, uploadDocument,
+  listCases, listDocumentTypes, uploadDocument, summarizeDocument,
 } from '../../api/client'
 import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption } from '../../types/api'
 import { Icon } from '../../components/icons'
@@ -42,6 +42,9 @@ export default function DocumentsListPage() {
   const [summary, setSummary] = useState<AiSummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryError, setSummaryError] = useState('')
+  const [genText, setGenText] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState('')
 
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [pickCaseId, setPickCaseId] = useState('')
@@ -76,11 +79,35 @@ export default function DocumentsListPage() {
     setExpandedId(id)
     setSummary(null)
     setSummaryError('')
+    setGenText('')
+    setGenError('')
     setSummaryLoading(true)
     getDocumentSummary(id)
       .then(setSummary)
       .catch((err) => setSummaryError(err instanceof Error ? err.message : 'No AI summary available.'))
       .finally(() => setSummaryLoading(false))
+  }
+
+  // ponytail: the backing model is fine-tuned only on Supreme Court judgment
+  // headnotes (ROUGE-L 0.2065, see finetune-summarizer/DOCUMENTATION.md) -- on
+  // other document types (affidavits, agreements, notices) it tends to
+  // hallucinate generic judgment-shaped boilerplate. Known quality ceiling,
+  // accepted for now; upgrade path is fine-tuning on this app's own document
+  // types or a larger base model.
+  async function generateSummary(id: number) {
+    if (!genText.trim()) { setGenError('Paste the document text to summarize.'); return }
+    setGenerating(true)
+    setGenError('')
+    try {
+      const { summary: summaryText } = await summarizeDocument(id, genText)
+      setSummary({ summary_text: summaryText, translated_text: null, keywords: null, important_dates: null, important_sections: null })
+      setSummaryError('')
+      setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, has_summary: true } : d)))
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : 'Failed to generate summary.')
+    } finally {
+      setGenerating(false)
+    }
   }
 
   async function openDocument(id: number) {
@@ -268,8 +295,27 @@ export default function DocumentsListPage() {
                     {expandedId === d.id && (
                       <div style={{ fontSize: 12.5, color: '#3D3126', borderTop: '1px solid #F1E9D9', paddingTop: 10 }}>
                         {summaryLoading && <div style={{ color: MUTED }}>Loading summary…</div>}
-                        {summaryError && <div style={{ color: MUTED }}>{summaryError}</div>}
                         {summary && <div>{summary.summary_text}</div>}
+                        {!summaryLoading && !summary && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ color: MUTED }}>{summaryError || 'No AI summary yet.'}</div>
+                            <textarea
+                              value={genText}
+                              onChange={(e) => setGenText(e.target.value)}
+                              placeholder="Paste the document text to generate an AI summary…"
+                              rows={3}
+                              style={{ padding: '8px 10px', borderRadius: 8, border: '1.5px solid #E7DCC6', fontSize: 12.5, fontFamily: 'inherit', resize: 'vertical' }}
+                            />
+                            {genError && <div style={{ color: '#B05C5C' }}>{genError}</div>}
+                            <div
+                              className={styles.ghostChip}
+                              style={{ alignSelf: 'flex-start', padding: '6px 12px', opacity: generating ? 0.6 : 1, cursor: generating ? 'default' : 'pointer' }}
+                              onClick={generating ? undefined : () => generateSummary(d.id)}
+                            >
+                              {generating ? 'Generating…' : 'Generate Summary'}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
