@@ -168,9 +168,9 @@ export default function MessagesPage() {
   const groups = conversation ? groupMessages(conversation.messages) : []
 
   return (
-    <div className={pageStyles.page}>
-      <div className={pageStyles.wrap}>
-        <div className={pageStyles.header}>
+    <div className={pageStyles.page} style={{ height: '100%', minHeight: 0, boxSizing: 'border-box' }}>
+      <div className={pageStyles.wrap} style={{ height: '100%', minHeight: 0 }}>
+        <div className={pageStyles.header} style={{ flexShrink: 0 }}>
           <div>
             <div className={pageStyles.title}>Messages</div>
             <div className={pageStyles.subtitle}>Conversations with your lawyers and clients.</div>
