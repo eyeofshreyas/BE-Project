@@ -144,6 +144,28 @@ export interface MatterDocumentSummary {
   verified_by: string | null
 }
 
+export interface MatterDueDiligence {
+  diligence_id: number
+  title_clear: boolean | null
+  tax_verified: boolean | null
+  encumbrance_checked: boolean | null
+  litigation_checked: boolean | null
+  lawyer_name: string | null
+  remarks: string | null
+  completed_at: string | null
+}
+
+export interface MatterRegistration {
+  registration_id: number
+  office_name: string | null
+  registration_number: string | null
+  registration_date: string | null
+  deed_number: string | null
+  registration_status: string | null
+  registered_by: string | null
+  remarks: string | null
+}
+
 export interface MatterDetail {
   matter_id: number
   matter_number: string
@@ -154,7 +176,9 @@ export interface MatterDetail {
   expected_completion_date: string | null
   created_at: string | null
   property: MatterProperty | null
+  due_diligence: MatterDueDiligence | null
   progress: MatterProgressStage[]
+  registration: MatterRegistration | null
   documents: MatterDocumentSummary[]
 }
 
@@ -278,6 +302,10 @@ export interface MeetingSummary {
   meeting_date: string
   duration_minutes: number | null
   agenda: string | null
+  discussion_summary: string | null
+  decisions: string | null
+  action_items: string | null
+  next_meeting_date: string | null
   meeting_status: string
   conducted_by: string | null
 }
