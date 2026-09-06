@@ -30,6 +30,11 @@ models/<domain>.py       Pydantic request/response schemas only.
 `app/db/supabase_client.py` holds the one shared `supabase` client (built
 from `SUPABASE_URL`/`SUPABASE_KEY` in `app/core/config.py`) that every
 controller imports directly -- there's no repository/DAO layer in between.
+It is constructed with an explicit `httpx.Client(http2=False, timeout=30s)`:
+supabase-py's default HTTP/2 client multiplexes every request over one TCP
+connection, which these threadpool-run sync controllers intermittently broke
+(`httpx.ReadError` -> spurious 500/503s) when a dashboard fired ~6 fetches at
+once. Don't remove that option without re-testing concurrent dashboard loads.
 
 ## Auth and authorization chain
 
@@ -81,12 +86,23 @@ Which controllers use which:
 - **`ensure_case_access`** (write/single-record endpoints where the caller
   already has a `case_id`) -- `create_invoice`, `create_hearing`,
   `create_meeting`, `create_judgement`, `create_expense`, `add_case_note`,
-  `change_case_status`, `unassign_lawyer`, `upload_document`,
-  `delete_document`. `conveyancing.py`'s `_ensure_matter_access` and
+  `update_case_note`, `delete_case_note`, `change_case_status`,
+  `unassign_lawyer`, `upload_document`, `delete_document`, and both
+  `case_ai_summary.py` handlers. `conveyancing.py`'s `_ensure_matter_access` and
   `documents.py`/`billing.py`/`hearings.py`/`meetings.py`'s internal
   `_get_*` helpers resolve a non-case ID (`matter_id`, `document_id`,
   `invoice_id`, `hearing_id`, `meeting_id`) to its owning `case_id` first,
   then apply the same check.
+
+- **Neither** -- `controllers/messages.py` has no case to scope to (a
+  conversation belongs to a client+lawyer pair). It runs its own guards on
+  top of `get_current_profile`: `_relationship_exists(client_id, lawyer_id)`
+  before creating a conversation (an active `case_lawyers` row joining that
+  lawyer to one of that client's cases -- the same invariant below, expressed
+  pair-wise), and `_ensure_participant()` on every read/write of an existing
+  thread (the caller must *be* the conversation's client or lawyer, resolved
+  via `_own_client_id`/`_own_lawyer_id`; admins are not participants and get
+  a 403 too).
 
 The one invariant every other authorization check assumes: a
 `case_lawyers` row with `is_active=True` is what grants a lawyer access to a
@@ -134,11 +150,37 @@ Each of the three `app/ml/*.py` callers reloads its model on every request
 tens of seconds to minutes for summarize/translate); moving to a long-lived
 worker process is the noted upgrade path if that latency becomes a problem.
 
+`controllers/case_ai_summary.py` is a fourth caller of that machinery: it
+reuses the *same* summarize and search runners (importing their venv/runner
+paths from `app/ml/summarize.py` and `app/ml/similar_cases.py`), just fed a
+case's notes + timeline text instead of one document, and upserts the result
+into `case_ai_summaries`.
+
+## External services and file storage
+
+- **Supabase Storage** -- one bucket, `documents`, shared by three writers:
+  case documents (`controllers/documents.py`, which owns the
+  `DOCUMENTS_BUCKET` constant), conveyancing matter documents
+  (`controllers/conveyancing.py`, which imports it), and message attachments
+  (`controllers/messages.py`, under `conversation-{id}/`). Downloads are
+  always short-lived signed URLs, never public paths.
+- **Razorpay** (`controllers/billing.py`) -- the only outbound third-party
+  API. `create_razorpay_order` opens an order for an invoice's outstanding
+  balance; `verify_razorpay_payment` re-checks the checkout's HMAC signature
+  *and* re-fetches the payment from Razorpay before writing a `payments` row
+  (idempotent on `transaction_reference`), so nothing about the amount or
+  status is trusted from the browser. Both 500 via `_razorpay_auth()` if
+  `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are unset; the rest of the app runs
+  fine without them.
+- **SMTP** (`app/core/email.py`) -- invoice reminders and password mail.
+
 ## Domain -> route -> controller -> model map
 
 | Domain | Route file | Controller file | Model file |
 |---|---|---|---|
 | Cases | `routes/cases.py` | `controllers/cases.py` | `models/cases.py` |
+| Case AI summary (`/cases/:id/ai-summary`) | `routes/cases.py` | `controllers/case_ai_summary.py` | `models/case_ai_summary.py` |
+| Messaging (conversations/messages) | `routes/messages.py` | `controllers/messages.py` | `models/messages.py` |
 | Case history (notes/timeline/status) | `routes/case_history.py` | `controllers/case_history.py` | `models/case_history.py` |
 | Client requests (invite/accept) | `routes/client_requests.py` | `controllers/client_requests.py` | `models/client_requests.py` |
 | Clients | `routes/clients.py` | `controllers/clients.py` | `models/clients.py` |

@@ -1,6 +1,6 @@
 # LexFlow — Low-Level Design
 
-A legal-tech case & conveyancing management system: React/Vite frontend, FastAPI backend on Supabase (Postgres + Auth), and an offline-trained ML subsystem (summarization, translation, similar-case search) invoked from the backend via subprocess.
+A legal-tech case & conveyancing management system: React/Vite frontend, FastAPI backend on Supabase (Postgres + Auth + Storage), an offline-trained ML subsystem (summarization, translation, similar-case search) invoked from the backend via subprocess, client↔lawyer messaging with file attachments, and Razorpay checkout for client invoice payments.
 
 Diagrams are best-effort reconstructions from the current codebase, not a spec — where the code takes a known shortcut, it's called out as a **current tradeoff** rather than presented as intended design.
 
@@ -14,12 +14,13 @@ graph LR
         FE["React/Vite Frontend"]
     end
 
-    subgraph Backend["FastAPI Backend (backend/main.py)"]
-        API["REST routers\n(cases, billing, hearings, meetings,\nconveyancing, documents, users, ...)"]
+    subgraph Backend["FastAPI Backend (backend/app/main.py)"]
+        API["REST routers\n(cases, billing, hearings, meetings,\nconveyancing, documents, judgements,\nmessages, users, ...)"]
         AI["/ai/* routers\n(summarize, translate, similar-cases)"]
     end
 
-    DB[("Supabase\nPostgres + Auth")]
+    DB[("Supabase\nPostgres + Auth + Storage")]
+    RZP["Razorpay API"]
 
     subgraph MLRunners["ML runners (separate venvs)"]
         R1["summarize_runner.py"]
@@ -33,9 +34,10 @@ graph LR
         A3["IndicTrans2\npretrained models"]
     end
 
-    FE -->|"fetch + Bearer token\n(src/lib/api.ts)"| API
+    FE -->|"fetch + Bearer token\n(src/api/client.ts)"| API
     FE -->|fetch| AI
-    API -->|"supabase-py client"| DB
+    API -->|"supabase-py client\n(HTTP/1.1, see §13)"| DB
+    API -->|"httpx: create order,\nverify captured payment"| RZP
     AI -->|"subprocess: JSON via stdin"| R1
     AI -->|subprocess| R2
     AI -->|subprocess| R3
@@ -58,10 +60,19 @@ graph TD
     end
 
     subgraph CaseDomain["Cases / Billing / History"]
-        cases["cases.py\nGET /cases"]
-        billing["billing.py\ninvoices, payments, expenses"]
-        history["case_history.py\nnotes, timeline, status-history"]
+        cases["cases.py\nGET/POST /cases, unassign-lawyer"]
+        billing["billing.py\ninvoices, payments, expenses,\nrazorpay-order / razorpay-verify"]
+        history["case_history.py\nnotes (title/checklist/pinned),\ntimeline, status-history"]
+        caseai["case_ai_summary.py\nGET/POST /cases/:id/ai-summary"]
     end
+
+    subgraph ClientDomain["Clients / Messaging"]
+        clients["clients.py\nGET /clients"]
+        creq["client_requests.py\ninvite / accept"]
+        msgs["messages.py\nconversations, messages,\nunread markers, attachments"]
+    end
+
+    judge["judgements.py\nGET/POST /judgements"]
 
     subgraph Scheduling["Hearings / Meetings"]
         hearings["hearings.py"]
@@ -80,17 +91,28 @@ graph TD
     end
 
     DB[("Supabase tables")]
+    RZP["Razorpay API"]
+    Storage[("Supabase Storage\ndocuments bucket")]
 
     mainpy --> DB
     auth --> DB
     users --> DB
     cases --> DB
     billing --> DB
+    billing --> RZP
     history --> DB
+    caseai -->|"upsert case_ai_summaries"| DB
+    caseai -->|"reuses summarize + search runners"| summarize
+    clients --> DB
+    creq --> DB
+    judge --> DB
+    msgs --> DB
+    msgs -->|"upload/sign attachments\nunder conversation-{id}/"| Storage
     hearings -->|"syncs cases.next_hearing_date"| DB
     meetings --> DB
     conv --> DB
     docs --> DB
+    docs --> Storage
     notif --> DB
     ref --> DB
     summarize -->|"upsert ai_summaries"| DB
@@ -135,6 +157,17 @@ sequenceDiagram
     end
 ```
 
+**Third path — messaging has no case to scope to.** `controllers/messages.py` doesn't use
+`ensure_case_access` at all: a conversation belongs to a (client_id, lawyer_id) pair, not a
+case. It runs its own two guards on top of `get_current_profile`:
+
+- `_relationship_exists(client_id, lawyer_id)` — before a conversation is created, checks for
+  an active `case_lawyers` row joining that lawyer to one of that client's cases. Same
+  invariant as `get_scoped_case_ids`, expressed pair-wise.
+- `_ensure_participant(conversation_row, profile)` — on every read/write of an existing
+  thread, 403s unless the caller *is* the conversation's client or lawyer (resolved via
+  `_own_client_id` / `_own_lawyer_id`). Admins are not participants, so they get a 403 too.
+
 ---
 
 ## 4. Data Model (inferred from query field names — not a live schema dump)
@@ -162,6 +195,12 @@ erDiagram
     CASES ||--o{ CASE_NOTES : has
     CASES ||--o{ CASE_TIMELINE : logs
     CASES ||--o{ CASE_STATUS_HISTORY : audits
+    CASES ||--o| CASE_AI_SUMMARIES : "case-level AI summary"
+    CASES ||--o{ JUDGEMENTS : "decided by"
+    CLIENTS ||--o{ CONVERSATIONS : "party to"
+    LAWYERS ||--o{ CONVERSATIONS : "party to"
+    CONVERSATIONS ||--o{ MESSAGES : contains
+    USERS ||--o{ MESSAGES : sends
     USERS ||--o{ NOTIFICATIONS : receives
     CASES ||--o| CONVEYANCING_MATTERS : "linked matter"
     CONVEYANCING_MATTERS ||--o{ CONVEYANCING_PARTIES : involves
@@ -169,6 +208,18 @@ erDiagram
     CONVEYANCING_MATTERS ||--o{ DUE_DILIGENCE : tracks
     CONVEYANCING_MATTERS ||--o{ REGISTRATION_PROGRESS : tracks
 ```
+
+Migration files in `backend/` are the closest thing to a schema of record for the newer
+tables/columns: `migrate_messages.sql` + `migrate_message_reads_and_attachments.sql`
+(conversations/messages, `client_last_read_at`/`lawyer_last_read_at`, the four
+`attachment_*` columns), `migrate_judgements.sql` (+`_reasoning`),
+`migrate_case_ai_and_notes.sql` (`case_ai_summaries`, plus `case_notes.title/checklist/pinned`),
+`migrate_case_description.sql` (`cases.description`), and
+`migrate_conveyancing_matter_progress.sql` (data backfill only).
+
+Unread counts are two nullable timestamps on `conversations`, not a `message_reads` join
+table — a thread only ever has two participants, so "everything the other side sent after
+this instant" is the whole state needed.
 
 ---
 
@@ -280,7 +331,7 @@ Covered by `backend/ml/test_subprocess_utils.py` (bare-JSON, banner-then-JSON, a
 
 ```mermaid
 flowchart TD
-    start(["Navigate to route"]) --> guarded{"Protected route?\n(/admin, /conveyancing, /settings)"}
+    start(["Navigate to route"]) --> guarded{"Protected route?\n(everything except /, /login,\n/signup, /role-selection —\nsee FRONTEND_ARCHITECTURE.md §1)"}
     guarded -->|no| render["Render page\n(LandingPage/LoginPage/SignUpPage/RoleSelectionPage)"]
     guarded -->|yes| readls["ProtectedRoute reads\nlocalStorage token + profile"]
     readls --> hastoken{"Token present?"}
@@ -320,8 +371,99 @@ flowchart TD
 
 ---
 
+## 11. Client ↔ Lawyer Messaging (`/messages/*`)
+
+One conversation per (client, lawyer) pair, created on demand from either side. Both the
+thread and the sidebar unread badge are **polled** — no websockets, no Supabase Realtime.
+
+```mermaid
+sequenceDiagram
+    participant U as MessagesPage
+    participant L as AppLayout badge
+    participant API as controllers/messages.py
+    participant DB as Supabase
+    participant S as Storage (documents bucket)
+
+    U->>API: POST /messages/conversations {other_party_id}
+    API->>DB: _relationship_exists (active case_lawyers row)
+    API->>DB: select-or-insert conversations (unique client_id+lawyer_id)
+    API-->>U: conversation summary
+
+    U->>API: GET /messages/conversations/:id
+    API->>API: _ensure_participant
+    API->>DB: set client/lawyer_last_read_at = now()
+    API->>DB: select messages order by created_at
+    API->>S: create_signed_url per attachment (TTL-limited)
+    API-->>U: messages (+ signed attachment URLs)
+
+    U->>API: POST /messages/conversations/:id/messages (multipart: body, file?)
+    API->>API: _ensure_participant, MIME allowlist -> 400 if rejected
+    API->>S: upload conversation-{id}/{uuid}.{ext}
+    API->>DB: insert messages (body nullable when a file is attached)
+    API-->>U: message summary
+
+    loop every 12s (thread) / 30s (badge)
+        U->>API: GET /messages/conversations/:id
+        L->>API: GET /messages/conversations
+    end
+```
+
+`list_conversations` runs two extra queries per conversation (last-message preview + unread
+count) — flagged `ponytail:` in the controller, upgrade path is a DB view/RPC.
+
+---
+
+## 12. Client Invoice Payment (Razorpay)
+
+The browser completes checkout, but nothing is trusted from it: the backend re-verifies the
+HMAC signature *and* re-fetches the payment from Razorpay before writing a `payments` row.
+
+```mermaid
+sequenceDiagram
+    participant C as BillingPage (client)
+    participant CO as Razorpay Checkout (index.html script)
+    participant API as controllers/billing.py
+    participant RZP as Razorpay API
+    participant DB as Supabase
+
+    C->>API: POST /billing/invoices/:id/razorpay-order
+    API->>API: outstanding = total - Completed payments
+    API->>RZP: create order (basic auth, key_id/key_secret)
+    API-->>C: order_id + public key_id
+    C->>CO: open checkout
+    CO-->>C: payment_id + signature
+    C->>API: POST /billing/invoices/:id/razorpay-verify
+    API->>API: HMAC-SHA256 of order + payment vs signature -> 400 on mismatch
+    API->>RZP: GET /payments/:id
+    RZP-->>API: status, order_id, amount
+    API->>API: reject unless status == "captured" and order matches
+    API->>DB: insert payments (idempotent on transaction_reference)
+    API->>DB: _recompute_invoice_status
+    API-->>C: payment summary
+```
+
+Unset `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` → 500 from `_razorpay_auth()`; the rest of the
+app runs fine without them.
+
+---
+
+## 13. Supabase Client & Concurrency
+
+`app/db/supabase_client.py` passes its own `httpx.Client(http2=False, timeout=30s)` into
+`create_client`. supabase-py's default client is HTTP/2, which multiplexes everything over
+one TCP connection; FastAPI runs these sync controllers in a threadpool, so a dashboard
+firing ~6 fetches at once intermittently died with `httpx.ReadError` (surfacing as 500s, or
+503s when the failing call was the auth check). HTTP/1.1 uses a real connection pool that is
+safe to share across threads. Passing `http_client` also opts out of the library's timeout
+defaults, hence the explicit timeout.
+
+---
+
 ## Known current tradeoffs (called out in code, not fixed here)
 
 - ML models/FAISS index reload on **every** request — no persistent worker (`summarize.py`, `translate.py`, `similar_cases.py`).
 - Frontend session state is `localStorage`-only, read via duplicated helpers instead of a shared context/hook.
 - `subprocess_utils` trusts the **last line** of stdout as the JSON payload — fragile if a runner script ever prints after its result line.
+- Messaging is **polled**, not pushed (12s thread / 30s unread badge), and `list_conversations` issues 2 extra queries per conversation.
+- RLS is disabled on `conversations`/`messages` (as on every other table) — the FastAPI layer is the only gatekeeper, and it holds the only Supabase key.
+- Message attachments share the `documents` bucket rather than getting their own, so no extra bucket has to be provisioned.
