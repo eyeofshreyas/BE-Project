@@ -495,3 +495,9 @@
   font-size: 11px;
   color: #B08D3E;
 }
+
+/* A client sees neither notes nor the AI summary, which empties the side
+   column, so their case page runs full width instead. */
+.columnsSolo {
+  grid-template-columns: minmax(0, 1fr);
+}

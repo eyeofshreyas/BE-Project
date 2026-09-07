@@ -52,8 +52,11 @@ def _to_status_history(row: dict) -> dict:
     }
 
 
-def list_case_notes(case_id: int, profile: dict = Depends(get_current_profile)):
-    """List notes for a case the caller has access to. Calls: `ensure_case_access()`, `_to_note()`."""
+def list_case_notes(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """List notes for a case the caller has access to. Notes are the firm's internal work
+    product -- only staff may read them, so this is role-gated as well as case-scoped, and
+    so is the AI summary built from them (see case_ai_summary.get_case_ai_summary).
+    Calls: `ensure_case_access()`, `_to_note()`."""
     ensure_case_access(case_id, profile)
     rows = supabase.table("case_notes").select(NOTES_SELECT).eq("case_id", case_id).order("created_at", desc=True).execute().data
     return [_to_note(row) for row in rows]

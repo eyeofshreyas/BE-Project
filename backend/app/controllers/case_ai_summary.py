@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, get_current_profile, require_roles
+from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, require_roles
 from app.ml.similar_cases import FINETUNE_VENV_PYTHON, SEARCH_RUNNER
 from app.ml.subprocess_utils import run_ml_subprocess
 from app.ml.summarize import INFERENCE_DIR, SUMMARIZE_RUNNER
@@ -38,8 +38,10 @@ def _build_case_text(case_id: int) -> str:
     return "\n".join(lines)
 
 
-def get_case_ai_summary(case_id: int, profile: dict = Depends(get_current_profile)):
-    """Fetch the stored AI summary for a case, if one has been generated. Calls: `ensure_case_access()`."""
+def get_case_ai_summary(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Fetch the stored AI summary for a case, if one has been generated. Staff-only: the
+    summary is written from the case's notes (see `_build_case_text()`), which are private to
+    the firm, so it inherits their audience. Calls: `ensure_case_access()`."""
     ensure_case_access(case_id, profile)
     rows = supabase.table("case_ai_summaries").select(CASE_AI_SUMMARY_SELECT).eq("case_id", case_id).execute().data
     if not rows:

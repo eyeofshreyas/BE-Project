@@ -164,7 +164,7 @@ export default function CaseDetailPage() {
 
   useEffect(() => {
     if (!numericCaseId) { setError('Invalid case.'); setLoading(false); return }
-    Promise.all([listCases(), listCaseNotes(numericCaseId), listCaseTimeline(numericCaseId), listDocuments(), listMeetings(numericCaseId)])
+    Promise.all([listCases(), canManage ? listCaseNotes(numericCaseId) : Promise.resolve([]), listCaseTimeline(numericCaseId), listDocuments(), listMeetings(numericCaseId)])
       .then(([cases, n, t, docs, m]) => {
         const found = cases.find((c) => c.case_id === numericCaseId)
         if (!found) { setError("This case doesn't exist or you don't have access to it."); return }
@@ -177,8 +177,8 @@ export default function CaseDetailPage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load this case.'))
       .finally(() => setLoading(false))
     if (canUploadDocs) listDocumentTypes().then(setDocumentTypes).catch(() => {})
-    getCaseAiSummary(numericCaseId).then(setAiSummary).catch(() => setAiSummary(null))
-  }, [numericCaseId, canUploadDocs])
+    if (canManage) getCaseAiSummary(numericCaseId).then(setAiSummary).catch(() => setAiSummary(null))
+  }, [numericCaseId, canUploadDocs, canManage])
 
   function showToast(msg: string) {
     setToast(msg)
@@ -392,6 +392,8 @@ export default function CaseDetailPage() {
     .filter((n) => !noteSearch.trim() || `${n.title ?? ''} ${n.note}`.toLowerCase().includes(noteSearch.trim().toLowerCase()))
     .sort((a, b) => Number(b.pinned) - Number(a.pinned))
 
+  const hasSideColumn = canManage || (canMessage && !!caseInfo.client)
+
   function openHearingForm() {
     setHearingOpen(true)
     meetingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -447,8 +449,9 @@ export default function CaseDetailPage() {
           </div>
         </div>
 
-        <div className={cd.columns}>
+        <div className={`${cd.columns} ${hasSideColumn ? '' : cd.columnsSolo}`}>
           <div className={cd.col}>
+            {canManage && (
             <div className={cd.aiCard}>
               <div className={cd.aiHead}>
                 <Icon name="sparkles" size={15} color={PRIMARY} /> AI summary
@@ -480,6 +483,7 @@ export default function CaseDetailPage() {
                 </Empty>
               )}
             </div>
+            )}
 
             <Card title="Timeline" count={timeline.length}>
               {timeline.length > 0 ? (
@@ -629,6 +633,7 @@ export default function CaseDetailPage() {
               </Card>
             )}
 
+            {canManage && (
             <Card title="Notes" count={notes.length}>
               {notes.length > 2 && (
                 <div className={cd.searchBox} style={{ marginBottom: 10 }}>
@@ -726,15 +731,12 @@ export default function CaseDetailPage() {
                 ))}
                 {filteredNotes.length === 0 && (
                   <Empty>
-                    {noteSearch.trim()
-                      ? 'No notes match that search.'
-                      : canAddNote
-                        ? 'Notes stay with the case. Everyone with access to it can read them, the client included.'
-                        : 'No notes on this case yet.'}
+                    {noteSearch.trim() ? 'No notes match that search.' : 'Notes are your firm\u2019s own record of the case. Clients never see them.'}
                   </Empty>
                 )}
               </div>
             </Card>
+            )}
           </div>
         </div>
 
