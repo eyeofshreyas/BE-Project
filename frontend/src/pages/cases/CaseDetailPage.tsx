@@ -6,7 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
-  unassignLawyer, getCaseAiSummary, generateCaseAiSummary, getOrCreateConversation,
+  unassignLawyer, getCaseAiSummary, generateCaseAiSummary, getOrCreateConversation, createMeeting,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
@@ -16,6 +16,7 @@ import { formatDate as formatDateWith } from '../../utils/date'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
+import cd from './CaseDetailPage.module.css'
 import { Dropdown } from '../conveyancing/ConveyancingDashboardPage'
 
 const PRIMARY = '#B08D3E'
@@ -65,6 +66,47 @@ function formatDay(iso: string) {
 type NoteForm = { id: number | null; title: string; note: string; checklist: ChecklistItem[] }
 const BLANK_FORM: NoteForm = { id: null, title: '', note: '', checklist: [] }
 
+/** One cell of the record header's facts strip. */
+function Fact({ label, value, children }: { label: string; value: string; children?: React.ReactNode }) {
+  return (
+    <div className={cd.fact}>
+      <div className={cd.factLabel}>{label}</div>
+      <div className={cd.factValue}>{value}</div>
+      {children}
+    </div>
+  )
+}
+
+/** Titled section card: an optional count pill and a right-aligned action sit in the head. */
+function Card({ title, count, action, innerRef, children }: {
+  title: string
+  count?: number
+  action?: React.ReactNode
+  innerRef?: React.RefObject<HTMLDivElement | null>
+  children: React.ReactNode
+}) {
+  return (
+    <div className={cd.card} ref={innerRef}>
+      <div className={cd.cardHead}>
+        <span className={cd.cardTitle}>{title}</span>
+        {count != null && count > 0 && <span className={cd.count}>{count}</span>}
+        {action && <div style={{ marginLeft: 'auto' }}>{action}</div>}
+      </div>
+      <div className={cd.cardBody}>{children}</div>
+    </div>
+  )
+}
+
+/** Empty section: says what belongs here, and offers the action that fills it. */
+function Empty({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div>
+      <div className={cd.empty}>{children}</div>
+      {action && <div className={cd.emptyRow}>{action}</div>}
+    </div>
+  )
+}
+
 /**
  * Loads all cases via `listCases()` and finds this one by `caseId` (there's
  * no single-case GET endpoint), plus notes/timeline/documents/meetings/AI-summary in
@@ -106,6 +148,12 @@ export default function CaseDetailPage() {
 
   const meetingsRef = useRef<HTMLDivElement>(null)
   const documentsRef = useRef<HTMLDivElement>(null)
+
+  const [hearingOpen, setHearingOpen] = useState(false)
+  const [hearingTitle, setHearingTitle] = useState('')
+  const [hearingDate, setHearingDate] = useState('')
+  const [hearingAgenda, setHearingAgenda] = useState('')
+  const [schedulingHearing, setSchedulingHearing] = useState(false)
 
   const [uploadTypeId, setUploadTypeId] = useState('')
   const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -269,6 +317,30 @@ export default function CaseDetailPage() {
     }
   }
 
+  async function submitHearing() {
+    if (!hearingTitle.trim() || !hearingDate) return
+    setSchedulingHearing(true)
+    try {
+      const created = await createMeeting({
+        case_id: numericCaseId,
+        meeting_title: hearingTitle.trim(),
+        meeting_date: new Date(hearingDate).toISOString(),
+        agenda: hearingAgenda.trim() || undefined,
+      })
+      setMeetings((prev) => [...prev, created])
+      setHearingTitle('')
+      setHearingDate('')
+      setHearingAgenda('')
+      setHearingOpen(false)
+      showToast('Hearing scheduled.')
+      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to schedule the hearing.')
+    } finally {
+      setSchedulingHearing(false)
+    }
+  }
+
   async function submitUpload() {
     if (!uploadFile || !uploadTypeId) return
     setUploading(true)
@@ -310,7 +382,7 @@ export default function CaseDetailPage() {
     <div className={styles.page}>
       <div className={styles.wrap}>
         <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>
-        <div className={styles.ghostChip} style={{ width: 'fit-content' }} onClick={() => navigate(-1)}>Back</div>
+        <div className={styles.ghostChip} style={{ width: 'fit-content' }} onClick={() => navigate('/cases')}>Back to cases</div>
       </div>
     </div>
   )
@@ -320,180 +392,227 @@ export default function CaseDetailPage() {
     .filter((n) => !noteSearch.trim() || `${n.title ?? ''} ${n.note}`.toLowerCase().includes(noteSearch.trim().toLowerCase()))
     .sort((a, b) => Number(b.pinned) - Number(a.pinned))
 
+  function openHearingForm() {
+    setHearingOpen(true)
+    meetingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  function openUploadForm() {
+    setUploadFormOpen(true)
+    documentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.wrap}>
-        <div style={{ background: '#FBF6EA', border: '1px solid #E7DCC6', borderRadius: 20, padding: '22px 26px 26px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 16, borderBottom: '1px solid #E7DCC6' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: MUTED, cursor: 'pointer' }} onClick={() => navigate(-1)}>Back to Cases</div>
-            <span style={{ cursor: 'pointer', display: 'flex' }} onClick={() => navigate(-1)}><Icon name="x" size={16} color={MUTED} /></span>
-          </div>
+        <div className={styles.breadcrumb}>
+          <span style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>Cases</span>
+          <span style={{ display: 'inline-flex', transform: 'rotate(-90deg)' }}><Icon name="chevron-down" size={13} color="#A38F66" /></span>
+          <span>{caseInfo.id}</span>
+        </div>
 
-          <div style={{ padding: '16px 0', borderBottom: '1px solid #E7DCC6' }}>
-            <div className={styles.statLabel}>{caseInfo.id}</div>
-            <div className={styles.title} style={{ fontSize: 20, marginTop: 2 }}>{caseInfo.case_title ?? caseInfo.court ?? 'No court assigned'}</div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-              <span className={styles.statusBadge} style={{ color: statusColor, background: statusBg }}>{statusLabel(caseInfo.status)}</span>
-              <span className={styles.statusBadge} style={{ color: PRIORITY_COLORS[caseInfo.priority] ?? '#6A5C42', background: '#EFEAE1' }}>{caseInfo.priority} priority</span>
+        <div className={cd.record}>
+          <div className={cd.recordTop}>
+            <div style={{ minWidth: 0 }}>
+              <div className={cd.caseNumber}>{caseInfo.id}</div>
+              <h1 className={cd.caseTitle}>{caseInfo.case_title ?? caseInfo.court ?? 'Untitled case'}</h1>
+              <div className={cd.badges}>
+                <span className={styles.statusBadge} style={{ color: statusColor, background: statusBg }}>{statusLabel(caseInfo.status)}</span>
+                <span className={styles.statusBadge} style={{ color: PRIORITY_COLORS[caseInfo.priority] ?? '#6A5C42', background: '#EFEAE1' }}>{caseInfo.priority} priority</span>
+              </div>
+            </div>
+
+            <div className={cd.actions}>
+              {canManage && (
+                <Dropdown value={caseInfo.status} options={STATUS_OPTIONS} labelFor={statusLabel} onChange={(st) => !statusSaving && updateStatus(st)} />
+              )}
+              {canUploadDocs && (
+                <div className={styles.ghostChip} onClick={openUploadForm}><Icon name="file-text" size={15} color={MUTED} /> Upload document</div>
+              )}
+              {canManage && (
+                <div className={styles.ghostChip} onClick={openHearingForm}><Icon name="calendar" size={15} color={MUTED} /> Schedule hearing</div>
+              )}
             </div>
           </div>
 
-          <div className={styles.midGrid} style={{ paddingTop: 20 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 20 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div className={styles.statLabel}>Client</div>
-                <div className={styles.statValue} style={{ fontSize: 16 }}>{caseInfo.client ?? '—'}</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div className={styles.statLabel}>Type</div>
-                <div className={styles.statValue} style={{ fontSize: 16 }}>{caseInfo.case_type ?? '—'}</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div className={styles.statLabel}>Next Hearing</div>
-                <div className={styles.statValue} style={{ fontSize: 16 }}>{caseInfo.hearing ?? '—'}</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div className={styles.statLabel}>Lawyer</div>
-                <div className={styles.statValue} style={{ fontSize: 16 }}>{caseInfo.lawyer ?? 'Not yet assigned'}</div>
-                {canManage && caseInfo.lawyer && (
-                  <div
-                    onClick={() => !unassigning && unassign()}
-                    style={{ fontSize: 11.5, fontWeight: 600, color: '#B05C5C', cursor: 'pointer', opacity: unassigning ? 0.6 : 1 }}
-                  >
-                    {unassigning ? 'Removing…' : 'Unassign'}
-                  </div>
+          <div className={cd.facts}>
+            <Fact label="Client" value={caseInfo.client ?? 'Not recorded'} />
+            <Fact label="Case type" value={caseInfo.case_type ?? 'Not set'} />
+            <Fact label="Next hearing" value={caseInfo.hearing ?? 'Not scheduled'} />
+            <Fact label="Responsible lawyer" value={caseInfo.lawyer ?? 'Not assigned'}>
+              {canManage && caseInfo.lawyer && (
+                <div className={cd.factAction} onClick={() => !unassigning && unassign()}>{unassigning ? 'Removing…' : 'Unassign'}</div>
+              )}
+            </Fact>
+          </div>
+        </div>
+
+        <div className={cd.columns}>
+          <div className={cd.col}>
+            <div className={cd.aiCard}>
+              <div className={cd.aiHead}>
+                <Icon name="sparkles" size={15} color={PRIMARY} /> AI summary
+                {aiSummary && (
+                  <button className={cd.linkAction} style={{ marginLeft: 'auto' }} onClick={() => !aiLoading && generateSummary()}>
+                    {aiLoading ? 'Summarising…' : 'Update'}
+                  </button>
                 )}
               </div>
-              {canManage && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div className={styles.statLabel}>Change Status</div>
-                  <Dropdown value={caseInfo.status} options={STATUS_OPTIONS} labelFor={statusLabel} onChange={(s) => !statusSaving && updateStatus(s)} />
-                </div>
-              )}
-            </div>
-
-            <div className={styles.panelCard} style={{ background: 'transparent' }}>
-              <div className={styles.panelTitle} style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Icon name="sparkles" size={15} color={PRIMARY} /> AI Summary</div>
               {aiSummary ? (
-                <div style={{ fontSize: 13.5, color: '#2A2118', lineHeight: 1.55 }}>
-                  <div>{aiSummary.summary_text}</div>
+                <>
+                  <div className={cd.aiBody}>{aiSummary.summary_text}</div>
                   {aiSummary.related_cases.length > 0 && (
-                    <div style={{ marginTop: 8, color: MUTED, fontSize: 12.5 }}>
-                      AI flags this as related to {aiSummary.related_cases.length} prior precedent{aiSummary.related_cases.length > 1 ? 's' : ''} on file: {aiSummary.related_cases.map((r) => r.doc_id).join(', ')}
+                    <div className={cd.aiMeta} style={{ fontSize: 12.5 }}>
+                      Resembles {aiSummary.related_cases.length} judgement{aiSummary.related_cases.length > 1 ? 's' : ''} already on file: {aiSummary.related_cases.map((r) => r.doc_id).join(', ')}
                     </div>
                   )}
-                  <div style={{ marginTop: 8, color: MUTED, fontSize: 11.5 }}>Generated {formatDate(aiSummary.generated_at)}</div>
-                </div>
+                  <div className={cd.aiMeta}>Generated {formatDate(aiSummary.generated_at)}</div>
+                </>
               ) : (
-                <div style={{ color: MUTED, fontSize: 13 }}>No AI summary generated yet.</div>
+                <Empty
+                  action={
+                    <div className={styles.primaryChip} style={{ opacity: aiLoading ? 0.7 : 1 }} onClick={() => !aiLoading && generateSummary()}>
+                      <Icon name="sparkles" size={15} color="#FFFFFF" /> {aiLoading ? 'Summarising…' : 'Generate summary'}
+                    </div>
+                  }
+                >
+                  Nothing summarised yet. LexFlow reads this case's notes, documents and timeline to draft a brief, and points out earlier judgements that resemble it.
+                </Empty>
               )}
             </div>
 
-            <div>
-              <div className={styles.panelTitle}>Case Timeline</div>
-              <div className={styles.timeline}>
-                {timeline.map((t) => (
-                  <div key={t.id} className={styles.timelineItem}>
-                    <span className={styles.timelineDot} style={{ background: PRIMARY }} />
-                    <div className={styles.timelineTitle}>{t.event_title}</div>
-                    {t.event_description && <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{t.event_description}</div>}
-                    <div className={styles.timelineMeta}>{formatDate(t.created_at)}{t.created_by ? ` · ${t.created_by}` : ''}</div>
-                  </div>
-                ))}
-                {timeline.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No activity yet.</div>}
-              </div>
-            </div>
+            <Card title="Timeline" count={timeline.length}>
+              {timeline.length > 0 ? (
+                <div className={styles.timeline}>
+                  {timeline.map((t) => (
+                    <div key={t.id} className={styles.timelineItem}>
+                      <span className={styles.timelineDot} style={{ background: PRIMARY }} />
+                      <div className={cd.rowTitle}>{t.event_title}</div>
+                      {t.event_description && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 3, lineHeight: 1.5 }}>{t.event_description}</div>}
+                      <div className={cd.metaRow}>
+                        <span>{formatDate(t.created_at)}</span>
+                        {t.created_by && <span>{t.created_by}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Empty>Nothing has happened on this case yet. Status changes, uploads and scheduled hearings all land here.</Empty>
+              )}
+            </Card>
 
-            <div ref={meetingsRef}>
-              <div className={styles.panelTitle}>Meetings & Hearings</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {meetings.map((m) => (
-                  <div key={m.id} style={{ padding: '10px 14px', border: '1px solid #E7DCC6', borderRadius: 10 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>{m.meeting_title ?? 'Meeting'}</div>
-                    <div style={{ fontSize: 11.5, color: MUTED, marginTop: 5 }}>{formatDate(m.meeting_date)} · {m.meeting_status}{m.conducted_by ? ` · ${m.conducted_by}` : ''}</div>
+            <Card
+              title="Hearings & meetings"
+              count={meetings.length}
+              innerRef={meetingsRef}
+              action={canManage && !hearingOpen && meetings.length > 0 ? <button className={cd.linkAction} onClick={() => setHearingOpen(true)}>Schedule</button> : undefined}
+            >
+              {canManage && hearingOpen && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                  <input value={hearingTitle} onChange={(e) => setHearingTitle(e.target.value)} placeholder="What is this hearing for?" style={inputStyle} />
+                  <input type="datetime-local" value={hearingDate} onChange={(e) => setHearingDate(e.target.value)} style={inputStyle} />
+                  <textarea value={hearingAgenda} onChange={(e) => setHearingAgenda(e.target.value)} placeholder="Agenda (optional)" rows={2} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div
+                      className={styles.primaryChip}
+                      style={{ opacity: schedulingHearing || !hearingTitle.trim() || !hearingDate ? 0.6 : 1 }}
+                      onClick={submitHearing}
+                    >
+                      {schedulingHearing ? 'Scheduling…' : 'Schedule hearing'}
+                    </div>
+                    <div className={styles.ghostChip} onClick={() => setHearingOpen(false)}>Cancel</div>
                   </div>
-                ))}
-                {meetings.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No meetings scheduled.</div>}
-              </div>
-            </div>
+                </div>
+              )}
+              {meetings.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {meetings.map((m) => (
+                    <div key={m.id} className={cd.listRow}>
+                      <div className={cd.rowTitle}>{m.meeting_title ?? 'Meeting'}</div>
+                      <div className={cd.metaRow}>
+                        <span>{formatDate(m.meeting_date)}</span>
+                        <span>{m.meeting_status}</span>
+                        {m.conducted_by && <span>{m.conducted_by}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : !hearingOpen && (
+                <Empty action={canManage ? <div className={styles.ghostChip} onClick={() => setHearingOpen(true)}><Icon name="calendar" size={15} color={MUTED} /> Schedule a hearing</div> : undefined}>
+                  Nothing is on the calendar for this case.
+                </Empty>
+              )}
+            </Card>
 
-            <div ref={documentsRef}>
-              <div className={styles.panelTitle}>Uploaded Documents</div>
+            <Card
+              title="Documents"
+              count={documents.length}
+              innerRef={documentsRef}
+              action={canUploadDocs && !uploadFormOpen && documents.length > 0 ? <button className={cd.linkAction} onClick={() => setUploadFormOpen(true)}>Upload</button> : undefined}
+            >
               {canUploadDocs && uploadFormOpen && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-                  <select
-                    value={uploadTypeId}
-                    onChange={(e) => setUploadTypeId(e.target.value)}
-                    style={{ padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13, background: '#FFFFFF' }}
-                  >
-                    <option value="">Document type…</option>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                  <select value={uploadTypeId} onChange={(e) => setUploadTypeId(e.target.value)} style={{ ...inputStyle, background: '#FFFFFF' }}>
+                    <option value="">Choose a document type…</option>
                     {documentTypes.map((t) => <option key={t.document_type_id} value={t.document_type_id}>{t.type_name}</option>)}
                   </select>
                   <input type="file" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12.5 }} />
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <div className={styles.primaryChip} style={{ opacity: uploading || !uploadFile || !uploadTypeId ? 0.6 : 1, justifyContent: 'center', flex: 1 }} onClick={submitUpload}>
+                    <div className={styles.primaryChip} style={{ opacity: uploading || !uploadFile || !uploadTypeId ? 0.6 : 1 }} onClick={submitUpload}>
                       {uploading ? 'Uploading…' : 'Upload'}
                     </div>
                     <div className={styles.ghostChip} onClick={() => setUploadFormOpen(false)}>Cancel</div>
                   </div>
                 </div>
               )}
-              <div className={styles.quickActionsList}>
-                {documents.map((d) => (
-                  <div key={d.id} className={styles.quickAction} onClick={() => openDocument(d)}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Icon name="file-text" size={18} color={MUTED} />
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{d.file_name}</div>
-                        <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{formatDay(d.upload_date)}</div>
+              {documents.length > 0 ? (
+                <div className={styles.quickActionsList}>
+                  {documents.map((d) => (
+                    <div key={d.id} className={styles.quickAction} onClick={() => openDocument(d)}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <Icon name="file-text" size={18} color={MUTED} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file_name}</div>
+                          <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{formatDay(d.upload_date)}</div>
+                        </div>
                       </div>
+                      <span className={styles.statusBadge} style={d.has_summary ? { color: '#2E9E58', background: '#E4F5EA' } : { color: '#B87F1E', background: '#FFF2E0' }}>
+                        {d.has_summary ? 'Summarised' : 'Not summarised'}
+                      </span>
                     </div>
-                    <span className={styles.statusBadge} style={d.has_summary ? { color: '#2E9E58', background: '#E4F5EA' } : { color: '#B87F1E', background: '#FFF2E0' }}>
-                      {d.has_summary ? 'Completed' : 'Pending'}
-                    </span>
-                  </div>
-                ))}
-                {documents.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No documents yet.</div>}
-              </div>
-            </div>
+                  ))}
+                </div>
+              ) : !uploadFormOpen && (
+                <Empty action={canUploadDocs ? <div className={styles.ghostChip} onClick={() => setUploadFormOpen(true)}><Icon name="file-text" size={15} color={MUTED} /> Upload a document</div> : undefined}>
+                  No documents filed against this case.
+                </Empty>
+              )}
+            </Card>
 
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div className={styles.primaryChip} style={{ opacity: aiLoading ? 0.7 : 1 }} onClick={() => !aiLoading && generateSummary()}>
-                <Icon name="sparkles" size={15} color="#FFFFFF" /> {aiLoading ? 'Generating…' : aiSummary ? 'Regenerate AI Summary' : 'Generate AI Summary'}
+            {canManage && caseInfo.status !== 'Closed' && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <span className={cd.dangerLink} onClick={closeCase}>Close case</span>
               </div>
-              {canUploadDocs && (
-                <div className={styles.ghostChip} onClick={() => { setUploadFormOpen(true); documentsRef.current?.scrollIntoView({ behavior: 'smooth' }) }}><Icon name="file-text" size={15} /> Upload Docs</div>
-              )}
-              {canManage && (
-                <div className={styles.ghostChip} onClick={() => meetingsRef.current?.scrollIntoView({ behavior: 'smooth' })}><Icon name="calendar" size={15} /> Schedule Hearing</div>
-              )}
-              {canManage && caseInfo.status !== 'Closed' && (
-                <div style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, color: '#B05C5C', cursor: 'pointer' }} onClick={closeCase}>Close Case</div>
-              )}
-            </div>
+            )}
           </div>
 
-          <div className={styles.sideCol}>
+          <div className={cd.col}>
             {canMessage && caseInfo.client && (
-              <div className={styles.panelCard} style={{ background: 'transparent' }}>
-                <div className={styles.panelTitle}>Client</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: PRIMARY, color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
-                    {initialsOf(caseInfo.client)}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>{caseInfo.client}</div>
-                    <div style={{ fontSize: 11.5, color: MUTED }}>Client</div>
+              <Card title="Client">
+                <div className={cd.clientRow}>
+                  <div className={cd.avatar}>{initialsOf(caseInfo.client)}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#2A2118' }}>{caseInfo.client}</div>
+                    <div style={{ fontSize: 11.5, color: MUTED }}>Client on this case</div>
                   </div>
                 </div>
                 {(caseInfo.client_email || caseInfo.client_phone) && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14, fontSize: 12.5, color: '#6A5C42' }}>
-                    {caseInfo.client_email && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Icon name="mail" size={14} color="#93826d" />{caseInfo.client_email}</div>}
-                    {caseInfo.client_phone && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Icon name="phone" size={14} color="#93826d" />{caseInfo.client_phone}</div>}
+                  <div className={cd.contactList}>
+                    {caseInfo.client_email && <div className={cd.contactItem}><Icon name="mail" size={14} color="#93826d" />{caseInfo.client_email}</div>}
+                    {caseInfo.client_phone && <div className={cd.contactItem}><Icon name="phone" size={14} color="#93826d" />{caseInfo.client_phone}</div>}
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                   <div
                     className={styles.primaryChip}
                     style={{ flex: 1, justifyContent: 'center', opacity: messaging || !caseInfo.client_id ? 0.6 : 1, cursor: messaging || !caseInfo.client_id ? 'default' : 'pointer' }}
@@ -507,103 +626,115 @@ export default function CaseDetailPage() {
                     </a>
                   )}
                 </div>
-              </div>
+              </Card>
             )}
 
-            <div>
-              <div className={styles.panelTitle}>Case Notes & Legal Observations</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1.5px solid #E7DCC6', borderRadius: 9, padding: '9px 12px', marginBottom: 10 }}>
-                <Icon name="search" size={15} color="#A38F66" />
-                <input
-                  value={noteSearch}
-                  onChange={(e) => setNoteSearch(e.target.value)}
-                  placeholder="Search notes…"
-                  style={{ border: 'none', outline: 'none', fontSize: 13.5, background: 'transparent', flex: 1, fontFamily: 'inherit' }}
-                />
-              </div>
-              {canAddNote && (
+            <Card title="Notes" count={notes.length}>
+              {notes.length > 2 && (
+                <div className={cd.searchBox} style={{ marginBottom: 10 }}>
+                  <Icon name="search" size={15} color="#A38F66" />
+                  <input value={noteSearch} onChange={(e) => setNoteSearch(e.target.value)} placeholder="Search notes…" className={cd.plainInput} />
+                </div>
+              )}
+
+              {canAddNote && noteForm === null && (
                 <>
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  <div className={cd.composer} style={{ marginTop: 0 }}>
                     <input
                       value={newNote}
                       onChange={(e) => setNewNote(e.target.value)}
-                      placeholder="Quick note… press Enter"
-                      style={{ ...inputStyle, flex: 1 }}
+                      placeholder="Write a note…"
+                      style={{ ...inputStyle, flex: 1, minWidth: 0 }}
                       onKeyDown={(e) => e.key === 'Enter' && submitNote()}
                     />
-                    <div className={styles.primaryChip} style={{ opacity: addingNote ? 0.7 : 1 }} onClick={submitNote}>{addingNote ? '…' : '+'}</div>
+                    <div className={styles.primaryChip} style={{ opacity: addingNote || !newNote.trim() ? 0.6 : 1 }} onClick={submitNote}>
+                      {addingNote ? 'Saving…' : 'Save'}
+                    </div>
                   </div>
-                  {noteForm === null ? (
-                    <div className={styles.primaryChip} style={{ justifyContent: 'center', marginBottom: 14 }} onClick={() => setNoteForm(BLANK_FORM)}>
-                      <Icon name="plus" size={15} color="#FFFFFF" /> Add New Note
-                    </div>
-                  ) : (
-                    <div style={{ border: '1.5px solid #E7DCC6', borderRadius: 10, padding: 12, marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <input value={noteForm.title} onChange={(e) => setNoteForm({ ...noteForm, title: e.target.value })} placeholder="Title (optional)" style={inputStyle} />
-                      <textarea value={noteForm.note} onChange={(e) => setNoteForm({ ...noteForm, note: e.target.value })} placeholder="Note content…" rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {noteForm.checklist.map((item, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                            <span>• {item.text}</span>
-                            <span style={{ marginLeft: 'auto', color: '#B05C5C', cursor: 'pointer', fontSize: 12 }} onClick={() => setNoteForm({ ...noteForm, checklist: noteForm.checklist.filter((_, j) => j !== i) })}>remove</span>
-                          </div>
-                        ))}
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <input
-                            value={checklistDraft}
-                            onChange={(e) => setChecklistDraft(e.target.value)}
-                            placeholder="Checklist item…"
-                            style={{ ...inputStyle, flex: 1 }}
-                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addChecklistDraftItem())}
-                          />
-                          <div className={styles.ghostChip} onClick={addChecklistDraftItem}>+ item</div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <div className={styles.primaryChip} style={{ opacity: savingNote ? 0.7 : 1 }} onClick={saveNoteForm}>{savingNote ? 'Saving…' : 'Save'}</div>
-                        <div className={styles.ghostChip} onClick={() => { setNoteForm(null); setChecklistDraft('') }}>Cancel</div>
-                      </div>
-                    </div>
-                  )}
+                  <button className={cd.linkAction} style={{ marginTop: 8 }} onClick={() => setNoteForm({ ...BLANK_FORM, note: newNote })}>
+                    Add a title and checklist
+                  </button>
                 </>
               )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+              {canAddNote && noteForm !== null && (
+                <div style={{ border: '1.5px solid #E7DCC6', borderRadius: 11, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <input value={noteForm.title} onChange={(e) => setNoteForm({ ...noteForm, title: e.target.value })} placeholder="Title" style={inputStyle} />
+                  <textarea value={noteForm.note} onChange={(e) => setNoteForm({ ...noteForm, note: e.target.value })} placeholder="What did you observe?" rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {noteForm.checklist.map((item, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                        <span>{item.text}</span>
+                        <button className={cd.linkAction} style={{ marginLeft: 'auto', color: '#B05C5C', fontSize: 12 }} onClick={() => setNoteForm({ ...noteForm, checklist: noteForm.checklist.filter((_, j) => j !== i) })}>
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        value={checklistDraft}
+                        onChange={(e) => setChecklistDraft(e.target.value)}
+                        placeholder="Add a to-do…"
+                        style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addChecklistDraftItem())}
+                      />
+                      <div className={styles.ghostChip} onClick={addChecklistDraftItem}>Add</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div className={styles.primaryChip} style={{ opacity: savingNote ? 0.7 : 1 }} onClick={saveNoteForm}>{savingNote ? 'Saving…' : 'Save note'}</div>
+                    <div className={styles.ghostChip} onClick={() => { setNoteForm(null); setChecklistDraft('') }}>Cancel</div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
                 {filteredNotes.map((n) => (
-                  <div key={n.id} style={{ padding: '10px 14px', border: '1px solid #E7DCC6', borderRadius: 10 }}>
+                  <div key={n.id} className={`${cd.noteCard} ${n.pinned ? cd.noteCardPinned : ''}`}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#2A2118', flex: 1 }}>{n.title ?? 'Note'}</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#2A2118', flex: 1, minWidth: 0 }}>{n.title}</div>
                       {canAddNote && (
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <span style={{ cursor: 'pointer', display: 'flex' }} onClick={() => togglePin(n)} title="Pin">
+                        <div className={cd.noteTools}>
+                          <button className={`${cd.iconBtn} ${n.pinned ? cd.starOn : ''}`} onClick={() => togglePin(n)} title={n.pinned ? 'Unpin note' : 'Pin note'} aria-label={n.pinned ? 'Unpin note' : 'Pin note'}>
                             <Icon name="star" size={14} color={n.pinned ? PRIMARY : '#C9BC9E'} />
-                          </span>
-                          <span style={{ cursor: 'pointer', display: 'flex' }} onClick={() => setNoteForm({ id: n.id, title: n.title ?? '', note: n.note, checklist: n.checklist ?? [] })} title="Edit">
+                          </button>
+                          <button className={cd.iconBtn} onClick={() => setNoteForm({ id: n.id, title: n.title ?? '', note: n.note, checklist: n.checklist ?? [] })} title="Edit note" aria-label="Edit note">
                             <Icon name="edit" size={14} color={MUTED} />
-                          </span>
-                          <span style={{ cursor: 'pointer', display: 'flex' }} onClick={() => removeNote(n.id)} title="Delete">
+                          </button>
+                          <button className={cd.iconBtn} onClick={() => removeNote(n.id)} title="Delete note" aria-label="Delete note">
                             <Icon name="trash-2" size={14} color="#B05C5C" />
-                          </span>
+                          </button>
                         </div>
                       )}
                     </div>
-                    <div style={{ fontSize: 13.5, color: '#2A2118', marginTop: 4 }}>{n.note}</div>
+                    <div style={{ fontSize: 13.5, color: '#2A2118', marginTop: n.title ? 4 : 0, lineHeight: 1.55 }}>{n.note}</div>
                     {n.checklist && n.checklist.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 9 }}>
                         {n.checklist.map((item, i) => (
                           <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: item.checked ? MUTED : '#2A2118', textDecoration: item.checked ? 'line-through' : 'none', cursor: canAddNote ? 'pointer' : 'default' }}>
-                            <input type="checkbox" checked={item.checked} disabled={!canAddNote} onChange={() => toggleChecklistItem(n, i)} />
+                            <input type="checkbox" className={cd.check} checked={item.checked} disabled={!canAddNote} onChange={() => toggleChecklistItem(n, i)} />
                             {item.text}
                           </label>
                         ))}
                       </div>
                     )}
-                    <div style={{ fontSize: 11.5, color: MUTED, marginTop: 6 }}>{n.lawyer_name ?? 'Lawyer'} · {formatDate(n.created_at)}</div>
+                    <div className={cd.metaRow}>
+                      <span>{n.lawyer_name ?? 'Lawyer'}</span>
+                      <span>{formatDate(n.created_at)}</span>
+                    </div>
                   </div>
                 ))}
-                {filteredNotes.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No notes yet.</div>}
+                {filteredNotes.length === 0 && (
+                  <Empty>
+                    {noteSearch.trim()
+                      ? 'No notes match that search.'
+                      : canAddNote
+                        ? 'Notes you keep here stay with the case and are visible to your firm, not the client.'
+                        : 'Your lawyer has not shared any notes on this case.'}
+                  </Empty>
+                )}
               </div>
-            </div>
-          </div>
+            </Card>
           </div>
         </div>
 

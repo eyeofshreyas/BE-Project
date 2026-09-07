@@ -24,7 +24,7 @@ class MeetingSummary(BaseModel):
 class MeetingCreate(BaseModel):
     """Request body for scheduling a meeting."""
     case_id: int
-    conducted_by: int
+    conducted_by: int | None = None
     meeting_title: str | None = None
     meeting_type: str | None = None
     meeting_date: str

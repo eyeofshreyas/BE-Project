@@ -82,11 +82,21 @@ def get_meeting(meeting_id: int, profile: dict = Depends(get_current_profile)):
 
 
 def create_meeting(data: MeetingCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
-    """Schedule a meeting for a case the caller has access to. Calls: `ensure_case_access()`, `_get_meeting()`."""
+    """Schedule a meeting for a case the caller has access to, conducted by the caller's own
+    lawyer record unless another is named -- the client never sends a lawyer_id, it only knows
+    user_ids. Calls: `ensure_case_access()`, `_get_meeting()`."""
     ensure_case_access(data.case_id, profile)
+
+    conducted_by = data.conducted_by
+    if conducted_by is None:
+        lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
+        if not lawyer_rows:
+            raise HTTPException(status_code=400, detail="Name a lawyer to conduct this meeting.")
+        conducted_by = lawyer_rows[0]["lawyer_id"]
+
     row = supabase.table("meetings").insert({
         "case_id": data.case_id,
-        "conducted_by": data.conducted_by,
+        "conducted_by": conducted_by,
         "meeting_title": data.meeting_title,
         "meeting_type": data.meeting_type,
         "meeting_date": data.meeting_date,
