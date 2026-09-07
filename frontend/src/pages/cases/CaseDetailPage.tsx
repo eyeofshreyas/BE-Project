@@ -16,7 +16,7 @@ import { formatDate as formatDateWith } from '../../utils/date'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
-import cd from './CaseDetailPage.module.css'
+import cd from './cases.module.css'
 import { Dropdown } from '../conveyancing/ConveyancingDashboardPage'
 
 const PRIMARY = '#B08D3E'
@@ -729,8 +729,8 @@ export default function CaseDetailPage() {
                     {noteSearch.trim()
                       ? 'No notes match that search.'
                       : canAddNote
-                        ? 'Notes you keep here stay with the case and are visible to your firm, not the client.'
-                        : 'Your lawyer has not shared any notes on this case.'}
+                        ? 'Notes stay with the case. Everyone with access to it can read them, the client included.'
+                        : 'No notes on this case yet.'}
                   </Empty>
                 )}
               </div>
