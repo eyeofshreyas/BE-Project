@@ -148,6 +148,10 @@ export function createMatter(payload: MatterCreatePayload) {
   return post<MatterCreated>('/conveyancing/matters', payload)
 }
 
+export function updateMatter(matterId: number, payload: { registration_status?: string; registration_date?: string; office_name?: string }) {
+  return patch<{ matter_id: number; registration_status: string | null; registration_date: string | null }>(`/conveyancing/matters/${matterId}`, payload)
+}
+
 export function getMatterDetail(matterId: number) {
   return get<MatterDetail>(`/conveyancing/matters/${matterId}`)
 }

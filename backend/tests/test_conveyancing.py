@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.conveyancing import update_due_diligence, complete_progress_stage
-from app.models.conveyancing import DueDiligenceUpdate
+from app.controllers.conveyancing import update_due_diligence, complete_progress_stage, update_matter
+from app.models.conveyancing import DueDiligenceUpdate, MatterUpdate
 
 
 def _fake_supabase(rows_by_table):
@@ -53,7 +53,20 @@ def test_complete_progress_stage_rejects_matter_on_out_of_scope_case():
             assert e.status_code == 403
 
 
+def test_update_matter_rejects_matter_on_out_of_scope_case():
+    """Verifies editing a matter's registration status/date on an out-of-scope case raises 403, via a mocked matter lookup. Exercises: `PATCH /conveyancing/matters/{id}` (`conveyancing.update_matter()`)."""
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
+         patch("app.controllers.conveyancing.supabase", _fake_supabase(MATTER_ON_CASE_20)):
+        try:
+            update_matter(5, MatterUpdate(registration_status="Lodged"), profile)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 403
+
+
 if __name__ == "__main__":
     test_update_due_diligence_rejects_matter_on_out_of_scope_case()
     test_complete_progress_stage_rejects_matter_on_out_of_scope_case()
+    test_update_matter_rejects_matter_on_out_of_scope_case()
     print("ok")

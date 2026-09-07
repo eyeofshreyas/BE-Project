@@ -8,14 +8,14 @@ from fastapi import Depends, File, HTTPException, UploadFile
 from app.db.supabase_client import supabase
 from app.controllers.documents import DOCUMENTS_BUCKET
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
-from app.models.conveyancing import Stats, StatusCount, MatterSummary, ConveyancingSummary, Property, DueDiligence, DueDiligenceUpdate, ProgressStage, PropertyRegistration, MatterDocument, MatterDetail, MatterCreate
+from app.models.conveyancing import Stats, StatusCount, MatterSummary, ConveyancingSummary, Property, DueDiligence, DueDiligenceUpdate, ProgressStage, PropertyRegistration, MatterDocument, MatterDetail, MatterCreate, MatterUpdate
 
 MATTERS_SELECT = (
-    "matter_id,matter_number,matter_type,transaction_type,registration_status,completion_percentage,case_id,"
+    "matter_id,matter_number,matter_type,transaction_type,registration_status,completion_percentage,case_id,created_at,"
     "conveyancing_parties(party_name,role),"
     "properties(property_name,address,city),"
     "property_registrations(registration_date),"
-    "cases(case_lawyers(lawyer_id,is_active,lawyers(users(full_name))))"
+    "cases(priority,case_lawyers(lawyer_id,is_active,lawyers(users(full_name))))"
 )
 
 
@@ -93,6 +93,8 @@ def conveyancing_summary(profile: dict = Depends(get_current_profile)):
                 "lawyer": _active_matter_lawyer(r["cases"]["case_lawyers"] if r.get("cases") else []),
                 "reg_date": _registration_date(r),
                 "status": r["registration_status"],
+                "priority": r["cases"]["priority"] if r.get("cases") else None,
+                "created_at": r.get("created_at"),
             }
             for r in rows[:500]
         ],
@@ -164,6 +166,36 @@ def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMI
         }).execute()
 
     return {"matter_id": matter_row["matter_id"], "matter_number": matter_number}
+
+
+def update_matter(matter_id: int, data: MatterUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Edit a matter's registration status and/or its scheduled registration (date + office),
+    upserting the `property_registrations` row since a matter may not have one yet. Backs both
+    the dashboard's row Edit action and the Schedule Registration quick action.
+    Calls: `_ensure_matter_access()`, `_registration_date()`."""
+    _ensure_matter_access(matter_id, profile)
+
+    if data.registration_status:
+        supabase.table("conveyancing_matters").update(
+            {"registration_status": data.registration_status}
+        ).eq("matter_id", matter_id).execute()
+
+    reg = {k: v for k, v in data.model_dump().items() if v is not None}
+    if reg:
+        existing = supabase.table("property_registrations").select("registration_id").eq("matter_id", matter_id).execute().data
+        if existing:
+            supabase.table("property_registrations").update(reg).eq("matter_id", matter_id).execute()
+        else:
+            supabase.table("property_registrations").insert({"matter_id": matter_id, **reg}).execute()
+
+    row = supabase.table("conveyancing_matters").select(
+        "matter_id,registration_status,property_registrations(registration_date)"
+    ).eq("matter_id", matter_id).execute().data[0]
+    return {
+        "matter_id": row["matter_id"],
+        "registration_status": row["registration_status"],
+        "registration_date": _registration_date(row),
+    }
 
 
 def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profile)):

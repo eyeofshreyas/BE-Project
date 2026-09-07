@@ -1,7 +1,7 @@
 /** `/conveyancing` route: role-dispatches to `StaffConveyancingView` (lawyer/admin) or `ClientConveyancingView`, both driven by `getConveyancingSummary()`. */
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { getConveyancingSummary, listAllMeetings, getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument } from '../../api/client'
+import { getConveyancingSummary, listAllMeetings, getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument, updateMatter, createInvoice } from '../../api/client'
 import type { ConveyancingSummary, MeetingSummary, UserProfile, MatterDetail } from '../../types/api'
 import { Icon } from '../../components/icons'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
@@ -48,7 +48,14 @@ const STATUS_STYLE_MAP: Record<string, [string, string]> = {
 }
 const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
 
-const QUICK_ACTIONS = ['Schedule Registration', 'Upload Documents', 'Request Settlement Funds']
+type ActionMode = 'schedule' | 'upload' | 'funds'
+const QUICK_ACTIONS: { label: string; mode: ActionMode }[] = [
+  { label: 'Schedule Registration', mode: 'schedule' },
+  { label: 'Upload Documents', mode: 'upload' },
+  { label: 'Request Settlement Funds', mode: 'funds' },
+]
+const REG_STATUSES = ['Pending', 'Drafting', 'Documents Pending', 'Registration Scheduled', 'Lodged', 'Registered', 'Completed']
+const FILTER_PRIORITIES = ['Any', 'Low', 'Medium', 'High'] as const
 const MATTERS_PAGE_SIZE = 6
 
 const FILTER_STATUSES: { label: string; dot: string }[] = [
@@ -80,6 +87,20 @@ function relativeDateTime(iso: string) {
 
 function formatDate(iso: string) {
   return formatDateWith(iso, { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+/** True when `iso` falls inside the Date Created filter's range (null range = no filtering). */
+function withinDateRange(iso: string | null, range: string | null) {
+  if (!range) return true
+  if (!iso) return false
+  const d = new Date(iso)
+  const now = new Date()
+  if (range === 'Today') return d.toDateString() === now.toDateString()
+  const start = new Date(now)
+  if (range === 'This Week') start.setDate(now.getDate() - now.getDay())
+  else start.setDate(1)
+  start.setHours(0, 0, 0, 0)
+  return d >= start
 }
 
 /** Page numbers to render around `current`, with '...' gaps -- always keeps 1, `total`, and current±1. */
@@ -136,9 +157,9 @@ export default function ConveyancingDashboardPage() {
  * Loads `getConveyancingSummary()` (stats, status donut, matters list) and
  * `listAllMeetings()` (for upcoming appointments); supports matter
  * search/type/status filtering with pagination, a "New Matter" button
- * that navigates to `/conveyancing/matters/new`, and a "Filter" popover
- * (status/matter type feed the real search filters; priority/date
- * created are display-only, matters carry no such fields yet).
+ * that navigates to `/conveyancing/matters/new`, a "Filter" popover
+ * (status/matter type/priority/date created all feed the matters list), and
+ * the Quick Actions + row Edit button, which open `MatterActionModal`.
  */
 function StaffConveyancingView() {
   const navigate = useNavigate()
@@ -152,19 +173,27 @@ function StaffConveyancingView() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [priorityFilter, setPriorityFilter] = useState('Any')
+  const [dateFilter, setDateFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
   const [filterOpen, setFilterOpen] = useState(false)
   const [draftStatus, setDraftStatus] = useState('All')
   const [draftType, setDraftType] = useState('All')
-  const [draftPriority, setDraftPriority] = useState<'Low' | 'Medium' | 'High'>('Medium')
+  const [draftPriority, setDraftPriority] = useState('Any')
   const [draftDateRange, setDraftDateRange] = useState<string | null>(null)
 
-  useEffect(() => {
-    getConveyancingSummary()
+  const [action, setAction] = useState<{ mode: ActionMode; matterId?: number } | null>(null)
+
+  function refresh() {
+    return getConveyancingSummary()
       .then(setSummary)
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load conveyancing data.'))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    refresh()
     listAllMeetings().then(setMeetings).catch(() => {})
   }, [])
 
@@ -175,29 +204,35 @@ function StaffConveyancingView() {
     return () => clearTimeout(timer)
   }, [toast])
 
-  function fireAction(label: string) {
-    setToast(`${label}…`)
-    setTimeout(() => setToast(null), 1800)
-  }
-
   function openFilters() {
     setDraftStatus(statusFilter)
     setDraftType(typeFilter)
+    setDraftPriority(priorityFilter)
+    setDraftDateRange(dateFilter)
     setFilterOpen(true)
   }
 
   function clearFilters() {
     setDraftStatus('All')
     setDraftType('All')
-    setDraftPriority('Medium')
+    setDraftPriority('Any')
     setDraftDateRange(null)
   }
 
   function applyFilters() {
     setStatusFilter(draftStatus)
     setTypeFilter(draftType)
+    setPriorityFilter(draftPriority)
+    setDateFilter(draftDateRange)
     setPage(1)
     setFilterOpen(false)
+  }
+
+  /** Closes an action modal, flashes its result and reloads the dashboard so stats/table reflect the change. */
+  function finishAction(message: string) {
+    setAction(null)
+    setToast(message)
+    refresh()
   }
 
   const total = summary?.status_breakdown.reduce((sum, s) => sum + s.count, 0) ?? 0
@@ -231,6 +266,8 @@ function StaffConveyancingView() {
   const filteredMatters = matters.filter((m) =>
     (typeFilter === 'All' || m.type === typeFilter) &&
     (statusFilter === 'All' || m.status === statusFilter) &&
+    (priorityFilter === 'Any' || m.priority === priorityFilter) &&
+    withinDateRange(m.created_at, dateFilter) &&
     (!searchLower || m.number.toLowerCase().includes(searchLower) || (m.client ?? '').toLowerCase().includes(searchLower))
   )
   const totalPages = Math.max(1, Math.ceil(filteredMatters.length / MATTERS_PAGE_SIZE))
@@ -301,7 +338,7 @@ function StaffConveyancingView() {
 
                   <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Priority</div>
                   <div style={{ display: 'flex', gap: 6, background: '#F1E9D6', borderRadius: 9, padding: 4, marginBottom: 18 }}>
-                    {(['Low', 'Medium', 'High'] as const).map((p) => (
+                    {FILTER_PRIORITIES.map((p) => (
                       <div key={p} onClick={() => setDraftPriority(p)} style={{ flex: 1, textAlign: 'center', padding: '7px 0', borderRadius: 7, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: draftPriority === p ? '#2A2118' : MUTED, background: draftPriority === p ? '#FFFFFF' : 'transparent' }}>
                         {p}
                       </div>
@@ -371,9 +408,9 @@ function StaffConveyancingView() {
               <div className={styles.panelCard}>
                 <div className={styles.panelTitle}>Quick Actions</div>
                 <div className={styles.quickActionsList}>
-                  {QUICK_ACTIONS.map((label) => (
-                    <div key={label} className={styles.quickAction} onClick={() => fireAction(label)}>
-                      <span>{label}</span><ChevronRightIcon />
+                  {QUICK_ACTIONS.map((a) => (
+                    <div key={a.label} className={styles.quickAction} onClick={() => setAction({ mode: a.mode })}>
+                      <span>{a.label}</span><ChevronRightIcon />
                     </div>
                   ))}
                 </div>
@@ -453,7 +490,7 @@ function StaffConveyancingView() {
                             {m.case_id ? (
                               <div onClick={() => navigate(`/cases/${m.case_id}`)} style={{ cursor: 'pointer', display: 'flex' }} title="View case"><Icon name="eye" size={16} color="#6A5C42" /></div>
                             ) : <span style={{ width: 16 }} />}
-                            <div style={{ cursor: 'default', display: 'flex', opacity: .4 }} title="Editing matters coming soon"><Icon name="edit" size={16} color="#6A5C42" /></div>
+                            <div onClick={() => setAction({ mode: 'schedule', matterId: m.matter_id })} style={{ cursor: 'pointer', display: 'flex' }} title="Edit matter"><Icon name="edit" size={16} color="#6A5C42" /></div>
                           </div>
                         </td>
                       </tr>
@@ -484,8 +521,169 @@ function StaffConveyancingView() {
           </>
         )}
 
+        {action && (
+          <MatterActionModal
+            mode={action.mode}
+            matters={matters}
+            initialMatterId={action.matterId}
+            onClose={() => setAction(null)}
+            onDone={finishAction}
+          />
+        )}
+
         {toast && <div className={styles.toast}>{toast}</div>}
 
+      </div>
+    </div>
+  )
+}
+
+const modalInput: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }
+
+function ModalField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: '#6A5C42', marginBottom: 6 }}>{label}</div>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * The one modal behind every write action on the staff dashboard, picked by `mode`:
+ * `schedule` patches the matter's registration status/date/office via `updateMatter()`
+ * (also what the row Edit button opens, pre-selected), `upload` attaches a file with
+ * `uploadMatterDocument()`, and `funds` raises a settlement invoice against the matter's
+ * case with `createInvoice()`. All three need a matter, so the picker is always shown.
+ */
+function MatterActionModal({ mode, matters, initialMatterId, onClose, onDone }: {
+  mode: ActionMode
+  matters: ConveyancingSummary['recent_matters']
+  initialMatterId?: number
+  onClose: () => void
+  onDone: (message: string) => void
+}) {
+  const [matterId, setMatterId] = useState(initialMatterId ?? matters[0]?.matter_id ?? 0)
+  const matter = matters.find((m) => m.matter_id === matterId)
+
+  const [status, setStatus] = useState(matter?.status ?? 'Registration Scheduled')
+  const [regDate, setRegDate] = useState(matter?.reg_date?.slice(0, 10) ?? '')
+  const [office, setOffice] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [amount, setAmount] = useState('')
+  const [dueDate, setDueDate] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  // Status/date belong to the selected matter, so re-seed them whenever it changes.
+  function pickMatter(id: number) {
+    const next = matters.find((m) => m.matter_id === id)
+    setMatterId(id)
+    setStatus(next?.status ?? 'Registration Scheduled')
+    setRegDate(next?.reg_date?.slice(0, 10) ?? '')
+  }
+
+  const title = mode === 'schedule' ? (initialMatterId ? 'Edit Matter' : 'Schedule Registration')
+    : mode === 'upload' ? 'Upload Documents'
+    : 'Request Settlement Funds'
+
+  async function submit() {
+    if (!matter) { setError('Select a matter first.'); return }
+    setSaving(true)
+    setError('')
+    try {
+      if (mode === 'schedule') {
+        await updateMatter(matter.matter_id, {
+          registration_status: status,
+          registration_date: regDate || undefined,
+          office_name: office.trim() || undefined,
+        })
+        onDone(`${matter.number} updated.`)
+      } else if (mode === 'upload') {
+        if (!file) { setError('Choose a file to upload.'); setSaving(false); return }
+        await uploadMatterDocument(matter.matter_id, file)
+        onDone(`${file.name} uploaded to ${matter.number}.`)
+      } else {
+        const value = Number(amount)
+        if (!value || value <= 0) { setError('Enter the settlement amount.'); setSaving(false); return }
+        if (matter.case_id == null) { setError('This matter has no case to invoice against.'); setSaving(false); return }
+        await createInvoice({
+          case_id: matter.case_id,
+          invoice_number: `SET-${matter.number}-${Date.now().toString().slice(-5)}`,
+          amount: value,
+          tax: 0,
+          total_amount: value,
+          issue_date: new Date().toISOString().slice(0, 10),
+          due_date: dueDate || undefined,
+          remarks: `Settlement funds requested for ${matter.number}`,
+        })
+        onDone(`Settlement funds requested for ${matter.number}.`)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Action failed.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24 }} onClick={onClose}>
+      <div style={{ background: '#FCF9F3', borderRadius: 18, width: 'min(460px, 100%)', padding: 24, boxShadow: '0 20px 48px rgba(0,0,0,.3)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 18, fontWeight: 700, color: '#2A2118' }}>{title}</div>
+          <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={18} color={MUTED} /></span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <ModalField label="Matter">
+            <select value={matterId} onChange={(e) => pickMatter(Number(e.target.value))} style={modalInput} disabled={initialMatterId != null}>
+              {matters.length === 0 && <option value={0}>No matters available</option>}
+              {matters.map((m) => <option key={m.matter_id} value={m.matter_id}>{m.number} — {m.title}</option>)}
+            </select>
+          </ModalField>
+
+          {mode === 'schedule' && (
+            <>
+              <ModalField label="Registration Status">
+                <select value={status} onChange={(e) => setStatus(e.target.value)} style={modalInput}>
+                  {[...new Set([...REG_STATUSES, status])].map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </ModalField>
+              <ModalField label="Registration Date">
+                <input type="date" value={regDate} onChange={(e) => setRegDate(e.target.value)} style={modalInput} />
+              </ModalField>
+              <ModalField label="Registrar Office (optional)">
+                <input value={office} onChange={(e) => setOffice(e.target.value)} placeholder="Sub-Registrar Office…" style={modalInput} />
+              </ModalField>
+            </>
+          )}
+
+          {mode === 'upload' && (
+            <ModalField label="Document">
+              <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={modalInput} />
+            </ModalField>
+          )}
+
+          {mode === 'funds' && (
+            <>
+              <ModalField label="Settlement Amount (₹)">
+                <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" style={modalInput} />
+              </ModalField>
+              <ModalField label="Due Date (optional)">
+                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={modalInput} />
+              </ModalField>
+            </>
+          )}
+
+          {error && <div style={{ color: '#B05C5C', fontSize: 12.5 }}>{error}</div>}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+            <div className={styles.ghostChip} onClick={onClose}>Cancel</div>
+            <div className={styles.primaryChip} style={{ opacity: saving ? .7 : 1, pointerEvents: saving ? 'none' : 'auto' }} onClick={submit}>
+              {saving ? 'Saving…' : 'Confirm'}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

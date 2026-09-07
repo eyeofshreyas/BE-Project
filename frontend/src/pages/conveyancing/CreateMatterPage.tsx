@@ -9,7 +9,7 @@ import styles from './ConveyancingDashboardPage.module.css'
 const MUTED = '#8C7C5E'
 const MATTER_TYPES = ['Sale', 'Purchase', 'Mortgage', 'Lease', 'Other']
 const PROPERTY_TYPES = ['Residential House', 'Apartment', 'Commercial', 'Land', 'Other']
-const PRIORITIES = ['Low', 'Normal', 'High'] as const
+const PRIORITIES = ['Low', 'Medium', 'High'] as const
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -48,7 +48,7 @@ export default function CreateMatterPage() {
 
   const [matterName, setMatterName] = useState('')
   const [matterType, setMatterType] = useState(MATTER_TYPES[0])
-  const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>('Normal')
+  const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>('Medium')
   const [lawyerQuery, setLawyerQuery] = useState('')
 
   const [clientQuery, setClientQuery] = useState('')
