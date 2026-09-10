@@ -5,9 +5,9 @@ import logoWhite from '../../assets/logo-white.svg'
 import { login, forgotPassword } from '../../api/client'
 import styles from './LoginPage.module.css'
 
-const PRIMARY = '#B08D3E'
-const BORDER = '#E7DCC6'
-const MUTED = '#8C7C5E'
+const PRIMARY = '#23306B'
+const BORDER = '#CFC6B0'
+const MUTED = '#6E6759'
 
 function MailIcon() {
   return (
@@ -44,7 +44,7 @@ function EyeIcon({ off }: { off: boolean }) {
 
 function AlertIcon() {
   return (
-    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#EF5350" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#B3282D" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <circle cx={12} cy={12} r={9} />
       <path d="M12 8v5" />
       <path d="M12 16h.01" />
@@ -54,7 +54,7 @@ function AlertIcon() {
 
 function ArrowIcon() {
   return (
-    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 12h14" />
       <path d="M13 6l6 6-6 6" />
     </svg>
@@ -73,7 +73,7 @@ function GoogleIcon() {
 
 function SparklesIcon() {
   return (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" />
     </svg>
   )
@@ -81,7 +81,7 @@ function SparklesIcon() {
 
 function LinkIcon() {
   return (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 15l6-6" />
       <path d="M11 6l1-1a3.5 3.5 0 0 1 5 5l-1 1" />
       <path d="M13 18l-1 1a3.5 3.5 0 0 1-5-5l1-1" />
@@ -91,7 +91,7 @@ function LinkIcon() {
 
 function LanguagesIcon() {
   return (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <circle cx={12} cy={12} r={9} />
       <path d="M3 12h18" />
       <path d="M12 3a15 15 0 0 1 0 18" />
@@ -123,10 +123,10 @@ export default function LoginPage() {
   const [toast, setToast] = useState<string | null>(null)
 
   const wrapStyle = (name: 'email' | 'password'): CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 10, background: '#FFFFFF',
-    border: `1.5px solid ${focused === name ? PRIMARY : BORDER}`, borderRadius: 12, padding: '13px 15px',
+    display: 'flex', alignItems: 'center', gap: 10, background: '#FCFAF4',
+    border: `1.5px solid ${focused === name ? PRIMARY : BORDER}`, borderRadius: 3, padding: '13px 15px',
     transition: 'border-color .15s, box-shadow .15s',
-    boxShadow: focused === name ? '0 0 0 3px rgba(176,141,62,.14)' : 'none',
+    boxShadow: focused === name ? '0 0 0 3px rgba(35, 48, 107,.14)' : 'none',
   })
 
   /** Validates the email field then calls `forgotPassword()`, showing the result as a toast. */
@@ -239,9 +239,9 @@ export default function LoginPage() {
             </div>
 
             <div className={styles.rememberRow} onClick={() => setRemember((r) => !r)}>
-              <div className={styles.checkbox} style={{ background: remember ? PRIMARY : '#FFFFFF', border: remember ? 'none' : `1.5px solid ${BORDER}` }}>
+              <div className={styles.checkbox} style={{ background: remember ? PRIMARY : '#FCFAF4', border: remember ? 'none' : `1.5px solid ${BORDER}` }}>
                 {remember && (
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 )}

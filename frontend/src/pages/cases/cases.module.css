@@ -3,10 +3,10 @@
    that page doesn't have: the record header, the facts strip, and the cards. */
 
 .record {
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 20px;
-  box-shadow: 0 1px 2px rgba(42, 33, 24, .04);
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
   overflow: hidden;
 }
 
@@ -20,16 +20,16 @@
 }
 
 .caseNumber {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'IBM Plex Mono', monospace;
   font-size: 12.5px;
-  color: #B08D3E;
+  color: #23306B;
 }
 
 .caseTitle {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
   font-size: 27px;
   font-weight: 700;
-  color: #2A2118;
+  color: #1A1A17;
   letter-spacing: -.015em;
   line-height: 1.15;
   margin: 5px 0 0;
@@ -56,33 +56,33 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 1px;
-  background: #E7DCC6;
-  border-top: 1px solid #E7DCC6;
+  background: #CFC6B0;
+  border-top: 1px solid #CFC6B0;
 }
 
 .fact {
-  background: #FBF7EE;
+  background: #F6F2E9;
   padding: 15px 26px;
 }
 
 .factLabel {
   font-size: 12px;
   font-weight: 500;
-  color: #8C7C5E;
+  color: #6E6759;
 }
 
 .factValue {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
   font-size: 15px;
   font-weight: 600;
-  color: #2A2118;
+  color: #1A1A17;
   margin-top: 5px;
 }
 
 .factAction {
   font-size: 11.5px;
   font-weight: 600;
-  color: #B05C5C;
+  color: #B3282D;
   cursor: pointer;
   margin-top: 4px;
 }
@@ -106,10 +106,10 @@
 }
 
 .card {
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 18px;
-  box-shadow: 0 1px 2px rgba(42, 33, 24, .04);
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
 }
 
 .cardHead {
@@ -117,22 +117,22 @@
   align-items: center;
   gap: 10px;
   padding: 16px 22px;
-  border-bottom: 1px solid #F1E9D9;
+  border-bottom: 1px solid #F1EDE0;
 }
 
 .cardTitle {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
   font-size: 14.5px;
   font-weight: 700;
-  color: #2A2118;
+  color: #1A1A17;
 }
 
 .count {
   font-size: 11.5px;
   font-weight: 700;
-  color: #8f6743;
-  background: #F1E9D9;
-  border-radius: 20px;
+  color: #1A2551;
+  background: #F1EDE0;
+  border-radius: 3px;
   padding: 2px 9px;
 }
 
@@ -144,8 +144,8 @@
    it gets the largest body type and a gold edge marking it as generated. */
 .aiCard {
   background: #FBF3E2;
-  border: 1px solid #E4D2A8;
-  border-radius: 18px;
+  border: 1px solid #E6E0CE;
+  border-radius: 3px;
   padding: 22px 24px 22px 28px;
   position: relative;
   overflow: hidden;
@@ -158,37 +158,37 @@
   top: 0;
   bottom: 0;
   width: 3px;
-  background: #B08D3E;
+  background: #23306B;
 }
 
 .aiHead {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
   font-size: 14.5px;
   font-weight: 700;
-  color: #2A2118;
+  color: #1A1A17;
   margin-bottom: 12px;
 }
 
 .aiBody {
   font-size: 15.5px;
   line-height: 1.6;
-  color: #2A2118;
+  color: #1A1A17;
   max-width: 68ch;
 }
 
 .aiMeta {
   font-size: 11.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 12px;
 }
 
 .empty {
   font-size: 13px;
   line-height: 1.55;
-  color: #8C7C5E;
+  color: #6E6759;
   max-width: 52ch;
 }
 
@@ -202,14 +202,14 @@
 
 .listRow {
   padding: 12px 14px;
-  border: 1px solid #E7DCC6;
-  border-radius: 11px;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
 }
 
 .rowTitle {
   font-size: 13.5px;
   font-weight: 600;
-  color: #2A2118;
+  color: #1A1A17;
 }
 
 /* Spacing, not middle dots, separates the meta fields. */
@@ -218,7 +218,7 @@
   gap: 16px;
   flex-wrap: wrap;
   font-size: 11.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 5px;
 }
 
@@ -232,8 +232,8 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: #B08D3E;
-  color: #FFFFFF;
+  background: #23306B;
+  color: #FCFAF4;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -248,7 +248,7 @@
   gap: 7px;
   margin-top: 14px;
   font-size: 12.5px;
-  color: #6A5C42;
+  color: #575145;
 }
 
 .contactItem {
@@ -263,10 +263,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1.5px solid #E7DCC6;
-  border-radius: 9px;
+  border: 1.5px solid #CFC6B0;
+  border-radius: 3px;
   padding: 8px 12px;
-  background: #FFFFFF;
+  background: #FCFAF4;
 }
 
 .plainInput {
@@ -277,7 +277,7 @@
   min-width: 0;
   font-size: 13.5px;
   font-family: inherit;
-  color: #2A2118;
+  color: #1A1A17;
 }
 
 .composer {
@@ -289,7 +289,7 @@
 .linkAction {
   font-size: 12.5px;
   font-weight: 600;
-  color: #B08D3E;
+  color: #23306B;
   cursor: pointer;
   background: none;
   border: none;
@@ -299,22 +299,22 @@
 
 .noteCard {
   padding: 12px 14px;
-  border: 1px solid #E7DCC6;
-  border-radius: 11px;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
 }
 
 .noteCardPinned {
-  border-color: #E4D2A8;
-  background: #FDF7EA;
+  border-color: #E6E0CE;
+  background: #F1EDE0;
 }
 
 /* The star icon is stroke-only, so filling it is what reads as "pinned". */
 .starOn svg {
-  fill: #B08D3E;
+  fill: #23306B;
 }
 
 .check {
-  accent-color: #B08D3E;
+  accent-color: #23306B;
 }
 
 .noteTools {
@@ -329,17 +329,17 @@
   background: none;
   border: none;
   padding: 2px;
-  border-radius: 6px;
+  border-radius: 3px;
 }
 
 .iconBtn:hover {
-  background: #F1E9D9;
+  background: #F1EDE0;
 }
 
 .dangerLink {
   font-size: 13px;
   font-weight: 600;
-  color: #B05C5C;
+  color: #B3282D;
   cursor: pointer;
 }
 
@@ -351,15 +351,15 @@
   gap: 14px;
   flex-wrap: wrap;
   padding: 14px 20px;
-  border-bottom: 1px solid #E7DCC6;
-  background: #FBF7EE;
+  border-bottom: 1px solid #CFC6B0;
+  background: #F6F2E9;
 }
 
 .tabs {
   display: flex;
   gap: 4px;
-  background: #EFE4CB;
-  border-radius: 10px;
+  background: #E6E0CE;
+  border-radius: 3px;
   padding: 4px;
 }
 
@@ -368,26 +368,26 @@
   align-items: center;
   gap: 7px;
   padding: 7px 13px;
-  border-radius: 8px;
+  border-radius: 3px;
   border: none;
   font-family: inherit;
   font-size: 12.5px;
   font-weight: 600;
-  color: #6A5C42;
+  color: #575145;
   background: transparent;
   cursor: pointer;
 }
 
 .tabOn {
-  color: #2A2118;
-  background: #FFFFFF;
-  box-shadow: 0 1px 2px rgba(42, 33, 24, .07);
+  color: #1A1A17;
+  background: #FCFAF4;
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .07);
 }
 
 .tabCount {
   font-size: 11px;
   font-weight: 700;
-  color: #8f6743;
+  color: #1A2551;
 }
 
 /* Sortable column heading: the caret's space is always reserved, so switching
@@ -424,7 +424,7 @@
   align-items: center;
   gap: 7px;
   font-size: 13px;
-  color: #2A2118;
+  color: #1A1A17;
 }
 
 .priorityDot {
@@ -440,17 +440,17 @@
   text-align: left;
   font: inherit;
   color: inherit;
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 18px;
-  box-shadow: 0 1px 2px rgba(42, 33, 24, .04);
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
   padding: 20px 22px;
   cursor: pointer;
 }
 
 .caseCard:hover {
-  border-color: #D8C79A;
-  box-shadow: 0 8px 20px rgba(42, 33, 24, .07);
+  border-color: #CFC6B0;
+  box-shadow: 0 8px 20px rgba(35, 48, 107, .07);
 }
 
 .caseCardTop {
@@ -466,7 +466,7 @@
   gap: 16px;
   margin-top: 18px;
   padding-top: 16px;
-  border-top: 1px solid #F1E9D9;
+  border-top: 1px solid #F1EDE0;
 }
 
 .activityLine {
@@ -474,7 +474,7 @@
   align-items: center;
   gap: 8px;
   font-size: 12.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 14px;
 }
 
@@ -482,7 +482,7 @@
   display: flex;
   gap: 9px;
   padding-top: 13px;
-  border-top: 1px solid #F1E9D9;
+  border-top: 1px solid #F1EDE0;
 }
 
 .updateRow:first-child {
@@ -491,9 +491,9 @@
 }
 
 .updateCase {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
-  color: #B08D3E;
+  color: #23306B;
 }
 
 /* A client sees neither notes nor the AI summary, which empties the side

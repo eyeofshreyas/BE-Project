@@ -34,16 +34,16 @@ export default function SettingsView({ onSave }: { onSave: () => void }) {
   const [autoBackup, setAutoBackup] = useState(true)
   const [theme, setTheme] = useState<'Light' | 'Dark' | 'System'>('Light')
 
-  const cardStyle = { background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 18, padding: 24, boxShadow: '0 1px 2px rgba(42,33,24,.04)', display: 'flex', flexDirection: 'column' as const, gap: 16 }
-  const fieldLabel = { fontSize: 12.5, fontWeight: 600, color: '#6A5C42', marginBottom: 7 }
-  const inputWrap = { display: 'flex', alignItems: 'center', gap: 9, background: '#FCF9F3', border: `1.5px solid ${C.border}`, borderRadius: 11, padding: '11px 13px' }
-  const inputStyle = { border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 13.5, color: C.text, fontFamily: 'Inter,sans-serif', minWidth: 0 }
+  const cardStyle = { background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 24, boxShadow: '0 1px 2px rgba(35, 48, 107,.04)', display: 'flex', flexDirection: 'column' as const, gap: 16 }
+  const fieldLabel = { fontSize: 12.5, fontWeight: 600, color: '#575145', marginBottom: 7 }
+  const inputWrap = { display: 'flex', alignItems: 'center', gap: 9, background: '#F6F2E9', border: `1.5px solid ${C.border}`, borderRadius: 3, padding: '11px 13px' }
+  const inputStyle = { border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 13.5, color: C.text, fontFamily: "'Public Sans',sans-serif", minWidth: 0 }
   const rowStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 2px', borderBottom: `1px solid ${C.border}` }
   const rowLastStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 2px' }
   const rowTitle = { fontSize: 13.5, fontWeight: 600, color: C.text }
   const rowDesc = { fontSize: 12, color: C.muted, marginTop: 2 }
-  const btnGhost = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 10, cursor: 'pointer', background: '#FFFFFF', color: C.text, border: `1px solid ${C.border}` }
-  const btnPrimary = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 10, cursor: 'pointer', background: C.primary, color: '#FFFFFF', boxShadow: '0 4px 12px rgba(176,141,62,.28)' }
+  const btnGhost = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 3, cursor: 'pointer', background: '#FCFAF4', color: C.text, border: `1px solid ${C.border}` }
+  const btnPrimary = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 3, cursor: 'pointer', background: C.primary, color: '#FCFAF4', boxShadow: '0 4px 12px rgba(35, 48, 107,.28)' }
 
   const adminInitials = fullName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 
@@ -54,13 +54,13 @@ export default function SettingsView({ onSave }: { onSave: () => void }) {
         <div className={styles.pageSubtitle}>Manage your admin account, platform configuration and preferences.</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 20, alignItems: 'start' }}>
-        <div style={{ background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 18, padding: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {MENU.map((m) => {
             const active = tab === m.key
             return (
-              <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: active ? '#F6EFDD' : 'transparent' }} onClick={() => setTab(m.key)}>
-                <span style={{ display: 'flex', flexShrink: 0 }}><Icon name={m.icon} size={17} color={active ? C.primaryDark : '#93826d'} /></span>
-                <span style={{ fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? C.text : '#6A5C42' }}>{m.label}</span>
+              <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 3, cursor: 'pointer', background: active ? '#F6EFDD' : 'transparent' }} onClick={() => setTab(m.key)}>
+                <span style={{ display: 'flex', flexShrink: 0 }}><Icon name={m.icon} size={17} color={active ? C.primaryDark : '#8C857A'} /></span>
+                <span style={{ fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? C.text : '#575145' }}>{m.label}</span>
               </div>
             )
           })}
@@ -71,7 +71,7 @@ export default function SettingsView({ onSave }: { onSave: () => void }) {
             <div style={cardStyle}>
               <div className={styles.cardTitle}>Admin Profile</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, paddingBottom: 16, borderBottom: `1px solid ${C.border}` }}>
-                <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg,#B08D3E,#D8C79A)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, flexShrink: 0 }}>{adminInitials}</div>
+                <div style={{ width: 56, height: 56, borderRadius: 3, background: 'linear-gradient(135deg,#23306B,#CFC6B0)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FCFAF4', fontFamily: "'Spectral',serif", fontWeight: 700, fontSize: 18, flexShrink: 0 }}>{adminInitials}</div>
                 <div><div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{fullName}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>Super Admin</div></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -107,9 +107,9 @@ export default function SettingsView({ onSave }: { onSave: () => void }) {
               <div className={styles.cardTitle}>Appearance</div>
               <div>
                 <div style={fieldLabel}>Theme</div>
-                <div style={{ display: 'flex', gap: 6, background: '#FCF9F3', border: `1px solid ${C.border}`, borderRadius: 11, padding: 4 }}>
+                <div style={{ display: 'flex', gap: 6, background: '#F6F2E9', border: `1px solid ${C.border}`, borderRadius: 3, padding: 4 }}>
                   {(['Light', 'Dark', 'System'] as const).map((t) => (
-                    <div key={t} style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 600, padding: 11, borderRadius: 9, cursor: 'pointer', background: theme === t ? C.primary : 'transparent', color: theme === t ? '#FFFFFF' : C.text }} onClick={() => setTheme(t)}>{t}</div>
+                    <div key={t} style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 600, padding: 11, borderRadius: 3, cursor: 'pointer', background: theme === t ? C.primary : 'transparent', color: theme === t ? '#FCFAF4' : C.text }} onClick={() => setTheme(t)}>{t}</div>
                   ))}
                 </div>
               </div>
@@ -123,7 +123,7 @@ export default function SettingsView({ onSave }: { onSave: () => void }) {
             </div>
           )}
 
-          <div style={{ background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 16, padding: '16px 20px', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: '16px 20px', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <div style={btnGhost}>Cancel</div>
             <div style={btnPrimary} onClick={onSave}>Save Changes</div>
           </div>

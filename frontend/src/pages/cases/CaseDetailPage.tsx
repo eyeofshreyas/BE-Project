@@ -19,8 +19,8 @@ import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import cd from './cases.module.css'
 import { Dropdown } from '../conveyancing/ConveyancingDashboardPage'
 
-const PRIMARY = '#B08D3E'
-const MUTED = '#8C7C5E'
+const PRIMARY = '#23306B'
+const MUTED = '#6E6759'
 
 const ADMIN = 1
 const LAWYER = 2
@@ -32,15 +32,15 @@ function statusLabel(s: string) {
   return STATUS_LABELS[s] ?? s
 }
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
-  Completed: ['#2E9E58', '#E4F5EA'],
-  Closed: ['#2E9E58', '#E4F5EA'],
-  Open: ['#B87F1E', '#FFF2E0'],
-  'In Progress': ['#B87F1E', '#FFF2E0'],
-  Pending: ['#B87F1E', '#FFF2E0'],
+  Completed: ['#4A6B4E', '#E4EDE5'],
+  Closed: ['#4A6B4E', '#E4EDE5'],
+  Open: ['#8A6A2F', '#F3EBD9'],
+  'In Progress': ['#8A6A2F', '#F3EBD9'],
+  Pending: ['#8A6A2F', '#F3EBD9'],
 }
-const PRIORITY_COLORS: Record<string, string> = { High: '#B05C5C', Medium: '#B87F1E', Low: '#2E9E58' }
+const PRIORITY_COLORS: Record<string, string> = { High: '#B3282D', Medium: '#8A6A2F', Low: '#4A6B4E' }
 
-const inputStyle = { padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5 }
+const inputStyle = { padding: '9px 12px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 13.5 }
 
 function loadProfile(): UserProfile | null {
   try {
@@ -381,13 +381,13 @@ export default function CaseDetailPage() {
   if (error || !caseInfo) return (
     <div className={styles.page}>
       <div className={styles.wrap}>
-        <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>
+        <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>
         <div className={styles.ghostChip} style={{ width: 'fit-content' }} onClick={() => navigate('/cases')}>Back to cases</div>
       </div>
     </div>
   )
 
-  const [statusColor, statusBg] = STATUS_STYLE_MAP[caseInfo.status] || ['#6A5C42', '#EFEAE1']
+  const [statusColor, statusBg] = STATUS_STYLE_MAP[caseInfo.status] || ['#575145', '#F0ECDF']
   const filteredNotes = notes
     .filter((n) => !noteSearch.trim() || `${n.title ?? ''} ${n.note}`.toLowerCase().includes(noteSearch.trim().toLowerCase()))
     .sort((a, b) => Number(b.pinned) - Number(a.pinned))
@@ -409,7 +409,7 @@ export default function CaseDetailPage() {
       <div className={styles.wrap}>
         <div className={styles.breadcrumb}>
           <span style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>Cases</span>
-          <span style={{ display: 'inline-flex', transform: 'rotate(-90deg)' }}><Icon name="chevron-down" size={13} color="#A38F66" /></span>
+          <span style={{ display: 'inline-flex', transform: 'rotate(-90deg)' }}><Icon name="chevron-down" size={13} color="#8C857A" /></span>
           <span>{caseInfo.id}</span>
         </div>
 
@@ -420,7 +420,7 @@ export default function CaseDetailPage() {
               <h1 className={cd.caseTitle}>{caseInfo.case_title ?? caseInfo.court ?? 'Untitled case'}</h1>
               <div className={cd.badges}>
                 <span className={styles.statusBadge} style={{ color: statusColor, background: statusBg }}>{statusLabel(caseInfo.status)}</span>
-                <span className={styles.statusBadge} style={{ color: PRIORITY_COLORS[caseInfo.priority] ?? '#6A5C42', background: '#EFEAE1' }}>{caseInfo.priority} priority</span>
+                <span className={styles.statusBadge} style={{ color: PRIORITY_COLORS[caseInfo.priority] ?? '#575145', background: '#F0ECDF' }}>{caseInfo.priority} priority</span>
               </div>
             </div>
 
@@ -475,7 +475,7 @@ export default function CaseDetailPage() {
                 <Empty
                   action={
                     <div className={styles.primaryChip} style={{ opacity: aiLoading ? 0.7 : 1 }} onClick={() => !aiLoading && generateSummary()}>
-                      <Icon name="sparkles" size={15} color="#FFFFFF" /> {aiLoading ? 'Summarising…' : 'Generate summary'}
+                      <Icon name="sparkles" size={15} color="#FCFAF4" /> {aiLoading ? 'Summarising…' : 'Generate summary'}
                     </div>
                   }
                 >
@@ -556,7 +556,7 @@ export default function CaseDetailPage() {
             >
               {canUploadDocs && uploadFormOpen && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                  <select value={uploadTypeId} onChange={(e) => setUploadTypeId(e.target.value)} style={{ ...inputStyle, background: '#FFFFFF' }}>
+                  <select value={uploadTypeId} onChange={(e) => setUploadTypeId(e.target.value)} style={{ ...inputStyle, background: '#FCFAF4' }}>
                     <option value="">Choose a document type…</option>
                     {documentTypes.map((t) => <option key={t.document_type_id} value={t.document_type_id}>{t.type_name}</option>)}
                   </select>
@@ -580,7 +580,7 @@ export default function CaseDetailPage() {
                           <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{formatDay(d.upload_date)}</div>
                         </div>
                       </div>
-                      <span className={styles.statusBadge} style={d.has_summary ? { color: '#2E9E58', background: '#E4F5EA' } : { color: '#B87F1E', background: '#FFF2E0' }}>
+                      <span className={styles.statusBadge} style={d.has_summary ? { color: '#4A6B4E', background: '#E4EDE5' } : { color: '#8A6A2F', background: '#F3EBD9' }}>
                         {d.has_summary ? 'Summarised' : 'Not summarised'}
                       </span>
                     </div>
@@ -606,14 +606,14 @@ export default function CaseDetailPage() {
                 <div className={cd.clientRow}>
                   <div className={cd.avatar}>{initialsOf(caseInfo.client)}</div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#2A2118' }}>{caseInfo.client}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A17' }}>{caseInfo.client}</div>
                     <div style={{ fontSize: 11.5, color: MUTED }}>Client on this case</div>
                   </div>
                 </div>
                 {(caseInfo.client_email || caseInfo.client_phone) && (
                   <div className={cd.contactList}>
-                    {caseInfo.client_email && <div className={cd.contactItem}><Icon name="mail" size={14} color="#93826d" />{caseInfo.client_email}</div>}
-                    {caseInfo.client_phone && <div className={cd.contactItem}><Icon name="phone" size={14} color="#93826d" />{caseInfo.client_phone}</div>}
+                    {caseInfo.client_email && <div className={cd.contactItem}><Icon name="mail" size={14} color="#8C857A" />{caseInfo.client_email}</div>}
+                    {caseInfo.client_phone && <div className={cd.contactItem}><Icon name="phone" size={14} color="#8C857A" />{caseInfo.client_phone}</div>}
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
@@ -622,7 +622,7 @@ export default function CaseDetailPage() {
                     style={{ flex: 1, justifyContent: 'center', opacity: messaging || !caseInfo.client_id ? 0.6 : 1, cursor: messaging || !caseInfo.client_id ? 'default' : 'pointer' }}
                     onClick={() => !messaging && messageClient()}
                   >
-                    <Icon name="message-circle" size={15} color="#FFFFFF" /> {messaging ? 'Opening…' : 'Message'}
+                    <Icon name="message-circle" size={15} color="#FCFAF4" /> {messaging ? 'Opening…' : 'Message'}
                   </div>
                   {caseInfo.client_phone && (
                     <a href={`tel:${caseInfo.client_phone}`} className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
@@ -637,7 +637,7 @@ export default function CaseDetailPage() {
             <Card title="Notes" count={notes.length}>
               {notes.length > 2 && (
                 <div className={cd.searchBox} style={{ marginBottom: 10 }}>
-                  <Icon name="search" size={15} color="#A38F66" />
+                  <Icon name="search" size={15} color="#8C857A" />
                   <input value={noteSearch} onChange={(e) => setNoteSearch(e.target.value)} placeholder="Search notes…" className={cd.plainInput} />
                 </div>
               )}
@@ -663,14 +663,14 @@ export default function CaseDetailPage() {
               )}
 
               {canAddNote && noteForm !== null && (
-                <div style={{ border: '1.5px solid #E7DCC6', borderRadius: 11, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ border: '1.5px solid #CFC6B0', borderRadius: 3, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <input value={noteForm.title} onChange={(e) => setNoteForm({ ...noteForm, title: e.target.value })} placeholder="Title" style={inputStyle} />
                   <textarea value={noteForm.note} onChange={(e) => setNoteForm({ ...noteForm, note: e.target.value })} placeholder="What did you observe?" rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {noteForm.checklist.map((item, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                         <span>{item.text}</span>
-                        <button className={cd.linkAction} style={{ marginLeft: 'auto', color: '#B05C5C', fontSize: 12 }} onClick={() => setNoteForm({ ...noteForm, checklist: noteForm.checklist.filter((_, j) => j !== i) })}>
+                        <button className={cd.linkAction} style={{ marginLeft: 'auto', color: '#B3282D', fontSize: 12 }} onClick={() => setNoteForm({ ...noteForm, checklist: noteForm.checklist.filter((_, j) => j !== i) })}>
                           Remove
                         </button>
                       </div>
@@ -697,7 +697,7 @@ export default function CaseDetailPage() {
                 {filteredNotes.map((n) => (
                   <div key={n.id} className={`${cd.noteCard} ${n.pinned ? cd.noteCardPinned : ''}`}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#2A2118', flex: 1, minWidth: 0 }}>{n.title}</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17', flex: 1, minWidth: 0 }}>{n.title}</div>
                       {canAddNote && (
                         <div className={cd.noteTools}>
                           <button className={`${cd.iconBtn} ${n.pinned ? cd.starOn : ''}`} onClick={() => togglePin(n)} title={n.pinned ? 'Unpin note' : 'Pin note'} aria-label={n.pinned ? 'Unpin note' : 'Pin note'}>
@@ -707,16 +707,16 @@ export default function CaseDetailPage() {
                             <Icon name="edit" size={14} color={MUTED} />
                           </button>
                           <button className={cd.iconBtn} onClick={() => removeNote(n.id)} title="Delete note" aria-label="Delete note">
-                            <Icon name="trash-2" size={14} color="#B05C5C" />
+                            <Icon name="trash-2" size={14} color="#B3282D" />
                           </button>
                         </div>
                       )}
                     </div>
-                    <div style={{ fontSize: 13.5, color: '#2A2118', marginTop: n.title ? 4 : 0, lineHeight: 1.55 }}>{n.note}</div>
+                    <div style={{ fontSize: 13.5, color: '#1A1A17', marginTop: n.title ? 4 : 0, lineHeight: 1.55 }}>{n.note}</div>
                     {n.checklist && n.checklist.length > 0 && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 9 }}>
                         {n.checklist.map((item, i) => (
-                          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: item.checked ? MUTED : '#2A2118', textDecoration: item.checked ? 'line-through' : 'none', cursor: canAddNote ? 'pointer' : 'default' }}>
+                          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: item.checked ? MUTED : '#1A1A17', textDecoration: item.checked ? 'line-through' : 'none', cursor: canAddNote ? 'pointer' : 'default' }}>
                             <input type="checkbox" className={cd.check} checked={item.checked} disabled={!canAddNote} onChange={() => toggleChecklistItem(n, i)} />
                             {item.text}
                           </label>

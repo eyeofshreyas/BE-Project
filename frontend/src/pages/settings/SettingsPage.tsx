@@ -4,8 +4,8 @@ import logo from '../../assets/logo.svg'
 import styles from './SettingsPage.module.css'
 import { Icon } from '../../components/icons'
 
-const PRIMARY = '#B58A2F'
-const MUTED = '#9CA3AF'
+const PRIMARY = '#1A2551'
+const MUTED = '#8C857A'
 
 const iconProps = { width: 17, height: 17, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
 
@@ -14,15 +14,15 @@ const Building2Icon = () => <svg {...iconProps}><path d="M6 21V5a1 1 0 0 1 1-1h6
 const HelpCircleIcon = () => <svg {...iconProps}><circle cx={12} cy={12} r={9} /><path d="M9.1 9a3 3 0 1 1 4.6 2.4c-.8.5-1.5 1.1-1.5 2.1" /><path d="M12 17h.01" /></svg>
 const SunIcon = () => <svg {...iconProps}><circle cx={12} cy={12} r={4} /><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" /></svg>
 const MoonIcon = () => <svg {...iconProps}><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" /></svg>
-const ChevronRightIcon = () => <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-const GlobeIconSm = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={9} /><path d="M3 12h18" /><path d="M12 3a15 15 0 0 1 0 18" /><path d="M12 3a15 15 0 0 0 0 18" /></svg>
-const ClockIconSm = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={9} /><path d="M12 7v5l4 2" /></svg>
-const DollarIconSm = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20" /><path d="M17 6.5c0-1.9-2.2-3.5-5-3.5s-5 1.6-5 3.5 2.2 3 5 3.5c2.8.5 5 1.6 5 3.5s-2.2 3.5-5 3.5-5-1.6-5-3.5" /></svg>
+const ChevronRightIcon = () => <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#8C857A" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+const GlobeIconSm = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#8C857A" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={9} /><path d="M3 12h18" /><path d="M12 3a15 15 0 0 1 0 18" /><path d="M12 3a15 15 0 0 0 0 18" /></svg>
+const ClockIconSm = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#8C857A" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={9} /><path d="M12 7v5l4 2" /></svg>
+const DollarIconSm = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#8C857A" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20" /><path d="M17 6.5c0-1.9-2.2-3.5-5-3.5s-5 1.6-5 3.5 2.2 3 5 3.5c2.8.5 5 1.6 5 3.5s-2.2 3.5-5 3.5-5-1.6-5-3.5" /></svg>
 const LockIconLg = () => <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={4} y={11} width={16} height={9} rx={2} /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
 const MonitorIconLg = () => <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={2} y={4} width={20} height={13} rx={2} /><path d="M8 21h8" /><path d="M12 17v4" /></svg>
 const SmartphoneIconLg = () => <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={6} y={2} width={12} height={20} rx={2} /><path d="M11 18h2" /></svg>
-const MessageSquareIconSm = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v12H8l-4 4z" /></svg>
-const CreditCardIconSm = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={2} y={5} width={20} height={14} rx={2} /><path d="M2 10h20" /><path d="M6 15h4" /></svg>
+const MessageSquareIconSm = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#8C857A" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v12H8l-4 4z" /></svg>
+const CreditCardIconSm = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#8C857A" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={2} y={5} width={20} height={14} rx={2} /><path d="M2 10h20" /><path d="M6 15h4" /></svg>
 
 const MENU = [
   { key: 'general', label: 'General', icon: <SlidersIcon /> },
@@ -37,9 +37,9 @@ function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
   return (
     <div
       onClick={onChange}
-      style={{ width: 44, height: 26, borderRadius: 20, padding: 2, cursor: 'pointer', background: value ? PRIMARY : '#E8E5DF', display: 'flex', justifyContent: value ? 'flex-end' : 'flex-start', flexShrink: 0, transition: 'background .15s' }}
+      style={{ width: 44, height: 26, borderRadius: 3, padding: 2, cursor: 'pointer', background: value ? PRIMARY : '#E6E0CE', display: 'flex', justifyContent: value ? 'flex-end' : 'flex-start', flexShrink: 0, transition: 'background .15s' }}
     >
-      <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#FFFFFF', boxShadow: '0 2px 4px rgba(0,0,0,.2)' }} />
+      <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#FCFAF4', boxShadow: '0 2px 4px rgba(0,0,0,.2)' }} />
     </div>
   )
 }
@@ -180,7 +180,7 @@ export default function SettingsPage() {
           <div style={{ position: 'relative' }}>
             <div className={styles.avatarRow} onClick={(e) => { e.stopPropagation(); setAvatarOpen((v) => !v); setNotifOpen(false) }}>
               <div className={styles.avatar}>MK</div>
-              <Icon name="chevron-down" size={14} color="#6B7280" />
+              <Icon name="chevron-down" size={14} color="#8C857A" />
             </div>
             {avatarOpen && (
               <div className={styles.dropdownMenu}>
@@ -200,7 +200,7 @@ export default function SettingsPage() {
               <div key={m.key} className={styles.menuRow} style={{ background: active ? '#EFE3C4' : 'transparent' }} onClick={() => setActiveSection(m.key)}>
                 <div className={styles.menuIndicator} style={{ height: active ? 18 : 0 }} />
                 <span style={{ color: active ? PRIMARY : '#8A8478', display: 'flex' }}>{m.icon}</span>
-                <span className={styles.menuLabel} style={{ fontWeight: active ? 700 : 600, color: active ? '#1F2937' : '#5B5344' }}>{m.label}</span>
+                <span className={styles.menuLabel} style={{ fontWeight: active ? 700 : 600, color: active ? '#33302A' : '#5B5344' }}>{m.label}</span>
               </div>
             )
           })}
@@ -223,9 +223,9 @@ export default function SettingsPage() {
                 <div><div className={styles.profileName}>{pName}</div><div className={styles.profileMeta}>{pDesignation} · Kulkarni & Associates</div></div>
               </div>
               <div className={styles.fieldsGrid}>
-                <Field label="Email"><Icon name="mail" size={16} color="#9CA3AF" /><input value={pEmail} onChange={(e) => markDirty(setPEmail)(e.target.value)} className={styles.input} /></Field>
-                <Field label="Phone"><Icon name="phone" size={16} color="#9CA3AF" /><input value={pPhone} onChange={(e) => markDirty(setPPhone)(e.target.value)} className={styles.input} /></Field>
-                <Field label="Designation"><Icon name="briefcase" size={16} color="#9CA3AF" /><input value={pDesignation} onChange={(e) => markDirty(setPDesignation)(e.target.value)} className={styles.input} /></Field>
+                <Field label="Email"><Icon name="mail" size={16} color="#8C857A" /><input value={pEmail} onChange={(e) => markDirty(setPEmail)(e.target.value)} className={styles.input} /></Field>
+                <Field label="Phone"><Icon name="phone" size={16} color="#8C857A" /><input value={pPhone} onChange={(e) => markDirty(setPPhone)(e.target.value)} className={styles.input} /></Field>
+                <Field label="Designation"><Icon name="briefcase" size={16} color="#8C857A" /><input value={pDesignation} onChange={(e) => markDirty(setPDesignation)(e.target.value)} className={styles.input} /></Field>
               </div>
             </div>
           )}
@@ -236,12 +236,12 @@ export default function SettingsPage() {
                 <div><div className={styles.cardTitle}>Regional Preferences</div><div className={styles.cardDesc}>Language, time and formatting defaults.</div></div>
               </div>
               <div className={styles.fieldsGrid}>
-                <Field label="Language"><GlobeIconSm /><select value={rLanguage} onChange={(e) => markDirty(setRLanguage)(e.target.value)} className={styles.select}>{['English (US)', 'English (UK)', 'Hindi', 'Tamil', 'Marathi'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#9CA3AF" /></Field>
-                <Field label="Timezone"><GlobeIconSm /><select value={rTimezone} onChange={(e) => markDirty(setRTimezone)(e.target.value)} className={styles.select}>{['Asia/Kolkata (GMT+5:30)', 'America/New_York (GMT-5)', 'Europe/London (GMT+0)'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#9CA3AF" /></Field>
-                <Field label="Date Format"><Icon name="calendar" size={16} color="#9CA3AF" /><select value={rDateFormat} onChange={(e) => markDirty(setRDateFormat)(e.target.value)} className={styles.select}>{['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#9CA3AF" /></Field>
-                <Field label="Time Format"><ClockIconSm /><select value={rTimeFormat} onChange={(e) => markDirty(setRTimeFormat)(e.target.value)} className={styles.select}>{['24-hour', '12-hour'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#9CA3AF" /></Field>
-                <Field label="Currency"><DollarIconSm /><select value={rCurrency} onChange={(e) => markDirty(setRCurrency)(e.target.value)} className={styles.select}>{['INR (₹)', 'USD ($)', 'GBP (£)'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#9CA3AF" /></Field>
-                <Field label="Week Starts On"><Icon name="calendar" size={16} color="#9CA3AF" /><select value={rWeekStart} onChange={(e) => markDirty(setRWeekStart)(e.target.value)} className={styles.select}>{['Monday', 'Sunday'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#9CA3AF" /></Field>
+                <Field label="Language"><GlobeIconSm /><select value={rLanguage} onChange={(e) => markDirty(setRLanguage)(e.target.value)} className={styles.select}>{['English (US)', 'English (UK)', 'Hindi', 'Tamil', 'Marathi'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#8C857A" /></Field>
+                <Field label="Timezone"><GlobeIconSm /><select value={rTimezone} onChange={(e) => markDirty(setRTimezone)(e.target.value)} className={styles.select}>{['Asia/Kolkata (GMT+5:30)', 'America/New_York (GMT-5)', 'Europe/London (GMT+0)'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#8C857A" /></Field>
+                <Field label="Date Format"><Icon name="calendar" size={16} color="#8C857A" /><select value={rDateFormat} onChange={(e) => markDirty(setRDateFormat)(e.target.value)} className={styles.select}>{['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#8C857A" /></Field>
+                <Field label="Time Format"><ClockIconSm /><select value={rTimeFormat} onChange={(e) => markDirty(setRTimeFormat)(e.target.value)} className={styles.select}>{['24-hour', '12-hour'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#8C857A" /></Field>
+                <Field label="Currency"><DollarIconSm /><select value={rCurrency} onChange={(e) => markDirty(setRCurrency)(e.target.value)} className={styles.select}>{['INR (₹)', 'USD ($)', 'GBP (£)'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#8C857A" /></Field>
+                <Field label="Week Starts On"><Icon name="calendar" size={16} color="#8C857A" /><select value={rWeekStart} onChange={(e) => markDirty(setRWeekStart)(e.target.value)} className={styles.select}>{['Monday', 'Sunday'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#8C857A" /></Field>
               </div>
             </div>
           )}
@@ -253,18 +253,18 @@ export default function SettingsPage() {
               <ToggleRow icon={<Icon name="shield" color={PRIMARY} />} title="Two-Factor Authentication" desc="Extra layer of protection at sign-in." value={sec2FA} onChange={toggleDirty(setSec2FA)} />
               <div className={styles.rowBorder}><div className={styles.rowLeft}><MonitorIconLg /><div><div className={styles.rowTitle}>Login Sessions</div><div className={styles.rowDesc}>3 active sessions across devices.</div></div></div><div className={styles.btnSecondary}>View Sessions</div></div>
               <div className={styles.rowBorder}><div className={styles.rowLeft}><SmartphoneIconLg /><div><div className={styles.rowTitle}>Trusted Devices</div><div className={styles.rowDesc}>2 devices trusted for quick sign-in.</div></div></div><div className={styles.btnSecondary}>Manage Devices</div></div>
-              <div className={styles.rowLast}><div className={styles.rowLeft}><Icon name="mail" size={16} color="#9CA3AF" /><div><div className={styles.rowTitle}>Recovery Methods</div><div className={styles.rowDesc}>Backup email and recovery codes configured.</div></div></div><span className={styles.badgeGreen}>Set up</span></div>
+              <div className={styles.rowLast}><div className={styles.rowLeft}><Icon name="mail" size={16} color="#8C857A" /><div><div className={styles.rowTitle}>Recovery Methods</div><div className={styles.rowDesc}>Backup email and recovery codes configured.</div></div></div><span className={styles.badgeGreen}>Set up</span></div>
             </div>
           )}
 
           {showNotifications && (
             <div className={styles.card}>
               <div className={styles.cardHeadRow}><div><div className={styles.cardTitle}>Notifications</div><div className={styles.cardDesc}>Choose how LexFlow keeps you informed.</div></div></div>
-              <ToggleRow icon={<Icon name="mail" size={16} color="#9CA3AF" />} title="Email" value={nEmail} onChange={toggleDirty(setNEmail)} />
+              <ToggleRow icon={<Icon name="mail" size={16} color="#8C857A" />} title="Email" value={nEmail} onChange={toggleDirty(setNEmail)} />
               <ToggleRow icon={<MonitorIconLg />} title="Desktop" value={nDesktop} onChange={toggleDirty(setNDesktop)} />
               <ToggleRow icon={<MessageSquareIconSm />} title="SMS" value={nSMS} onChange={toggleDirty(setNSMS)} />
-              <ToggleRow icon={<Icon name="file-text" size={16} color="#9CA3AF" />} title="Weekly Reports" value={nWeeklyReports} onChange={toggleDirty(setNWeeklyReports)} />
-              <ToggleRow icon={<Icon name="briefcase" size={16} color="#9CA3AF" />} title="Case Updates" value={nCaseUpdates} onChange={toggleDirty(setNCaseUpdates)} />
+              <ToggleRow icon={<Icon name="file-text" size={16} color="#8C857A" />} title="Weekly Reports" value={nWeeklyReports} onChange={toggleDirty(setNWeeklyReports)} />
+              <ToggleRow icon={<Icon name="briefcase" size={16} color="#8C857A" />} title="Case Updates" value={nCaseUpdates} onChange={toggleDirty(setNCaseUpdates)} />
               <ToggleRow icon={<Icon name="sparkles" color={PRIMARY} />} title="AI Insights" value={nAiInsights} onChange={toggleDirty(setNAiInsights)} />
               <ToggleRow icon={<CreditCardIconSm />} title="Billing Alerts" value={nBillingAlerts} onChange={toggleDirty(setNBillingAlerts)} last />
             </div>
@@ -275,9 +275,9 @@ export default function SettingsPage() {
               <div className={styles.cardHeadRow}><div><div className={styles.cardTitle}>AI Preferences</div><div className={styles.cardDesc}>Tune how the LexFlow AI Assistant works for you.</div></div></div>
               <ToggleRow icon={<Icon name="sparkles" color={PRIMARY} />} title="Enable AI Suggestions" desc="Smart next-step suggestions across cases." value={aiEnableSuggestions} onChange={toggleDirty(setAiEnableSuggestions)} />
               <div className={styles.fieldsGrid} style={{ paddingTop: 16 }}>
-                <Field label="Preferred Model"><Icon name="sparkles" color={PRIMARY} /><select value={aiPreferredModel} onChange={(e) => markDirty(setAiPreferredModel)(e.target.value)} className={styles.select}>{['Claude Opus 4', 'Claude Sonnet 4', 'Claude Haiku'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#9CA3AF" /></Field>
-                <Field label="Response Style"><select value={aiResponseStyle} onChange={(e) => markDirty(setAiResponseStyle)(e.target.value)} className={styles.select}>{['Professional', 'Concise', 'Detailed'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#9CA3AF" /></Field>
-                <Field label="Legal Citation Format"><Icon name="file-text" size={16} color="#9CA3AF" /><select value={aiCitationFormat} onChange={(e) => markDirty(setAiCitationFormat)(e.target.value)} className={styles.select}>{['Bluebook', 'ALWD', 'OSCOLA'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#9CA3AF" /></Field>
+                <Field label="Preferred Model"><Icon name="sparkles" color={PRIMARY} /><select value={aiPreferredModel} onChange={(e) => markDirty(setAiPreferredModel)(e.target.value)} className={styles.select}>{['Claude Opus 4', 'Claude Sonnet 4', 'Claude Haiku'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#8C857A" /></Field>
+                <Field label="Response Style"><select value={aiResponseStyle} onChange={(e) => markDirty(setAiResponseStyle)(e.target.value)} className={styles.select}>{['Professional', 'Concise', 'Detailed'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#8C857A" /></Field>
+                <Field label="Legal Citation Format"><Icon name="file-text" size={16} color="#8C857A" /><select value={aiCitationFormat} onChange={(e) => markDirty(setAiCitationFormat)(e.target.value)} className={styles.select}>{['Bluebook', 'ALWD', 'OSCOLA'].map((o) => <option key={o}>{o}</option>)}</select><Icon name="chevron-down" size={14} color="#8C857A" /></Field>
               </div>
               <ToggleRow title="Auto Draft" value={aiAutoDraft} onChange={toggleDirty(setAiAutoDraft)} />
               <ToggleRow title="Auto Summaries" value={aiAutoSummaries} onChange={toggleDirty(setAiAutoSummaries)} last />
@@ -302,7 +302,7 @@ export default function SettingsPage() {
               <div className={styles.cardHeadRow}><div><div className={styles.cardTitle}>Appearance</div><div className={styles.cardDesc}>Choose how LexFlow looks on this device.</div></div></div>
               <div className={styles.themeSeg}>
                 {(['Light', 'Dark', 'System'] as const).map((t) => (
-                  <div key={t} className={styles.themeSegOption} style={{ background: appearanceTheme === t ? PRIMARY : 'transparent', color: appearanceTheme === t ? '#FFFFFF' : '#1F2937' }} onClick={() => markDirty(setAppearanceTheme)(t)}>{t}</div>
+                  <div key={t} className={styles.themeSegOption} style={{ background: appearanceTheme === t ? PRIMARY : 'transparent', color: appearanceTheme === t ? '#FCFAF4' : '#33302A' }} onClick={() => markDirty(setAppearanceTheme)(t)}>{t}</div>
                 ))}
               </div>
             </div>

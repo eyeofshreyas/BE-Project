@@ -11,8 +11,8 @@ import { formatDate as formatDateWith } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import shellStyles from '../../components/AppShell.module.css'
 
-const MUTED = '#8C7C5E'
-const PRIMARY = '#B08D3E'
+const MUTED = '#6E6759'
+const PRIMARY = '#23306B'
 
 function formatDate(iso: string) {
   return formatDateWith(iso, { month: 'short', day: 'numeric' })
@@ -208,7 +208,7 @@ export default function DocumentsListPage() {
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading documents…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
         {!loading && !error && (
           <>
@@ -217,7 +217,7 @@ export default function DocumentsListPage() {
                 <div key={s.label} className={styles.statCard}>
                   <div className={styles.statIconRow}>
                     <div className={styles.statIconWrap}><Icon name={s.icon} size={18} color={PRIMARY} /></div>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em' }}>{s.label}</span>
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>{s.label}</span>
                   </div>
                   <div className={styles.statValue}>{String(s.value).padStart(2, '0')}</div>
                   <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${s.pct}%` }} /></div>
@@ -233,32 +233,32 @@ export default function DocumentsListPage() {
               onDragLeave={() => setDragOver(false)}
               onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files[0]) }}
               style={{
-                border: `2px dashed ${dragOver ? PRIMARY : '#E7DCC6'}`, borderRadius: 16, padding: '32px 20px',
-                textAlign: 'center', cursor: 'pointer', background: dragOver ? '#FBF7EE' : '#FFFFFF',
+                border: `2px dashed ${dragOver ? PRIMARY : '#CFC6B0'}`, borderRadius: 3, padding: '32px 20px',
+                textAlign: 'center', cursor: 'pointer', background: dragOver ? '#F6F2E9' : '#FCFAF4',
               }}
             >
               <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,image/*,video/*" style={{ display: 'none' }} onChange={(e) => pickFile(e.target.files?.[0])} />
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
                 <Icon name="upload-cloud" size={20} color={PRIMARY} strokeWidth={1.8} />
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#2A2118' }}>Drop a file here, or click to browse</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A17' }}>Drop a file here, or click to browse</div>
               <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>PDF, Word, images, or video · AI will extract, summarize, and index it automatically</div>
             </div>
 
             {pendingFile && (
               <div className={styles.panelCard} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>Upload "{pendingFile.name}"</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1A17' }}>Upload "{pendingFile.name}"</div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <select value={pickCaseId} onChange={(e) => setPickCaseId(e.target.value)} style={{ flex: 1, minWidth: 180, padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
+                  <select value={pickCaseId} onChange={(e) => setPickCaseId(e.target.value)} style={{ flex: 1, minWidth: 180, padding: '9px 12px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}>
                     <option value="">Select a case…</option>
                     {cases.map((c) => <option key={c.case_id} value={c.case_id}>{c.id} — {c.case_title ?? c.court}</option>)}
                   </select>
-                  <select value={pickTypeId} onChange={(e) => setPickTypeId(e.target.value)} style={{ flex: 1, minWidth: 160, padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
+                  <select value={pickTypeId} onChange={(e) => setPickTypeId(e.target.value)} style={{ flex: 1, minWidth: 160, padding: '9px 12px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}>
                     <option value="">Select a type…</option>
                     {docTypes.map((t) => <option key={t.document_type_id} value={t.document_type_id}>{t.type_name}</option>)}
                   </select>
                 </div>
-                {uploadError && <div style={{ fontSize: 12.5, color: '#B05C5C' }}>{uploadError}</div>}
+                {uploadError && <div style={{ fontSize: 12.5, color: '#B3282D' }}>{uploadError}</div>}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <div className={styles.darkBtn} style={{ opacity: uploading ? 0.6 : 1 }} onClick={uploading ? undefined : confirmUpload}>{uploading ? 'Uploading…' : 'Upload'}</div>
                   <div className={styles.ghostChip} onClick={cancelUpload}>Cancel</div>
@@ -271,29 +271,29 @@ export default function DocumentsListPage() {
                 {recentDocs.map((d) => (
                   <div key={d.id} className={styles.panelCard} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 9, background: '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Icon name="file-text" size={16} color={PRIMARY} />
                       </div>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div onClick={() => openPreview(d)} style={{ fontSize: 13, fontWeight: 600, color: '#2A2118', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{d.file_name}</div>
-                          <span className={shellStyles.pill} style={d.has_summary ? { color: '#2E9E58', background: '#E4F5EA', flexShrink: 0 } : { color: '#B87F1E', background: '#FFF2E0', flexShrink: 0 }}>
+                          <div onClick={() => openPreview(d)} style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{d.file_name}</div>
+                          <span className={shellStyles.pill} style={d.has_summary ? { color: '#4A6B4E', background: '#E4EDE5', flexShrink: 0 } : { color: '#8A6A2F', background: '#F3EBD9', flexShrink: 0 }}>
                             {d.has_summary ? 'Completed' : 'Processing'}
                           </span>
                         </div>
                         <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{d.case_number ?? '—'} · {formatDate(d.upload_date)}</div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 8, borderTop: '1px solid #F1E9D9', paddingTop: 10 }}>
-                      <div onClick={() => toggleSummary(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: expandedId === d.id ? '#EFE4CB' : '#FFFFFF' }}>
-                        <Icon name="sparkles" size={13} color="#6A5C42" /> Summary
+                    <div style={{ display: 'flex', gap: 8, borderTop: '1px solid #F1EDE0', paddingTop: 10 }}>
+                      <div onClick={() => toggleSummary(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: expandedId === d.id ? '#E6E0CE' : '#FCFAF4' }}>
+                        <Icon name="sparkles" size={13} color="#575145" /> Summary
                       </div>
                       <div className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, opacity: .5, cursor: 'default' }} title="Similar-document search coming soon">
-                        <Icon name="search" size={13} color="#6A5C42" /> Similar
+                        <Icon name="search" size={13} color="#575145" /> Similar
                       </div>
                     </div>
                     {expandedId === d.id && (
-                      <div style={{ fontSize: 12.5, color: '#3D3126', borderTop: '1px solid #F1E9D9', paddingTop: 10 }}>
+                      <div style={{ fontSize: 12.5, color: '#33302A', borderTop: '1px solid #F1EDE0', paddingTop: 10 }}>
                         {summaryLoading && <div style={{ color: MUTED }}>Loading summary…</div>}
                         {summary && <div>{summary.summary_text}</div>}
                         {!summaryLoading && !summary && (
@@ -304,9 +304,9 @@ export default function DocumentsListPage() {
                               onChange={(e) => setGenText(e.target.value)}
                               placeholder="Paste the document text to generate an AI summary…"
                               rows={3}
-                              style={{ padding: '8px 10px', borderRadius: 8, border: '1.5px solid #E7DCC6', fontSize: 12.5, fontFamily: 'inherit', resize: 'vertical' }}
+                              style={{ padding: '8px 10px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 12.5, fontFamily: 'inherit', resize: 'vertical' }}
                             />
-                            {genError && <div style={{ color: '#B05C5C' }}>{genError}</div>}
+                            {genError && <div style={{ color: '#B3282D' }}>{genError}</div>}
                             <div
                               className={styles.ghostChip}
                               style={{ alignSelf: 'flex-start', padding: '6px 12px', opacity: generating ? 0.6 : 1, cursor: generating ? 'default' : 'pointer' }}
@@ -328,7 +328,7 @@ export default function DocumentsListPage() {
                 placeholder="Search by document name, case number…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                style={{ flex: 1, padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
+                style={{ flex: 1, padding: '9px 14px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}
               />
               <div ref={filterRef} style={{ position: 'relative' }}>
                 <div
@@ -336,13 +336,13 @@ export default function DocumentsListPage() {
                   onClick={() => setFiltersOpen((o) => !o)}
                   style={{ borderColor: typeFilter ? PRIMARY : undefined }}
                 >
-                  <Icon name="filter" size={14} color="#6A5C42" /> Filters
+                  <Icon name="filter" size={14} color="#575145" /> Filters
                 </div>
                 {filtersOpen && (
-                  <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', background: '#FFFFFF', border: '1px solid #E7DCC6', borderRadius: 12, boxShadow: '0 10px 24px rgba(42,33,24,.12)', padding: 6, width: 180, zIndex: 30 }}>
+                  <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', background: '#FCFAF4', border: '1px solid #CFC6B0', borderRadius: 3, boxShadow: '0 10px 24px rgba(35, 48, 107,.12)', padding: 6, width: 180, zIndex: 30 }}>
                     <div
                       onClick={() => { setTypeFilter(''); setFiltersOpen(false) }}
-                      style={{ padding: '8px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: !typeFilter ? '#8f6743' : '#2A2118', background: !typeFilter ? '#FBF0D6' : 'transparent' }}
+                      style={{ padding: '8px 10px', borderRadius: 3, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: !typeFilter ? '#1A2551' : '#1A1A17', background: !typeFilter ? '#F3EBD9' : 'transparent' }}
                     >
                       All Categories
                     </div>
@@ -350,7 +350,7 @@ export default function DocumentsListPage() {
                       <div
                         key={t.document_type_id}
                         onClick={() => { setTypeFilter(t.type_name); setFiltersOpen(false) }}
-                        style={{ padding: '8px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: typeFilter === t.type_name ? '#8f6743' : '#2A2118', background: typeFilter === t.type_name ? '#FBF0D6' : 'transparent' }}
+                        style={{ padding: '8px 10px', borderRadius: 3, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: typeFilter === t.type_name ? '#1A2551' : '#1A1A17', background: typeFilter === t.type_name ? '#F3EBD9' : 'transparent' }}
                       >
                         {t.type_name}
                       </div>
@@ -377,22 +377,22 @@ export default function DocumentsListPage() {
                     <tr key={d.id} className={styles.tr}>
                       <td className={styles.tdClient} onClick={() => openPreview(d)} style={{ cursor: 'pointer' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ width: 28, height: 28, borderRadius: 7, background: '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             <Icon name="file-text" size={14} color={PRIMARY} />
                           </div>
                           {d.file_name}
                         </div>
                       </td>
-                      <td className={styles.td}>{d.document_type ? <span className={shellStyles.pill} style={{ color: '#6A5C42', background: '#EFE4CB' }}>{d.document_type}</span> : '—'}</td>
+                      <td className={styles.td}>{d.document_type ? <span className={shellStyles.pill} style={{ color: '#575145', background: '#E6E0CE' }}>{d.document_type}</span> : '—'}</td>
                       <td className={styles.tdMono}>{d.case_number ?? '—'}</td>
                       <td className={styles.td}>{formatDate(d.upload_date)}</td>
                       <td className={styles.td}>{formatSize(d.file_size)}</td>
                       <td className={styles.td}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                          <div onClick={() => openDocument(d.id)} className={shellStyles.actionBtn} title="Open in browser"><Icon name="globe" size={14} color="#6A5C42" /></div>
-                          <div onClick={() => downloadDocument(d.id)} className={shellStyles.actionBtn} title="Download"><Icon name="download" size={14} color="#6A5C42" /></div>
-                          <div onClick={() => openPreview(d)} className={shellStyles.actionBtn} title="Preview"><Icon name="eye" size={14} color="#6A5C42" /></div>
-                          <div onClick={() => removeDocument(d.id)} className={shellStyles.actionBtnDanger} title="Delete"><Icon name="trash-2" size={14} color="#B05C5C" /></div>
+                          <div onClick={() => openDocument(d.id)} className={shellStyles.actionBtn} title="Open in browser"><Icon name="globe" size={14} color="#575145" /></div>
+                          <div onClick={() => downloadDocument(d.id)} className={shellStyles.actionBtn} title="Download"><Icon name="download" size={14} color="#575145" /></div>
+                          <div onClick={() => openPreview(d)} className={shellStyles.actionBtn} title="Preview"><Icon name="eye" size={14} color="#575145" /></div>
+                          <div onClick={() => removeDocument(d.id)} className={shellStyles.actionBtnDanger} title="Delete"><Icon name="trash-2" size={14} color="#B3282D" /></div>
                         </div>
                       </td>
                     </tr>

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { getDocumentDownloadUrl } from '../api/client'
 import { Icon } from './icons'
 
-const MUTED = '#8C7C5E'
+const MUTED = '#6E6759'
 
 // Callers (DocumentsListPage, CaseDetailPage) check this before rendering
 // the modal -- anything else (Word docs, etc.) skips straight to download.
@@ -25,18 +25,18 @@ export default function DocumentPreviewModal({ documentId, fileName, mimeType, o
   }, [documentId])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24 }} onClick={onClose}>
-      <div style={{ background: '#FFFFFF', borderRadius: 16, width: 'min(900px, 100%)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 48px rgba(0,0,0,.3)' }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid #E7DCC6' }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#2A2118', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</div>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(35, 48, 107,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24 }} onClick={onClose}>
+      <div style={{ background: '#FCFAF4', borderRadius: 3, width: 'min(900px, 100%)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 48px rgba(0,0,0,.3)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid #CFC6B0' }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            {url && <a href={url} target="_blank" rel="noreferrer" title="Download" style={{ display: 'flex' }}><Icon name="download" size={16} color="#6A5C42" /></a>}
-            <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={16} color="#6A5C42" /></span>
+            {url && <a href={url} target="_blank" rel="noreferrer" title="Download" style={{ display: 'flex' }}><Icon name="download" size={16} color="#575145" /></a>}
+            <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={16} color="#575145" /></span>
           </div>
         </div>
 
-        <div style={{ flex: 1, minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', background: '#FBF7EE' }}>
-          {error && <div style={{ color: '#B05C5C', fontSize: 13, padding: 24 }}>{error}</div>}
+        <div style={{ flex: 1, minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', background: '#F6F2E9' }}>
+          {error && <div style={{ color: '#B3282D', fontSize: 13, padding: 24 }}>{error}</div>}
           {!error && !url && <div style={{ color: MUTED, fontSize: 13 }}>Loading…</div>}
           {!error && url && mimeType.startsWith('image/') && (
             <img src={url} alt={fileName} style={{ maxWidth: '100%', maxHeight: '80vh', display: 'block' }} />

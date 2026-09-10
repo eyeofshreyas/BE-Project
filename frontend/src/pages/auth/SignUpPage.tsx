@@ -6,11 +6,11 @@ import { signup } from '../../api/client'
 import styles from './SignUpPage.module.css'
 import { Icon } from '../../components/icons'
 
-const PRIMARY = '#B08D3E'
-const BORDER = '#E7DCC6'
-const TEXT = '#2A2118'
-const MUTED = '#8C7C5E'
-const BG = '#FCF9F3'
+const PRIMARY = '#23306B'
+const BORDER = '#CFC6B0'
+const TEXT = '#1A1A17'
+const MUTED = '#6E6759'
+const BG = '#F6F2E9'
 
 const iconProps = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: MUTED, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
 
@@ -18,9 +18,9 @@ const LockIcon = () => <svg {...iconProps}><rect x={4} y={11} width={16} height=
 const ClockIcon = () => <svg {...iconProps}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l4 2" /></svg>
 const LanguagesIcon = () => <svg {...iconProps}><circle cx={12} cy={12} r={9} /><path d="M3 12h18" /><path d="M12 3a15 15 0 0 1 0 18" /><path d="M12 3a15 15 0 0 0 0 18" /></svg>
 const MapPinIcon = () => <svg {...iconProps}><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z" /><circle cx={12} cy={9.5} r={2.3} /></svg>
-const AlertIcon = () => <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#EF5350" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={9} /><path d="M12 8v5" /><path d="M12 16h.01" /></svg>
-const ArrowIcon = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
-const CheckIcon = () => <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+const AlertIcon = () => <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#B3282D" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={9} /><path d="M12 8v5" /><path d="M12 16h.01" /></svg>
+const ArrowIcon = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+const CheckIcon = () => <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
 const EyeIcon = ({ off }: { off: boolean }) => off ? (
   <svg {...iconProps}><path d="M2 12s3.5-7 10-7c1.8 0 3.4.5 4.7 1.2M22 12s-3.5 7-10 7c-1.8 0-3.4-.5-4.7-1.2" /><path d="M3 3l18 18" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>
 ) : (
@@ -45,10 +45,10 @@ function passwordScore(pw: string) {
 
 const STRENGTH_META = [
   { label: '', color: BORDER },
-  { label: 'Weak', color: '#EF5350' },
-  { label: 'Fair', color: '#FFB74D' },
-  { label: 'Good', color: '#D8C79A', textColor: '#7A5A24' },
-  { label: 'Strong', color: '#4CAF50' },
+  { label: 'Weak', color: '#B3282D' },
+  { label: 'Fair', color: '#8A6A2F' },
+  { label: 'Good', color: '#CFC6B0', textColor: '#1A2551' },
+  { label: 'Strong', color: '#4A6B4E' },
 ]
 
 type FocusName = 'fullName' | 'phone' | 'email' | 'password' | 'confirm' | 'bar' | 'practice' | 'years' | 'language' | 'address' | null
@@ -83,7 +83,7 @@ export default function SignUpPage() {
 
   const wrapStyle = (name: FocusName): CSSProperties => ({
     display: 'flex', alignItems: 'center', gap: 9, background: BG,
-    border: `1.5px solid ${focused === name ? PRIMARY : BORDER}`, borderRadius: 11, padding: '11px 13px',
+    border: `1.5px solid ${focused === name ? PRIMARY : BORDER}`, borderRadius: 3, padding: '11px 13px',
     width: '100%', minWidth: 0, boxSizing: 'border-box', transition: 'border-color .15s', position: 'relative',
   })
   const mkFocus = (name: FocusName) => () => setFocused(name)
@@ -137,10 +137,10 @@ export default function SignUpPage() {
             <div>
               <div className={styles.label}>I am a</div>
               <div className={styles.roleToggle}>
-                <div className={styles.roleOption} style={{ background: isLawyer ? '#FFFFFF' : 'transparent', color: isLawyer ? TEXT : MUTED, boxShadow: isLawyer ? '0 1px 2px rgba(42,33,24,.08)' : 'none' }} onClick={() => setRole('lawyer')}>
+                <div className={styles.roleOption} style={{ background: isLawyer ? '#FCFAF4' : 'transparent', color: isLawyer ? TEXT : MUTED, boxShadow: isLawyer ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('lawyer')}>
                   <Icon name="briefcase" size={15} /><span>Lawyer</span>
                 </div>
-                <div className={styles.roleOption} style={{ background: !isLawyer ? '#FFFFFF' : 'transparent', color: !isLawyer ? TEXT : MUTED, boxShadow: !isLawyer ? '0 1px 2px rgba(42,33,24,.08)' : 'none' }} onClick={() => setRole('client')}>
+                <div className={styles.roleOption} style={{ background: !isLawyer ? '#FCFAF4' : 'transparent', color: !isLawyer ? TEXT : MUTED, boxShadow: !isLawyer ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('client')}>
                   <Icon name="users" size={15} /><span>Client</span>
                 </div>
               </div>
@@ -185,7 +185,7 @@ export default function SignUpPage() {
               <div style={{ marginTop: -8 }}>
                 <div className={styles.strengthBars}>
                   {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className={styles.strengthBar} style={{ background: i < score ? meta.color : '#EFE4CB' }} />
+                    <div key={i} className={styles.strengthBar} style={{ background: i < score ? meta.color : '#E6E0CE' }} />
                   ))}
                 </div>
                 <div className={styles.strengthLabel} style={{ color: meta.textColor || meta.color }}>{meta.label}</div>

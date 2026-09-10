@@ -7,7 +7,7 @@ import heroAttorney from '../../assets/hero-attorney.jpg'
 import styles from './LandingPage.module.css'
 import { Icon } from '../../components/icons'
 
-const PRIMARY = '#B08D3E'
+const PRIMARY = '#23306B'
 
 const iconProps = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: PRIMARY, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
 
@@ -21,8 +21,8 @@ const LockIcon = () => <svg {...iconProps}><rect x={4} y={11} width={16} height=
 const UsersIcon = () => <svg {...iconProps}><circle cx={9} cy={8} r={3} /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><circle cx={17} cy={9} r={2.5} /></svg>
 const ActivityIcon = () => <svg {...iconProps}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
 const SparklesIcon = () => <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" /></svg>
-const ShieldIconW = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /></svg>
-const CheckIconW = () => <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+const ShieldIconW = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /></svg>
+const CheckIconW = () => <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
 
 const NAV_SECTIONS = [
   { id: 'challenges', label: 'Home' },
@@ -108,7 +108,7 @@ export default function LandingPage() {
             {NAV_SECTIONS.map((n) => {
               const active = activeSection === n.id
               return (
-                <a key={n.id} href={`#${n.id}`} onClick={scrollToSection(n.id)} className={styles.navLink} style={{ fontWeight: active ? 700 : 500, color: active ? '#2A2118' : '#8C7C5E' }}>
+                <a key={n.id} href={`#${n.id}`} onClick={scrollToSection(n.id)} className={styles.navLink} style={{ fontWeight: active ? 700 : 500, color: active ? '#1A1A17' : '#6E6759' }}>
                   {n.label}
                   <span className={styles.navUnderline} style={{ transform: `scaleX(${active ? 1 : 0})` }} />
                 </a>

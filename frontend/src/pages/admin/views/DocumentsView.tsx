@@ -64,17 +64,17 @@ export default function DocumentsView() {
                 {documents.map((doc) => (
                   <Fragment key={doc.id}>
                     <tr className={styles.tr}>
-                      <td className={styles.td} style={{ fontWeight: 600, color: '#2A2118' }}>{doc.file_name}</td>
-                      <td className={styles.td} style={{ color: '#3D3126' }}>{doc.document_type ?? '—'}</td>
-                      <td className={styles.td} style={{ color: '#8C7C5E' }}>{doc.case_number ?? '—'}</td>
-                      <td className={styles.td} style={{ color: '#3D3126' }}>{doc.uploaded_by ?? '—'}</td>
-                      <td className={styles.td} style={{ color: '#3D3126' }}>{doc.upload_date}</td>
+                      <td className={styles.td} style={{ fontWeight: 600, color: '#1A1A17' }}>{doc.file_name}</td>
+                      <td className={styles.td} style={{ color: '#33302A' }}>{doc.document_type ?? '—'}</td>
+                      <td className={styles.td} style={{ color: '#6E6759' }}>{doc.case_number ?? '—'}</td>
+                      <td className={styles.td} style={{ color: '#33302A' }}>{doc.uploaded_by ?? '—'}</td>
+                      <td className={styles.td} style={{ color: '#33302A' }}>{doc.upload_date}</td>
                       <td className={styles.td}>
                         <div style={{ display: 'flex', gap: 4 }}>
                           <span className={styles.actionBtn} title="AI Summary" onClick={() => toggleSummary(doc.id)}>
-                            <Icon name="sparkles" size={15} color={expandedId === doc.id ? C.primary : '#6A5C42'} />
+                            <Icon name="sparkles" size={15} color={expandedId === doc.id ? C.primary : '#575145'} />
                           </span>
-                          <span className={styles.actionBtn} title="Download"><Icon name="download" size={15} color="#6A5C42" /></span>
+                          <span className={styles.actionBtn} title="Download"><Icon name="download" size={15} color="#575145" /></span>
                         </div>
                       </td>
                     </tr>
@@ -84,7 +84,7 @@ export default function DocumentsView() {
                           {summaryLoading && <div style={{ color: C.muted, fontSize: 13 }}>Loading summary…</div>}
                           {summaryError && <div style={{ color: C.muted, fontSize: 13 }}>{summaryError}</div>}
                           {summary && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: '#3D3126', padding: '4px 0' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: '#33302A', padding: '4px 0' }}>
                               <div><strong>Summary:</strong> {summary.summary_text}</div>
                               {summary.keywords && <div><strong>Keywords:</strong> {summary.keywords}</div>}
                               {summary.important_dates && <div><strong>Important dates:</strong> {summary.important_dates}</div>}

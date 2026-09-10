@@ -61,10 +61,10 @@ export default function DashboardView({ quickActions }: { quickActions: QuickAct
             <div
               key={qa.label}
               className={styles.chipBase}
-              style={{ color: qa.primary ? '#FFFFFF' : '#3D3126', background: qa.primary ? C.primary : '#FFFFFF', border: qa.primary ? 'none' : `1px solid ${C.border}` }}
+              style={{ color: qa.primary ? '#FCFAF4' : '#33302A', background: qa.primary ? C.primary : '#FCFAF4', border: qa.primary ? 'none' : `1px solid ${C.border}` }}
               onClick={qa.onClick}
             >
-              <Icon name={qa.icon} size={15} color={qa.primary ? '#FFFFFF' : C.primaryDark} /><span>{qa.label}</span>
+              <Icon name={qa.icon} size={15} color={qa.primary ? '#FCFAF4' : C.primaryDark} /><span>{qa.label}</span>
             </div>
           ))}
         </div>
@@ -72,22 +72,22 @@ export default function DashboardView({ quickActions }: { quickActions: QuickAct
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 12 }}>
         {OVERVIEW_DEFS.map((c) => (
-          <div key={c.label} style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(158deg,#FFFFFF 0%,#FDF7EA 100%)', border: `1px solid ${C.border}`, borderRadius: 16, padding: '15px 16px 13px', display: 'flex', flexDirection: 'column', gap: 11, boxShadow: '0 1px 2px rgba(42,33,24,.05)' }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg,#B08D3E,#8f6743)' }} />
+          <div key={c.label} style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(158deg,#FCFAF4 0%,#F1EDE0 100%)', border: `1px solid ${C.border}`, borderRadius: 3, padding: '15px 16px 13px', display: 'flex', flexDirection: 'column', gap: 11, boxShadow: '0 1px 2px rgba(35, 48, 107,.05)' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg,#23306B,#1A2551)' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(150deg,#F6EDDC 0%,#EFE4CB 100%)', border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(150deg,#F6EDDC 0%,#E6E0CE 100%)', border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Icon name={c.icon} size={18} color={C.primaryDark} />
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 10.5, color: '#8C7C5E', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.07em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.label}</div>
+                <div style={{ fontSize: 9.5, color: '#6E6759', fontWeight: 600, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.label}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginTop: 3 }}>
-                  <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 25, fontWeight: 700, color: '#2A2118', lineHeight: 1, letterSpacing: '-.02em' }}>{c.value}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: C.primaryDark, background: '#EFE3D2', border: `1px solid ${C.border}`, padding: '3px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{c.trend}</div>
+                  <div style={{ fontFamily: "'Spectral',serif", fontSize: 25, fontWeight: 700, color: '#1A1A17', lineHeight: 1, letterSpacing: '-.02em' }}>{c.value}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.primaryDark, background: '#EFE3D2', border: `1px solid ${C.border}`, padding: '3px 8px', borderRadius: 3, whiteSpace: 'nowrap' }}>{c.trend}</div>
                 </div>
               </div>
             </div>
             <div style={{ height: 3, borderRadius: 3, background: '#F1E7D3', overflow: 'hidden' }}>
-              <div style={{ width: `${c.barPct}%`, height: '100%', borderRadius: 3, background: 'linear-gradient(90deg,#C9A47C,#B08D3E)' }} />
+              <div style={{ width: `${c.barPct}%`, height: '100%', borderRadius: 3, background: 'linear-gradient(90deg,#C9A47C,#23306B)' }} />
             </div>
           </div>
         ))}
@@ -95,16 +95,16 @@ export default function DashboardView({ quickActions }: { quickActions: QuickAct
 
       <div>
         <div className={styles.sectionTitle} style={{ marginBottom: 14 }}>Recent Activity</div>
-        <div style={{ background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 18, padding: '10px 22px', boxShadow: '0 1px 2px rgba(42,33,24,.04)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: '10px 22px', boxShadow: '0 1px 2px rgba(35, 48, 107,.04)', display: 'flex', flexDirection: 'column' }}>
           {ACTIVITY_DEFS.map((a, i) => (
-            <div key={a.title} style={{ display: 'flex', gap: 12, padding: '9px 0', borderBottom: i === ACTIVITY_DEFS.length - 1 ? 'none' : '1px solid #F1E9D9' }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div key={a.title} style={{ display: 'flex', gap: 12, padding: '9px 0', borderBottom: i === ACTIVITY_DEFS.length - 1 ? 'none' : '1px solid #F1EDE0' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Icon name={a.icon} size={14} color={C.primaryDark} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#2A2118' }}>{a.title}</div>
-                <div style={{ fontSize: 12, color: '#8C7C5E', marginTop: 2, lineHeight: 1.4 }}>{a.desc}</div>
-                <div style={{ fontSize: 11, color: '#A38F66', marginTop: 4 }}>{a.time}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#1A1A17' }}>{a.title}</div>
+                <div style={{ fontSize: 12, color: '#6E6759', marginTop: 2, lineHeight: 1.4 }}>{a.desc}</div>
+                <div style={{ fontSize: 11, color: '#8C857A', marginTop: 4 }}>{a.time}</div>
               </div>
             </div>
           ))}
@@ -113,40 +113,40 @@ export default function DashboardView({ quickActions }: { quickActions: QuickAct
 
       <div>
         <div className={styles.sectionTitle}>System Notifications</div>
-        <div style={{ fontSize: 13, color: '#8C7C5E', margin: '4px 0 14px' }}>Security alerts, AI job failures, sign-ups and approvals awaiting review.</div>
+        <div style={{ fontSize: 13, color: '#6E6759', margin: '4px 0 14px' }}>Security alerts, AI job failures, sign-ups and approvals awaiting review.</div>
         <div style={{ display: 'grid', gridTemplateColumns: detail ? '340px minmax(0,1fr)' : 'minmax(0,1fr)', gap: 20, alignItems: 'start' }}>
-          <div style={{ background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 2px rgba(42,33,24,.04)' }}>
-            <div style={{ padding: '13px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C7C5E', borderBottom: `1px solid ${C.border}` }}>All notifications</div>
+          <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden', boxShadow: '0 1px 2px rgba(35, 48, 107,.04)' }}>
+            <div style={{ padding: '13px 16px', fontSize: 9.5, fontWeight: 700, letterSpacing: '.13em', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', color: '#6E6759', borderBottom: `1px solid ${C.border}` }}>All notifications</div>
             {SYSTEM_NOTIFS.map((n, i) => (
               <div
                 key={n.label}
-                style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', cursor: 'pointer', borderBottom: i === SYSTEM_NOTIFS.length - 1 ? 'none' : '1px solid #F0E8D8', background: selectedNotif === i ? '#FCF6EA' : 'transparent' }}
+                style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', cursor: 'pointer', borderBottom: i === SYSTEM_NOTIFS.length - 1 ? 'none' : '1px solid #F1EDE0', background: selectedNotif === i ? '#FCF6EA' : 'transparent' }}
                 onClick={() => setSelectedNotif(i)}
               >
-                <div style={{ width: 30, height: 30, borderRadius: 9, background: n.color + '1f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={n.icon} size={15} color={n.color} /></div>
+                <div style={{ width: 30, height: 30, borderRadius: 3, background: n.color + '1f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={n.icon} size={15} color={n.color} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: '#2A2118', lineHeight: 1.45, fontWeight: selectedNotif === i ? 600 : 500 }}>{n.detail}</div>
-                  <div style={{ fontSize: 11, color: '#A38F66', marginTop: 4 }}>{n.time}</div>
+                  <div style={{ fontSize: 13, color: '#1A1A17', lineHeight: 1.45, fontWeight: selectedNotif === i ? 600 : 500 }}>{n.detail}</div>
+                  <div style={{ fontSize: 11, color: '#8C857A', marginTop: 4 }}>{n.time}</div>
                 </div>
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: n.color, background: n.color + '1f', borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>{n.count}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: n.color, background: n.color + '1f', borderRadius: 3, padding: '3px 9px', flexShrink: 0 }}>{n.count}</span>
               </div>
             ))}
           </div>
           {detail && (
-            <div style={{ background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 18, padding: 28, boxShadow: '0 1px 2px rgba(42,33,24,.04)', display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+            <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 28, boxShadow: '0 1px 2px rgba(35, 48, 107,.04)', display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: detail.color + '1f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={detail.icon} size={20} color={detail.color} /></div>
+                <div style={{ width: 44, height: 44, borderRadius: 3, background: detail.color + '1f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={detail.icon} size={20} color={detail.color} /></div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, flex: 1 }}>
-                  <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 21, fontWeight: 700, color: '#2A2118', lineHeight: 1.35 }}>{detail.detail}</div>
+                  <div style={{ fontFamily: "'Spectral',serif", fontSize: 21, fontWeight: 700, color: '#1A1A17', lineHeight: 1.35 }}>{detail.detail}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ fontSize: 11.5, color: '#A38F66' }}>{detail.time}</div>
-                    <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: '#6A5C42', background: '#EFE4CB', padding: '4px 9px', borderRadius: 20 }}>{detail.label}</div>
-                    <div style={{ fontSize: 11, color: '#8C7C5E' }}>{detail.count} {detail.count === 1 ? 'item' : 'items'}</div>
+                    <div style={{ fontSize: 11.5, color: '#8C857A' }}>{detail.time}</div>
+                    <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.13em', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', color: '#575145', background: '#E6E0CE', padding: '4px 9px', borderRadius: 3 }}>{detail.label}</div>
+                    <div style={{ fontSize: 11, color: '#6E6759' }}>{detail.count} {detail.count === 1 ? 'item' : 'items'}</div>
                   </div>
                 </div>
-                <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }} onClick={() => setSelectedNotif(null)}><Icon name="x" size={15} color="#8C7C5E" /></div>
+                <div style={{ width: 30, height: 30, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }} onClick={() => setSelectedNotif(null)}><Icon name="x" size={15} color="#6E6759" /></div>
               </div>
-              <div style={{ height: 1, background: '#F0E8D8' }} />
+              <div style={{ height: 1, background: '#F1EDE0' }} />
               <div style={{ fontSize: 13.5, color: '#4A3F2E', lineHeight: 1.6 }}>{detail.body}</div>
             </div>
           )}
@@ -154,8 +154,8 @@ export default function DashboardView({ quickActions }: { quickActions: QuickAct
       </div>
 
       <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center' }}>
-        <div style={{ fontSize: 12.5, color: '#8C7C5E' }}>AI-Assisted Legal Workflow and Document Intelligence Platform</div>
-        <div style={{ fontSize: 11.5, color: '#A38F66', marginTop: 4 }}>© 2026 LexFlow Technologies</div>
+        <div style={{ fontSize: 12.5, color: '#6E6759' }}>AI-Assisted Legal Workflow and Document Intelligence Platform</div>
+        <div style={{ fontSize: 11.5, color: '#8C857A', marginTop: 4 }}>© 2026 LexFlow Technologies</div>
       </div>
     </>
   )

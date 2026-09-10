@@ -67,19 +67,19 @@ export default function AnalyticsView() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 1.3fr', gap: 20, alignItems: 'stretch' }}>
           <div className={styles.card} style={{ display: 'flex', flexDirection: 'column' }}>
             <div className={styles.cardTitle} style={{ marginBottom: 4 }}>Case Status</div>
-            <div style={{ fontSize: 12, color: '#8C7C5E', marginBottom: 16 }}>Distribution across all cases</div>
+            <div style={{ fontSize: 12, color: '#6E6759', marginBottom: 16 }}>Distribution across all cases</div>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ width: 150, height: 150, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `conic-gradient(${donutStops})` }}>
-                <div style={{ width: 92, height: 92, background: '#FFFFFF', borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#2A2118', fontFamily: "'Poppins',sans-serif", lineHeight: 1 }}>1,204</div>
-                  <div style={{ fontSize: 10.5, color: '#8C7C5E', marginTop: 2 }}>total cases</div>
+                <div style={{ width: 92, height: 92, background: '#FCFAF4', borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#1A1A17', fontFamily: "'Spectral',serif", lineHeight: 1 }}>1,204</div>
+                  <div style={{ fontSize: 10.5, color: '#6E6759', marginTop: 2 }}>total cases</div>
                 </div>
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
               {DONUT_SLICES.map((d) => (
-                <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#3D3126' }}>
-                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: d.color, flexShrink: 0 }} /><span style={{ flex: 1 }}>{d.label}</span><span style={{ fontWeight: 600, color: '#8C7C5E' }}>{d.pct}%</span>
+                <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#33302A' }}>
+                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: d.color, flexShrink: 0 }} /><span style={{ flex: 1 }}>{d.label}</span><span style={{ fontWeight: 600, color: '#6E6759' }}>{d.pct}%</span>
                 </div>
               ))}
             </div>
@@ -87,13 +87,13 @@ export default function AnalyticsView() {
 
           <div className={styles.card}>
             <div className={styles.cardTitle} style={{ marginBottom: 4 }}>Monthly Case Growth</div>
-            <div style={{ fontSize: 12, color: '#8C7C5E', marginBottom: 18 }}>New cases filed, last 6 months</div>
+            <div style={{ fontSize: 12, color: '#6E6759', marginBottom: 18 }}>New cases filed, last 6 months</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, height: 150, padding: '0 4px' }}>
               {GROWTH_VALS.map((v, i) => (
                 <div key={GROWTH_MONTHS[i]} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, height: '100%', justifyContent: 'flex-end' }}>
-                  <div style={{ fontSize: 11, color: '#8C7C5E', fontWeight: 600 }}>{v}</div>
-                  <div style={{ width: '60%', maxWidth: 34, height: `${(v / GROWTH_MAX) * 110}px`, borderRadius: '8px 8px 3px 3px', background: 'linear-gradient(180deg,#C9A47C,#B08D3E)' }} />
-                  <div style={{ fontSize: 11.5, color: '#8C7C5E', fontWeight: 500 }}>{GROWTH_MONTHS[i]}</div>
+                  <div style={{ fontSize: 11, color: '#6E6759', fontWeight: 600 }}>{v}</div>
+                  <div style={{ width: '60%', maxWidth: 34, height: `${(v / GROWTH_MAX) * 110}px`, borderRadius: '3px 8px 3px 3px', background: 'linear-gradient(180deg,#C9A47C,#23306B)' }} />
+                  <div style={{ fontSize: 11.5, color: '#6E6759', fontWeight: 500 }}>{GROWTH_MONTHS[i]}</div>
                 </div>
               ))}
             </div>
@@ -101,7 +101,7 @@ export default function AnalyticsView() {
 
           <div className={styles.card}>
             <div className={styles.cardTitle} style={{ marginBottom: 4 }}>AI Usage Trend</div>
-            <div style={{ fontSize: 12, color: '#8C7C5E', marginBottom: 14 }}>AI summaries generated, last 8 weeks</div>
+            <div style={{ fontSize: 12, color: '#6E6759', marginBottom: 14 }}>AI summaries generated, last 8 weeks</div>
             <svg viewBox="0 0 300 140" width="100%" height={150} preserveAspectRatio="none">
               <polygon points={aiAreaPoints} fill={C.primary} opacity={0.12} />
               <polyline points={aiLinePoints} fill="none" stroke={C.primary} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
@@ -115,19 +115,19 @@ export default function AnalyticsView() {
         <div className={styles.sectionTitle} style={{ marginBottom: 14 }}>Document Insights</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 16 }}>
           {DOC_INSIGHTS.map((d) => (
-            <div key={d.label} style={{ background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: d.color + '1f', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={d.icon} size={17} color={d.color} /></div>
-              <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 21, fontWeight: 700, color: '#2A2118' }}>{d.value}</div>
-              <div style={{ fontSize: 12, color: '#8C7C5E', fontWeight: 500 }}>{d.label}</div>
+            <div key={d.label} style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 3, background: d.color + '1f', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={d.icon} size={17} color={d.color} /></div>
+              <div style={{ fontFamily: "'Spectral',serif", fontSize: 21, fontWeight: 700, color: '#1A1A17' }}>{d.value}</div>
+              <div style={{ fontSize: 12, color: '#6E6759', fontWeight: 500 }}>{d.label}</div>
             </div>
           ))}
         </div>
         <div className={styles.card}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>Storage Usage</div>
-            <div style={{ fontSize: 12.5, color: '#8C7C5E' }}>340 GB of 500 GB used</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>Storage Usage</div>
+            <div style={{ fontSize: 12.5, color: '#6E6759' }}>340 GB of 500 GB used</div>
           </div>
-          <div style={{ height: 10, background: '#EFE4CB', borderRadius: 6, overflow: 'hidden' }}><div style={{ width: '68%', height: '100%', background: 'linear-gradient(90deg,#B08D3E,#D8C79A)', borderRadius: 6 }} /></div>
+          <div style={{ height: 10, background: '#E6E0CE', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: '68%', height: '100%', background: 'linear-gradient(90deg,#23306B,#CFC6B0)', borderRadius: 3 }} /></div>
         </div>
       </div>
 
@@ -135,16 +135,16 @@ export default function AnalyticsView() {
         <div className={styles.sectionTitle} style={{ marginBottom: 14 }}>AI System Status</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
           {AI_STATUS.map((s) => (
-            <div key={s.label} style={{ background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 16, padding: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div key={s.label} style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 9, background: '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={s.icon} size={16} color={C.primaryDark} /></div>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>{s.label}</div>
+                  <div style={{ width: 32, height: 32, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={s.icon} size={16} color={C.primaryDark} /></div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1A17' }}>{s.label}</div>
                 </div>
                 <span className={styles.pill} style={pillStyle(STATUS_COLOR[s.status])}>{s.status}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#8C7C5E' }}><span>Uptime</span><span style={{ fontWeight: 600, color: '#3D3126' }}>{s.uptime}</span></div>
-              <div style={{ fontSize: 11, color: '#A38F66' }}>Last checked {s.lastChecked}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6E6759' }}><span>Uptime</span><span style={{ fontWeight: 600, color: '#33302A' }}>{s.uptime}</span></div>
+              <div style={{ fontSize: 11, color: '#8C857A' }}>Last checked {s.lastChecked}</div>
             </div>
           ))}
         </div>

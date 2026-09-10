@@ -1,8 +1,8 @@
 .page {
   min-height: 100vh;
   min-width: 1024px;
-  background: #FCF9F3;
-  font-family: 'Inter', sans-serif;
+  background: #F6F2E9;
+  font-family: 'Public Sans', sans-serif;
   padding: 32px;
   box-sizing: border-box;
 }
@@ -24,16 +24,16 @@
 }
 
 .title {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
   font-size: 26px;
   font-weight: 700;
-  color: #2A2118;
+  color: #1A1A17;
   letter-spacing: -.01em;
 }
 
 .subtitle {
   font-size: 14px;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 6px;
 }
 
@@ -50,21 +50,21 @@
   font-size: 13px;
   font-weight: 600;
   padding: 10px 16px;
-  border-radius: 10px;
+  border-radius: 3px;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .ghostChip {
-  background: #FFFFFF;
-  color: #2A2118;
-  border: 1px solid #E7DCC6;
+  background: #FCFAF4;
+  color: #1A1A17;
+  border: 1px solid #CFC6B0;
 }
 
 .primaryChip {
-  background: #B08D3E;
-  color: #FFFFFF;
-  box-shadow: 0 4px 12px rgba(176, 141, 62, .28);
+  background: #23306B;
+  color: #FCFAF4;
+  box-shadow: 0 4px 12px rgba(35, 48, 107, .28);
 }
 
 .topGrid {
@@ -82,19 +82,19 @@
 }
 
 .statCard {
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 16px;
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 1px 2px rgba(42, 33, 24, .04);
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
   transition: box-shadow .15s, transform .15s;
 }
 
 .statCard:hover {
-  box-shadow: 0 10px 24px rgba(42, 33, 24, .09);
+  box-shadow: 0 10px 24px rgba(35, 48, 107, .09);
   transform: translateY(-2px);
 }
 
@@ -107,34 +107,34 @@
 .statIconWrap {
   width: 38px;
   height: 38px;
-  border-radius: 10px;
-  background: #EFE4CB;
+  border-radius: 3px;
+  background: #E6E0CE;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .statValue {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
   font-size: 26px;
   font-weight: 700;
-  color: #2A2118;
+  color: #1A1A17;
   line-height: 1;
 }
 
 .statLabel {
   font-size: 12.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 6px;
   font-weight: 500;
 }
 
 .donutCard {
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 18px;
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
   padding: 18px 20px;
-  box-shadow: 0 1px 2px rgba(42, 33, 24, .04);
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
   display: flex;
   align-items: center;
   gap: 18px;
@@ -153,7 +153,7 @@
 .donutHole {
   width: 60px;
   height: 60px;
-  background: #FFFFFF;
+  background: #FCFAF4;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
@@ -164,14 +164,14 @@
 .donutTotal {
   font-size: 15px;
   font-weight: 700;
-  color: #2A2118;
-  font-family: 'Poppins', sans-serif;
+  color: #1A1A17;
+  font-family: 'Spectral', serif;
   line-height: 1;
 }
 
 .donutTotalLabel {
   font-size: 9.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 1px;
 }
 
@@ -183,8 +183,8 @@
 .legendTitle {
   font-size: 14px;
   font-weight: 700;
-  color: #2A2118;
-  font-family: 'Poppins', sans-serif;
+  color: #1A1A17;
+  font-family: 'Spectral', serif;
   margin-bottom: 8px;
 }
 
@@ -199,7 +199,7 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #6A5C42;
+  color: #575145;
 }
 
 .legendDot {
@@ -217,33 +217,33 @@
 }
 
 .tableCard {
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 18px;
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(42, 33, 24, .04);
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
 }
 
 .tableHead {
   padding: 18px 24px;
-  border-bottom: 1px solid #E7DCC6;
+  border-bottom: 1px solid #CFC6B0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #FBF7EE;
+  background: #F6F2E9;
 }
 
 .tableHeadTitle {
   font-size: 15.5px;
   font-weight: 700;
-  color: #2A2118;
-  font-family: 'Poppins', sans-serif;
+  color: #1A1A17;
+  font-family: 'Spectral', serif;
 }
 
 .viewAll {
   font-size: 12.5px;
   font-weight: 600;
-  color: #B08D3E;
+  color: #23306B;
   cursor: pointer;
 }
 
@@ -255,41 +255,42 @@
 .th {
   text-align: left;
   padding: 12px 24px;
-  font-size: 11.5px;
+  font-size: 9.5px;
   font-weight: 600;
-  color: #8C7C5E;
+  color: #6E6759;
+  font-family: 'IBM Plex Mono', monospace;
   text-transform: uppercase;
-  letter-spacing: .02em;
-  background: #FBF7EE;
+  letter-spacing: .13em;
+  background: #F6F2E9;
 }
 
 .tr {
-  border-top: 1px solid #E7DCC6;
+  border-top: 1px solid #CFC6B0;
   cursor: pointer;
 }
 
 .tr:hover {
-  background: #FCF9F3;
+  background: #F6F2E9;
 }
 
 .td {
   padding: 14px 16px;
   font-size: 13.5px;
-  color: #2A2118;
+  color: #1A1A17;
 }
 
 .tdMono {
   padding: 14px 24px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'IBM Plex Mono', monospace;
   font-size: 12.5px;
-  color: #B08D3E;
+  color: #23306B;
 }
 
 .tdClient {
   padding: 14px 16px;
   font-size: 13.5px;
   font-weight: 500;
-  color: #2A2118;
+  color: #1A1A17;
 }
 
 .statusBadge {
@@ -308,18 +309,18 @@
 }
 
 .panelCard {
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 18px;
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
   padding: 22px;
-  box-shadow: 0 1px 2px rgba(42, 33, 24, .04);
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
 }
 
 .panelTitle {
   font-size: 14.5px;
   font-weight: 700;
-  color: #2A2118;
-  font-family: 'Poppins', sans-serif;
+  color: #1A1A17;
+  font-family: 'Spectral', serif;
   margin-bottom: 14px;
 }
 
@@ -334,23 +335,23 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  border: 1px solid #E7DCC6;
-  border-radius: 11px;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
   cursor: pointer;
   font-size: 13.5px;
   font-weight: 500;
-  color: #2A2118;
+  color: #1A1A17;
 }
 
 .quickAction:hover {
-  border-color: #B08D3E;
-  background: #FBF7EE;
+  border-color: #23306B;
+  background: #F6F2E9;
 }
 
 .timeline {
   position: relative;
   margin-left: 21px;
-  border-left: 2px solid #E7DCC6;
+  border-left: 2px solid #CFC6B0;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -378,13 +379,13 @@
 .timelineTitle {
   font-size: 13px;
   font-weight: 500;
-  color: #2A2118;
+  color: #1A1A17;
   margin-top: 3px;
 }
 
 .timelineMeta {
   font-size: 12px;
-  color: #8C7C5E;
+  color: #6E6759;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -395,27 +396,27 @@
   position: fixed;
   bottom: 28px;
   right: 28px;
-  background: #2A2118;
-  color: #FCF9F3;
+  background: #23306B;
+  color: #F6F2E9;
   font-size: 13px;
   font-weight: 600;
   padding: 12px 18px;
-  border-radius: 10px;
+  border-radius: 3px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, .2);
 }
 
 .progressTrack {
   width: 100%;
   height: 6px;
-  border-radius: 4px;
-  background: #EFE4CB;
+  border-radius: 3px;
+  background: #E6E0CE;
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
-  border-radius: 4px;
-  background: #B08D3E;
+  border-radius: 3px;
+  background: #23306B;
 }
 
 .barChartArea {
@@ -438,26 +439,26 @@
 
 .bar {
   width: 60%;
-  border-radius: 6px 6px 0 0;
-  background: #D8C79A;
+  border-radius: 3px 6px 0 0;
+  background: #CFC6B0;
   min-height: 4px;
 }
 
 .barMonthLabel {
   font-size: 11px;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 8px;
 }
 
 .barValueBadge {
   position: absolute;
   top: -24px;
-  background: #8f6743;
-  color: #FFFFFF;
+  background: #1A2551;
+  color: #FCFAF4;
   font-size: 11px;
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: 3px;
   white-space: nowrap;
 }
 
@@ -466,20 +467,20 @@
   align-items: center;
   gap: 6px;
   font-size: 12.5px;
-  color: #8C7C5E;
+  color: #6E6759;
 }
 
 .breadcrumb span:last-child {
-  color: #2A2118;
+  color: #1A1A17;
   font-weight: 600;
 }
 
 .calendarNavBtn {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
-  border: 1px solid #E7DCC6;
-  background: #FFFFFF;
+  border-radius: 3px;
+  border: 1px solid #CFC6B0;
+  background: #FCFAF4;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -487,7 +488,7 @@
 }
 
 .calendarNavBtn:hover {
-  background: #FBF7EE;
+  background: #F6F2E9;
 }
 
 .calendarGrid {
@@ -497,21 +498,22 @@
 
 .calendarDowCell {
   padding: 10px 8px;
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 700;
-  color: #8C7C5E;
+  color: #6E6759;
+  font-family: 'IBM Plex Mono', monospace;
   text-transform: uppercase;
-  letter-spacing: .03em;
+  letter-spacing: .13em;
   text-align: left;
-  background: #FBF7EE;
-  border-bottom: 1px solid #E7DCC6;
+  background: #F6F2E9;
+  border-bottom: 1px solid #CFC6B0;
 }
 
 .calendarCell {
   min-height: 90px;
   padding: 8px;
-  border-right: 1px solid #F1E9D9;
-  border-bottom: 1px solid #F1E9D9;
+  border-right: 1px solid #F1EDE0;
+  border-bottom: 1px solid #F1EDE0;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -520,7 +522,7 @@
 .calendarDayNum {
   font-size: 12.5px;
   font-weight: 600;
-  color: #2A2118;
+  color: #1A1A17;
   width: 20px;
   height: 20px;
   display: flex;
@@ -533,9 +535,9 @@
   font-size: 10.5px;
   font-weight: 600;
   padding: 3px 6px;
-  border-radius: 5px;
-  background: #EFE4CB;
-  color: #6A5C42;
+  border-radius: 3px;
+  background: #E6E0CE;
+  color: #575145;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -546,12 +548,12 @@
   align-items: center;
   gap: 8px;
   padding: 9px 14px;
-  border-radius: 10px;
-  border: 1px solid #E7DCC6;
+  border-radius: 3px;
+  border: 1px solid #CFC6B0;
   font-size: 13px;
   font-weight: 500;
-  background: #FFFFFF;
-  color: #2A2118;
+  background: #FCFAF4;
+  color: #1A1A17;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -561,8 +563,8 @@
   top: calc(100% + 6px);
   left: 0;
   min-width: 210px;
-  background: #FFFFFF;
-  border-radius: 14px;
+  background: #FCFAF4;
+  border-radius: 3px;
   box-shadow: 0 20px 48px rgba(0, 0, 0, .14);
   padding: 8px;
   z-index: 41;
@@ -570,14 +572,14 @@
 
 .dropdownItem {
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: 3px;
   font-size: 13.5px;
-  color: #2A2118;
+  color: #1A1A17;
   cursor: pointer;
 }
 
 .dropdownItem:hover {
-  background: #FBF7EE;
+  background: #F6F2E9;
 }
 
 .darkBtn {
@@ -587,9 +589,9 @@
   font-size: 12.5px;
   font-weight: 600;
   padding: 8px 14px;
-  border-radius: 9px;
-  background: #2A2118;
-  color: #FFFFFF;
+  border-radius: 3px;
+  background: #23306B;
+  color: #FCFAF4;
   cursor: pointer;
   white-space: nowrap;
 }

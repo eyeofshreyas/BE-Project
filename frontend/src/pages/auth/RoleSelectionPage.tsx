@@ -4,9 +4,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
 import styles from './RoleSelectionPage.module.css'
 
-const PRIMARY = '#B08D3E'
-const PRIMARY_DARK = '#7A5A24'
-const BORDER = '#E7DCC6'
+const PRIMARY = '#23306B'
+const PRIMARY_DARK = '#1A2551'
+const BORDER = '#CFC6B0'
 
 function BriefcaseIcon({ color }: { color: string }) {
   return (
@@ -39,7 +39,7 @@ function ShieldIcon({ color }: { color: string }) {
 
 function CheckIcon() {
   return (
-    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
     </svg>
   )
@@ -98,13 +98,13 @@ export default function RoleSelectionPage() {
               className={styles.card}
               style={{
                 border: active ? `2px solid ${PRIMARY}` : `1px solid ${BORDER}`,
-                boxShadow: active ? '0 12px 28px rgba(176,141,62,.18)' : '0 1px 2px rgba(42,33,24,.04)',
+                boxShadow: active ? '0 12px 28px rgba(35, 48, 107,.18)' : '0 1px 2px rgba(35, 48, 107,.04)',
                 transform: active ? 'translateY(-2px)' : 'none',
               }}
               onClick={() => setSelected(r.key)}
             >
-              <div className={styles.iconWrap} style={{ background: active ? PRIMARY : '#EFE4CB' }}>
-                {r.icon(active ? '#FFFFFF' : PRIMARY_DARK)}
+              <div className={styles.iconWrap} style={{ background: active ? PRIMARY : '#E6E0CE' }}>
+                {r.icon(active ? '#FCFAF4' : PRIMARY_DARK)}
               </div>
               <div className={styles.cardTitle}>{r.title}</div>
               <div className={styles.cardDesc}>{r.desc}</div>
@@ -124,7 +124,7 @@ export default function RoleSelectionPage() {
       <div className={styles.footer}>
         <div
           className={styles.continueBtn}
-          style={{ cursor: canContinue ? 'pointer' : 'not-allowed', background: canContinue ? PRIMARY : '#E9DFD1', color: canContinue ? '#FFFFFF' : '#A38F66', boxShadow: canContinue ? '0 6px 16px rgba(176,141,62,.28)' : 'none' }}
+          style={{ cursor: canContinue ? 'pointer' : 'not-allowed', background: canContinue ? PRIMARY : '#E9DFD1', color: canContinue ? '#FCFAF4' : '#8C857A', boxShadow: canContinue ? '0 6px 16px rgba(35, 48, 107,.28)' : 'none' }}
           onClick={handleContinue}
         >
           Continue<ArrowIcon />

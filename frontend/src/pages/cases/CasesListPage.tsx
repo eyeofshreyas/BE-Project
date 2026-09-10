@@ -8,23 +8,23 @@ import { formatDate, timeAgo } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import cd from './cases.module.css'
 
-const MUTED = '#8C7C5E'
+const MUTED = '#6E6759'
 const CLOSED_STATUSES = new Set(['Closed', 'Completed'])
 const ACTIVE_STATUSES = new Set(['Open', 'In Progress'])
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
-  Completed: ['#2E9E58', '#E4F5EA'],
-  Closed: ['#2E9E58', '#E4F5EA'],
-  Open: ['#B87F1E', '#FFF2E0'],
-  'In Progress': ['#B87F1E', '#FFF2E0'],
-  Pending: ['#B87F1E', '#FFF2E0'],
+  Completed: ['#4A6B4E', '#E4EDE5'],
+  Closed: ['#4A6B4E', '#E4EDE5'],
+  Open: ['#8A6A2F', '#F3EBD9'],
+  'In Progress': ['#8A6A2F', '#F3EBD9'],
+  Pending: ['#8A6A2F', '#F3EBD9'],
 }
-const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
+const DEFAULT_STATUS_STYLE: [string, string] = ['#575145', '#F0ECDF']
 const STATUS_LABELS: Record<string, string> = { Open: 'Active' }
 function statusLabel(s: string) {
   return STATUS_LABELS[s] ?? s
 }
 
-const PRIORITY_COLORS: Record<string, string> = { High: '#B05C5C', Medium: '#B87F1E', Low: '#2E9E58' }
+const PRIORITY_COLORS: Record<string, string> = { High: '#B3282D', Medium: '#8A6A2F', Low: '#4A6B4E' }
 const PRIORITY_RANK: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
 
 const FILTERS = ['All', 'Active', 'Pending', 'Closed']
@@ -60,7 +60,7 @@ function hearingLabel(iso: string) {
 function hearingColor(iso: string) {
   const days = daysUntil(iso)
   if (days < 0) return MUTED
-  return days <= 7 ? '#B87F1E' : '#2A2118'
+  return days <= 7 ? '#8A6A2F' : '#1A1A17'
 }
 
 function loadProfile(): UserProfile | null {
@@ -140,7 +140,7 @@ function StaffCasesView() {
         <button className={cd.sortHead} style={align === 'right' ? { marginLeft: 'auto' } : undefined} onClick={() => sortBy(sortKey)}>
           {label}
           <span className={`${cd.caret} ${active ? '' : cd.caretOff} ${active && !sort.asc ? cd.caretUp : ''}`}>
-            <Icon name="chevron-down" size={12} color="#8f6743" strokeWidth={2.4} />
+            <Icon name="chevron-down" size={12} color="#1A2551" strokeWidth={2.4} />
           </span>
         </button>
       </th>
@@ -152,17 +152,17 @@ function StaffCasesView() {
       <div className={styles.wrap}>
         <div className={styles.header}>
           <div className={styles.title}>Cases</div>
-          <div className={styles.primaryChip} onClick={() => navigate('/cases/new')}><Icon name="plus" size={15} color="#FFFFFF" /> New case</div>
+          <div className={styles.primaryChip} onClick={() => navigate('/cases/new')}><Icon name="plus" size={15} color="#FCFAF4" /> New case</div>
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading cases…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
         {!loading && !error && (
           <div className={styles.tableCard}>
             <div className={cd.toolbar}>
               <div className={cd.searchBox} style={{ flex: 1, minWidth: 240 }}>
-                <Icon name="search" size={15} color="#A38F66" />
+                <Icon name="search" size={15} color="#8C857A" />
                 <input
                   placeholder="Search by case, client or number…"
                   value={search}
@@ -197,7 +197,7 @@ function StaffCasesView() {
                     <tr key={c.id} className={styles.tr} onClick={() => navigate(`/cases/${c.case_id}`)}>
                       <td className={styles.tdClient}>
                         <div style={{ fontWeight: 700 }}>{c.case_title ?? c.id}</div>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: '#B08D3E', marginTop: 2 }}>{c.id}</div>
+                        <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: '#23306B', marginTop: 2 }}>{c.id}</div>
                       </td>
                       <td className={styles.td}>{c.client ?? 'No client'}</td>
                       <td className={styles.td}>{c.case_type ?? '—'}</td>
@@ -311,18 +311,18 @@ function ClientCasesView() {
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading your cases…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
         {!loading && !error && (
           <>
             <div className={styles.statCards}>
               {statCards.map((s) => (
                 <div key={s.label} className={styles.statCard}>
-                  <div className={styles.statIconRow}><div className={styles.statIconWrap}><Icon name={s.icon} size={18} color="#8f6743" /></div></div>
+                  <div className={styles.statIconRow}><div className={styles.statIconWrap}><Icon name={s.icon} size={18} color="#1A2551" /></div></div>
                   <div>
                     <div className={styles.statValue}>{s.value}</div>
                     <div className={styles.statLabel}>{s.label}</div>
-                    {s.sublabel && <div style={{ fontSize: 12, color: '#B08D3E', fontWeight: 600, marginTop: 5 }}>{s.sublabel}</div>}
+                    {s.sublabel && <div style={{ fontSize: 12, color: '#23306B', fontWeight: 600, marginTop: 5 }}>{s.sublabel}</div>}
                   </div>
                 </div>
               ))}
@@ -331,7 +331,7 @@ function ClientCasesView() {
             <div className={styles.midGrid}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div className={cd.searchBox}>
-                  <Icon name="search" size={15} color="#A38F66" />
+                  <Icon name="search" size={15} color="#8C857A" />
                   <input
                     placeholder="Search your cases…"
                     value={search}
@@ -348,7 +348,7 @@ function ClientCasesView() {
                       <div className={cd.caseCardTop}>
                         <div style={{ minWidth: 0 }}>
                           <div className={cd.caseNumber}>{c.id}</div>
-                          <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 16, fontWeight: 700, color: '#2A2118', marginTop: 3 }}>{c.case_title ?? c.id}</div>
+                          <div style={{ fontFamily: "'Spectral', serif", fontSize: 16, fontWeight: 700, color: '#1A1A17', marginTop: 3 }}>{c.case_title ?? c.id}</div>
                           <div style={{ fontSize: 12.5, color: MUTED, marginTop: 3 }}>{c.court ?? 'Court not set'}</div>
                         </div>
                         <span className={styles.statusBadge} style={{ color, background: bg, flexShrink: 0 }}>{statusLabel(c.status)}</span>
@@ -366,9 +366,9 @@ function ClientCasesView() {
 
                       {latest && (
                         <div className={cd.activityLine}>
-                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#B08D3E', flexShrink: 0 }} />
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#23306B', flexShrink: 0 }} />
                           {latest.event_title}
-                          <span style={{ color: '#A38F66' }}>{timeAgo(latest.created_at)}</span>
+                          <span style={{ color: '#8C857A' }}>{timeAgo(latest.created_at)}</span>
                         </div>
                       )}
                     </button>
@@ -395,12 +395,12 @@ function ClientCasesView() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
                     {updates.map((u) => (
                       <div key={u.id} className={cd.updateRow}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#B08D3E', marginTop: 6, flexShrink: 0 }} />
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#23306B', marginTop: 6, flexShrink: 0 }} />
                         <div style={{ minWidth: 0 }}>
                           <div className={cd.updateCase}>{caseNumbers[u.case_id] ?? ''}</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118', marginTop: 2 }}>{u.event_title}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17', marginTop: 2 }}>{u.event_title}</div>
                           {u.event_description && <div style={{ fontSize: 12, color: MUTED, marginTop: 3, lineHeight: 1.5 }}>{u.event_description}</div>}
-                          <div style={{ fontSize: 11.5, color: '#A38F66', marginTop: 4 }}>{timeAgo(u.created_at)}</div>
+                          <div style={{ fontSize: 11.5, color: '#8C857A', marginTop: 4 }}>{timeAgo(u.created_at)}</div>
                         </div>
                       </div>
                     ))}
