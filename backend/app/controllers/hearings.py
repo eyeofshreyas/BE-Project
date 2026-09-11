@@ -3,6 +3,7 @@
 from datetime import date
 
 from fastapi import Depends, HTTPException
+from app.controllers.case_history import add_timeline_event
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.hearings import HearingSummary, HearingCreate, HearingUpdate
@@ -117,7 +118,19 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
         "hearing_status": "Scheduled",
     }).execute().data[0]
     _sync_next_hearing_date(data.case_id)
-    return _get_hearing(row["hearing_id"])
+
+    hearing = _get_hearing(row["hearing_id"])
+    when = hearing["hearing_date"]
+    if hearing["hearing_time"]:
+        when += f" at {hearing['hearing_time'][:5]}"
+    where = ", ".join(part for part in (hearing["judge_name"], hearing["courtroom"]) if part)
+    add_timeline_event(
+        data.case_id, "hearing_scheduled",
+        f"Hearing scheduled for {when}",
+        f"Listed before {where}." if where else None,
+        profile["user_id"],
+    )
+    return hearing
 
 
 def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
