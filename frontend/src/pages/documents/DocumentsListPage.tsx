@@ -1,10 +1,11 @@
 /** `/documents` route: full document library with drag-drop upload, AI-summary cards, search/type filtering, and a detail table. Uses `DocumentPreviewModal` for inline preview. */
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   listDocuments, getDocumentSummary, getDocumentDownloadUrl, deleteDocument,
-  listCases, listDocumentTypes, uploadDocument, summarizeDocument,
+  listCases, listDocumentTypes, uploadDocument, summarizeDocument, findSimilarCases,
 } from '../../api/client'
-import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption } from '../../types/api'
+import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption, SimilarCaseResult } from '../../types/api'
 import { Icon } from '../../components/icons'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
 import { formatDate as formatDateWith } from '../../utils/date'
@@ -16,6 +17,16 @@ const PRIMARY = '#23306B'
 
 function formatDate(iso: string) {
   return formatDateWith(iso, { month: 'short', day: 'numeric' })
+}
+
+/** Which stat card is currently acting as a filter; '' is the "Total Docs" card, i.e. no filter. */
+type QuickFilter = '' | 'summary' | 'week' | 'case'
+
+function matchesQuick(d: DocumentSummary, filter: QuickFilter, weekAgoMs: number) {
+  if (filter === 'summary') return d.has_summary
+  if (filter === 'week') return new Date(d.upload_date).getTime() >= weekAgoMs
+  if (filter === 'case') return Boolean(d.case_number)
+  return true
 }
 
 function formatSize(bytes: number | null) {
@@ -32,6 +43,7 @@ function formatSize(bytes: number | null) {
  * `DocumentPreviewModal`), and `deleteDocument()`.
  */
 export default function DocumentsListPage() {
+  const navigate = useNavigate()
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [docTypes, setDocTypes] = useState<DocumentTypeOption[]>([])
@@ -54,8 +66,15 @@ export default function DocumentsListPage() {
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [similarId, setSimilarId] = useState<number | null>(null)
+  const [similarHits, setSimilarHits] = useState<SimilarCaseResult[]>([])
+  const [similarLoading, setSimilarLoading] = useState(false)
+  const [similarError, setSimilarError] = useState('')
+
+  const [toast, setToast] = useState('')
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
 
@@ -66,6 +85,12 @@ export default function DocumentsListPage() {
     document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(''), 4000)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   useEffect(() => {
     Promise.all([listDocuments(), listCases(), listDocumentTypes()])
@@ -86,6 +111,22 @@ export default function DocumentsListPage() {
       .then(setSummary)
       .catch((err) => setSummaryError(err instanceof Error ? err.message : 'No AI summary available.'))
       .finally(() => setSummaryLoading(false))
+  }
+
+  /** Searches the public IN-Abs judgment corpus (`/ai/similar-cases`) for precedents that
+   * read like this document. The query is the document's stored AI summary -- the file
+   * contents never reach the browser, so without a summary there's nothing to match on. */
+  function toggleSimilar(id: number) {
+    if (similarId === id) { setSimilarId(null); return }
+    setSimilarId(id)
+    setSimilarHits([])
+    setSimilarError('')
+    setSimilarLoading(true)
+    getDocumentSummary(id)
+      .then((s) => findSimilarCases(s.summary_text))
+      .then(setSimilarHits)
+      .catch(() => setSimilarError('Generate an AI summary for this document first -- similar search matches on its text.'))
+      .finally(() => setSimilarLoading(false))
   }
 
   // ponytail: the backing model is fine-tuned only on Supreme Court judgment
@@ -110,6 +151,16 @@ export default function DocumentsListPage() {
     }
   }
 
+  function caseIdOf(caseNumber: string | null) {
+    return cases.find((c) => c.id === caseNumber)?.case_id
+  }
+
+  function openCase(caseNumber: string | null) {
+    const caseId = caseIdOf(caseNumber)
+    if (caseId) navigate(`/cases/${caseId}`)
+    else setToast("That case isn't in your list.")
+  }
+
   async function openDocument(id: number) {
     const tab = window.open('', '_blank')
     try {
@@ -125,7 +176,7 @@ export default function DocumentsListPage() {
       const { url } = await getDocumentDownloadUrl(id, true)
       window.location.href = url
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Failed to download document.')
+      setToast(err instanceof Error ? err.message : 'Failed to download document.')
     }
   }
 
@@ -142,7 +193,7 @@ export default function DocumentsListPage() {
       await deleteDocument(id)
       setDocuments((prev) => prev.filter((d) => d.id !== id))
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Failed to delete document.')
+      setToast(err instanceof Error ? err.message : 'Failed to delete document.')
     }
   }
 
@@ -183,10 +234,10 @@ export default function DocumentsListPage() {
   const total = documents.length || 1
 
   const statCards = [
-    { label: 'Total Docs', value: documents.length, pct: 100, icon: 'file-text' as const },
-    { label: 'With AI Summary', value: withSummaryCount, pct: Math.round((withSummaryCount / total) * 100), icon: 'sparkles' as const },
-    { label: 'Uploaded This Week', value: thisWeekCount, pct: Math.round((thisWeekCount / total) * 100), icon: 'calendar' as const },
-    { label: 'Cases Covered', value: casesCovered, pct: Math.round((casesCovered / total) * 100), icon: 'briefcase' as const },
+    { label: 'Total Docs', value: documents.length, pct: 100, icon: 'file-text' as const, filter: '' as QuickFilter },
+    { label: 'With AI Summary', value: withSummaryCount, pct: Math.round((withSummaryCount / total) * 100), icon: 'sparkles' as const, filter: 'summary' as QuickFilter },
+    { label: 'Uploaded This Week', value: thisWeekCount, pct: Math.round((thisWeekCount / total) * 100), icon: 'calendar' as const, filter: 'week' as QuickFilter },
+    { label: 'Cases Covered', value: casesCovered, pct: Math.round((casesCovered / total) * 100), icon: 'briefcase' as const, filter: 'case' as QuickFilter },
   ]
 
   const recentDocs = [...documents].sort((a, b) => b.upload_date.localeCompare(a.upload_date)).slice(0, 4)
@@ -194,7 +245,8 @@ export default function DocumentsListPage() {
   const searchLower = search.toLowerCase()
   const filteredDocuments = documents.filter((d) =>
     (!searchLower || d.file_name.toLowerCase().includes(searchLower) || (d.case_number ?? '').toLowerCase().includes(searchLower)) &&
-    (!typeFilter || d.document_type === typeFilter)
+    (!typeFilter || d.document_type === typeFilter) &&
+    matchesQuick(d, quickFilter, weekAgoMs)
   )
 
   return (
@@ -214,7 +266,13 @@ export default function DocumentsListPage() {
           <>
             <div className={styles.statCards}>
               {statCards.map((s) => (
-                <div key={s.label} className={styles.statCard}>
+                <div
+                  key={s.label}
+                  className={styles.statCard}
+                  onClick={() => setQuickFilter(s.filter)}
+                  title={`Show ${s.label.toLowerCase()}`}
+                  style={{ cursor: 'pointer', ...(quickFilter === s.filter ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : {}) }}
+                >
                   <div className={styles.statIconRow}>
                     <div className={styles.statIconWrap}><Icon name={s.icon} size={18} color={PRIMARY} /></div>
                     <span style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>{s.label}</span>
@@ -288,7 +346,7 @@ export default function DocumentsListPage() {
                       <div onClick={() => toggleSummary(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: expandedId === d.id ? '#E6E0CE' : '#FCFAF4' }}>
                         <Icon name="sparkles" size={13} color="#575145" /> Summary
                       </div>
-                      <div className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, opacity: .5, cursor: 'default' }} title="Similar-document search coming soon">
+                      <div onClick={() => toggleSimilar(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: similarId === d.id ? '#E6E0CE' : '#FCFAF4' }} title="Find similar judgments">
                         <Icon name="search" size={13} color="#575145" /> Similar
                       </div>
                     </div>
@@ -316,6 +374,21 @@ export default function DocumentsListPage() {
                             </div>
                           </div>
                         )}
+                      </div>
+                    )}
+                    {similarId === d.id && (
+                      <div style={{ fontSize: 12.5, color: '#33302A', borderTop: '1px solid #F1EDE0', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {similarLoading && <div style={{ color: MUTED }}>Searching the judgment corpus…</div>}
+                        {similarError && <div style={{ color: MUTED }}>{similarError}</div>}
+                        {!similarLoading && !similarError && similarHits.length === 0 && <div style={{ color: MUTED }}>No similar judgments found.</div>}
+                        {similarHits.map((hit) => (
+                          <div key={hit.doc_id} style={{ borderLeft: '2px solid #E6E0CE', paddingLeft: 10 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: '.08em' }}>
+                              {hit.doc_id} · {(hit.score * 100).toFixed(0)}% match
+                            </div>
+                            <div style={{ marginTop: 3, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{hit.excerpt}</div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -384,7 +457,16 @@ export default function DocumentsListPage() {
                         </div>
                       </td>
                       <td className={styles.td}>{d.document_type ? <span className={shellStyles.pill} style={{ color: '#575145', background: '#E6E0CE' }}>{d.document_type}</span> : '—'}</td>
-                      <td className={styles.tdMono}>{d.case_number ?? '—'}</td>
+                      <td className={styles.tdMono}>
+                        {d.case_number ? (
+                          <span
+                            onClick={() => openCase(d.case_number)}
+                            style={{ cursor: caseIdOf(d.case_number) ? 'pointer' : 'default', textDecoration: caseIdOf(d.case_number) ? 'underline' : 'none' }}
+                          >
+                            {d.case_number}
+                          </span>
+                        ) : '—'}
+                      </td>
                       <td className={styles.td}>{formatDate(d.upload_date)}</td>
                       <td className={styles.td}>{formatSize(d.file_size)}</td>
                       <td className={styles.td}>
@@ -406,6 +488,8 @@ export default function DocumentsListPage() {
           </>
         )}
       </div>
+
+      {toast && <div className={styles.toast}>{toast}</div>}
 
       {previewDoc && (
         <DocumentPreviewModal

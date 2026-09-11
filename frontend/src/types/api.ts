@@ -343,6 +343,12 @@ export interface HearingSummary {
   notes: string | null
 }
 
+export interface SimilarCaseResult {
+  doc_id: string
+  score: number
+  excerpt: string
+}
+
 export interface RazorpayOrder {
   order_id: string
   amount: number
