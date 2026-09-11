@@ -150,7 +150,7 @@ export default function ClientsPage() {
             {filtered.map((c) => {
               const [color, bg] = STATUS_STYLE_MAP[c.status] || ['#575145', '#F0ECDF']
               return (
-                <div key={c.id} style={{ background: '#FCFAF4', border: '1px solid #CFC6B0', borderRadius: 3, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div key={c.id} onClick={() => navigate(`/clients/${c.id}`)} style={{ background: '#FCFAF4', border: '1px solid #CFC6B0', borderRadius: 3, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
                   <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#F3EBD9', color: PRIMARY_DARK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, fontFamily: "'Spectral', serif", flexShrink: 0 }}>
                     {initialsOf(c.full_name)}
                   </div>
@@ -171,7 +171,7 @@ export default function ClientsPage() {
                       <Icon name="alert-triangle" size={12} color="#B3282D" />{moneyRound(c.pending_amount)} PENDING
                     </div>
                   )}
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()}>
                     <a href={`mailto:${c.email}`} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #CFC6B0', background: '#FCFAF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, textDecoration: 'none' }} title="Email">
                       <Icon name="mail" size={14} />
                     </a>
