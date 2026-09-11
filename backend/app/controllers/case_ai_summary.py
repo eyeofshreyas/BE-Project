@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, require_roles
+from app.ml.case_search import search_own_cases
 from app.ml.similar_cases import FINETUNE_VENV_PYTHON, SEARCH_RUNNER
 from app.ml.subprocess_utils import run_ml_subprocess
 from app.ml.summarize import INFERENCE_DIR, SUMMARIZE_RUNNER
@@ -157,3 +158,16 @@ def generate_case_ai_summary(case_id: int, profile: dict = Depends(require_roles
     }
     supabase.table("case_ai_summaries").upsert(row, on_conflict="case_id").execute()
     return _to_case_ai_summary(row)
+
+
+def list_similar_own_cases(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Rank the caller's *other* cases against this one -- "have we handled something like this
+    before" over the firm's own files, not the public reference corpus. The query is the same
+    case file the summary is written from, and `search_own_cases()` applies the caller's normal
+    case scoping, so a lawyer is only ever matched against cases they're assigned to.
+    Calls: `ensure_case_access()`, `_build_case_text()`, `search_own_cases()`."""
+    ensure_case_access(case_id, profile)
+    text = _build_case_text(case_id)
+    if not text.strip():
+        return []
+    return search_own_cases(profile, text, top_k=5, exclude_case_id=case_id)

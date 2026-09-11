@@ -102,3 +102,22 @@ if __name__ == "__main__":
     test_case_search_returns_empty_without_running_the_subprocess()
     test_client_searches_only_their_own_cases()
     print("ok")
+
+
+def test_search_own_cases_drops_the_case_being_compared():
+    """"Cases like this one" must not rank the case itself first at a perfect score.
+    Exercises: `case_search.search_own_cases(exclude_case_id=...)`."""
+    from app.ml.case_search import search_own_cases
+
+    rows = _rows()
+    rows["case_lawyers"] = [{"case_id": 10}, {"case_id": 20}]  # assigned to both
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    fake = _fake_supabase(rows)
+    with patch("app.middleware.auth.supabase", fake), patch("app.ml.case_search.supabase", fake), \
+         patch("app.ml.case_search.run_ml_subprocess") as run_ml_subprocess:
+        run_ml_subprocess.return_value = [{"case_id": 20, "score": 0.8}]
+        results = search_own_cases(profile, "boundary encroachment", exclude_case_id=10)
+
+    embedded = {doc["case_id"] for doc in run_ml_subprocess.call_args[0][1]["docs"]}
+    assert embedded == {20}
+    assert [r["case_id"] for r in results] == [20]

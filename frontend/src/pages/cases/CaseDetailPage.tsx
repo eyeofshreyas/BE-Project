@@ -6,11 +6,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
-  unassignLawyer, getCaseAiSummary, generateCaseAiSummary, getOrCreateConversation, createMeeting,
+  unassignLawyer, getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
-  DocumentTypeOption, UserProfile, CaseAiSummary,
+  DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
@@ -141,6 +141,8 @@ export default function CaseDetailPage() {
 
   const [aiSummary, setAiSummary] = useState<CaseAiSummary | null>(null)
   const [openPrecedent, setOpenPrecedent] = useState<string | null>(null)
+  const [similarCases, setSimilarCases] = useState<CaseSearchResult[] | null>(null)
+  const [similarLoading, setSimilarLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
 
   const [statusSaving, setStatusSaving] = useState(false)
@@ -257,6 +259,19 @@ export default function CaseDetailPage() {
       setNotes((prev) => prev.filter((n) => n.id !== noteId))
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to delete note.')
+    }
+  }
+
+  /** Ranks the firm's other cases against this one via `/cases/:id/similar` -- the lawyer's own
+   * files, scoped the way the case list is, not the public judgement corpus. */
+  async function findSimilarCases() {
+    setSimilarLoading(true)
+    try {
+      setSimilarCases(await listSimilarOwnCases(numericCaseId))
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to find similar cases.')
+    } finally {
+      setSimilarLoading(false)
     }
   }
 
@@ -493,6 +508,49 @@ export default function CaseDetailPage() {
                 </Empty>
               )}
             </div>
+            )}
+
+            {canManage && (
+              <Card
+                title="Similar cases"
+                count={similarCases?.length}
+                action={
+                  similarCases && (
+                    <button className={cd.linkAction} onClick={() => !similarLoading && findSimilarCases()}>
+                      {similarLoading ? 'Searching…' : 'Refresh'}
+                    </button>
+                  )
+                }
+              >
+                {similarCases === null ? (
+                  <Empty
+                    action={
+                      <div className={styles.ghostChip} style={{ opacity: similarLoading ? 0.7 : 1 }} onClick={() => !similarLoading && findSimilarCases()}>
+                        <Icon name="search" size={15} color="#575145" /> {similarLoading ? 'Searching…' : 'Find similar cases'}
+                      </div>
+                    }
+                  >
+                    Match this case against the others on your desk -- LexFlow reads each one's notes and documents to find the ones you've handled like it before.
+                  </Empty>
+                ) : similarCases.length === 0 ? (
+                  <Empty>No other case of yours reads like this one yet.</Empty>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {similarCases.map((c) => (
+                      <div key={c.case_id} className={cd.listRow} style={{ cursor: 'pointer' }} onClick={() => navigate(`/cases/${c.case_id}`)}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div className={cd.caseNumber}>{c.case_number ?? '—'}</div>
+                            <div className={cd.rowTitle} style={{ marginTop: 2 }}>{c.case_title ?? 'Untitled case'}</div>
+                          </div>
+                          <span className={styles.statusBadge} style={{ color: '#575145', background: '#F0ECDF', flexShrink: 0 }}>{Math.round(c.score * 100)}% match</span>
+                        </div>
+                        {c.excerpt && <div className={cd.metaRow} style={{ display: 'block', lineHeight: 1.5 }}>{c.excerpt}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
             )}
 
             <Card title="Timeline" count={timeline.length}>

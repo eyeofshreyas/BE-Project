@@ -349,6 +349,14 @@ export interface SimilarCaseResult {
   excerpt: string
 }
 
+export interface CaseSearchResult {
+  case_id: number
+  case_number: string | null
+  case_title: string | null
+  score: number
+  excerpt: string
+}
+
 export interface SimilarCaseDetail {
   doc_id: string
   citation: string | null

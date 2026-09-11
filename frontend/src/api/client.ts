@@ -39,6 +39,7 @@ import type {
   MessageSummary,
   SimilarCaseResult,
   SimilarCaseDetail,
+  CaseSearchResult,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -182,6 +183,10 @@ export function findSimilarCases(query: string, topK = 5) {
 
 export function translateText(text: string, targetLanguage: string, documentId?: number) {
   return post<{ translated_text: string }>('/ai/translate', { text, target_language: targetLanguage, document_id: documentId ?? null })
+}
+
+export function listSimilarOwnCases(caseId: number) {
+  return get<CaseSearchResult[]>(`/cases/${caseId}/similar`)
 }
 
 export function getSimilarCase(docId: string) {
