@@ -168,6 +168,10 @@ export default function CaseDetailPage() {
 
   useEffect(() => {
     if (!numericCaseId) { setError('Invalid case.'); setLoading(false); return }
+    // React Router keeps this component mounted when one case links to another, so anything
+    // scoped to a single case has to be cleared by hand or it is read as the new case's.
+    setSimilarCases(null)
+    setOpenPrecedent(null)
     Promise.all([listCases(), canManage ? listCaseNotes(numericCaseId) : Promise.resolve([]), listCaseTimeline(numericCaseId), listDocuments(), listMeetings(numericCaseId)])
       .then(([cases, n, t, docs, m]) => {
         const found = cases.find((c) => c.case_id === numericCaseId)
