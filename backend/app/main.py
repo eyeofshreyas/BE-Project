@@ -122,7 +122,16 @@ def signup(data: SignupRequest):
             "password_hash": "managed_by_supabase_auth",
             "phone": data.phone,
         }).execute().data[0]
+    except PostgrestAPIError as e:
+        if e.code == "23505":
+            raise HTTPException(status_code=409, detail="An account with this email already exists. Try logging in instead.")
+        logger.exception("User row insert failed after auth signup for %s", data.email)
+        raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
+    except Exception:
+        logger.exception("User row insert failed after auth signup for %s", data.email)
+        raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
 
+    try:
         if data.role == "lawyer":
             supabase.table("lawyers").insert({
                 "user_id": user_row["user_id"],
@@ -149,15 +158,15 @@ def signup(data: SignupRequest):
                     "notification_type": "client_request",
                     "is_read": False,
                 }).execute()
-    except PostgrestAPIError as e:
-        if e.code == "23505":
-            raise HTTPException(status_code=409, detail="An account with this email already exists. Try logging in instead.")
-        # ponytail: auth account now exists without a profile row if this
-        # fails partway; a reconciliation job is the ceiling, not built yet.
+    except Exception as e:
+        # A users row without its lawyers/clients row logs in fine but 400s on every
+        # role endpoint ("No lawyer profile for this account"), so undo it by hand --
+        # there is no transaction across REST calls. The auth account survives; signing
+        # up again reuses it.
+        supabase.table("users").delete().eq("user_id", user_row["user_id"]).execute()
         logger.exception("Profile setup failed after auth signup for %s", data.email)
-        raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
-    except Exception:
-        logger.exception("Profile setup failed after auth signup for %s", data.email)
+        if data.role == "lawyer" and isinstance(e, PostgrestAPIError) and e.code == "23505":
+            raise HTTPException(status_code=409, detail="That bar council number is already registered.")
         raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
 
     return {"message": "Signup successful. Check your email to verify your account."}

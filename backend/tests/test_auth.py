@@ -182,6 +182,37 @@ def test_signup_reports_generic_profile_failure_for_other_db_errors():
             assert "contact support" in e.detail.lower()
 
 
+def test_signup_deletes_the_users_row_when_the_profile_insert_fails():
+    """Verifies a failed lawyers-row insert removes the just-created users row, so the account
+    can't log in with no profile (the "No lawyer profile for this account" 400). Exercises:
+    `POST /signup` (`main.signup()`)."""
+    fake = MagicMock()
+    fake.auth.sign_up.return_value = None
+
+    def table(name):
+        t = MagicMock()
+        if name == "users":
+            t.insert.return_value.execute.return_value.data = [{"user_id": 77}]
+        else:
+            t.insert.return_value.execute.side_effect = PostgrestAPIError({
+                "message": "duplicate key value violates unique constraint \"lawyers_bar_council_number_key\"",
+                "code": "23505", "hint": None, "details": None,
+            })
+        return t
+
+    tables = {}
+    fake.table.side_effect = lambda name: tables.setdefault(name, table(name))
+    payload = SignupRequest(email="new@example.com", password="whatever123", full_name="New User", phone="9000000000", role="lawyer", bar_council_number="MH/1/2020")
+    with patch("app.main.supabase", fake):
+        try:
+            signup(payload)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 409
+            assert "bar council" in e.detail.lower()
+    tables["users"].delete.return_value.eq.assert_called_once_with("user_id", 77)
+
+
 def test_login_rejects_actually_wrong_password():
     """Verifies a wrong-password login attempt raises 401 with a generic invalid-credentials message. Exercises: `POST /login` (`main.login()`)."""
     fake = MagicMock()
@@ -214,4 +245,5 @@ if __name__ == "__main__":
     test_login_rejects_actually_wrong_password()
     test_signup_reports_duplicate_email_distinctly()
     test_signup_reports_generic_profile_failure_for_other_db_errors()
+    test_signup_deletes_the_users_row_when_the_profile_insert_fails()
     print("ok")
