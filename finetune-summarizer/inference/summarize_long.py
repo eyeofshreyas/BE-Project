@@ -14,6 +14,8 @@ MODEL_NAME = "unsloth/Llama-3.2-1B-Instruct-bnb-4bit"
 ADAPTER_DIR = "../finetune/lora_adapter"
 MAX_SEQ_LENGTH = 2048
 CHUNK_TOKENS = 1200  # leaves room for instruction + template + generated summary within 2048
+REPETITION_PENALTY = 1.15
+NO_REPEAT_NGRAM = 6  # legal prose reuses short phrases ("the High Court held"); 6 spares those
 
 MAP_PROMPT = """### Instruction:
 Summarize the following excerpt from an Indian Supreme Court judgment in a concise legal headnote.
@@ -55,9 +57,20 @@ def chunk_by_tokens(tokenizer, text, max_tokens=CHUNK_TOKENS):
 
 
 def generate(model, tokenizer, prompt, max_new_tokens=220):
-    """Runs greedy generation on a single prompt and returns the decoded completion text."""
+    """Runs greedy generation on a single prompt and returns the decoded completion text.
+
+    Greedy decoding on a 1B model falls into a sentence-level loop on short or thin input (case
+    notes rather than a full judgment), restating one clause until max_new_tokens runs out.
+    NO_REPEAT_NGRAM blocks the loop outright and REPETITION_PENALTY discourages it earlier;
+    both stay off the sampling path so output is still deterministic."""
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=MAX_SEQ_LENGTH).to(model.device)
-    out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+    out = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=False,
+        repetition_penalty=REPETITION_PENALTY,
+        no_repeat_ngram_size=NO_REPEAT_NGRAM,
+    )
     return tokenizer.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True).strip()
 
 
