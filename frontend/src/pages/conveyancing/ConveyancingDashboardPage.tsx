@@ -1,7 +1,7 @@
 /** `/conveyancing` route: role-dispatches to `StaffConveyancingView` (lawyer/admin) or `ClientConveyancingView`, both driven by `getConveyancingSummary()`. */
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { getConveyancingSummary, listAllMeetings, getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument, updateMatter, createInvoice } from '../../api/client'
+import { getConveyancingSummary, listAllMeetings, getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument, updateMatter } from '../../api/client'
 import type { ConveyancingSummary, MeetingSummary, UserProfile, MatterDetail } from '../../types/api'
 import { Icon } from '../../components/icons'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
@@ -48,11 +48,10 @@ const STATUS_STYLE_MAP: Record<string, [string, string]> = {
 }
 const DEFAULT_STATUS_STYLE: [string, string] = ['#575145', '#F0ECDF']
 
-type ActionMode = 'schedule' | 'upload' | 'funds'
+type ActionMode = 'schedule' | 'upload'
 const QUICK_ACTIONS: { label: string; mode: ActionMode }[] = [
   { label: 'Schedule Registration', mode: 'schedule' },
   { label: 'Upload Documents', mode: 'upload' },
-  { label: 'Request Settlement Funds', mode: 'funds' },
 ]
 const REG_STATUSES = ['Pending', 'Drafting', 'Documents Pending', 'Registration Scheduled', 'Lodged', 'Registered', 'Completed']
 const FILTER_PRIORITIES = ['Any', 'Low', 'Medium', 'High'] as const
@@ -552,9 +551,8 @@ function ModalField({ label, children }: { label: string; children: React.ReactN
 /**
  * The one modal behind every write action on the staff dashboard, picked by `mode`:
  * `schedule` patches the matter's registration status/date/office via `updateMatter()`
- * (also what the row Edit button opens, pre-selected), `upload` attaches a file with
- * `uploadMatterDocument()`, and `funds` raises a settlement invoice against the matter's
- * case with `createInvoice()`. All three need a matter, so the picker is always shown.
+ * (also what the row Edit button opens, pre-selected) and `upload` attaches a file with
+ * `uploadMatterDocument()`. Both need a matter, so the picker is always shown.
  */
 function MatterActionModal({ mode, matters, initialMatterId, onClose, onDone }: {
   mode: ActionMode
@@ -570,8 +568,6 @@ function MatterActionModal({ mode, matters, initialMatterId, onClose, onDone }: 
   const [regDate, setRegDate] = useState(matter?.reg_date?.slice(0, 10) ?? '')
   const [office, setOffice] = useState('')
   const [file, setFile] = useState<File | null>(null)
-  const [amount, setAmount] = useState('')
-  const [dueDate, setDueDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -583,9 +579,7 @@ function MatterActionModal({ mode, matters, initialMatterId, onClose, onDone }: 
     setRegDate(next?.reg_date?.slice(0, 10) ?? '')
   }
 
-  const title = mode === 'schedule' ? (initialMatterId ? 'Edit Matter' : 'Schedule Registration')
-    : mode === 'upload' ? 'Upload Documents'
-    : 'Request Settlement Funds'
+  const title = mode === 'schedule' ? (initialMatterId ? 'Edit Matter' : 'Schedule Registration') : 'Upload Documents'
 
   async function submit() {
     if (!matter) { setError('Select a matter first.'); return }
@@ -599,25 +593,10 @@ function MatterActionModal({ mode, matters, initialMatterId, onClose, onDone }: 
           office_name: office.trim() || undefined,
         })
         onDone(`${matter.number} updated.`)
-      } else if (mode === 'upload') {
+      } else {
         if (!file) { setError('Choose a file to upload.'); setSaving(false); return }
         await uploadMatterDocument(matter.matter_id, file)
         onDone(`${file.name} uploaded to ${matter.number}.`)
-      } else {
-        const value = Number(amount)
-        if (!value || value <= 0) { setError('Enter the settlement amount.'); setSaving(false); return }
-        if (matter.case_id == null) { setError('This matter has no case to invoice against.'); setSaving(false); return }
-        await createInvoice({
-          case_id: matter.case_id,
-          invoice_number: `SET-${matter.number}-${Date.now().toString().slice(-5)}`,
-          amount: value,
-          tax: 0,
-          total_amount: value,
-          issue_date: new Date().toISOString().slice(0, 10),
-          due_date: dueDate || undefined,
-          remarks: `Settlement funds requested for ${matter.number}`,
-        })
-        onDone(`Settlement funds requested for ${matter.number}.`)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed.')
@@ -662,17 +641,6 @@ function MatterActionModal({ mode, matters, initialMatterId, onClose, onDone }: 
             <ModalField label="Document">
               <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={modalInput} />
             </ModalField>
-          )}
-
-          {mode === 'funds' && (
-            <>
-              <ModalField label="Settlement Amount (₹)">
-                <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" style={modalInput} />
-              </ModalField>
-              <ModalField label="Due Date (optional)">
-                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={modalInput} />
-              </ModalField>
-            </>
           )}
 
           {error && <div style={{ color: '#B3282D', fontSize: 12.5 }}>{error}</div>}
