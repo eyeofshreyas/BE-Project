@@ -88,6 +88,18 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
     """Create a hearing for a case the caller has access to, and update the case's
     next_hearing_date. Calls: `ensure_case_access()`, `_sync_next_hearing_date()`, `_get_hearing()`."""
     ensure_case_access(data.case_id, profile)
+
+    # A double-submitted form used to land twice, leaving two hearings a person can't tell
+    # apart -- and both then read as two separate listings everywhere the case is summarised.
+    clash = (
+        supabase.table("hearings").select("hearing_id")
+        .eq("case_id", data.case_id).eq("hearing_date", data.hearing_date)
+        .eq("hearing_time", data.hearing_time).eq("judge_id", data.judge_id)
+        .execute().data
+    )
+    if clash:
+        raise HTTPException(status_code=409, detail="This case already has a hearing at that date and time before that judge")
+
     row = supabase.table("hearings").insert({
         "case_id": data.case_id,
         "judge_id": data.judge_id,
