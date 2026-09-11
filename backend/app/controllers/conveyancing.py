@@ -35,6 +35,10 @@ def _active_matter_lawyer(case_lawyers: list[dict]) -> str | None:
             return cl["lawyers"]["users"]["full_name"]
     return None
 
+# The registration pipeline every matter runs through -- seeded on create so the
+# progress stepper and completion_percentage have something to work with.
+REGISTRATION_STAGES = ["Due Diligence", "Stamp Duty Payment", "Deed Execution", "Registration"]
+
 COMPLETED_STATUSES = {"Completed", "Registered"}
 PENDING_STATUSES = {"Pending", "Registration Scheduled", "Documents Pending"}
 
@@ -101,6 +105,26 @@ def conveyancing_summary(profile: dict = Depends(get_current_profile)):
     }
 
 
+def _suffix(value: str, prefix: str) -> int | None:
+    """Numeric tail of `value` after `prefix`, or None if it isn't one of our generated numbers."""
+    tail = value[len(prefix):] if value.startswith(prefix) else ""
+    return int(tail) if tail.isdigit() else None
+
+
+def _next_matter_seq(year: int) -> int:
+    """Next free sequence for this year's MAT-<year>-NNN / PROP<year>NNN pair. Counting rows
+    drifts out of sync with the numbers actually in use (seed data jumps to MAT-2026-106 with
+    far fewer rows), which collided with `cases.case_number`'s unique index, so take the
+    highest number in use across both tables instead.
+    # ponytail: read-then-insert, fine at this app's traffic; move to a DB sequence if
+    # concurrent creates ever race for the same number."""
+    matters = supabase.table("conveyancing_matters").select("matter_number").execute().data
+    cases = supabase.table("cases").select("case_number").execute().data
+    used = [_suffix(m["matter_number"], f"MAT-{year}-") for m in matters]
+    used += [_suffix(c["case_number"], f"PROP{year}") for c in cases]
+    return max([n for n in used if n is not None], default=0) + 1
+
+
 def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     """Create a conveyancing matter: `conveyancing_matters.case_id`/`properties.address` are
     NOT NULL, so this opens a lightweight `cases` row first (case_type 'Property', the first
@@ -114,13 +138,11 @@ def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMI
         raise HTTPException(status_code=500, detail="Missing reference data: a 'Property' case type and at least one court are required.")
 
     year = datetime.now(timezone.utc).year
-    # ponytail: matter/case number = count+1, fine at this app's traffic; move
-    # to a DB sequence if concurrent creates ever race for the same number.
-    count = len(supabase.table("conveyancing_matters").select("matter_id").execute().data)
-    matter_number = f"MAT-{year}-{count + 1:03d}"
+    seq = _next_matter_seq(year)
+    matter_number = f"MAT-{year}-{seq:03d}"
 
     case_row = supabase.table("cases").insert({
-        "case_number": f"PROP{year}{count + 1:03d}",
+        "case_number": f"PROP{year}{seq:03d}",
         "case_title": data.matter_name,
         "client_id": data.client_id,
         "court_id": court_rows[0]["court_id"],
@@ -156,6 +178,15 @@ def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMI
         "completion_percentage": 0,
         "expected_completion_date": data.target_settlement_date,
     }).execute().data[0]
+
+    supabase.table("registration_progress").insert([
+        {"matter_id": matter_row["matter_id"], "stage_name": name, "stage_order": i + 1, "completed": False}
+        for i, name in enumerate(REGISTRATION_STAGES)
+    ]).execute()
+    supabase.table("due_diligence").insert({
+        "matter_id": matter_row["matter_id"],
+        "lawyer_id": lawyer_rows[0]["lawyer_id"] if lawyer_rows else None,
+    }).execute()
 
     client_rows = supabase.table("clients").select("users(full_name)").eq("client_id", data.client_id).execute().data
     if client_rows:
@@ -323,11 +354,12 @@ def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict
     _ensure_matter_access(matter_id, profile)
 
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
-    rows = supabase.table("due_diligence").select("diligence_id").eq("matter_id", matter_id).execute().data
-    if not rows:
-        raise HTTPException(status_code=404, detail="No due diligence record for this matter")
-
-    supabase.table("due_diligence").update(updates).eq("matter_id", matter_id).execute()
+    # Matters seeded before create_matter() opened a due_diligence row have none,
+    # so insert on first update rather than 404ing the checklist forever.
+    if supabase.table("due_diligence").select("diligence_id").eq("matter_id", matter_id).execute().data:
+        supabase.table("due_diligence").update(updates).eq("matter_id", matter_id).execute()
+    else:
+        supabase.table("due_diligence").insert({"matter_id": matter_id, **updates}).execute()
     result = supabase.table("due_diligence").select("*,lawyers(users(full_name))").eq("matter_id", matter_id).execute().data[0]
     lawyer = result.get("lawyers")
     return {**result, "lawyer_name": lawyer["users"]["full_name"] if lawyer else None}

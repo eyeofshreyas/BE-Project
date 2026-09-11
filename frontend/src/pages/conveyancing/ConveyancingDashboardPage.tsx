@@ -1,7 +1,7 @@
 /** `/conveyancing` route: role-dispatches to `StaffConveyancingView` (lawyer/admin) or `ClientConveyancingView`, both driven by `getConveyancingSummary()`. */
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { getConveyancingSummary, listAllMeetings, getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument, updateMatter } from '../../api/client'
+import { getConveyancingSummary, listAllMeetings, getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument, updateMatter, updateDueDiligence, completeProgressStage } from '../../api/client'
 import type { ConveyancingSummary, MeetingSummary, UserProfile, MatterDetail } from '../../types/api'
 import { Icon } from '../../components/icons'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
@@ -71,6 +71,13 @@ const FILTER_MATTER_TYPES: { label: string; icon: React.ReactNode }[] = [
   { label: 'Lease', icon: <KeyIcon /> },
 ]
 const FILTER_DATE_RANGES = ['Today', 'This Week', 'This Month']
+type DiligenceField = 'title_clear' | 'tax_verified' | 'encumbrance_checked' | 'litigation_checked'
+const DILIGENCE_CHECKS: [DiligenceField, string][] = [
+  ['title_clear', 'Title clear'],
+  ['tax_verified', 'Taxes verified'],
+  ['encumbrance_checked', 'Encumbrance checked'],
+  ['litigation_checked', 'Litigation checked'],
+]
 const MATTER_TYPE_OPTIONS = ['Residential Sale', 'Commercial Lease', 'Residential Purchase', 'Off-the-Plan Purchase', 'Mortgage', 'Trust Deed']
 
 function relativeDateTime(iso: string) {
@@ -100,6 +107,12 @@ function withinDateRange(iso: string | null, range: string | null) {
   else start.setDate(1)
   start.setHours(0, 0, 0, 0)
   return d >= start
+}
+
+/** Filter facets are coarse ("Purchase", "Pending") while matter values are specific
+ * ("Off-the-Plan Purchase", "Documents Pending"), so match on containment, not equality. */
+function matchesFacet(value: string | null, filter: string) {
+  return filter === 'All' || (value ?? '').toLowerCase().includes(filter.toLowerCase())
 }
 
 /** Page numbers to render around `current`, with '...' gaps -- always keeps 1, `total`, and current±1. */
@@ -183,6 +196,7 @@ function StaffConveyancingView() {
   const [draftDateRange, setDraftDateRange] = useState<string | null>(null)
 
   const [action, setAction] = useState<{ mode: ActionMode; matterId?: number } | null>(null)
+  const [detailMatterId, setDetailMatterId] = useState<number | null>(null)
 
   function refresh() {
     return getConveyancingSummary()
@@ -263,8 +277,8 @@ function StaffConveyancingView() {
   const matterStatuses = ['All', ...new Set(matters.map((m) => m.status))]
   const searchLower = search.toLowerCase()
   const filteredMatters = matters.filter((m) =>
-    (typeFilter === 'All' || m.type === typeFilter) &&
-    (statusFilter === 'All' || m.status === statusFilter) &&
+    matchesFacet(m.type, typeFilter) &&
+    matchesFacet(m.status, statusFilter) &&
     (priorityFilter === 'Any' || m.priority === priorityFilter) &&
     withinDateRange(m.created_at, dateFilter) &&
     (!searchLower || m.number.toLowerCase().includes(searchLower) || (m.client ?? '').toLowerCase().includes(searchLower))
@@ -478,7 +492,7 @@ function StaffConveyancingView() {
                     const [color, bg] = STATUS_STYLE_MAP[m.status] || DEFAULT_STATUS_STYLE
                     return (
                       <tr key={m.matter_id} className={styles.tr}>
-                        <td className={styles.tdMono}>{m.number}</td>
+                        <td className={styles.tdMono}><span style={{ cursor: 'pointer', color: PRIMARY }} onClick={() => setDetailMatterId(m.matter_id)}>{m.number}</span></td>
                         <td className={styles.tdClient}>{m.title}</td>
                         <td className={styles.td}>{m.client ?? '—'}</td>
                         <td className={styles.td}>{m.type}</td>
@@ -528,6 +542,10 @@ function StaffConveyancingView() {
             onClose={() => setAction(null)}
             onDone={finishAction}
           />
+        )}
+
+        {detailMatterId != null && (
+          <MatterDetailModal matterId={detailMatterId} canEdit onClose={() => { setDetailMatterId(null); refresh() }} />
         )}
 
         {toast && <div className={styles.toast}>{toast}</div>}
@@ -777,13 +795,16 @@ function formatArea(property: MatterDetail['property']) {
  * via `getMatterDetail()`: overview, property, registration-progress stepper, and shared
  * documents (preview/download via the existing document endpoints, upload via
  * `uploadMatterDocument()` -- appends the new doc to `matter.documents` on success).
+ * With `canEdit` (staff, who open it from the matters table) the progress stages become
+ * click-to-complete and the due-diligence checklist becomes editable.
  */
-function MatterDetailModal({ matterId, onClose }: { matterId: number; onClose: () => void }) {
+function MatterDetailModal({ matterId, canEdit = false, onClose }: { matterId: number; canEdit?: boolean; onClose: () => void }) {
   const [matter, setMatter] = useState<MatterDetail | null>(null)
   const [error, setError] = useState('')
   const [previewDoc, setPreviewDoc] = useState<{ id: number; fileName: string; mimeType: string } | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -805,6 +826,33 @@ function MatterDetailModal({ matterId, onClose }: { matterId: number; onClose: (
       setUploadError(err instanceof Error ? err.message : 'Failed to upload document.')
     } finally {
       setUploading(false)
+    }
+  }
+
+  /** Marks one pending stage complete; the server recomputes completion_percentage from all stages. */
+  async function completeStage(progressId: number) {
+    if (!canEdit || saving) return
+    setSaving(true)
+    try {
+      const updated = await completeProgressStage(matterId, progressId)
+      setMatter((prev) => (prev ? { ...prev, progress: prev.progress.map((s) => (s.progress_id === progressId ? updated : s)) } : prev))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update this stage.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function toggleDiligence(field: DiligenceField, next: boolean) {
+    if (!canEdit || saving) return
+    setSaving(true)
+    try {
+      const updated = await updateDueDiligence(matterId, { [field]: next })
+      setMatter((prev) => (prev ? { ...prev, due_diligence: updated } : prev))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update due diligence.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -865,21 +913,42 @@ function MatterDetailModal({ matterId, onClose }: { matterId: number; onClose: (
                   ))}
                 </div>
               </div>
+
+              <div className={styles.panelCard}>
+                <div className={styles.panelTitle}>Due Diligence</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {DILIGENCE_CHECKS.map(([field, label]) => (
+                    <label key={field} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, color: '#1A1A17', cursor: canEdit ? 'pointer' : 'default' }}>
+                      <input
+                        type="checkbox"
+                        checked={matter.due_diligence?.[field] ?? false}
+                        disabled={!canEdit || saving}
+                        onChange={(e) => toggleDiligence(field, e.target.checked)}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                {matter.due_diligence?.remarks && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 10 }}>{matter.due_diligence.remarks}</div>}
+              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div className={styles.panelCard}>
                 <div className={styles.panelTitle}>Registration Progress</div>
                 <div className={styles.timeline}>
-                  {matter.progress.map((s) => (
-                    <div key={s.progress_id} className={styles.timelineItem}>
-                      <span className={styles.timelineDot} style={{ background: s.completed ? PRIMARY_DARK : '#FCFAF4', border: `2px solid ${PRIMARY_DARK}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {s.completed && <Icon name="check-circle" size={9} color="#FCFAF4" strokeWidth={3} />}
-                      </span>
-                      <div className={styles.timelineTitle} style={{ fontWeight: 700 }}>{s.stage_name}</div>
-                      <div className={styles.timelineMeta}>{s.completed ? (s.completed_at ? formatDate(s.completed_at) : 'Completed') : 'Pending'}</div>
-                    </div>
-                  ))}
+                  {matter.progress.map((s) => {
+                    const clickable = canEdit && !s.completed
+                    return (
+                      <div key={s.progress_id} className={styles.timelineItem} style={{ cursor: clickable ? 'pointer' : 'default' }} onClick={() => clickable && completeStage(s.progress_id)}>
+                        <span className={styles.timelineDot} style={{ background: s.completed ? PRIMARY_DARK : '#FCFAF4', border: `2px solid ${PRIMARY_DARK}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {s.completed && <Icon name="check-circle" size={9} color="#FCFAF4" strokeWidth={3} />}
+                        </span>
+                        <div className={styles.timelineTitle} style={{ fontWeight: 700 }}>{s.stage_name}</div>
+                        <div className={styles.timelineMeta}>{s.completed ? (s.completed_at ? formatDate(s.completed_at) : 'Completed') : clickable ? 'Pending — click to complete' : 'Pending'}</div>
+                      </div>
+                    )
+                  })}
                   {matter.progress.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No progress stages yet.</div>}
                 </div>
               </div>

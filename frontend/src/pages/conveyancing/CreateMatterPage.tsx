@@ -39,8 +39,8 @@ const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box'
  * that carries the client/priority -- `cases.client_id` is required) and
  * navigates back to `/conveyancing`. Client selection is required for that
  * reason even though the mockup doesn't mark it so. Responsible Lawyer is
- * decorative: the backend assigns whoever is creating the matter instead,
- * since there's no accessible lawyer-directory endpoint for non-admins.
+ * read-only: the backend assigns whoever is creating the matter, since there's
+ * no accessible lawyer-directory endpoint for non-admins.
  */
 export default function CreateMatterPage() {
   const navigate = useNavigate()
@@ -49,7 +49,6 @@ export default function CreateMatterPage() {
   const [matterName, setMatterName] = useState('')
   const [matterType, setMatterType] = useState(MATTER_TYPES[0])
   const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>('Medium')
-  const [lawyerQuery, setLawyerQuery] = useState('')
 
   const [clientQuery, setClientQuery] = useState('')
   const [clientId, setClientId] = useState('')
@@ -149,7 +148,7 @@ export default function CreateMatterPage() {
               </div>
             </Field>
             <Field label="Responsible Lawyer">
-              <input placeholder="Search lawyer..." value={lawyerQuery} onChange={(e) => setLawyerQuery(e.target.value)} style={inputStyle} />
+              <input value="Assigned to you on save" readOnly style={{ ...inputStyle, background: '#F6F2E9', color: MUTED }} />
             </Field>
           </div>
 

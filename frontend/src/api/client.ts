@@ -34,6 +34,8 @@ import type {
   MatterCreated,
   MatterDetail,
   MatterDocumentSummary,
+  MatterDueDiligence,
+  MatterProgressStage,
   ConversationSummary,
   ConversationDetail,
   MessageSummary,
@@ -164,6 +166,14 @@ export function updateMatter(matterId: number, payload: { registration_status?: 
 
 export function getMatterDetail(matterId: number) {
   return get<MatterDetail>(`/conveyancing/matters/${matterId}`)
+}
+
+export function updateDueDiligence(matterId: number, payload: Partial<Pick<MatterDueDiligence, 'title_clear' | 'tax_verified' | 'encumbrance_checked' | 'litigation_checked' | 'remarks'>>) {
+  return patch<MatterDueDiligence>(`/conveyancing/matters/${matterId}/due-diligence`, payload)
+}
+
+export function completeProgressStage(matterId: number, progressId: number) {
+  return patch<MatterProgressStage>(`/conveyancing/matters/${matterId}/progress/${progressId}`, {})
 }
 
 export function uploadMatterDocument(matterId: number, file: File) {

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.conveyancing import update_due_diligence, complete_progress_stage, update_matter
+from app.controllers.conveyancing import update_due_diligence, complete_progress_stage, update_matter, _next_matter_seq
 from app.models.conveyancing import DueDiligenceUpdate, MatterUpdate
 
 
@@ -65,8 +65,22 @@ def test_update_matter_rejects_matter_on_out_of_scope_case():
             assert e.status_code == 403
 
 
+def test_next_matter_seq_skips_numbers_already_in_use():
+    """Verifies the generated matter/case number clears every number already taken -- counting
+    rows produced PROP2026010 while that case_number existed, breaking every create. Exercises:
+    `POST /conveyancing/matters` (`conveyancing.create_matter()`)."""
+    fake = MagicMock()
+    fake.table.side_effect = lambda name: MagicMock(**{"select.return_value.execute.return_value.data": {
+        "conveyancing_matters": [{"matter_number": "MAT-2026-001"}, {"matter_number": "MAT-2026-106"}],
+        "cases": [{"case_number": "PROP2026010"}, {"case_number": "CRL-2026-9"}],
+    }[name]})
+    with patch("app.controllers.conveyancing.supabase", fake):
+        assert _next_matter_seq(2026) == 107
+
+
 if __name__ == "__main__":
     test_update_due_diligence_rejects_matter_on_out_of_scope_case()
     test_complete_progress_stage_rejects_matter_on_out_of_scope_case()
     test_update_matter_rejects_matter_on_out_of_scope_case()
+    test_next_matter_seq_skips_numbers_already_in_use()
     print("ok")
