@@ -87,10 +87,10 @@ export default function ClientsPage() {
   const closedCount = clients.filter((c) => c.status === 'Closed').length
 
   const statCards = [
-    { label: 'Total Clients', value: clients.length, icon: 'users' as const, highlight: true },
-    { label: 'Active', value: activeCount, icon: 'bar-chart-2' as const },
-    { label: 'Pending', value: pendingCount, icon: 'clock' as const },
-    { label: 'Closed', value: closedCount, icon: 'check-circle' as const },
+    { label: 'Total Clients', value: clients.length, icon: 'users' as const, filter: 'All Statuses' },
+    { label: 'Active', value: activeCount, icon: 'bar-chart-2' as const, filter: 'Active' },
+    { label: 'Pending', value: pendingCount, icon: 'clock' as const, filter: 'Pending' },
+    { label: 'Closed', value: closedCount, icon: 'check-circle' as const, filter: 'Closed' },
   ]
 
   return (
@@ -105,12 +105,14 @@ export default function ClientsPage() {
 
         <div className={styles.statCards}>
           {statCards.map((s) => {
-            const lit = s.highlight || hoveredCard === s.label
+            const lit = statusFilter === s.filter || hoveredCard === s.label
             return (
             <div
               key={s.label}
               className={styles.statCard}
-              style={lit ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : undefined}
+              style={{ cursor: 'pointer', ...(lit ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : {}) }}
+              onClick={() => setStatusFilter(s.filter)}
+              title={`Show ${s.label.toLowerCase()}`}
               onMouseEnter={() => setHoveredCard(s.label)}
               onMouseLeave={() => setHoveredCard(null)}
             >
