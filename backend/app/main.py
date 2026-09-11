@@ -8,6 +8,7 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
 from supabase_auth.errors import AuthApiError
 from postgrest.exceptions import APIError as PostgrestAPIError
@@ -42,6 +43,20 @@ from app.routes.judgements import router as judgements_router
 from app.routes.messages import router as messages_router
 
 app = FastAPI()
+
+
+@app.middleware("http")
+async def unhandled_errors_as_json(request, call_next):
+    """Turn an unhandled exception into a JSON 500 instead of letting Starlette re-raise it.
+    Re-raising kills the response before CORSMiddleware can touch it, so the browser only ever
+    saw "Failed to fetch" -- no status, no message -- for every unexpected backend error.
+    Registered before CORSMiddleware so it runs *inside* it and the 500 keeps its CORS headers."""
+    try:
+        return await call_next(request)
+    except Exception:
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse(status_code=500, content={"detail": "Something went wrong on our side. Please try again."})
+
 
 app.add_middleware(
     CORSMiddleware,

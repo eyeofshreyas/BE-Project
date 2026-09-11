@@ -4,6 +4,7 @@ download URL, and fetching an AI-generated summary."""
 import uuid
 
 from fastapi import Depends, File, Form, HTTPException, UploadFile
+from storage3.exceptions import StorageApiError
 from app.db.supabase_client import supabase
 from app.middleware.auth import ensure_case_access, get_current_profile, get_scoped_case_ids
 from app.models.documents import DocumentSummary, AiSummary
@@ -106,7 +107,13 @@ def get_document_download_url(document_id: int, download: bool = False, profile:
         raise HTTPException(status_code=403, detail="You don't have access to this document")
 
     options = {"download": True} if download else None
-    signed = supabase.storage.from_(DOCUMENTS_BUCKET).create_signed_url(rows[0]["file_path"], 300, options)
+    try:
+        signed = supabase.storage.from_(DOCUMENTS_BUCKET).create_signed_url(rows[0]["file_path"], 300, options)
+    except StorageApiError:
+        # The documents row outlived its stored object (seed rows that were never
+        # uploaded, a file cleared from the bucket). Say so instead of 500ing --
+        # every preview/open/download button routes through here.
+        raise HTTPException(status_code=404, detail="This document's file is no longer in storage.")
     return {"url": signed["signedURL"]}
 
 
