@@ -190,7 +190,7 @@ export default function ClientsPage() {
                     >
                       <Icon name="banknote" size={14} />
                     </div>
-                    <div style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #CFC6B0', background: '#FCFAF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'default' }} title="Client schedule coming soon">
+                    <div onClick={() => navigate(`/clients/${c.id}`)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #CFC6B0', background: '#FCFAF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'pointer' }} title="Client schedule">
                       <Icon name="calendar" size={14} />
                     </div>
                   </div>

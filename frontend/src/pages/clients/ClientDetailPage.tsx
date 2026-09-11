@@ -3,8 +3,8 @@
  * `RecordPaymentPage` when it navigates back here). */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { listClients, listCases, listInvoices, getOrCreateConversation } from '../../api/client'
-import type { ClientSummary, CaseSummary, InvoiceSummary } from '../../types/api'
+import { listClients, listCases, listInvoices, listHearings, getOrCreateConversation } from '../../api/client'
+import type { ClientSummary, CaseSummary, InvoiceSummary, HearingSummary } from '../../types/api'
 import { formatDate } from '../../utils/date'
 import { Icon } from '../../components/icons'
 import { Card, Empty, Fact } from '../cases/CaseDetailPage'
@@ -24,6 +24,12 @@ const CASE_STATUS_STYLE: Record<string, [string, string]> = {
   Open: ['#8A6A2F', '#F3EBD9'],
   'In Progress': ['#8A6A2F', '#F3EBD9'],
   Pending: ['#8A6A2F', '#F3EBD9'],
+}
+const HEARING_STATUS_STYLE: Record<string, [string, string]> = {
+  Scheduled: ['#8A6A2F', '#F3EBD9'],
+  Completed: ['#4A6B4E', '#E4EDE5'],
+  Adjourned: ['#575145', '#F0ECDF'],
+  Cancelled: ['#B3282D', '#F7E4E5'],
 }
 const INVOICE_STATUS_STYLE: Record<string, [string, string]> = {
   Paid: ['#4A6B4E', '#E4EDE5'],
@@ -59,6 +65,7 @@ export default function ClientDetailPage() {
   const [client, setClient] = useState<ClientSummary | null>(null)
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([])
+  const [hearings, setHearings] = useState<HearingSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [messaging, setMessaging] = useState(false)
@@ -66,8 +73,8 @@ export default function ClientDetailPage() {
 
   useEffect(() => {
     if (!id) { setError('Invalid client.'); setLoading(false); return }
-    Promise.all([listClients(), listCases(), listInvoices()])
-      .then(([clients, allCases, allInvoices]) => {
+    Promise.all([listClients(), listCases(), listInvoices(), listHearings()])
+      .then(([clients, allCases, allInvoices, allHearings]) => {
         const found = clients.find((c) => c.id === id)
         if (!found) { setError("This client doesn't exist or you don't have access to them."); return }
         setClient(found)
@@ -76,6 +83,12 @@ export default function ClientDetailPage() {
         // invoices carry the case_number string, which is CaseSummary.id
         const caseNumbers = new Set(theirCases.map((c) => c.id))
         setInvoices(allInvoices.filter((inv) => inv.case_number && caseNumbers.has(inv.case_number)))
+        const caseIds = new Set(theirCases.map((c) => c.case_id))
+        setHearings(
+          allHearings
+            .filter((h) => caseIds.has(h.case_id))
+            .sort((a, b) => a.hearing_date.localeCompare(b.hearing_date)),
+        )
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load this client.'))
       .finally(() => setLoading(false))
@@ -197,6 +210,34 @@ export default function ClientDetailPage() {
           </div>
 
           <div className={cd.col}>
+            <Card title="Hearings" count={hearings.length}>
+              {hearings.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {hearings.map((h) => {
+                    const [color, bg] = HEARING_STATUS_STYLE[h.hearing_status] || DEFAULT_STATUS_STYLE
+                    return (
+                      <div key={h.id} className={cd.listRow} style={{ cursor: 'pointer' }} onClick={() => navigate(`/cases/${h.case_id}`)}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div className={cd.rowTitle}>{formatDate(h.hearing_date)}{h.hearing_time ? ` · ${h.hearing_time.slice(0, 5)}` : ''}</div>
+                            <div className={cd.caseNumber} style={{ marginTop: 2 }}>{h.case_number ?? '—'}</div>
+                          </div>
+                          <span className={styles.statusBadge} style={{ color, background: bg, flexShrink: 0 }}>{h.hearing_status}</span>
+                        </div>
+                        <div className={cd.metaRow}>
+                          <span>{h.court_name ?? 'Court not set'}</span>
+                          {h.courtroom && <span>{h.courtroom}</span>}
+                          {h.judge_name && <span>{h.judge_name}</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <Empty>No hearings scheduled for this client's cases.</Empty>
+              )}
+            </Card>
+
             <Card title="Invoices" count={invoices.length}>
               {invoices.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
