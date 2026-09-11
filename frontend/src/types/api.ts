@@ -290,6 +290,14 @@ export interface JudgementCreatePayload {
   tags?: string[]
 }
 
+export interface JudgeOption {
+  judge_id: number
+  judge_name: string
+  designation: string | null
+  court_id: number
+  court_name: string | null
+}
+
 export interface DocumentTypeOption {
   document_type_id: number
   type_name: string

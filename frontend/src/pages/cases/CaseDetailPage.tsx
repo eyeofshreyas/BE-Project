@@ -7,10 +7,11 @@ import {
   listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
   unassignLawyer, getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
+  listHearings, createHearing, listJudges,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
-  DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult,
+  DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
@@ -154,10 +155,21 @@ export default function CaseDetailPage() {
   const documentsRef = useRef<HTMLDivElement>(null)
 
   const [hearingOpen, setHearingOpen] = useState(false)
-  const [hearingTitle, setHearingTitle] = useState('')
-  const [hearingDate, setHearingDate] = useState('')
-  const [hearingAgenda, setHearingAgenda] = useState('')
+  const [scheduleKind, setScheduleKind] = useState<'hearing' | 'meeting'>('hearing')
   const [schedulingHearing, setSchedulingHearing] = useState(false)
+  const [hearings, setHearings] = useState<HearingSummary[]>([])
+  const [judges, setJudges] = useState<JudgeOption[]>([])
+  const [hearingJudgeId, setHearingJudgeId] = useState('')
+  const [hearingDate, setHearingDate] = useState('')
+  const [hearingTime, setHearingTime] = useState('')
+  const [hearingCourtroom, setHearingCourtroom] = useState('')
+  const [hearingNotes, setHearingNotes] = useState('')
+  // Set when the backend refuses the hearing as a possible double-submit; the form then
+  // offers to send it again saying the repeat listing is deliberate.
+  const [duplicateHearing, setDuplicateHearing] = useState('')
+  const [meetingTitle, setMeetingTitle] = useState('')
+  const [meetingWhen, setMeetingWhen] = useState('')
+  const [meetingAgenda, setMeetingAgenda] = useState('')
 
   const [uploadTypeId, setUploadTypeId] = useState('')
   const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -172,8 +184,8 @@ export default function CaseDetailPage() {
     // scoped to a single case has to be cleared by hand or it is read as the new case's.
     setSimilarCases(null)
     setOpenPrecedent(null)
-    Promise.all([listCases(), canManage ? listCaseNotes(numericCaseId) : Promise.resolve([]), listCaseTimeline(numericCaseId), listDocuments(), listMeetings(numericCaseId)])
-      .then(([cases, n, t, docs, m]) => {
+    Promise.all([listCases(), canManage ? listCaseNotes(numericCaseId) : Promise.resolve([]), listCaseTimeline(numericCaseId), listDocuments(), listMeetings(numericCaseId), listHearings()])
+      .then(([cases, n, t, docs, m, h]) => {
         const found = cases.find((c) => c.case_id === numericCaseId)
         if (!found) { setError("This case doesn't exist or you don't have access to it."); return }
         setCaseInfo(found)
@@ -181,10 +193,12 @@ export default function CaseDetailPage() {
         setTimeline(t)
         setDocuments(docs.filter((d) => d.case_number === found.id))
         setMeetings(m)
+        setHearings(h.filter((x) => x.case_id === numericCaseId).sort((a, b) => a.hearing_date.localeCompare(b.hearing_date)))
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load this case.'))
       .finally(() => setLoading(false))
     if (canUploadDocs) listDocumentTypes().then(setDocumentTypes).catch(() => {})
+    if (canManage) listJudges().then(setJudges).catch(() => {})
     if (canManage) getCaseAiSummary(numericCaseId).then(setAiSummary).catch(() => setAiSummary(null))
   }, [numericCaseId, canUploadDocs, canManage])
 
@@ -338,25 +352,71 @@ export default function CaseDetailPage() {
     }
   }
 
-  async function submitHearing() {
-    if (!hearingTitle.trim() || !hearingDate) return
+  function closeScheduleForm() {
+    setHearingOpen(false)
+    setDuplicateHearing('')
+    setHearingJudgeId('')
+    setHearingDate('')
+    setHearingTime('')
+    setHearingCourtroom('')
+    setHearingNotes('')
+    setMeetingTitle('')
+    setMeetingWhen('')
+    setMeetingAgenda('')
+  }
+
+  /** Books a real court hearing (`POST /hearings`). The backend refuses a hearing identical to
+   * one already on the case, in case a submit landed twice -- `allowDuplicate` re-sends it to
+   * say the repeat listing is meant. */
+  async function submitHearing(allowDuplicate = false) {
+    if (!hearingJudgeId || !hearingDate) return
+    setSchedulingHearing(true)
+    setDuplicateHearing('')
+    try {
+      const created = await createHearing({
+        case_id: numericCaseId,
+        judge_id: Number(hearingJudgeId),
+        hearing_date: hearingDate,
+        hearing_time: hearingTime || undefined,
+        courtroom: hearingCourtroom.trim() || undefined,
+        notes: hearingNotes.trim() || undefined,
+        allow_duplicate: allowDuplicate || undefined,
+      })
+      setHearings((prev) => [...prev, created].sort((a, b) => a.hearing_date.localeCompare(b.hearing_date)))
+      closeScheduleForm()
+      showToast('Hearing scheduled.')
+      listCases().then((cases) => {
+        const found = cases.find((c) => c.case_id === numericCaseId)
+        if (found) setCaseInfo(found)
+      }).catch(() => {})
+      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+    } catch (err) {
+      const status = (err as { status?: number }).status
+      // the 409 detail names the API flag, which means nothing to a lawyer -- the button
+      // beside this message is how they say the repeat listing is deliberate
+      if (status === 409) setDuplicateHearing('This case already has a hearing at that date and time before that judge.')
+      else showToast(err instanceof Error ? err.message : 'Failed to schedule the hearing.')
+    } finally {
+      setSchedulingHearing(false)
+    }
+  }
+
+  async function submitMeeting() {
+    if (!meetingTitle.trim() || !meetingWhen) return
     setSchedulingHearing(true)
     try {
       const created = await createMeeting({
         case_id: numericCaseId,
-        meeting_title: hearingTitle.trim(),
-        meeting_date: new Date(hearingDate).toISOString(),
-        agenda: hearingAgenda.trim() || undefined,
+        meeting_title: meetingTitle.trim(),
+        meeting_date: new Date(meetingWhen).toISOString(),
+        agenda: meetingAgenda.trim() || undefined,
       })
       setMeetings((prev) => [...prev, created])
-      setHearingTitle('')
-      setHearingDate('')
-      setHearingAgenda('')
-      setHearingOpen(false)
-      showToast('Hearing scheduled.')
+      closeScheduleForm()
+      showToast('Meeting scheduled.')
       listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to schedule the hearing.')
+      showToast(err instanceof Error ? err.message : 'Failed to schedule the meeting.')
     } finally {
       setSchedulingHearing(false)
     }
@@ -417,6 +477,7 @@ export default function CaseDetailPage() {
 
   function openHearingForm() {
     setHearingOpen(true)
+    setScheduleKind('hearing')
     meetingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
@@ -579,31 +640,97 @@ export default function CaseDetailPage() {
 
             <Card
               title="Hearings & meetings"
-              count={meetings.length}
+              count={hearings.length + meetings.length}
               innerRef={meetingsRef}
-              action={canManage && !hearingOpen && meetings.length > 0 ? <button className={cd.linkAction} onClick={() => setHearingOpen(true)}>Schedule</button> : undefined}
+              action={canManage && !hearingOpen && (hearings.length + meetings.length) > 0 ? <button className={cd.linkAction} onClick={() => setHearingOpen(true)}>Schedule</button> : undefined}
             >
               {canManage && hearingOpen && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                  <input value={hearingTitle} onChange={(e) => setHearingTitle(e.target.value)} placeholder="What is this hearing for?" style={inputStyle} />
-                  <input type="datetime-local" value={hearingDate} onChange={(e) => setHearingDate(e.target.value)} style={inputStyle} />
-                  <textarea value={hearingAgenda} onChange={(e) => setHearingAgenda(e.target.value)} placeholder="Agenda (optional)" rows={2} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <div
-                      className={styles.primaryChip}
-                      style={{ opacity: schedulingHearing || !hearingTitle.trim() || !hearingDate ? 0.6 : 1 }}
-                      onClick={submitHearing}
-                    >
-                      {schedulingHearing ? 'Scheduling…' : 'Schedule hearing'}
-                    </div>
-                    <div className={styles.ghostChip} onClick={() => setHearingOpen(false)}>Cancel</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {(['hearing', 'meeting'] as const).map((kind) => (
+                      <button
+                        key={kind}
+                        className={styles.ghostChip}
+                        style={{ padding: '5px 12px', fontSize: 12, background: scheduleKind === kind ? '#E6E0CE' : '#FCFAF4' }}
+                        onClick={() => { setScheduleKind(kind); setDuplicateHearing('') }}
+                      >
+                        {kind === 'hearing' ? 'Court hearing' : 'Internal meeting'}
+                      </button>
+                    ))}
                   </div>
+
+                  {scheduleKind === 'hearing' ? (
+                    <>
+                      <select value={hearingJudgeId} onChange={(e) => { setHearingJudgeId(e.target.value); setDuplicateHearing('') }} style={inputStyle}>
+                        <option value="">Select a judge…</option>
+                        {judges.map((j) => (
+                          <option key={j.judge_id} value={j.judge_id}>{j.judge_name}{j.court_name ? ` — ${j.court_name}` : ''}</option>
+                        ))}
+                      </select>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input type="date" value={hearingDate} onChange={(e) => { setHearingDate(e.target.value); setDuplicateHearing('') }} style={{ ...inputStyle, flex: 1 }} />
+                        <input type="time" value={hearingTime} onChange={(e) => { setHearingTime(e.target.value); setDuplicateHearing('') }} style={{ ...inputStyle, flex: 1 }} />
+                      </div>
+                      <input value={hearingCourtroom} onChange={(e) => setHearingCourtroom(e.target.value)} placeholder="Courtroom (optional)" style={inputStyle} />
+                      <textarea value={hearingNotes} onChange={(e) => setHearingNotes(e.target.value)} placeholder="Notes (optional)" rows={2} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+                      {duplicateHearing && (
+                        <div style={{ fontSize: 12.5, color: '#8A6A2F', background: '#F3EBD9', borderRadius: 3, padding: '8px 10px', lineHeight: 1.5 }}>
+                          {duplicateHearing}
+                          <button className={cd.linkAction} style={{ marginLeft: 8 }} onClick={() => !schedulingHearing && submitHearing(true)}>
+                            Schedule it anyway
+                          </button>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <div
+                          className={styles.primaryChip}
+                          style={{ opacity: schedulingHearing || !hearingJudgeId || !hearingDate ? 0.6 : 1 }}
+                          onClick={() => !schedulingHearing && submitHearing()}
+                        >
+                          {schedulingHearing ? 'Scheduling…' : 'Schedule hearing'}
+                        </div>
+                        <div className={styles.ghostChip} onClick={closeScheduleForm}>Cancel</div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <input value={meetingTitle} onChange={(e) => setMeetingTitle(e.target.value)} placeholder="What is this meeting for?" style={inputStyle} />
+                      <input type="datetime-local" value={meetingWhen} onChange={(e) => setMeetingWhen(e.target.value)} style={inputStyle} />
+                      <textarea value={meetingAgenda} onChange={(e) => setMeetingAgenda(e.target.value)} placeholder="Agenda (optional)" rows={2} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <div
+                          className={styles.primaryChip}
+                          style={{ opacity: schedulingHearing || !meetingTitle.trim() || !meetingWhen ? 0.6 : 1 }}
+                          onClick={() => !schedulingHearing && submitMeeting()}
+                        >
+                          {schedulingHearing ? 'Scheduling…' : 'Schedule meeting'}
+                        </div>
+                        <div className={styles.ghostChip} onClick={closeScheduleForm}>Cancel</div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
-              {meetings.length > 0 ? (
+              {hearings.length + meetings.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {hearings.map((h) => (
+                    <div key={`h${h.id}`} className={cd.listRow}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                        {/* hearing_date is a plain date, not a timestamp -- formatDate would
+                            render it as local midnight and show a bogus time beside the real one */}
+                        <div className={cd.rowTitle}>{formatDay(h.hearing_date)}{h.hearing_time ? ` · ${h.hearing_time.slice(0, 5)}` : ''}</div>
+                        <span className={styles.statusBadge} style={{ color: '#575145', background: '#F0ECDF', flexShrink: 0 }}>{h.hearing_status}</span>
+                      </div>
+                      <div className={cd.metaRow}>
+                        <span>{h.judge_name ?? 'Judge not set'}</span>
+                        {h.courtroom && <span>{h.courtroom}</span>}
+                        {h.hearing_outcome && <span>{h.hearing_outcome}</span>}
+                      </div>
+                      {h.notes && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>{h.notes}</div>}
+                    </div>
+                  ))}
                   {meetings.map((m) => (
-                    <div key={m.id} className={cd.listRow}>
+                    <div key={`m${m.id}`} className={cd.listRow}>
                       <div className={cd.rowTitle}>{m.meeting_title ?? 'Meeting'}</div>
                       <div className={cd.metaRow}>
                         <span>{formatDate(m.meeting_date)}</span>

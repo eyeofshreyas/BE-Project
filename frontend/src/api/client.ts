@@ -40,6 +40,7 @@ import type {
   SimilarCaseResult,
   SimilarCaseDetail,
   CaseSearchResult,
+  JudgeOption,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -88,7 +89,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
 
     const data = await res.json()
-    if (!res.ok) throw new Error(data.detail ?? 'Request failed')
+    if (!res.ok) {
+      // Callers that need to tell one failure from another (a 409 the user can override,
+      // say) shouldn't have to string-match the message.
+      const error = new Error(data.detail ?? 'Request failed') as Error & { status?: number }
+      error.status = res.status
+      throw error
+    }
     return data as T
   }
   throw new Error('Request failed')
@@ -295,6 +302,23 @@ export function verifyRazorpayPayment(invoiceId: number, payload: { razorpay_ord
 
 export function listHearings() {
   return get<HearingSummary[]>('/hearings')
+}
+
+export function listJudges() {
+  return get<JudgeOption[]>('/reference/judges')
+}
+
+/** `allow_duplicate` re-sends a hearing the backend refused as a possible double-submit. */
+export function createHearing(payload: {
+  case_id: number
+  judge_id: number
+  hearing_date: string
+  hearing_time?: string
+  courtroom?: string
+  notes?: string
+  allow_duplicate?: boolean
+}) {
+  return post<HearingSummary>('/hearings', payload)
 }
 
 export function updateHearingStatus(hearingId: number, hearing_status: string) {
