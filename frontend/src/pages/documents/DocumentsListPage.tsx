@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   listDocuments, getDocumentSummary, getDocumentDownloadUrl, deleteDocument,
   listCases, listDocumentTypes, uploadDocument, summarizeDocument, findSimilarCases, getSimilarCase,
+  translateText,
 } from '../../api/client'
 import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption, SimilarCaseResult, SimilarCaseDetail } from '../../types/api'
 import { Icon } from '../../components/icons'
@@ -14,6 +15,8 @@ import shellStyles from '../../components/AppShell.module.css'
 
 const MUTED = '#6E6759'
 const PRIMARY = '#23306B'
+// the languages /ai/translate maps to FLORES codes; it also accepts a raw code
+const LANGUAGES = ['Hindi', 'Marathi', 'Tamil', 'Telugu', 'Bengali', 'Gujarati']
 
 function formatDate(iso: string) {
   return formatDateWith(iso, { month: 'short', day: 'numeric' })
@@ -73,6 +76,12 @@ export default function DocumentsListPage() {
 
   const [openHit, setOpenHit] = useState<string | null>(null)
 
+  const [translateId, setTranslateId] = useState<number | null>(null)
+  const [translateLang, setTranslateLang] = useState('')
+  const [translation, setTranslation] = useState('')
+  const [translating, setTranslating] = useState(false)
+  const [translateError, setTranslateError] = useState('')
+
   const [toast, setToast] = useState('')
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
@@ -113,6 +122,41 @@ export default function DocumentsListPage() {
       .then(setSummary)
       .catch((err) => setSummaryError(err instanceof Error ? err.message : 'No AI summary available.'))
       .finally(() => setSummaryLoading(false))
+  }
+
+  function toggleTranslate(id: number) {
+    if (translateId === id) { setTranslateId(null); return }
+    setTranslateId(id)
+    setTranslateLang('')
+    setTranslation('')
+    setTranslateError('')
+  }
+
+  /** Translates the document's AI summary via `/ai/translate` (IndicTrans2). The summary is the
+   * only document text the browser ever has, and the backend stores the result on the document's
+   * `ai_summaries` row, so it comes back with the summary on the next load. */
+  async function runTranslate(id: number, language: string) {
+    setTranslateLang(language)
+    setTranslation('')
+    setTranslateError('')
+    setTranslating(true)
+    let source: string
+    try {
+      source = (await getDocumentSummary(id)).summary_text
+    } catch {
+      setTranslateError('Generate an AI summary for this document first -- translation runs on its summary text.')
+      setTranslating(false)
+      return
+    }
+    try {
+      const { translated_text } = await translateText(source, language, id)
+      setTranslation(translated_text)
+      if (expandedId === id) setSummary((prev) => (prev ? { ...prev, translated_text } : prev))
+    } catch (err) {
+      setTranslateError(err instanceof Error ? err.message : 'Failed to translate.')
+    } finally {
+      setTranslating(false)
+    }
   }
 
   /** Searches the public IN-Abs judgment corpus (`/ai/similar-cases`) for precedents that
@@ -351,11 +395,20 @@ export default function DocumentsListPage() {
                       <div onClick={() => toggleSimilar(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: similarId === d.id ? '#E6E0CE' : '#FCFAF4' }} title="Find similar judgments">
                         <Icon name="search" size={13} color="#575145" /> Similar
                       </div>
+                      <div onClick={() => toggleTranslate(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: translateId === d.id ? '#E6E0CE' : '#FCFAF4' }} title="Translate the summary">
+                        <Icon name="globe" size={13} color="#575145" /> Translate
+                      </div>
                     </div>
                     {expandedId === d.id && (
                       <div style={{ fontSize: 12.5, color: '#33302A', borderTop: '1px solid #F1EDE0', paddingTop: 10 }}>
                         {summaryLoading && <div style={{ color: MUTED }}>Loading summary…</div>}
                         {summary && <div>{summary.summary_text}</div>}
+                        {summary?.translated_text && (
+                          <div style={{ marginTop: 8, borderTop: '1px solid #F1EDE0', paddingTop: 8 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>Translation</div>
+                            <div style={{ marginTop: 3 }}>{summary.translated_text}</div>
+                          </div>
+                        )}
                         {!summaryLoading && !summary && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             <div style={{ color: MUTED }}>{summaryError || 'No AI summary yet.'}</div>
@@ -376,6 +429,26 @@ export default function DocumentsListPage() {
                             </div>
                           </div>
                         )}
+                      </div>
+                    )}
+                    {translateId === d.id && (
+                      <div style={{ fontSize: 12.5, color: '#33302A', borderTop: '1px solid #F1EDE0', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {LANGUAGES.map((lang) => (
+                            <div
+                              key={lang}
+                              onClick={() => !translating && runTranslate(d.id, lang)}
+                              className={styles.ghostChip}
+                              style={{ padding: '4px 10px', fontSize: 11.5, cursor: translating ? 'default' : 'pointer', background: translateLang === lang ? '#E6E0CE' : '#FCFAF4' }}
+                            >
+                              {lang}
+                            </div>
+                          ))}
+                        </div>
+                        {translating && <div style={{ color: MUTED }}>Translating into {translateLang}…</div>}
+                        {translateError && <div style={{ color: MUTED }}>{translateError}</div>}
+                        {translation && <div style={{ lineHeight: 1.6 }}>{translation}</div>}
+                        {!translating && !translateError && !translation && <div style={{ color: MUTED }}>Pick a language to translate this document's summary.</div>}
                       </div>
                     )}
                     {similarId === d.id && (

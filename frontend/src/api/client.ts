@@ -180,6 +180,10 @@ export function findSimilarCases(query: string, topK = 5) {
   return post<SimilarCaseResult[]>('/ai/similar-cases', { query, top_k: topK })
 }
 
+export function translateText(text: string, targetLanguage: string, documentId?: number) {
+  return post<{ translated_text: string }>('/ai/translate', { text, target_language: targetLanguage, document_id: documentId ?? null })
+}
+
 export function getSimilarCase(docId: string) {
   return get<SimilarCaseDetail>(`/ai/similar-cases/${encodeURIComponent(docId)}`)
 }
