@@ -14,6 +14,7 @@ import type {
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
+import SimilarCaseModal from '../../components/SimilarCaseModal'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import cd from './cases.module.css'
@@ -139,6 +140,7 @@ export default function CaseDetailPage() {
   const [savingNote, setSavingNote] = useState(false)
 
   const [aiSummary, setAiSummary] = useState<CaseAiSummary | null>(null)
+  const [openPrecedent, setOpenPrecedent] = useState<string | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
 
   const [statusSaving, setStatusSaving] = useState(false)
@@ -466,7 +468,15 @@ export default function CaseDetailPage() {
                   <div className={cd.aiBody}>{aiSummary.summary_text}</div>
                   {aiSummary.related_cases.length > 0 && (
                     <div className={cd.aiMeta} style={{ fontSize: 12.5 }}>
-                      Resembles {aiSummary.related_cases.length} judgement{aiSummary.related_cases.length > 1 ? 's' : ''} already on file: {aiSummary.related_cases.map((r) => r.doc_id).join(', ')}
+                      Reads like {aiSummary.related_cases.length} reported judgement{aiSummary.related_cases.length > 1 ? 's' : ''}:{' '}
+                      {aiSummary.related_cases.map((r, i) => (
+                        <span key={r.doc_id}>
+                          {i > 0 && ', '}
+                          <button className={cd.linkAction} onClick={() => setOpenPrecedent(r.doc_id)} title="Read this judgement">
+                            {r.doc_id} ({Math.round(r.score * 100)}%)
+                          </button>
+                        </span>
+                      ))}
                     </div>
                   )}
                   <div className={cd.aiMeta}>Generated {formatDate(aiSummary.generated_at)}</div>
@@ -742,6 +752,8 @@ export default function CaseDetailPage() {
 
         {toast && <div className={styles.toast}>{toast}</div>}
       </div>
+
+      {openPrecedent && <SimilarCaseModal docId={openPrecedent} onClose={() => setOpenPrecedent(null)} />}
 
       {previewDoc && (
         <DocumentPreviewModal

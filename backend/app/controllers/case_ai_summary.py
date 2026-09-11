@@ -24,8 +24,26 @@ def _to_case_ai_summary(row: dict) -> dict:
     }
 
 
+def _document_summaries(case_id: int) -> list[str]:
+    """The AI summaries of the case's documents -- the closest thing to the filings' own text
+    that's stored, since document files live in Storage and are never read back here."""
+    docs = supabase.table("documents").select("document_id").eq("case_id", case_id).execute().data
+    if not docs:
+        return []
+    rows = (
+        supabase.table("ai_summaries")
+        .select("summary_text")
+        .in_("document_id", [d["document_id"] for d in docs])
+        .execute()
+        .data
+    )
+    return [row["summary_text"] for row in rows if row.get("summary_text")]
+
+
 def _build_case_text(case_id: int) -> str:
-    """Concatenates a case's notes and timeline events into one text blob for the ML runners."""
+    """Concatenates a case's notes, timeline events and document summaries into one text blob
+    for the ML runners -- so the summary and the precedent search both see the whole case, not
+    one filing. Calls: `_document_summaries()`."""
     notes = supabase.table("case_notes").select("note").eq("case_id", case_id).execute().data
     timeline = supabase.table("case_timeline").select("event_title,event_description") \
         .eq("case_id", case_id).execute().data
@@ -35,6 +53,7 @@ def _build_case_text(case_id: int) -> str:
         f"{t['event_title']}: {t['event_description']}" if t["event_description"] else t["event_title"]
         for t in timeline
     ]
+    lines += _document_summaries(case_id)
     return "\n".join(lines)
 
 
@@ -56,7 +75,7 @@ def generate_case_ai_summary(case_id: int, profile: dict = Depends(require_roles
     ensure_case_access(case_id, profile)
     text = _build_case_text(case_id)
     if not text.strip():
-        raise HTTPException(status_code=400, detail="This case has no notes or timeline yet to summarize")
+        raise HTTPException(status_code=400, detail="This case has no notes, timeline or document summaries yet to summarize")
 
     summary = run_ml_subprocess(
         [str(FINETUNE_VENV_PYTHON), str(SUMMARIZE_RUNNER)], {"text": text}, cwd=str(INFERENCE_DIR), timeout=600,
