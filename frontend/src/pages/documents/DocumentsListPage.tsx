@@ -3,13 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   listDocuments, getDocumentSummary, getDocumentDownloadUrl, deleteDocument,
-  listCases, listDocumentTypes, uploadDocument, summarizeDocument, findSimilarCases,
+  listCases, listDocumentTypes, uploadDocument, summarizeDocument,
   translateText,
 } from '../../api/client'
-import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption, SimilarCaseResult } from '../../types/api'
+import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption } from '../../types/api'
 import { Icon } from '../../components/icons'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
-import SimilarCaseModal from '../../components/SimilarCaseModal'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import shellStyles from '../../components/AppShell.module.css'
@@ -69,13 +68,6 @@ export default function DocumentsListPage() {
   const [uploadError, setUploadError] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const [similarId, setSimilarId] = useState<number | null>(null)
-  const [similarHits, setSimilarHits] = useState<SimilarCaseResult[]>([])
-  const [similarLoading, setSimilarLoading] = useState(false)
-  const [similarError, setSimilarError] = useState('')
-
-  const [openHit, setOpenHit] = useState<string | null>(null)
 
   const [translateId, setTranslateId] = useState<number | null>(null)
   const [translateLang, setTranslateLang] = useState('')
@@ -158,22 +150,6 @@ export default function DocumentsListPage() {
     } finally {
       setTranslating(false)
     }
-  }
-
-  /** Searches the public IN-Abs judgment corpus (`/ai/similar-cases`) for precedents that
-   * read like this document. The query is the document's stored AI summary -- the file
-   * contents never reach the browser, so without a summary there's nothing to match on. */
-  function toggleSimilar(id: number) {
-    if (similarId === id) { setSimilarId(null); return }
-    setSimilarId(id)
-    setSimilarHits([])
-    setSimilarError('')
-    setSimilarLoading(true)
-    getDocumentSummary(id)
-      .then((s) => findSimilarCases(s.summary_text))
-      .then(setSimilarHits)
-      .catch(() => setSimilarError('Generate an AI summary for this document first -- similar search matches on its text.'))
-      .finally(() => setSimilarLoading(false))
   }
 
   // ponytail: the backing model is fine-tuned only on Supreme Court judgment
@@ -393,9 +369,6 @@ export default function DocumentsListPage() {
                       <div onClick={() => toggleSummary(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: expandedId === d.id ? '#E6E0CE' : '#FCFAF4' }}>
                         <Icon name="sparkles" size={13} color="#575145" /> Summary
                       </div>
-                      <div onClick={() => toggleSimilar(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: similarId === d.id ? '#E6E0CE' : '#FCFAF4' }} title="Find similar judgments">
-                        <Icon name="search" size={13} color="#575145" /> Similar
-                      </div>
                       <div onClick={() => toggleTranslate(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: translateId === d.id ? '#E6E0CE' : '#FCFAF4' }} title="Translate the summary">
                         <Icon name="globe" size={13} color="#575145" /> Translate
                       </div>
@@ -450,21 +423,6 @@ export default function DocumentsListPage() {
                         {translateError && <div style={{ color: MUTED }}>{translateError}</div>}
                         {translation && <div style={{ lineHeight: 1.6 }}>{translation}</div>}
                         {!translating && !translateError && !translation && <div style={{ color: MUTED }}>Pick a language to translate this document's summary.</div>}
-                      </div>
-                    )}
-                    {similarId === d.id && (
-                      <div style={{ fontSize: 12.5, color: '#33302A', borderTop: '1px solid #F1EDE0', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {similarLoading && <div style={{ color: MUTED }}>Searching the judgment corpus…</div>}
-                        {similarError && <div style={{ color: MUTED }}>{similarError}</div>}
-                        {!similarLoading && !similarError && similarHits.length === 0 && <div style={{ color: MUTED }}>No similar judgments found.</div>}
-                        {similarHits.map((hit) => (
-                          <div key={hit.doc_id} onClick={() => setOpenHit(hit.doc_id)} style={{ borderLeft: '2px solid #E6E0CE', paddingLeft: 10, cursor: 'pointer' }} title="Read this judgement">
-                            <div style={{ fontSize: 11, fontWeight: 700, color: PRIMARY, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: '.08em', textDecoration: 'underline' }}>
-                              {hit.doc_id} · {(hit.score * 100).toFixed(0)}% match
-                            </div>
-                            <div style={{ marginTop: 3, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{hit.excerpt}</div>
-                          </div>
-                        ))}
                       </div>
                     )}
                   </div>
@@ -567,7 +525,6 @@ export default function DocumentsListPage() {
 
       {toast && <div className={styles.toast}>{toast}</div>}
 
-      {openHit && <SimilarCaseModal docId={openHit} onClose={() => setOpenHit(null)} />}
 
       {previewDoc && (
         <DocumentPreviewModal
