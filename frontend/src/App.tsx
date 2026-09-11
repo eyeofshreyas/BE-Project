@@ -17,6 +17,7 @@ import GenerateInvoicePage from './pages/billing/GenerateInvoicePage'
 import HearingsPage from './pages/hearings/HearingsPage'
 import ClientsPage from './pages/clients/ClientsPage'
 import CreateClientPage from './pages/clients/CreateClientPage'
+import ClientDetailPage from './pages/clients/ClientDetailPage'
 import MessagesPage from './pages/messages/MessagesPage'
 import JudgementsPage from './pages/judgements/JudgementsPage'
 import SettingsPage from './pages/settings/SettingsPage'
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="/billing/invoices/:invoiceId/record-payment" element={<ProtectedRoute><AppLayout><RecordPaymentPage /></AppLayout></ProtectedRoute>} />
         <Route path="/hearings" element={<ProtectedRoute><AppLayout><HearingsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/clients/new" element={<ProtectedRoute><AppLayout><CreateClientPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/clients/:clientId" element={<ProtectedRoute><AppLayout><ClientDetailPage /></AppLayout></ProtectedRoute>} />
         <Route path="/clients" element={<ProtectedRoute><AppLayout><ClientsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/judgements" element={<ProtectedRoute><AppLayout><JudgementsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/messages" element={<ProtectedRoute><AppLayout><MessagesPage /></AppLayout></ProtectedRoute>} />

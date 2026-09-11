@@ -67,7 +67,7 @@ type NoteForm = { id: number | null; title: string; note: string; checklist: Che
 const BLANK_FORM: NoteForm = { id: null, title: '', note: '', checklist: [] }
 
 /** One cell of the record header's facts strip. */
-function Fact({ label, value, children }: { label: string; value: string; children?: React.ReactNode }) {
+export function Fact({ label, value, children }: { label: string; value: string; children?: React.ReactNode }) {
   return (
     <div className={cd.fact}>
       <div className={cd.factLabel}>{label}</div>
@@ -78,7 +78,7 @@ function Fact({ label, value, children }: { label: string; value: string; childr
 }
 
 /** Titled section card: an optional count pill and a right-aligned action sit in the head. */
-function Card({ title, count, action, innerRef, children }: {
+export function Card({ title, count, action, innerRef, children }: {
   title: string
   count?: number
   action?: React.ReactNode
@@ -98,7 +98,7 @@ function Card({ title, count, action, innerRef, children }: {
 }
 
 /** Empty section: says what belongs here, and offers the action that fills it. */
-function Empty({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
+export function Empty({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div>
       <div className={cd.empty}>{children}</div>

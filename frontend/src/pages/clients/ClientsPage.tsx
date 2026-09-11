@@ -172,7 +172,7 @@ export default function ClientsPage() {
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <div style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #CFC6B0', background: '#FCFAF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'default' }} title="Client profile coming soon">
+                    <div onClick={() => navigate(`/clients/${c.id}`)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #CFC6B0', background: '#FCFAF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'pointer' }} title="View client">
                       <Icon name="eye" size={14} />
                     </div>
                     <a href={`mailto:${c.email}`} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #CFC6B0', background: '#FCFAF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, textDecoration: 'none' }} title="Email">
@@ -194,7 +194,7 @@ export default function ClientsPage() {
                       <Icon name="calendar" size={14} />
                     </div>
                   </div>
-                  <div className={styles.darkBtn} style={{ cursor: 'default' }} title="Client profile coming soon">DETAILS</div>
+                  <div className={styles.darkBtn} onClick={() => navigate(`/clients/${c.id}`)} title="View client">DETAILS</div>
                 </div>
               )
             })}
