@@ -186,7 +186,7 @@ export default function ClientDetailPage() {
                   {cases.map((c) => {
                     const [color, bg] = CASE_STATUS_STYLE[c.status] || DEFAULT_STATUS_STYLE
                     return (
-                      <div key={c.case_id} className={cd.listRow} style={{ cursor: 'pointer' }} onClick={() => navigate(`/cases/${c.case_id}`)}>
+                      <div key={c.case_id} className={`${cd.listRow} ${cd.listRowLink}`} onClick={() => navigate(`/cases/${c.case_id}`)}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                           <div style={{ minWidth: 0 }}>
                             <div className={cd.caseNumber}>{c.id}</div>
@@ -216,7 +216,7 @@ export default function ClientDetailPage() {
                   {hearings.map((h) => {
                     const [color, bg] = HEARING_STATUS_STYLE[h.hearing_status] || DEFAULT_STATUS_STYLE
                     return (
-                      <div key={h.id} className={cd.listRow} style={{ cursor: 'pointer' }} onClick={() => navigate(`/cases/${h.case_id}`)}>
+                      <div key={h.id} className={`${cd.listRow} ${cd.listRowLink}`} onClick={() => navigate(`/cases/${h.case_id}`)}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                           <div style={{ minWidth: 0 }}>
                             <div className={cd.rowTitle}>{formatDate(h.hearing_date)}{h.hearing_time ? ` · ${h.hearing_time.slice(0, 5)}` : ''}</div>

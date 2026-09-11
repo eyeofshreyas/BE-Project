@@ -206,6 +206,17 @@
   border-radius: 3px;
 }
 
+/* A row that opens something when clicked -- the hover is what says so. */
+.listRowLink {
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+
+.listRowLink:hover {
+  background: #F6F2E9;
+  border-color: #B9AE92;
+}
+
 .rowTitle {
   font-size: 13.5px;
   font-weight: 600;

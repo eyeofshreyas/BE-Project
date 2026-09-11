@@ -537,7 +537,7 @@ export default function CaseDetailPage() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {similarCases.map((c) => (
-                      <div key={c.case_id} className={cd.listRow} style={{ cursor: 'pointer' }} onClick={() => navigate(`/cases/${c.case_id}`)}>
+                      <div key={c.case_id} className={`${cd.listRow} ${cd.listRowLink}`} onClick={() => navigate(`/cases/${c.case_id}`)}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                           <div style={{ minWidth: 0 }}>
                             <div className={cd.caseNumber}>{c.case_number ?? '—'}</div>
