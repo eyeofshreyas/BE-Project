@@ -187,9 +187,6 @@ export default function ClientsPage() {
                     >
                       <Icon name="banknote" size={14} />
                     </div>
-                    <div onClick={() => navigate(`/clients/${c.id}`)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #CFC6B0', background: '#FCFAF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, cursor: 'pointer' }} title="Client schedule">
-                      <Icon name="calendar" size={14} />
-                    </div>
                   </div>
                   <div className={styles.darkBtn} onClick={() => navigate(`/clients/${c.id}`)} title="View client">DETAILS</div>
                 </div>
