@@ -38,6 +38,7 @@ import type {
   ConversationDetail,
   MessageSummary,
   SimilarCaseResult,
+  SimilarCaseDetail,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -177,6 +178,10 @@ export function summarizeDocument(documentId: number, text: string) {
 
 export function findSimilarCases(query: string, topK = 5) {
   return post<SimilarCaseResult[]>('/ai/similar-cases', { query, top_k: topK })
+}
+
+export function getSimilarCase(docId: string) {
+  return get<SimilarCaseDetail>(`/ai/similar-cases/${encodeURIComponent(docId)}`)
 }
 
 export function listUsers(role?: string) {

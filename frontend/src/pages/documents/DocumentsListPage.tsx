@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   listDocuments, getDocumentSummary, getDocumentDownloadUrl, deleteDocument,
-  listCases, listDocumentTypes, uploadDocument, summarizeDocument, findSimilarCases,
+  listCases, listDocumentTypes, uploadDocument, summarizeDocument, findSimilarCases, getSimilarCase,
 } from '../../api/client'
-import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption, SimilarCaseResult } from '../../types/api'
+import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption, SimilarCaseResult, SimilarCaseDetail } from '../../types/api'
 import { Icon } from '../../components/icons'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
 import { formatDate as formatDateWith } from '../../utils/date'
@@ -70,6 +70,8 @@ export default function DocumentsListPage() {
   const [similarHits, setSimilarHits] = useState<SimilarCaseResult[]>([])
   const [similarLoading, setSimilarLoading] = useState(false)
   const [similarError, setSimilarError] = useState('')
+
+  const [openHit, setOpenHit] = useState<string | null>(null)
 
   const [toast, setToast] = useState('')
   const [search, setSearch] = useState('')
@@ -382,8 +384,8 @@ export default function DocumentsListPage() {
                         {similarError && <div style={{ color: MUTED }}>{similarError}</div>}
                         {!similarLoading && !similarError && similarHits.length === 0 && <div style={{ color: MUTED }}>No similar judgments found.</div>}
                         {similarHits.map((hit) => (
-                          <div key={hit.doc_id} style={{ borderLeft: '2px solid #E6E0CE', paddingLeft: 10 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: '.08em' }}>
+                          <div key={hit.doc_id} onClick={() => setOpenHit(hit.doc_id)} style={{ borderLeft: '2px solid #E6E0CE', paddingLeft: 10, cursor: 'pointer' }} title="Read this judgement">
+                            <div style={{ fontSize: 11, fontWeight: 700, color: PRIMARY, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: '.08em', textDecoration: 'underline' }}>
                               {hit.doc_id} · {(hit.score * 100).toFixed(0)}% match
                             </div>
                             <div style={{ marginTop: 3, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{hit.excerpt}</div>
@@ -491,6 +493,8 @@ export default function DocumentsListPage() {
 
       {toast && <div className={styles.toast}>{toast}</div>}
 
+      {openHit && <SimilarCaseModal docId={openHit} onClose={() => setOpenHit(null)} />}
+
       {previewDoc && (
         <DocumentPreviewModal
           documentId={previewDoc.id}
@@ -499,6 +503,51 @@ export default function DocumentsListPage() {
           onClose={() => setPreviewDoc(null)}
         />
       )}
+    </div>
+  )
+}
+
+/** Reads one IN-Abs judgment behind a "Similar" hit -- its headnote summary and full text. */
+function SimilarCaseModal({ docId, onClose }: { docId: string; onClose: () => void }) {
+  const [detail, setDetail] = useState<SimilarCaseDetail | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    getSimilarCase(docId)
+      .then(setDetail)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load this judgement.'))
+  }, [docId])
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(35, 48, 107,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24 }} onClick={onClose}>
+      <div style={{ background: '#FCFAF4', borderRadius: 3, width: 'min(820px, 100%)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 48px rgba(0,0,0,.3)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, padding: '14px 18px', borderBottom: '1px solid #CFC6B0' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17' }}>{detail?.citation ?? docId}</div>
+            <div style={{ fontSize: 11, color: MUTED, marginTop: 2, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: '.08em' }}>
+              IN-ABS REFERENCE CORPUS · {docId}
+            </div>
+          </div>
+          <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={16} color="#575145" /></span>
+        </div>
+
+        <div style={{ overflow: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {error && <div style={{ color: '#B3282D', fontSize: 13 }}>{error}</div>}
+          {!error && !detail && <div style={{ color: MUTED, fontSize: 13 }}>Loading judgement…</div>}
+          {detail?.summary && (
+            <div>
+              <div className={styles.sectionTitle} style={{ fontSize: 13 }}>Headnote</div>
+              <div style={{ fontSize: 13, lineHeight: 1.6, color: '#33302A', whiteSpace: 'pre-wrap' }}>{detail.summary}</div>
+            </div>
+          )}
+          {detail && (
+            <div>
+              <div className={styles.sectionTitle} style={{ fontSize: 13 }}>Full judgement</div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.65, color: '#33302A', whiteSpace: 'pre-wrap' }}>{detail.text}</div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

@@ -349,6 +349,13 @@ export interface SimilarCaseResult {
   excerpt: string
 }
 
+export interface SimilarCaseDetail {
+  doc_id: string
+  citation: string | null
+  summary: string | null
+  text: string
+}
+
 export interface RazorpayOrder {
   order_id: string
   amount: number
