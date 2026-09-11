@@ -135,9 +135,11 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
 
 def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     """Update a hearing's status/outcome/notes; also re-syncs the case's next_hearing_date
-    since a status change can affect which hearing is now the nearest upcoming one.
-    Calls: `_get_hearing()`, `_sync_next_hearing_date()`."""
-    _get_hearing(hearing_id, get_scoped_case_ids(profile))
+    since a status change can affect which hearing is now the nearest upcoming one, and records
+    a timeline event when the hearing reaches a new status -- what happened at a hearing is case
+    history, and the case brief reads the timeline as such.
+    Calls: `_get_hearing()`, `_sync_next_hearing_date()`, `add_timeline_event()`."""
+    before = _get_hearing(hearing_id, get_scoped_case_ids(profile))
 
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if not updates:
@@ -149,4 +151,13 @@ def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends
 
     _sync_next_hearing_date(rows[0]["case_id"])
 
-    return _get_hearing(hearing_id)
+    hearing = _get_hearing(hearing_id)
+    # only a status change is worth an event -- correcting a typo in the notes is not case history
+    if hearing["hearing_status"] != before["hearing_status"]:
+        add_timeline_event(
+            hearing["case_id"], "hearing_updated",
+            f"Hearing of {hearing['hearing_date']} marked {hearing['hearing_status']}",
+            hearing["hearing_outcome"] or hearing["notes"],
+            profile["user_id"],
+        )
+    return hearing

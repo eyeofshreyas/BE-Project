@@ -7,7 +7,7 @@ import {
   listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
   unassignLawyer, getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
-  listHearings, createHearing, listJudges,
+  listHearings, createHearing, listJudges, updateHearing, updateMeeting, deleteDocument,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
@@ -67,6 +67,8 @@ function formatDay(iso: string) {
 
 type NoteForm = { id: number | null; title: string; note: string; checklist: ChecklistItem[] }
 const BLANK_FORM: NoteForm = { id: null, title: '', note: '', checklist: [] }
+const HEARING_STATUSES = ['Scheduled', 'Completed', 'Adjourned', 'Cancelled']
+const MEETING_STATUSES = ['Scheduled', 'Completed', 'Cancelled']
 
 /** One cell of the record header's facts strip. */
 export function Fact({ label, value, children }: { label: string; value: string; children?: React.ReactNode }) {
@@ -167,6 +169,13 @@ export default function CaseDetailPage() {
   // Set when the backend refuses the hearing as a possible double-submit; the form then
   // offers to send it again saying the repeat listing is deliberate.
   const [duplicateHearing, setDuplicateHearing] = useState('')
+  // the row whose outcome is being recorded, and the draft for it
+  const [outcomeFor, setOutcomeFor] = useState<{ kind: 'hearing' | 'meeting'; id: number } | null>(null)
+  const [outcomeStatus, setOutcomeStatus] = useState('')
+  const [outcomeText, setOutcomeText] = useState('')
+  const [outcomeNext, setOutcomeNext] = useState('')
+  const [savingOutcome, setSavingOutcome] = useState(false)
+  const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<number | null>(null)
   const [meetingTitle, setMeetingTitle] = useState('')
   const [meetingWhen, setMeetingWhen] = useState('')
   const [meetingAgenda, setMeetingAgenda] = useState('')
@@ -349,6 +358,55 @@ export default function CaseDetailPage() {
       showToast(err instanceof Error ? err.message : 'Failed to unassign lawyer.')
     } finally {
       setUnassigning(false)
+    }
+  }
+
+  function openOutcomeForm(kind: 'hearing' | 'meeting', id: number, status: string, text: string) {
+    setOutcomeFor({ kind, id })
+    setOutcomeStatus(status)
+    setOutcomeText(text)
+    setOutcomeNext('')
+  }
+
+  /** Writes back what actually happened -- a hearing's outcome or a meeting's discussion. Both
+   * are read by the AI case brief, and until now neither could be recorded anywhere in the app. */
+  async function saveOutcome() {
+    if (!outcomeFor) return
+    setSavingOutcome(true)
+    try {
+      if (outcomeFor.kind === 'hearing') {
+        const updated = await updateHearing(outcomeFor.id, {
+          hearing_status: outcomeStatus || undefined,
+          hearing_outcome: outcomeText.trim() || undefined,
+          next_hearing_date: outcomeNext || undefined,
+        })
+        setHearings((prev) => prev.map((h) => (h.id === updated.id ? updated : h)))
+      } else {
+        const updated = await updateMeeting(outcomeFor.id, {
+          meeting_status: outcomeStatus || undefined,
+          discussion_summary: outcomeText.trim() || undefined,
+          next_meeting_date: outcomeNext || undefined,
+        })
+        setMeetings((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
+      }
+      setOutcomeFor(null)
+      showToast('Outcome recorded.')
+      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to record the outcome.')
+    } finally {
+      setSavingOutcome(false)
+    }
+  }
+
+  async function removeDocument(documentId: number) {
+    try {
+      await deleteDocument(documentId)
+      setDocuments((prev) => prev.filter((d) => d.id !== documentId))
+      setConfirmDeleteDoc(null)
+      showToast('Document deleted.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to delete the document.')
     }
   }
 
@@ -727,6 +785,26 @@ export default function CaseDetailPage() {
                         {h.hearing_outcome && <span>{h.hearing_outcome}</span>}
                       </div>
                       {h.notes && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>{h.notes}</div>}
+                      {canManage && outcomeFor?.id !== h.id && (
+                        <button className={cd.linkAction} style={{ marginTop: 6 }} onClick={() => openOutcomeForm('hearing', h.id, h.hearing_status, h.hearing_outcome ?? '')}>
+                          Record outcome
+                        </button>
+                      )}
+                      {outcomeFor?.kind === 'hearing' && outcomeFor.id === h.id && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10, borderTop: '1px solid #F1EDE0', paddingTop: 10 }}>
+                          <select value={outcomeStatus} onChange={(e) => setOutcomeStatus(e.target.value)} style={inputStyle}>
+                            {HEARING_STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
+                          </select>
+                          <input value={outcomeText} onChange={(e) => setOutcomeText(e.target.value)} placeholder={"What was the outcome?"} style={inputStyle} />
+                          <input type="date" value={outcomeNext} onChange={(e) => setOutcomeNext(e.target.value)} title={"Next hearing date"} style={inputStyle} />
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <div className={styles.primaryChip} style={{ opacity: savingOutcome ? 0.6 : 1 }} onClick={() => !savingOutcome && saveOutcome()}>
+                              {savingOutcome ? 'Saving…' : 'Save'}
+                            </div>
+                            <div className={styles.ghostChip} onClick={() => setOutcomeFor(null)}>Cancel</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                   {meetings.map((m) => (
@@ -737,6 +815,27 @@ export default function CaseDetailPage() {
                         <span>{m.meeting_status}</span>
                         {m.conducted_by && <span>{m.conducted_by}</span>}
                       </div>
+                      {m.discussion_summary && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>{m.discussion_summary}</div>}
+                      {canManage && outcomeFor?.id !== m.id && (
+                        <button className={cd.linkAction} style={{ marginTop: 6 }} onClick={() => openOutcomeForm('meeting', m.id, m.meeting_status, m.discussion_summary ?? '')}>
+                          Record outcome
+                        </button>
+                      )}
+                      {outcomeFor?.kind === 'meeting' && outcomeFor.id === m.id && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10, borderTop: '1px solid #F1EDE0', paddingTop: 10 }}>
+                          <select value={outcomeStatus} onChange={(e) => setOutcomeStatus(e.target.value)} style={inputStyle}>
+                            {MEETING_STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
+                          </select>
+                          <input value={outcomeText} onChange={(e) => setOutcomeText(e.target.value)} placeholder={"What was discussed?"} style={inputStyle} />
+                          <input type="date" value={outcomeNext} onChange={(e) => setOutcomeNext(e.target.value)} title={"Next meeting date"} style={inputStyle} />
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <div className={styles.primaryChip} style={{ opacity: savingOutcome ? 0.6 : 1 }} onClick={() => !savingOutcome && saveOutcome()}>
+                              {savingOutcome ? 'Saving…' : 'Save'}
+                            </div>
+                            <div className={styles.ghostChip} onClick={() => setOutcomeFor(null)}>Cancel</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -779,9 +878,25 @@ export default function CaseDetailPage() {
                           <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{formatDay(d.upload_date)}</div>
                         </div>
                       </div>
-                      <span className={styles.statusBadge} style={d.has_summary ? { color: '#4A6B4E', background: '#E4EDE5' } : { color: '#8A6A2F', background: '#F3EBD9' }}>
-                        {d.has_summary ? 'Summarised' : 'Not summarised'}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                        <span className={styles.statusBadge} style={d.has_summary ? { color: '#4A6B4E', background: '#E4EDE5' } : { color: '#8A6A2F', background: '#F3EBD9' }}>
+                          {d.has_summary ? 'Summarised' : 'Not summarised'}
+                        </span>
+                        {canUploadDocs && (
+                          // two-step rather than a window.confirm: deleting a filing is worth a
+                          // deliberate second click, and a modal dialog here blocks the page
+                          confirmDeleteDoc === d.id ? (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                              <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeDocument(d.id)}>Delete</button>
+                              <button className={cd.linkAction} onClick={() => setConfirmDeleteDoc(null)}>Keep</button>
+                            </span>
+                          ) : (
+                            <button className={cd.iconBtn} onClick={() => setConfirmDeleteDoc(d.id)} title="Delete document" aria-label="Delete document">
+                              <Icon name="trash-2" size={14} color="#B3282D" />
+                            </button>
+                          )
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

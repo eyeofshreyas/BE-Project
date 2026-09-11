@@ -33,6 +33,16 @@ class MeetingCreate(BaseModel):
     next_meeting_date: str | None = None
 
 
+class MeetingUpdate(BaseModel):
+    """Request body for recording what came out of a meeting. Every field is optional; only the
+    ones sent are written."""
+    meeting_status: str | None = None
+    discussion_summary: str | None = None
+    decisions: str | None = None
+    action_items: str | None = None
+    next_meeting_date: str | None = None
+
+
 class ParticipantSummary(BaseModel):
     """Meeting participant row shaped for list responses."""
     participant_id: int

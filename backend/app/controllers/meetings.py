@@ -3,7 +3,7 @@
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
-from app.models.meetings import MeetingSummary, MeetingCreate, ParticipantSummary, ParticipantCreate
+from app.models.meetings import MeetingSummary, MeetingCreate, MeetingUpdate, ParticipantSummary, ParticipantCreate
 
 MEETINGS_SELECT = (
     "meeting_id,case_id,meeting_title,meeting_type,meeting_date,duration_minutes,"
@@ -106,6 +106,22 @@ def create_meeting(data: MeetingCreate, profile: dict = Depends(require_roles(AD
         "meeting_status": "Scheduled",
     }).execute().data[0]
     return _get_meeting(row["meeting_id"])
+
+
+def update_meeting(meeting_id: int, data: MeetingUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """Record a meeting's outcome -- what was discussed, decided and agreed, and whether it
+    happened. Scoped like every other meeting read, so a lawyer can only touch meetings on
+    cases they're assigned to. Calls: `_get_meeting()`."""
+    _get_meeting(meeting_id, get_scoped_case_ids(profile))
+
+    updates = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not updates:
+        return _get_meeting(meeting_id)
+
+    rows = supabase.table("meetings").update(updates).eq("meeting_id", meeting_id).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return _get_meeting(meeting_id)
 
 
 def list_participants(meeting_id: int, profile: dict = Depends(get_current_profile)):

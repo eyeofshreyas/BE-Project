@@ -321,6 +321,27 @@ export function createHearing(payload: {
   return post<HearingSummary>('/hearings', payload)
 }
 
+/** Records what happened at a hearing. Only the fields sent are written. */
+export function updateHearing(hearingId: number, payload: {
+  hearing_status?: string
+  hearing_outcome?: string
+  next_hearing_date?: string
+  notes?: string
+}) {
+  return patch<HearingSummary>(`/hearings/${hearingId}`, payload)
+}
+
+/** Records what came out of a meeting. Only the fields sent are written. */
+export function updateMeeting(meetingId: number, payload: {
+  meeting_status?: string
+  discussion_summary?: string
+  decisions?: string
+  action_items?: string
+  next_meeting_date?: string
+}) {
+  return patch<MeetingSummary>(`/meetings/${meetingId}`, payload)
+}
+
 export function updateHearingStatus(hearingId: number, hearing_status: string) {
   return patch<HearingSummary>(`/hearings/${hearingId}`, { hearing_status })
 }
