@@ -30,6 +30,10 @@ class HearingCreate(BaseModel):
     hearing_time: str | None = None
     courtroom: str | None = None
     notes: str | None = None
+    # A case really can be listed twice before the same judge at the same time -- a re-listing,
+    # or two matters heard together. Set this to say the repeat is deliberate; left off, an
+    # identical hearing is refused so a double-submitted form doesn't create one by accident.
+    allow_duplicate: bool = False
 
 
 class HearingUpdate(BaseModel):

@@ -91,14 +91,21 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
 
     # A double-submitted form used to land twice, leaving two hearings a person can't tell
     # apart -- and both then read as two separate listings everywhere the case is summarised.
-    clash = (
-        supabase.table("hearings").select("hearing_id")
-        .eq("case_id", data.case_id).eq("hearing_date", data.hearing_date)
-        .eq("hearing_time", data.hearing_time).eq("judge_id", data.judge_id)
-        .execute().data
-    )
-    if clash:
-        raise HTTPException(status_code=409, detail="This case already has a hearing at that date and time before that judge")
+    # The repeat is only refused until the caller says it's deliberate, since a case genuinely
+    # can be listed twice at one slot.
+    if not data.allow_duplicate:
+        clash = (
+            supabase.table("hearings").select("hearing_id")
+            .eq("case_id", data.case_id).eq("hearing_date", data.hearing_date)
+            .eq("hearing_time", data.hearing_time).eq("judge_id", data.judge_id)
+            .execute().data
+        )
+        if clash:
+            raise HTTPException(
+                status_code=409,
+                detail="This case already has a hearing at that date and time before that judge. "
+                       "Send allow_duplicate=true if the repeat listing is intended.",
+            )
 
     row = supabase.table("hearings").insert({
         "case_id": data.case_id,

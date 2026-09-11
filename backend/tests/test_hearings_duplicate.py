@@ -1,6 +1,7 @@
 # ponytail self-check for create_hearing -- a double-submitted form used to
 # insert the same hearing twice, and every case summary then read it as two.
-"""Tests that a case can't be given the same hearing twice."""
+"""Tests that a case isn't given the same hearing twice by accident -- and that a
+deliberate repeat listing still can be."""
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -33,6 +34,20 @@ def test_second_identical_hearing_is_rejected():
 
     assert exc.value.status_code == 409
     table.insert.assert_not_called()
+
+
+def test_an_intended_repeat_listing_goes_through():
+    """A case can genuinely be listed twice at one slot -- saying so must not be refused."""
+    fake, table = _fake_supabase([{"hearing_id": 1}])
+    payload = PAYLOAD.model_copy(update={"allow_duplicate": True})
+    with patch("app.controllers.hearings.supabase", fake), \
+         patch("app.controllers.hearings.ensure_case_access"), \
+         patch("app.controllers.hearings._sync_next_hearing_date"), \
+         patch("app.controllers.hearings._get_hearing") as get_hearing:
+        get_hearing.return_value = {"id": 42}
+        assert create_hearing(payload, PROFILE) == {"id": 42}
+
+    table.insert.assert_called_once()
 
 
 def test_a_new_slot_still_inserts():
