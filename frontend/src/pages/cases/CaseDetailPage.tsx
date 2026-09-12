@@ -1040,7 +1040,7 @@ export default function CaseDetailPage() {
                           )}
                           {canManage && d.mime_type === 'application/pdf' && (!d.esign_status || ESIGN_RESENDABLE.has(d.esign_status)) && (
                             <button className={cd.iconBtn} onClick={() => toggleSign(d.id)} title={d.esign_status ? 'Resend for e-signature' : 'Send for e-signature'} aria-label={d.esign_status ? 'Resend for e-signature' : 'Send for e-signature'}>
-                              <Icon name="edit" size={14} color={MUTED} />
+                              <Icon name="signature" size={14} color={MUTED} />
                             </button>
                           )}
                           {canUploadDocs && (

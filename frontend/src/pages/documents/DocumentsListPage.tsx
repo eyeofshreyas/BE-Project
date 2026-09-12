@@ -417,7 +417,7 @@ export default function DocumentsListPage() {
                       </div>
                       {d.mime_type === 'application/pdf' && (!d.esign_status || ESIGN_RESENDABLE.has(d.esign_status)) && (
                         <div onClick={() => toggleSign(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: signId === d.id ? '#E6E0CE' : '#FCFAF4' }} title={d.esign_status ? 'Resend for e-signature' : 'Send for e-signature'}>
-                          <Icon name="edit" size={13} color="#575145" /> {d.esign_status ? 'Resend' : 'Sign'}
+                          <Icon name="signature" size={13} color="#575145" /> {d.esign_status ? 'Resend' : 'Sign'}
                         </div>
                       )}
                     </div>
