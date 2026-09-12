@@ -201,6 +201,10 @@ export function summarizeDocument(documentId: number, text = '') {
   return post<{ summary: string }>('/ai/summarize', { text, document_id: documentId })
 }
 
+export function requestSignature(documentId: number, signers: { name: string; email: string }[]) {
+  return post<DocumentSummary>(`/documents/${documentId}/request-signature`, { signers })
+}
+
 export function findSimilarCases(query: string, topK = 5) {
   return post<SimilarCaseResult[]>('/ai/similar-cases', { query, top_k: topK })
 }

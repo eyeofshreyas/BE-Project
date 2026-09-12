@@ -38,3 +38,10 @@ RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
 ECOURTS_API_KEY = os.getenv("ECOURTS_API_KEY")
 ECOURTS_API_BASE = os.getenv("ECOURTS_API_BASE", "https://webapi.ecourtsindia.com")
+
+LEEGALITY_AUTH_TOKEN = os.getenv("LEEGALITY_AUTH_TOKEN")
+LEEGALITY_PRIVATE_SALT = os.getenv("LEEGALITY_PRIVATE_SALT")
+# Created once in the Leegality dashboard (defines signers, signature types, notifications) --
+# not something this app creates via API. See docs/FUTURE_SCOPE.md.
+LEEGALITY_WORKFLOW_PROFILE_ID = os.getenv("LEEGALITY_WORKFLOW_PROFILE_ID")
+LEEGALITY_API_BASE = os.getenv("LEEGALITY_API_BASE", "https://sandbox.leegality.com/api")

@@ -21,7 +21,7 @@ MAX_DOCUMENT_BYTES = 25 * 1024 * 1024
 # ranges as it plays and seeks, so a dead URL stalls playback part-way through.
 DOCUMENT_URL_TTL = 3600
 DOCUMENTS_SELECT = (
-    "document_id,file_name,mime_type,upload_date,file_size,case_id,file_path,"
+    "document_id,file_name,mime_type,upload_date,file_size,case_id,file_path,esign_status,"
     "document_types(type_name),cases(case_number),users(full_name)"
 )
 
@@ -38,6 +38,7 @@ def _to_document_summary(row: dict, has_summary: bool = False) -> dict:
         "case_number": row["cases"]["case_number"] if row["cases"] else None,
         "uploaded_by": row["users"]["full_name"] if row["users"] else None,
         "has_summary": has_summary,
+        "esign_status": row.get("esign_status"),
     }
 
 

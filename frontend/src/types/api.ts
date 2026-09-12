@@ -209,6 +209,7 @@ export interface DocumentSummary {
   case_number: string | null
   uploaded_by: string | null
   has_summary: boolean
+  esign_status: string | null
 }
 
 export interface AiSummary {

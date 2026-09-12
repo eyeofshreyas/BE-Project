@@ -31,9 +31,16 @@ cp .env.example .env      # then fill in SUPABASE_URL and SUPABASE_KEY
 
 `SUPABASE_URL` / `SUPABASE_KEY` are required — the server refuses to start
 without them. Get them from the Supabase project dashboard (Settings → API; use
-the **service role** key). SMTP, Razorpay, and eCourts vars are optional;
-invite emails are logged instead of sent, "Pay Now" returns 500 until Razorpay
-is set, and "Sync with eCourts" returns 500 until `ECOURTS_API_KEY` is set.
+the **service role** key). SMTP, Razorpay, eCourts, and Leegality vars are
+optional; invite emails are logged instead of sent, "Pay Now" returns 500
+until Razorpay is set, "Sync with eCourts" returns 500 until
+`ECOURTS_API_KEY` is set, and "Sign" on a document returns 500 until the
+Leegality vars are set (see `.env.example` for how to get them).
+
+Leegality also needs your production webhook URL (`https://<your-domain>/webhooks/leegality`)
+configured on the Workflow itself in the Leegality dashboard, so it knows
+where to POST signing events back to — a purely local backend can't receive
+these without a tunnel (ngrok or similar) during development.
 
 OCR on scanned PDFs/images (used by `/ai/summarize` and `/ai/translate` via
 `extract_document_text()`) needs the `tesseract-ocr` and `poppler-utils`

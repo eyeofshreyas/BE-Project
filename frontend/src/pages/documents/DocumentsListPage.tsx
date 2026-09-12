@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   listDocuments, getDocumentSummary, getDocumentDownloadUrl, deleteDocument,
   listCases, listDocumentTypes, uploadDocument, summarizeDocument,
-  translateText,
+  translateText, requestSignature,
 } from '../../api/client'
 import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption } from '../../types/api'
 import { Icon } from '../../components/icons'
@@ -69,6 +69,12 @@ export default function DocumentsListPage() {
   const [translation, setTranslation] = useState('')
   const [translating, setTranslating] = useState(false)
   const [translateError, setTranslateError] = useState('')
+
+  const [signId, setSignId] = useState<number | null>(null)
+  const [signerName, setSignerName] = useState('')
+  const [signerEmail, setSignerEmail] = useState('')
+  const [signing, setSigning] = useState(false)
+  const [signError, setSignError] = useState('')
 
   const [toast, setToast] = useState('')
   // ?q= lets another page link straight to a filtered library (the admin console's
@@ -147,6 +153,33 @@ export default function DocumentsListPage() {
       setTranslateError(err instanceof Error ? err.message : 'Failed to translate.')
     } finally {
       setTranslating(false)
+    }
+  }
+
+  function toggleSign(id: number) {
+    if (signId === id) { setSignId(null); return }
+    setSignId(id)
+    setSignerName('')
+    setSignerEmail('')
+    setSignError('')
+  }
+
+  /** Sends the document to Leegality for e-signature (`POST /documents/:id/request-signature`).
+   * v1 is one signer at a time -- the backend already accepts a list, so multi-signer is just a
+   * form change, not a backend one, whenever that's actually needed. */
+  async function submitSign(id: number) {
+    if (!signerName.trim() || !signerEmail.trim()) return
+    setSigning(true)
+    setSignError('')
+    try {
+      const updated = await requestSignature(id, [{ name: signerName.trim(), email: signerEmail.trim() }])
+      setDocuments((prev) => prev.map((d) => (d.id === id ? updated : d)))
+      setSignId(null)
+      setToast('Sent for e-signature.')
+    } catch (err) {
+      setSignError(err instanceof Error ? err.message : 'Failed to send for e-signature.')
+    } finally {
+      setSigning(false)
     }
   }
 
@@ -359,6 +392,11 @@ export default function DocumentsListPage() {
                           <span className={shellStyles.pill} style={d.has_summary ? { color: '#4A6B4E', background: '#E4EDE5', flexShrink: 0 } : { color: '#8A6A2F', background: '#F3EBD9', flexShrink: 0 }}>
                             {d.has_summary ? 'Completed' : 'Processing'}
                           </span>
+                          {d.esign_status && (
+                            <span className={shellStyles.pill} style={d.esign_status === 'COMPLETED' ? { color: '#4A6B4E', background: '#E4EDE5', flexShrink: 0 } : { color: '#8A6A2F', background: '#F3EBD9', flexShrink: 0 }}>
+                              {d.esign_status === 'COMPLETED' ? 'Signed' : 'Awaiting signature'}
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{d.case_number ?? '—'} · {formatDate(d.upload_date)}</div>
                       </div>
@@ -370,6 +408,11 @@ export default function DocumentsListPage() {
                       <div onClick={() => toggleTranslate(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: translateId === d.id ? '#E6E0CE' : '#FCFAF4' }} title="Translate the summary">
                         <Icon name="globe" size={13} color="#575145" /> Translate
                       </div>
+                      {d.mime_type === 'application/pdf' && !d.esign_status && (
+                        <div onClick={() => toggleSign(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: signId === d.id ? '#E6E0CE' : '#FCFAF4' }} title="Send for e-signature">
+                          <Icon name="edit" size={13} color="#575145" /> Sign
+                        </div>
+                      )}
                     </div>
                     {expandedId === d.id && (
                       <div style={{ fontSize: 12.5, color: '#33302A', borderTop: '1px solid #F1EDE0', paddingTop: 10 }}>
@@ -421,6 +464,31 @@ export default function DocumentsListPage() {
                         {translateError && <div style={{ color: MUTED }}>{translateError}</div>}
                         {translation && <div style={{ lineHeight: 1.6 }}>{translation}</div>}
                         {!translating && !translateError && !translation && <div style={{ color: MUTED }}>Pick a language to translate this document's summary.</div>}
+                      </div>
+                    )}
+                    {signId === d.id && (
+                      <div style={{ fontSize: 12.5, color: '#33302A', borderTop: '1px solid #F1EDE0', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input
+                          value={signerName}
+                          onChange={(e) => setSignerName(e.target.value)}
+                          placeholder="Signer's name"
+                          style={{ padding: '7px 10px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 12.5 }}
+                        />
+                        <input
+                          value={signerEmail}
+                          onChange={(e) => setSignerEmail(e.target.value)}
+                          placeholder="Signer's email"
+                          type="email"
+                          style={{ padding: '7px 10px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 12.5 }}
+                        />
+                        {signError && <div style={{ color: '#B3282D' }}>{signError}</div>}
+                        <div
+                          className={styles.ghostChip}
+                          style={{ alignSelf: 'flex-start', padding: '6px 12px', opacity: signing || !signerName.trim() || !signerEmail.trim() ? 0.6 : 1, cursor: signing ? 'default' : 'pointer' }}
+                          onClick={signing ? undefined : () => submitSign(d.id)}
+                        >
+                          {signing ? 'Sending…' : 'Send for signature'}
+                        </div>
                       </div>
                     )}
                   </div>

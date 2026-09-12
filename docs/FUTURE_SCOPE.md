@@ -51,9 +51,9 @@ Not started. Ordered by the priority set in the market brief.
 |---|---|---|---|
 | 1 | ~~eCourts / CNR sync~~ | Done (§1) | Manual sync only — see follow-ups above |
 | 2 | ~~Document OCR~~ | Done (§1.1 below) | Scanned PDFs and image uploads now feed the existing summarize/translate pipeline |
-| 3 | E-signatures | Table stakes across every competitor researched (Clio, MyCase, PracticePanther, JuniorLawyer); conveyancing work depends on it directly | Needs a vendor decision (e.g. Leegality, DocuSign) — not researched yet |
-| 4 | Conflict-of-interest check | Ethics-adjacent, expected by bar associations | Lower urgency than 3 |
-| 5 | Basic trust accounting / reconciliation | Table stakes at every competitor; MyCase's automated 3-way reconciliation is the bar | Lower urgency than 3 |
+| 3 | ~~E-signatures~~ | Done (§4 below) | Leegality, PDF documents only |
+| 4 | Conflict-of-interest check | Ethics-adjacent, expected by bar associations | Lower urgency than 5 |
+| 5 | Basic trust accounting / reconciliation | Table stakes at every competitor; MyCase's automated 3-way reconciliation is the bar | Lower urgency than 4 |
 
 ### Document OCR — how it landed
 
@@ -64,6 +64,45 @@ existing pypdf path — same pattern pypdf already used, no new venv. A PDF with
 layer (a scan) now renders each page via `pdf2image` and OCRs it; `image/*` uploads OCR
 directly. Requires the `tesseract-ocr` and `poppler-utils` system packages (see
 `SETUP.md`) — missing either degrades to a clear 500, not a crash.
+
+### E-signatures — how it landed
+
+Bought, not built — see the [market brief](https://claude.ai/code/artifact/6bc8dcba-d386-4268-94ec-d4382b712d45) for why. Only 7 CCA-licensed eSign Service Providers
+(ESPs) in India can legally perform Aadhaar-based cryptographic signing; Leegality is an
+ASP (Application Service Provider) that integrates with one behind its API, the same role
+Clio's DocuSign integration and MyCase's native eSignature play for their markets. Chosen
+over Digio for self-serve access — Leegality issues API credentials immediately from
+account settings, Digio gates its API behind an enterprise sales conversation.
+
+Integrated in `app/controllers/esign.py`: `request_signature()` sends a stored PDF to
+Leegality's `POST /v3.0/sign/request` against a pre-configured Workflow (`profileId`,
+created once in the Leegality dashboard — not something this app creates via API); the
+`documents` table tracks `esign_document_id`/`esign_status` in Leegality's own vocabulary
+(same reasoning as `cases.ecourts_status`). `handle_esign_webhook()` receives Leegality's
+signing-event callbacks at `POST /webhooks/leegality` — deliberately outside the app's
+normal auth, since Leegality (not a logged-in user) calls it; instead it verifies the
+payload's `mac` field (`HMAC-SHA1(documentId, privateSalt)`). On a `Completed` document it
+downloads the signed PDF from Leegality's CDN link immediately (that link expires in 15
+seconds) and stores it in LexFlow's own Storage bucket rather than depending on Leegality
+to keep serving it.
+
+**Left out of v1, deliberately:**
+
+- **Multi-signer / countersigning.** The backend already accepts a `signers` list; the
+  frontend form sends one signer at a time. Extend the form, not the API, once a document
+  genuinely needs more than one signer.
+- **Only PDF documents can be signed** — Leegality's API doesn't accept other formats, and
+  neither does this integration. A Word doc or scan would need converting to PDF first,
+  which isn't wired up.
+- **No per-request webhook override.** `customURL.webhookURL`/`errorWebhookURL` (settable
+  per invitee in the Create Request payload) aren't sent — the webhook URL comes from
+  whatever's configured on the Workflow itself in the Leegality dashboard. Fine for a
+  single deployment; would need setting explicitly if LexFlow ever runs multiple
+  environments against one Leegality account.
+- **Rejection/expiry events aren't distinguished from a normal in-progress signature** — the
+  webhook handler stores whatever `documentStatus` string Leegality sends as-is, but
+  doesn't yet surface "signer rejected" or "invite expired" differently in the UI from
+  "still pending."
 
 ---
 
