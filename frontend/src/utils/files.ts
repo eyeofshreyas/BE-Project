@@ -1,9 +1,18 @@
 /** Shared file helpers. */
 
-/** Whether the document preview page can render this type inline; anything else
- * (Word docs, etc.) goes straight to download instead. */
-export function isPreviewable(mimeType: string) {
-  return mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType === 'application/pdf'
+/**
+ * Whether the preview page can render this type inline; anything else goes straight to
+ * download. For video this asks the browser rather than guessing from the mime type:
+ * canPlayType() is the only reliable pre-flight signal, because a <video> pointed at
+ * something it can't decode often never fires its error event -- Chrome just sits in
+ * NETWORK_LOADING showing a dead player. It rules out MOV, AVI and MPEG outright, and
+ * answers "maybe" for MP4/WebM/MKV, where the container is fine but the codecs inside
+ * may still not be; the elements keep an onError backstop for that case.
+ */
+export function canRenderInline(mimeType: string) {
+  if (mimeType.startsWith('image/') || mimeType === 'application/pdf') return true
+  if (mimeType.startsWith('video/')) return document.createElement('video').canPlayType(mimeType) !== ''
+  return false
 }
 
 /** Bytes as a short human-readable size. */

@@ -8,7 +8,7 @@ import {
 } from '../../api/client'
 import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption } from '../../types/api'
 import { Icon } from '../../components/icons'
-import { isPreviewable, formatSize, uploadRejection } from '../../utils/files'
+import { canRenderInline, formatSize, uploadRejection } from '../../utils/files'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import shellStyles from '../../components/AppShell.module.css'
@@ -199,7 +199,7 @@ export default function DocumentsListPage() {
 
 
   function openPreview(d: DocumentSummary) {
-    if (isPreviewable(d.mime_type)) navigate(`/documents/${d.id}`)
+    if (canRenderInline(d.mime_type)) navigate(`/documents/${d.id}`)
     else openDocument(d.id)
   }
 

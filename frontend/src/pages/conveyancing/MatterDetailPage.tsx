@@ -8,7 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument, updateDueDiligence, completeProgressStage } from '../../api/client'
 import type { MatterDetail, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
-import { isPreviewable, uploadRejection } from '../../utils/files'
+import { canRenderInline, uploadRejection } from '../../utils/files'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from './ConveyancingDashboardPage.module.css'
 
@@ -267,7 +267,7 @@ export default function MatterDetailPage() {
                       <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
                         <span
                           style={{ fontSize: 12.5, fontWeight: 600, color: '#23306B', cursor: 'pointer' }}
-                          onClick={() => (d.mime_type && isPreviewable(d.mime_type) ? navigate(`/documents/${d.document_id}`) : downloadDoc(d.document_id))}
+                          onClick={() => (d.mime_type && canRenderInline(d.mime_type) ? navigate(`/documents/${d.document_id}`) : downloadDoc(d.document_id))}
                         >
                           Preview
                         </span>

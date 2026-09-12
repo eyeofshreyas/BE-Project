@@ -14,7 +14,7 @@ import type {
   DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
-import { isPreviewable, uploadRejection } from '../../utils/files'
+import { canRenderInline, uploadRejection } from '../../utils/files'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import cd from './cases.module.css'
@@ -512,7 +512,7 @@ export default function CaseDetailPage() {
 
   /** Dispatches on mime type: previewable types open the document preview page, others go straight to `downloadDocument()`. */
   function openDocument(d: DocumentSummary) {
-    if (isPreviewable(d.mime_type)) navigate(`/documents/${d.id}`)
+    if (canRenderInline(d.mime_type)) navigate(`/documents/${d.id}`)
     else downloadDocument(d.id)
   }
 

@@ -8,7 +8,7 @@ import { listDocuments, getDocumentDownloadUrl } from '../../api/client'
 import type { DocumentSummary } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { formatDate } from '../../utils/date'
-import { isPreviewable, formatSize } from '../../utils/files'
+import { canRenderInline, formatSize } from '../../utils/files'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
 const MUTED = '#6E6759'
@@ -22,6 +22,10 @@ export default function DocumentPreviewPage() {
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // mime_type only names the container: canRenderInline() lets through plenty the browser
+  // can't actually decode (MKV, most MOV). The element's own error event is the only
+  // reliable signal, so fall back to Download when it fires rather than leaving a dead player.
+  const [undecodable, setUndecodable] = useState(false)
 
   useEffect(() => {
     if (!numericId) { setError('Invalid document.'); setLoading(false); return }
@@ -47,6 +51,7 @@ export default function DocumentPreviewPage() {
     </div>
   )
 
+  const showInline = canRenderInline(doc.mime_type) && !undecodable
   const meta = [doc.document_type, doc.case_number, formatSize(doc.file_size), `Uploaded ${formatDate(doc.upload_date)}`]
     .filter(Boolean).join(' · ')
 
@@ -78,12 +83,30 @@ export default function DocumentPreviewPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', background: '#F6F2E9', border: '1px solid #CFC6B0', borderRadius: 3, minHeight: 320 }}>
-          {doc.mime_type.startsWith('image/') && <img src={url} alt={doc.file_name} style={{ maxWidth: '100%', display: 'block' }} />}
-          {doc.mime_type.startsWith('video/') && <video src={url} controls style={{ maxWidth: '100%', maxHeight: '78vh' }} />}
-          {doc.mime_type === 'application/pdf' && <iframe src={url} title={doc.file_name} style={{ width: '100%', height: '78vh', border: 'none' }} />}
-          {!isPreviewable(doc.mime_type) && (
-            <div style={{ padding: 40, textAlign: 'center', color: MUTED, fontSize: 13.5 }}>
-              This file type can't be shown here. Use Download to open it.
+          {showInline && doc.mime_type.startsWith('image/') && (
+            <img src={url} alt={doc.file_name} onError={() => setUndecodable(true)} style={{ maxWidth: '100%', display: 'block' }} />
+          )}
+          {showInline && doc.mime_type.startsWith('video/') && (
+            <video src={url} controls onError={() => setUndecodable(true)} style={{ maxWidth: '100%', maxHeight: '78vh' }} />
+          )}
+          {/* an <iframe> gives no usable error event, so a PDF the browser won't render
+              shows the viewer's own message rather than ours */}
+          {showInline && doc.mime_type === 'application/pdf' && (
+            <iframe src={url} title={doc.file_name} style={{ width: '100%', height: '78vh', border: 'none' }} />
+          )}
+          {!showInline && (
+            <div style={{ padding: 40, textAlign: 'center', color: MUTED, fontSize: 13.5, maxWidth: 420 }}>
+              <Icon name="file-text" size={28} color="#8C857A" />
+              <div style={{ marginTop: 10 }}>
+                {undecodable
+                  ? `This browser couldn't display ${doc.file_name}. Download it to open in another application.`
+                  : "This file type can't be shown here. Download it to open."}
+              </div>
+              {url && (
+                <a href={url} target="_blank" rel="noreferrer" className={styles.primaryChip} style={{ textDecoration: 'none', marginTop: 14, display: 'inline-flex' }}>
+                  <Icon name="download" size={15} color="#FCFAF4" /> Download
+                </a>
+              )}
             </div>
           )}
         </div>

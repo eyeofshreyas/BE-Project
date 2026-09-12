@@ -14,6 +14,10 @@ DOCUMENTS_BUCKET = "documents"
 TEXT_MIME_PREFIX = "text/"
 # Same ceiling message attachments use (see messages.MAX_ATTACHMENT_BYTES).
 MAX_DOCUMENT_BYTES = 25 * 1024 * 1024
+# An hour, matching messages.ATTACHMENT_URL_TTL. It was 5 minutes, which is fine for a
+# PDF the browser fetches once but not for video: a <video> element re-requests byte
+# ranges as it plays and seeks, so a dead URL stalls playback part-way through.
+DOCUMENT_URL_TTL = 3600
 DOCUMENTS_SELECT = (
     "document_id,file_name,mime_type,upload_date,file_size,case_id,file_path,"
     "document_types(type_name),cases(case_number),users(full_name)"
@@ -128,7 +132,7 @@ def get_document_download_url(document_id: int, download: bool = False, profile:
 
     options = {"download": True} if download else None
     try:
-        signed = supabase.storage.from_(DOCUMENTS_BUCKET).create_signed_url(rows[0]["file_path"], 300, options)
+        signed = supabase.storage.from_(DOCUMENTS_BUCKET).create_signed_url(rows[0]["file_path"], DOCUMENT_URL_TTL, options)
     except StorageApiError:
         # The documents row outlived its stored object (seed rows that were never
         # uploaded, a file cleared from the bucket). Say so instead of 500ing --
