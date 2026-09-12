@@ -1,8 +1,8 @@
 /** `/cases` route: role-dispatches to `StaffCasesView` (lawyer/admin, sortable table) or `ClientCasesView` (client, one card per case). */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listCases, listHearings, listCaseTimeline } from '../../api/client'
-import type { CaseSummary, HearingSummary, TimelineEvent, UserProfile } from '../../types/api'
+import { listCases, listHearings, listCaseTimeline, searchOwnCases } from '../../api/client'
+import type { CaseSummary, CaseSearchResult, HearingSummary, TimelineEvent, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { formatDate, timeAgo } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
@@ -264,6 +264,11 @@ function ClientCasesView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  // Enter escalates from the instant substring filter to the backend's semantic
+  // ranking; null means no AI search is in effect and the plain filter applies.
+  const [aiHits, setAiHits] = useState<CaseSearchResult[] | null>(null)
+  const [aiSearching, setAiSearching] = useState(false)
+  const [aiError, setAiError] = useState('')
 
   useEffect(() => {
     Promise.all([listCases(), listHearings()])
@@ -282,9 +287,33 @@ function ClientCasesView() {
   }, [])
 
   const searchLower = search.trim().toLowerCase()
-  const filtered = cases.filter((c) =>
-    !searchLower || c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower) || (c.lawyer ?? '').toLowerCase().includes(searchLower)
-  )
+  const filtered = aiHits
+    ? aiHits.map((h) => cases.find((c) => c.case_id === h.case_id)).filter((c): c is CaseSummary => !!c)
+    : cases.filter((c) =>
+        !searchLower || c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower) || (c.lawyer ?? '').toLowerCase().includes(searchLower)
+      )
+  const excerptByCase = Object.fromEntries((aiHits ?? []).map((h) => [h.case_id, h.excerpt]))
+
+  async function runAiSearch() {
+    const query = search.trim()
+    if (!query) { clearSearch(); return }
+    setAiSearching(true)
+    setAiError('')
+    try {
+      setAiHits(await searchOwnCases(query, 10))
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Search failed.')
+      setAiHits(null)
+    } finally {
+      setAiSearching(false)
+    }
+  }
+
+  function clearSearch() {
+    setSearch('')
+    setAiHits(null)
+    setAiError('')
+  }
 
   const activeCases = cases.filter((c) => !CLOSED_STATUSES.has(c.status))
   const closedCases = cases.filter((c) => CLOSED_STATUSES.has(c.status))
@@ -333,12 +362,27 @@ function ClientCasesView() {
                 <div className={cd.searchBox}>
                   <Icon name="search" size={15} color="#8C857A" />
                   <input
-                    placeholder="Search your cases…"
+                    placeholder="Search your cases, or describe one and press Enter…"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => { setSearch(e.target.value); setAiHits(null); setAiError('') }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !aiSearching) runAiSearch() }}
                     className={cd.plainInput}
                   />
+                  {aiSearching && <span style={{ fontSize: 12, color: MUTED, flexShrink: 0 }}>Searching…</span>}
+                  {search && !aiSearching && (
+                    <button className={cd.linkAction} style={{ flexShrink: 0 }} onClick={clearSearch}>Clear</button>
+                  )}
                 </div>
+
+                {aiError && <div style={{ fontSize: 12.5, color: '#B3282D' }}>{aiError}</div>}
+                {aiHits && !aiError && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
+                    <Icon name="sparkles" size={14} color="#23306B" />
+                    {aiHits.length > 0
+                      ? `Closest matches for "${search.trim()}", ranked by meaning rather than wording.`
+                      : `Nothing on your file reads like "${search.trim()}".`}
+                  </div>
+                )}
 
                 {filtered.map((c) => {
                   const [color, bg] = STATUS_STYLE_MAP[c.status] || DEFAULT_STATUS_STYLE
@@ -364,7 +408,12 @@ function ClientCasesView() {
                         <CardFact label="Filed" value={c.filing_date ? formatDate(c.filing_date) : 'Not recorded'} />
                       </div>
 
-                      {latest && (
+                      {excerptByCase[c.case_id] ? (
+                        <div className={cd.activityLine} style={{ alignItems: 'flex-start', lineHeight: 1.5 }}>
+                          <Icon name="sparkles" size={13} color="#23306B" />
+                          <span style={{ color: MUTED }}>{excerptByCase[c.case_id]}</span>
+                        </div>
+                      ) : latest && (
                         <div className={cd.activityLine}>
                           <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#23306B', flexShrink: 0 }} />
                           {latest.event_title}
@@ -382,7 +431,8 @@ function ClientCasesView() {
                     </div>
                     {cases.length > 0 && (
                       <div className={cd.emptyRow}>
-                        <button className={cd.linkAction} onClick={() => setSearch('')}>Clear search</button>
+                        {!aiHits && <button className={cd.linkAction} onClick={() => !aiSearching && runAiSearch()}>Try searching by meaning</button>}
+                        <button className={cd.linkAction} onClick={clearSearch}>Clear search</button>
                       </div>
                     )}
                   </div>

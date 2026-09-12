@@ -208,6 +208,11 @@ export function listSimilarOwnCases(caseId: number) {
   return get<CaseSearchResult[]>(`/cases/${caseId}/similar`)
 }
 
+/** Semantic search over the caller's own cases (backed by `/ai/case-search`). */
+export function searchOwnCases(query: string, topK = 5) {
+  return post<CaseSearchResult[]>('/ai/case-search', { query, top_k: topK })
+}
+
 export function getSimilarCase(docId: string) {
   return get<SimilarCaseDetail>(`/ai/similar-cases/${encodeURIComponent(docId)}`)
 }
