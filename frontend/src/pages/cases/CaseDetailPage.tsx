@@ -8,6 +8,7 @@ import {
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
   unassignLawyer, getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
   listHearings, createHearing, listJudges, updateHearing, updateMeeting, deleteDocument,
+  setCaseCnr, syncCaseEcourts,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
@@ -148,6 +149,10 @@ export default function CaseDetailPage() {
 
   const [statusSaving, setStatusSaving] = useState(false)
   const [unassigning, setUnassigning] = useState(false)
+  const [cnrEditing, setCnrEditing] = useState(false)
+  const [cnrInput, setCnrInput] = useState('')
+  const [cnrSaving, setCnrSaving] = useState(false)
+  const [syncingEcourts, setSyncingEcourts] = useState(false)
   const [messaging, setMessaging] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -357,6 +362,38 @@ export default function CaseDetailPage() {
       showToast(err instanceof Error ? err.message : 'Failed to unassign lawyer.')
     } finally {
       setUnassigning(false)
+    }
+  }
+
+  async function saveCnr() {
+    if (!cnrInput.trim()) return
+    setCnrSaving(true)
+    try {
+      const updated = await setCaseCnr(numericCaseId, cnrInput.trim())
+      setCaseInfo(updated)
+      setCnrEditing(false)
+      setCnrInput('')
+      showToast('CNR saved.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save CNR.')
+    } finally {
+      setCnrSaving(false)
+    }
+  }
+
+  /** Pulls the latest status for this case from eCourts by its CNR (`POST /cases/:id/sync-ecourts`)
+   * and refreshes the timeline, since a sync logs its own event there. */
+  async function syncEcourts() {
+    setSyncingEcourts(true)
+    try {
+      const updated = await syncCaseEcourts(numericCaseId)
+      setCaseInfo(updated)
+      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+      showToast('Synced with eCourts.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to sync with eCourts.')
+    } finally {
+      setSyncingEcourts(false)
     }
   }
 
@@ -593,6 +630,38 @@ export default function CaseDetailPage() {
                 <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => !messaging && openConversation(caseInfo.lawyer_id)}>{messaging ? 'Opening…' : 'Message'}</button>
               )}
             </Fact>
+            {canManage && (
+              <Fact label="eCourts CNR" value={caseInfo.cnr_number ?? 'Not linked'}>
+                {cnrEditing ? (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                    <input
+                      value={cnrInput}
+                      onChange={(e) => setCnrInput(e.target.value.toUpperCase())}
+                      placeholder="16-character CNR"
+                      maxLength={16}
+                      style={{ ...inputStyle, padding: '5px 8px', fontSize: 12, width: 140 }}
+                      onKeyDown={(e) => e.key === 'Enter' && saveCnr()}
+                    />
+                    <button className={cd.linkAction} style={{ fontSize: 11.5 }} onClick={saveCnr}>{cnrSaving ? 'Saving…' : 'Save'}</button>
+                    <button className={cd.linkAction} style={{ fontSize: 11.5 }} onClick={() => { setCnrEditing(false); setCnrInput('') }}>Cancel</button>
+                  </div>
+                ) : caseInfo.cnr_number ? (
+                  <>
+                    <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => !syncingEcourts && syncEcourts()}>
+                      {syncingEcourts ? 'Syncing…' : 'Sync with eCourts'}
+                    </button>
+                    {caseInfo.ecourts_status && (
+                      <div className={cd.metaRow} style={{ marginTop: 4 }}>
+                        <span>{caseInfo.ecourts_status}</span>
+                        {caseInfo.ecourts_last_synced_at && <span>Synced {formatDate(caseInfo.ecourts_last_synced_at)}</span>}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => setCnrEditing(true)}>Add CNR</button>
+                )}
+              </Fact>
+            )}
           </div>
         </div>
 

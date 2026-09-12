@@ -35,3 +35,11 @@ class CaseSummary(BaseModel):
     hearing: str | None
     priority: str
     description: str | None
+    cnr_number: str | None
+    ecourts_status: str | None
+    ecourts_last_synced_at: str | None
+
+
+class CnrUpdate(BaseModel):
+    """Request body for attaching a case's eCourts CNR number."""
+    cnr_number: str

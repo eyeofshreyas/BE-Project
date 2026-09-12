@@ -331,6 +331,14 @@ export function unassignLawyer(caseId: number) {
   return post<CaseSummary>(`/cases/${caseId}/unassign-lawyer`, {})
 }
 
+export function setCaseCnr(caseId: number, cnrNumber: string) {
+  return patch<CaseSummary>(`/cases/${caseId}/cnr`, { cnr_number: cnrNumber })
+}
+
+export function syncCaseEcourts(caseId: number) {
+  return post<CaseSummary>(`/cases/${caseId}/sync-ecourts`, {})
+}
+
 export function listInvoices() {
   return get<InvoiceSummary[]>('/billing/invoices')
 }

@@ -9,6 +9,7 @@ from app.models.cases import CaseCreate, CaseSummary
 
 CASES_SELECT = (
     "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,description,"
+    "cnr_number,ecourts_status,ecourts_last_synced_at,"
     "client_id,"
     "clients(users(full_name,email,phone)),"
     "courts(court_name),"
@@ -49,6 +50,9 @@ def _to_case_summary(row: dict) -> dict:
         "hearing": row["next_hearing_date"],
         "priority": row["priority"],
         "description": row.get("description"),
+        "cnr_number": row.get("cnr_number"),
+        "ecourts_status": row.get("ecourts_status"),
+        "ecourts_last_synced_at": row.get("ecourts_last_synced_at"),
     }
 
 

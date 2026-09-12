@@ -35,3 +35,6 @@ SMTP_FROM = os.getenv("SMTP_FROM") or SMTP_USER
 
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+
+ECOURTS_API_KEY = os.getenv("ECOURTS_API_KEY")
+ECOURTS_API_BASE = os.getenv("ECOURTS_API_BASE", "https://webapi.ecourtsindia.com")

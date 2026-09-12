@@ -48,6 +48,9 @@ export interface CaseSummary {
   hearing: string | null
   priority: string
   description: string | null
+  cnr_number: string | null
+  ecourts_status: string | null
+  ecourts_last_synced_at: string | null
 }
 
 export interface CaseCreatePayload {
