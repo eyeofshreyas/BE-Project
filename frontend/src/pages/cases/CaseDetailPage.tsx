@@ -182,6 +182,8 @@ export default function CaseDetailPage() {
 
   const [uploadTypeId, setUploadTypeId] = useState('')
   const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
+  const [uploadDragOver, setUploadDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadFormOpen, setUploadFormOpen] = useState(false)
 
@@ -582,7 +584,7 @@ export default function CaseDetailPage() {
             <Fact label="Case type" value={caseInfo.case_type ?? 'Not set'} />
             <Fact label="Next hearing" value={caseInfo.hearing ? formatDay(caseInfo.hearing) : 'Not scheduled'}>
               {caseInfo.hearing && (
-                <div className={cd.factAction} onClick={() => navigate('/hearings')}>View in calendar</div>
+                <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => navigate('/hearings')}>View in calendar</button>
               )}
             </Fact>
             <Fact label="Responsible lawyer" value={caseInfo.lawyer ?? 'Not assigned'}>
@@ -590,7 +592,7 @@ export default function CaseDetailPage() {
                 <div className={cd.factAction} onClick={() => !unassigning && unassign()}>{unassigning ? 'Removing…' : 'Unassign'}</div>
               )}
               {!canManage && caseInfo.lawyer_id && (
-                <div className={cd.factAction} onClick={() => !messaging && openConversation(caseInfo.lawyer_id)}>{messaging ? 'Opening…' : 'Message'}</div>
+                <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => !messaging && openConversation(caseInfo.lawyer_id)}>{messaging ? 'Opening…' : 'Message'}</button>
               )}
             </Fact>
           </div>
@@ -860,17 +862,56 @@ export default function CaseDetailPage() {
               action={canUploadDocs && !uploadFormOpen && documents.length > 0 ? <button className={cd.linkAction} onClick={() => setUploadFormOpen(true)}>Upload</button> : undefined}
             >
               {canUploadDocs && uploadFormOpen && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                  <select value={uploadTypeId} onChange={(e) => setUploadTypeId(e.target.value)} style={{ ...inputStyle, background: '#FCFAF4' }}>
-                    <option value="">Choose a document type…</option>
-                    {documentTypes.map((t) => <option key={t.document_type_id} value={t.document_type_id}>{t.type_name}</option>)}
-                  </select>
-                  <input type="file" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12.5 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx,image/*,video/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => { setUploadFile(e.target.files?.[0] ?? null); e.target.value = '' }}
+                  />
+                  {uploadFile ? (
+                    <div className={cd.listRow} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Icon name="file-text" size={18} color={MUTED} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className={cd.rowTitle} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uploadFile.name}</div>
+                        <div className={cd.metaRow}><span>{(uploadFile.size / 1024).toFixed(0)} KB</span></div>
+                      </div>
+                      <button className={cd.linkAction} onClick={() => uploadInputRef.current?.click()}>Replace</button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => uploadInputRef.current?.click()}
+                      onDragOver={(e) => { e.preventDefault(); setUploadDragOver(true) }}
+                      onDragLeave={() => setUploadDragOver(false)}
+                      onDrop={(e) => { e.preventDefault(); setUploadDragOver(false); setUploadFile(e.dataTransfer.files[0] ?? null) }}
+                      style={{
+                        border: `2px dashed ${uploadDragOver ? PRIMARY : '#CFC6B0'}`, borderRadius: 3, padding: '28px 20px',
+                        textAlign: 'center', cursor: 'pointer', background: uploadDragOver ? '#F6F2E9' : '#FCFAF4',
+                      }}
+                    >
+                      <div style={{ width: 40, height: 40, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+                        <Icon name="upload-cloud" size={19} color={PRIMARY} strokeWidth={1.8} />
+                      </div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17' }}>Drop a file here, or click to browse</div>
+                      <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>PDF, Word, images, or video · filed against {caseInfo.id}</div>
+                    </div>
+                  )}
+                  <Dropdown
+                    value={uploadTypeId}
+                    options={['', ...documentTypes.map((t) => String(t.document_type_id))]}
+                    labelFor={(v) => documentTypes.find((t) => String(t.document_type_id) === v)?.type_name ?? 'Choose a document type…'}
+                    onChange={setUploadTypeId}
+                  />
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <div className={styles.primaryChip} style={{ opacity: uploading || !uploadFile || !uploadTypeId ? 0.6 : 1 }} onClick={submitUpload}>
+                    <div
+                      className={styles.primaryChip}
+                      style={{ opacity: uploading || !uploadFile || !uploadTypeId ? 0.6 : 1, cursor: uploading || !uploadFile || !uploadTypeId ? 'default' : 'pointer' }}
+                      onClick={submitUpload}
+                    >
                       {uploading ? 'Uploading…' : 'Upload'}
                     </div>
-                    <div className={styles.ghostChip} onClick={() => setUploadFormOpen(false)}>Cancel</div>
+                    <div className={styles.ghostChip} onClick={() => { setUploadFormOpen(false); setUploadFile(null); setUploadTypeId('') }}>Cancel</div>
                   </div>
                 </div>
               )}
