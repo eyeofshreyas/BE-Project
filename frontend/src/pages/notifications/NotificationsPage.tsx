@@ -7,11 +7,18 @@ import type { NotificationSummary } from '../../types/api'
 import NotificationsPanel from '../../components/NotificationsPanel'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
+const POLL_MS = 30000
+
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
 
   useEffect(() => {
-    listNotifications().then(setNotifications).catch(() => {})
+    function load() {
+      listNotifications().then(setNotifications).catch(() => {})
+    }
+    load()
+    const interval = setInterval(load, POLL_MS)
+    return () => clearInterval(interval)
   }, [])
 
   function markRead(n: NotificationSummary) {

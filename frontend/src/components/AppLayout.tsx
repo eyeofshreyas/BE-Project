@@ -75,9 +75,16 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [profileOpen, setProfileOpen] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
 
+  // Notifications for the bell dropdown. Polled so a reminder/update sent while the
+  // user is elsewhere (or just sitting on a page) shows up without a manual reload.
   useEffect(() => {
-    listNotifications().then(setNotifications).catch(() => {})
-  }, [])
+    function load() {
+      listNotifications().then(setNotifications).catch(() => {})
+    }
+    load()
+    const interval = setInterval(load, UNREAD_POLL_MS)
+    return () => clearInterval(interval)
+  }, [location.pathname])
 
   // Unread message count for the Messages nav badge. Polled so it stays live while the
   // user is on other pages -- the Messages page itself clears it on open.
