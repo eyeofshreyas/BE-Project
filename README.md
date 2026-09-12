@@ -7,8 +7,9 @@ invoices, and message their lawyer.
 
 Full system design is in [`docs/HLD.md`](docs/HLD.md) (subsystems, tech stack,
 design principles) and [`docs/LLD.md`](docs/LLD.md) (endpoints, data model, ML
-pipeline internals). Deferred work and what unblocks it is in
-[`docs/FUTURE_SCOPE.md`](docs/FUTURE_SCOPE.md).
+pipeline internals). What each feature does and why it exists is in
+[`docs/FEATURE_LIST.md`](docs/FEATURE_LIST.md); deferred work and what
+unblocks it is in [`docs/FUTURE_SCOPE.md`](docs/FUTURE_SCOPE.md).
 
 ## Stack
 
