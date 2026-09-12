@@ -33,6 +33,13 @@ REPETITION_PENALTY = 1.15
 NO_REPEAT_NGRAM = 6  # legal prose reuses short phrases ("the High Court held"); 6 spares those
 MAX_NEW_TOKENS = 400  # 220 cut briefs off mid-clause; trim_to_sentence() handles the tail
 MAX_REDUCE_PASSES = 4  # safety stop for the reduce loop; 4 covers ~books' worth of chunks
+# The final summary grows with the document: a 40-page judgment gets more than the 4 sentences a
+# 2-page one gets. Both the prompt (asks for N sentences) and the token cap have to move -- the cap
+# alone does nothing, the model stops when it thinks it is done.
+MIN_SENTENCES = 4
+MAX_SENTENCES = 20  # ~900 output tokens, all that is left of the 2048 window beside the input
+SENTENCES_PER_CHUNK = 2
+TOKENS_PER_SENTENCE = 45  # legal prose runs long; measured against the 400/8-sentence baseline
 SENTENCE_ENDINGS = (".", "!", "?")
 
 CASE_MAP_PROMPT = """### Instruction:
@@ -47,8 +54,8 @@ parties, dates or findings.
 
 CASE_REDUCE_PROMPT = """### Instruction:
 You are briefing the lawyer responsible for this case. Using only the section summaries below,
-write 4-6 sentences covering what the dispute is about, where it currently stands, and what
-happens next. Do not invent parties, dates or findings.
+write about {sentences} sentences covering what the dispute is about, where it currently stands,
+and what happens next. Do not invent parties, dates or findings.
 
 ### Section Summaries:
 {text}
@@ -66,7 +73,8 @@ Summarize the following excerpt from an Indian Supreme Court judgment in a conci
 """
 
 REDUCE_PROMPT = """### Instruction:
-Combine the following section summaries of an Indian Supreme Court judgment into a single concise legal headnote.
+Combine the following section summaries of an Indian Supreme Court judgment into a single legal
+headnote of about {sentences} sentences.
 
 ### Section Summaries:
 {text}
@@ -128,11 +136,22 @@ def prompts_for(mode):
     return (CASE_MAP_PROMPT, CASE_REDUCE_PROMPT) if mode == "case" else (MAP_PROMPT, REDUCE_PROMPT)
 
 
-def reduce_budget(tokenizer, reduce_prompt):
+def target_sentences(n_chunks):
+    """How long the final summary should be for a document split into n_chunks sections."""
+    return min(MAX_SENTENCES, max(MIN_SENTENCES, SENTENCES_PER_CHUNK * n_chunks))
+
+
+def sentence_tokens(sentences):
+    """Token cap that leaves room for `sentences` sentences, never below the MAX_NEW_TOKENS floor."""
+    return max(MAX_NEW_TOKENS, sentences * TOKENS_PER_SENTENCE)
+
+
+def reduce_budget(tokenizer, reduce_prompt, max_new_tokens=MAX_NEW_TOKENS):
     """How many tokens of section summaries fit in one reduce pass, once the prompt wording and
     the generated output have taken their share of MAX_SEQ_LENGTH."""
-    overhead = len(tokenizer(reduce_prompt.format(text=""), add_special_tokens=False)["input_ids"])
-    return MAX_SEQ_LENGTH - MAX_NEW_TOKENS - overhead
+    empty = reduce_prompt.format(text="", sentences=MAX_SENTENCES)
+    overhead = len(tokenizer(empty, add_special_tokens=False)["input_ids"])
+    return MAX_SEQ_LENGTH - max_new_tokens - overhead
 
 
 def summarize(model, tokenizer, text, mode="judgment"):
@@ -144,25 +163,34 @@ def summarize(model, tokenizer, text, mode="judgment"):
     all in at once let the tokenizer silently truncate away the later sections *and* the trailing
     instruction, so a 60-page file was summarized from its first few pages only. Instead the
     summaries are reduced in budget-sized groups, repeatedly, until they fit in a single pass.
-    Calls: `prompts_for()`, `chunk_by_tokens()`, `reduce_budget()`, `generate()`."""
+    The final pass asks for a length proportional to the document; intermediate passes stay short
+    so each round actually shrinks. Calls: `prompts_for()`, `chunk_by_tokens()`,
+    `target_sentences()`, `sentence_tokens()`, `reduce_budget()`, `generate()`."""
     map_prompt, reduce_prompt = prompts_for(mode)
     chunks = chunk_by_tokens(tokenizer, text)
 
     if len(chunks) == 1:
         if mode != "case":
             return generate(model, tokenizer, map_prompt.format(text=chunks[0]))
-        return generate(model, tokenizer, reduce_prompt.format(text=chunks[0]))
+        return generate(model, tokenizer, reduce_prompt.format(text=chunks[0], sentences=MIN_SENTENCES))
 
+    # ponytail: a 1B model treats "about N sentences" as a hint, not a contract -- expect the
+    # length to track the document loosely. A bigger base model is the upgrade path.
+    sentences = target_sentences(len(chunks))
+    final_tokens = sentence_tokens(sentences)
     summaries = [generate(model, tokenizer, map_prompt.format(text=c)) for c in chunks]
-    budget = reduce_budget(tokenizer, reduce_prompt)
-    # Each pass shrinks the text by roughly CHUNK_TOKENS/MAX_NEW_TOKENS, so this bottoms out in a
-    # few rounds; the cap is only there so a degenerate non-shrinking pass can't spin forever.
+    budget = reduce_budget(tokenizer, reduce_prompt, final_tokens)
+    # Each pass shrinks the text by roughly budget/MAX_NEW_TOKENS, so this bottoms out in a few
+    # rounds; the cap is only there so a degenerate non-shrinking pass can't spin forever.
     for _ in range(MAX_REDUCE_PASSES):
         groups = chunk_by_tokens(tokenizer, "\n".join(summaries), budget)
         if len(groups) == 1:
-            return generate(model, tokenizer, reduce_prompt.format(text=groups[0]))
-        summaries = [generate(model, tokenizer, reduce_prompt.format(text=g)) for g in groups]
-    return generate(model, tokenizer, reduce_prompt.format(text=summaries[0]))
+            prompt = reduce_prompt.format(text=groups[0], sentences=sentences)
+            return generate(model, tokenizer, prompt, max_new_tokens=final_tokens)
+        summaries = [generate(model, tokenizer, reduce_prompt.format(text=g, sentences=MIN_SENTENCES))
+                     for g in groups]
+    prompt = reduce_prompt.format(text=summaries[0], sentences=sentences)
+    return generate(model, tokenizer, prompt, max_new_tokens=final_tokens)
 
 
 def _demo():
@@ -189,6 +217,16 @@ def _demo():
     budget = reduce_budget(tok, REDUCE_PROMPT)
     assert budget < MAX_SEQ_LENGTH - MAX_NEW_TOKENS
     assert all(len(g.split()) <= budget for g in chunk_by_tokens(tok, "word " * 5000, budget))
+
+    # the final summary scales with the document, within bounds, and always leaves the reduce
+    # prompt room for input -- otherwise the loop could never collapse to one group
+    assert target_sentences(1) == MIN_SENTENCES
+    assert target_sentences(5) == 10
+    assert target_sentences(500) == MAX_SENTENCES
+    assert sentence_tokens(MIN_SENTENCES) == MAX_NEW_TOKENS
+    assert sentence_tokens(MAX_SENTENCES) > MAX_NEW_TOKENS
+    big = reduce_budget(tok, REDUCE_PROMPT, sentence_tokens(MAX_SENTENCES))
+    assert big > MAX_NEW_TOKENS, "a reduce group must hold more than one pass can generate"
     print("demo passed")
 
 
