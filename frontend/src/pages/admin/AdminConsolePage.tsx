@@ -12,6 +12,7 @@ import DashboardView from './views/DashboardView'
 import UsersView from './views/UsersView'
 import CasesView from './views/CasesView'
 import DocumentsView from './views/DocumentsView'
+import NotificationsView from './views/NotificationsView'
 import ReportsView from './views/ReportsView'
 import AnalyticsView from './views/AnalyticsView'
 import SettingsView from './views/SettingsView'
@@ -20,7 +21,7 @@ import type { UserProfile, NotificationSummary } from '../../types/api'
 import { timeAgo } from '../../utils/date'
 import styles from '../../components/AppShell.module.css'
 
-type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'reports' | 'analytics' | 'settings'
+type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'notifications' | 'reports' | 'analytics' | 'settings'
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Super Admin', 2: 'Lawyer', 3: 'Client' }
 
@@ -46,6 +47,7 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
   { key: 'users', label: 'Users', icon: 'users' },
   { key: 'cases', label: 'Cases', icon: 'scale' },
   { key: 'documents', label: 'Documents', icon: 'file-text' },
+  { key: 'notifications', label: 'Notifications', icon: 'bell' },
   { key: 'reports', label: 'Reports', icon: 'bar-chart-2' },
   { key: 'analytics', label: 'Analytics', icon: 'pie-chart' },
 ]
@@ -63,6 +65,7 @@ export default function AdminConsolePage() {
   const [toast, setToast] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(loadProfile)
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
+  const [openNotifId, setOpenNotifId] = useState<number | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -76,7 +79,8 @@ export default function AdminConsolePage() {
         .then((updated) => setNotifications((prev) => prev.map((x) => (x.id === updated.id ? updated : x))))
         .catch(() => {})
     }
-    goTo('dashboard')
+    setOpenNotifId(n.id)
+    goTo('notifications')
   }
 
   function saveProfile(updated: UserProfile) {
@@ -191,10 +195,11 @@ export default function AdminConsolePage() {
         </div>
 
         <div className={styles.content} onClick={closeMenus}>
-          {activePage === 'dashboard' && <DashboardView quickActions={quickActions} notifications={notifications} adminName={profile?.full_name ?? null} />}
+          {activePage === 'dashboard' && <DashboardView quickActions={quickActions} adminName={profile?.full_name ?? null} />}
           {activePage === 'users' && <UsersView />}
           {activePage === 'cases' && <CasesView />}
           {activePage === 'documents' && <DocumentsView />}
+          {activePage === 'notifications' && <NotificationsView notifications={notifications} selectedId={openNotifId} onOpen={openNotification} onClose={() => setOpenNotifId(null)} />}
           {activePage === 'reports' && <ReportsView />}
           {activePage === 'analytics' && <AnalyticsView />}
           {activePage === 'settings' && <SettingsView profile={profile} onSave={showToast} onProfileChange={saveProfile} />}

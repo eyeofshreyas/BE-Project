@@ -82,6 +82,7 @@ All calls go through named functions in `api/client.ts`; each wraps a
 | `SignUpPage` | `signup` | `POST /signup` |
 | `AdminConsolePage` | `listNotifications`, `markNotificationRead` | `GET /notifications`, `PATCH /notifications/:id/read` |
 | `admin/views/DashboardView` | `getAdminStats`, `listAdminActivity` | `GET /admin/stats`, `GET /admin/activity` |
+| `admin/views/NotificationsView` | — (notifications passed down from `AdminConsolePage`) | — |
 | `admin/views/AnalyticsView` | `getAdminAnalytics` | `GET /admin/analytics` |
 | `admin/views/SettingsView` | `getPlatformSettings`, `updatePlatformSettings`, `updateOwnProfile`, `forgotPassword` | `GET`/`PATCH /admin/settings`, `PATCH /users/me`, `POST /forgot-password` |
 | `admin/views/UsersView` | `listUsers`, `setUserStatus` | `GET /users`, `PATCH /users/:id/status` |

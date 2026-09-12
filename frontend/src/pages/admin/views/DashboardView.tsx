@@ -1,12 +1,12 @@
-/** Admin console "Dashboard" tab: platform overview stats (`getAdminStats()`), the
- * platform-wide activity feed (`listAdminActivity()`), and a master/detail list of the
- * admin's own notifications (passed down from `AdminConsolePage`). */
+/** Admin console "Dashboard" tab: platform overview stats (`getAdminStats()`) and the
+ * platform-wide activity feed (`listAdminActivity()`). Notifications live in their own
+ * tab -- see `NotificationsView`. */
 import { useEffect, useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C } from '../../../components/theme'
 import { getAdminStats, listAdminActivity } from '../../../api/client'
-import type { AdminStats, ActivityEvent, NotificationSummary } from '../../../types/api'
-import { formatDate, timeAgo } from '../../../utils/date'
+import type { AdminStats, ActivityEvent } from '../../../types/api'
+import { timeAgo } from '../../../utils/date'
 import styles from '../../../components/AppShell.module.css'
 
 type QuickAction = { label: string; icon: 'user-plus' | 'plus' | 'file-text'; primary?: boolean; onClick: () => void }
@@ -35,37 +35,20 @@ const EVENT_ICONS: Record<string, IconName> = {
   note_added: 'edit',
 }
 
-/** Notification `notification_type` -> icon + accent colour, with a neutral fallback. */
-const NOTIF_STYLES: Record<string, { icon: IconName; color: string }> = {
-  client_request: { icon: 'user-plus', color: C.primaryDark },
-  invoice_reminder: { icon: 'receipt', color: C.warning },
-  hearing: { icon: 'calendar', color: C.warning },
-  payment: { icon: 'banknote', color: C.success },
-  document: { icon: 'file-text', color: C.primary },
-}
-
-function notifStyle(type: string) {
-  return NOTIF_STYLES[type.toLowerCase()] ?? { icon: 'bell' as IconName, color: C.primaryDark }
-}
-
 /**
- * Renders `quickActions` (passed from `AdminConsolePage`), the overview stat grid,
- * the recent-activity feed, and a master/detail panel over `notifications` (click a
- * row to expand it on the right). Stats and activity load on mount.
+ * Renders `quickActions` (passed from `AdminConsolePage`), the overview stat grid and
+ * the recent-activity feed. Stats and activity load on mount.
  */
-export default function DashboardView({ quickActions, notifications, adminName }: { quickActions: QuickAction[]; notifications: NotificationSummary[]; adminName: string | null }) {
+export default function DashboardView({ quickActions, adminName }: { quickActions: QuickAction[]; adminName: string | null }) {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [activity, setActivity] = useState<ActivityEvent[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [selectedNotif, setSelectedNotif] = useState<number | null>(null)
 
   useEffect(() => {
     Promise.all([getAdminStats(), listAdminActivity()])
       .then(([s, a]) => { setStats(s); setActivity(a) })
       .catch((e: Error) => setError(e.message))
   }, [])
-
-  const detail = notifications.find((n) => n.id === selectedNotif) ?? null
 
   return (
     <>
@@ -123,52 +106,6 @@ export default function DashboardView({ quickActions, notifications, adminName }
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      <div>
-        <div className={styles.sectionTitle}>System Notifications</div>
-        <div style={{ fontSize: 13, color: '#6E6759', margin: '4px 0 14px' }}>Client requests, invoice reminders and hearing alerts addressed to this admin account.</div>
-        <div style={{ display: 'grid', gridTemplateColumns: detail ? '340px minmax(0,1fr)' : 'minmax(0,1fr)', gap: 20, alignItems: 'start' }}>
-          <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden', boxShadow: '0 1px 2px rgba(35, 48, 107,.04)' }}>
-            <div style={{ padding: '13px 16px', fontSize: 9.5, fontWeight: 700, letterSpacing: '.13em', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', color: '#6E6759', borderBottom: `1px solid ${C.border}` }}>All notifications</div>
-            {notifications.length === 0 && <div style={{ padding: '14px 16px', fontSize: 12.5, color: '#8C857A' }}>No notifications.</div>}
-            {notifications.map((n, i) => {
-              const s = notifStyle(n.notification_type)
-              return (
-                <div
-                  key={n.id}
-                  style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', cursor: 'pointer', borderBottom: i === notifications.length - 1 ? 'none' : '1px solid #F1EDE0', background: selectedNotif === n.id ? '#FCF6EA' : 'transparent' }}
-                  onClick={() => setSelectedNotif(n.id)}
-                >
-                  <div style={{ width: 30, height: 30, borderRadius: 3, background: s.color + '1f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={s.icon} size={15} color={s.color} /></div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, color: '#1A1A17', lineHeight: 1.45, fontWeight: n.is_read ? 500 : 600 }}>{n.title ?? n.message}</div>
-                    <div style={{ fontSize: 11, color: '#8C857A', marginTop: 4 }}>{timeAgo(n.created_at)}</div>
-                  </div>
-                  {!n.is_read && <span style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 6, flexShrink: 0, background: s.color }} />}
-                </div>
-              )
-            })}
-          </div>
-          {detail && (
-            <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 28, boxShadow: '0 1px 2px rgba(35, 48, 107,.04)', display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 3, background: notifStyle(detail.notification_type).color + '1f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={notifStyle(detail.notification_type).icon} size={20} color={notifStyle(detail.notification_type).color} /></div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, flex: 1 }}>
-                  <div style={{ fontFamily: "'Spectral',serif", fontSize: 21, fontWeight: 700, color: '#1A1A17', lineHeight: 1.35 }}>{detail.title ?? detail.message}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <div style={{ fontSize: 11.5, color: '#8C857A' }}>{formatDate(detail.created_at)}</div>
-                    <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.13em', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', color: '#575145', background: '#E6E0CE', padding: '4px 9px', borderRadius: 3 }}>{detail.notification_type.replace(/_/g, ' ')}</div>
-                    {detail.case_number && <div style={{ fontSize: 11, color: '#6E6759' }}>{detail.case_number}</div>}
-                  </div>
-                </div>
-                <div style={{ width: 30, height: 30, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }} onClick={() => setSelectedNotif(null)}><Icon name="x" size={15} color="#6E6759" /></div>
-              </div>
-              <div style={{ height: 1, background: '#F1EDE0' }} />
-              <div style={{ fontSize: 13.5, color: '#4A3F2E', lineHeight: 1.6 }}>{detail.message ?? 'No further detail.'}</div>
-            </div>
-          )}
         </div>
       </div>
 
