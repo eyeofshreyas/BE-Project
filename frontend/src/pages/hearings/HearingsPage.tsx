@@ -233,7 +233,13 @@ function ClientHearingsView() {
 
   useEffect(() => {
     listHearings()
-      .then(setHearings)
+      .then((rows) => {
+        setHearings(rows)
+        // Open on the month of the next hearing, not today's — otherwise "View
+        // Upcoming Hearing" lands the client on an empty calendar.
+        const next = rows.filter((h) => h.hearing_date >= isoDate(new Date())).sort((a, b) => a.hearing_date.localeCompare(b.hearing_date))[0]
+        if (next) setViewDate(new Date(next.hearing_date))
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load hearings.'))
       .finally(() => setLoading(false))
   }, [])
