@@ -1,8 +1,6 @@
 /** Admin console "Cases" tab: table of every case on the platform (`listCases()`), with a
  * CSV export and per-row links to the case page and its documents. */
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Icon } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
 import { listCases } from '../../../api/client'
 import { formatDate } from '../../../utils/date'
@@ -10,7 +8,7 @@ import type { CaseSummary } from '../../../types/api'
 import { downloadCsv } from '../../../utils/files'
 import styles from '../../../components/AppShell.module.css'
 
-const CASE_COLUMNS = ['Case ID', 'Client', 'Assigned Lawyer', 'Court', 'Status', 'Next Hearing', 'Priority', 'Actions']
+const CASE_COLUMNS = ['Case ID', 'Client', 'Assigned Lawyer', 'Court', 'Status', 'Next Hearing', 'Priority']
 
 const STATUS_COLORS: Record<string, string> = {
   Active: C.success, Pending: C.warning, Closed: '#8C857A', 'On Hold': C.danger,
@@ -19,10 +17,9 @@ const STATUS_COLORS: Record<string, string> = {
 const PRIORITY_COLORS: Record<string, string> = { High: C.danger, Medium: C.warning, Low: C.success }
 
 /** Fetches all cases via `listCases()` and renders them as a status/priority-badged table.
- * Admin doesn't get into a case's own detail page (notes, AI summary, documents) from here
- * -- only the document icon, which opens the library pre-filtered to that case. */
+ * A read-only overview -- admin doesn't get into a case's own detail page or document
+ * library from here. */
 export default function CasesView() {
-  const navigate = useNavigate()
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -73,11 +70,6 @@ export default function CasesView() {
                     <td className={styles.td}><span className={styles.pill} style={pillStyle(STATUS_COLORS[row.status] ?? C.muted)}>{row.status}</span></td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{row.hearing ? formatDate(row.hearing) : '—'}</td>
                     <td className={styles.td}><span className={styles.pill} style={pillStyle(PRIORITY_COLORS[row.priority] ?? C.muted)}>{row.priority}</span></td>
-                    <td className={styles.td}>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <span className={styles.actionBtn} title="View documents" onClick={() => navigate(`/documents?q=${encodeURIComponent(row.id)}`)}><Icon name="file-text" size={15} color="#575145" /></span>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
