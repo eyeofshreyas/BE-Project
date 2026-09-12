@@ -17,3 +17,9 @@ class UserSummary(BaseModel):
 class StatusUpdate(BaseModel):
     """Request body for activating/deactivating a user."""
     is_active: bool
+
+
+class ProfileUpdate(BaseModel):
+    """Request body for a user editing their own profile."""
+    full_name: str
+    phone: str

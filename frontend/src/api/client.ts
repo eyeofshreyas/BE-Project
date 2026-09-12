@@ -43,6 +43,10 @@ import type {
   SimilarCaseDetail,
   CaseSearchResult,
   JudgeOption,
+  AdminStats,
+  ActivityEvent,
+  AdminAnalytics,
+  PlatformSettings,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -223,6 +227,30 @@ export function listUsers(role?: string) {
 
 export function setUserStatus(userId: number, isActive: boolean) {
   return patch<UserSummary>(`/users/${userId}/status`, { is_active: isActive })
+}
+
+export function updateOwnProfile(payload: { full_name: string; phone: string }) {
+  return patch<UserSummary>('/users/me', payload)
+}
+
+export function getAdminStats() {
+  return get<AdminStats>('/admin/stats')
+}
+
+export function listAdminActivity(limit = 15) {
+  return get<ActivityEvent[]>(`/admin/activity?limit=${limit}`)
+}
+
+export function getAdminAnalytics() {
+  return get<AdminAnalytics>('/admin/analytics')
+}
+
+export function getPlatformSettings() {
+  return get<PlatformSettings>('/admin/settings')
+}
+
+export function updatePlatformSettings(payload: PlatformSettings) {
+  return patch<PlatformSettings>('/admin/settings', payload)
 }
 
 export function listNotifications() {

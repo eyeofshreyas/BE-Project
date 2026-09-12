@@ -24,7 +24,9 @@ type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'reports' | 'anal
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Super Admin', 2: 'Lawyer', 3: 'Client' }
 
-const NOTIF_COLORS: Record<string, string> = { Hearing: C.warning, Payment: C.success, Document: C.primary }
+const NOTIF_COLORS: Record<string, string> = { hearing: C.warning, invoice_reminder: C.success, client_request: C.primary }
+
+const TODAY = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
 function initialsOf(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
@@ -59,7 +61,7 @@ export default function AdminConsolePage() {
   const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [profile] = useState<UserProfile | null>(loadProfile)
+  const [profile, setProfile] = useState<UserProfile | null>(loadProfile)
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
   const navigate = useNavigate()
 
@@ -75,6 +77,11 @@ export default function AdminConsolePage() {
         .catch(() => {})
     }
     goTo('dashboard')
+  }
+
+  function saveProfile(updated: UserProfile) {
+    setProfile(updated)
+    localStorage.setItem('lexflow_profile', JSON.stringify(updated))
   }
 
   function logout() {
@@ -145,7 +152,7 @@ export default function AdminConsolePage() {
             <input placeholder="Search users, lawyers, clients, cases, documents..." className={styles.searchInput} />
           </div>
           <div className={styles.topbarRight}>
-            <div className={styles.todayLabel}>Friday, August 7, 2026</div>
+            <div className={styles.todayLabel}>{TODAY}</div>
             <div style={{ position: 'relative' }}>
               <div className={styles.bellBtn} style={{ background: notifOpen ? '#E6E0CE' : 'transparent' }} onClick={(e) => { e.stopPropagation(); setNotifOpen((v) => !v); setProfileOpen(false) }}>
                 <Icon name="bell" size={19} color="#575145" />
@@ -157,7 +164,7 @@ export default function AdminConsolePage() {
                   {notifications.length === 0 && <div style={{ padding: '10px 4px', fontSize: 12.5, color: '#8C857A' }}>No notifications.</div>}
                   {notifications.map((n) => (
                     <div key={n.id} className={styles.notifDropdownRow} onClick={() => openNotification(n)}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 5, flexShrink: 0, background: n.is_read ? '#CFC6B0' : (NOTIF_COLORS[n.notification_type] ?? C.primary) }} />
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 5, flexShrink: 0, background: n.is_read ? '#CFC6B0' : (NOTIF_COLORS[n.notification_type.toLowerCase()] ?? C.primary) }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, color: '#1A1A17', lineHeight: 1.4 }}>{n.title ?? n.message}</div>
                         <div style={{ fontSize: 11, color: '#8C857A', marginTop: 2 }}>{timeAgo(n.created_at)}</div>
@@ -184,13 +191,13 @@ export default function AdminConsolePage() {
         </div>
 
         <div className={styles.content} onClick={closeMenus}>
-          {activePage === 'dashboard' && <DashboardView quickActions={quickActions} />}
+          {activePage === 'dashboard' && <DashboardView quickActions={quickActions} notifications={notifications} adminName={profile?.full_name ?? null} />}
           {activePage === 'users' && <UsersView />}
           {activePage === 'cases' && <CasesView />}
           {activePage === 'documents' && <DocumentsView />}
           {activePage === 'reports' && <ReportsView />}
           {activePage === 'analytics' && <AnalyticsView />}
-          {activePage === 'settings' && <SettingsView onSave={() => showToast('Settings saved.')} />}
+          {activePage === 'settings' && <SettingsView profile={profile} onSave={showToast} onProfileChange={saveProfile} />}
         </div>
       </div>
 

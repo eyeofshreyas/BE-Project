@@ -1,10 +1,11 @@
-"""Admin-only controllers for managing users (list, activate/deactivate). Gated by
-require_roles(ADMIN) -- see docs/BACKEND_ARCHITECTURE.md's require_roles-only section."""
+"""Controllers for users: the admin-only roster (list, activate/deactivate), gated by
+require_roles(ADMIN) -- see docs/BACKEND_ARCHITECTURE.md's require_roles-only section --
+plus the self-service profile edit any signed-in user may make to their own row."""
 
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, require_roles
-from app.models.users import UserSummary, StatusUpdate
+from app.middleware.auth import ADMIN, get_current_profile, require_roles
+from app.models.users import UserSummary, StatusUpdate, ProfileUpdate
 
 USERS_SELECT = "user_id,full_name,email,phone,is_active,created_at,roles(role_name)"
 
@@ -39,4 +40,13 @@ def set_user_status(user_id: int, data: StatusUpdate, profile: dict = Depends(re
     if not rows:
         raise HTTPException(status_code=404, detail="User not found")
     result = supabase.table("users").select(USERS_SELECT).eq("user_id", user_id).execute().data
+    return _to_user_summary(result[0])
+
+
+def update_own_profile(data: ProfileUpdate, profile: dict = Depends(get_current_profile)):
+    """Update the caller's own name/phone. Email is deliberately not editable here: it's the
+    only link between a `users` row and its Supabase Auth account (see auth.get_current_profile),
+    so changing it on one side alone locks the account out. Calls: `_to_user_summary()`."""
+    supabase.table("users").update(data.model_dump()).eq("user_id", profile["user_id"]).execute()
+    result = supabase.table("users").select(USERS_SELECT).eq("user_id", profile["user_id"]).execute().data
     return _to_user_summary(result[0])

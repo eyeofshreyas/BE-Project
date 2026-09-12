@@ -81,6 +81,9 @@ All calls go through named functions in `api/client.ts`; each wraps a
 | `LoginPage` | `login`, `forgotPassword` | `POST /login`, `POST /forgot-password` |
 | `SignUpPage` | `signup` | `POST /signup` |
 | `AdminConsolePage` | `listNotifications`, `markNotificationRead` | `GET /notifications`, `PATCH /notifications/:id/read` |
+| `admin/views/DashboardView` | `getAdminStats`, `listAdminActivity` | `GET /admin/stats`, `GET /admin/activity` |
+| `admin/views/AnalyticsView` | `getAdminAnalytics` | `GET /admin/analytics` |
+| `admin/views/SettingsView` | `getPlatformSettings`, `updatePlatformSettings`, `updateOwnProfile`, `forgotPassword` | `GET`/`PATCH /admin/settings`, `PATCH /users/me`, `POST /forgot-password` |
 | `admin/views/UsersView` | `listUsers`, `setUserStatus` | `GET /users`, `PATCH /users/:id/status` |
 | `admin/views/CasesView` | `listCases` | `GET /cases` |
 | `admin/views/DocumentsView` | `listDocuments`, `getDocumentSummary` | `GET /documents`, `GET /documents/:id/summary` |

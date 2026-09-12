@@ -443,3 +443,46 @@ export interface ConversationDetail {
   other_party_role: 'lawyer' | 'client'
   messages: MessageSummary[]
 }
+
+export interface AdminStats {
+  total_users: number
+  active_lawyers: number
+  registered_clients: number
+  active_cases: number
+  documents_uploaded: number
+  ai_summaries: number
+  revenue_this_month: number
+  pending_hearings: number
+}
+
+export interface ActivityEvent {
+  id: number
+  event_type: string
+  event_title: string
+  event_description: string | null
+  case_number: string | null
+  actor: string | null
+  created_at: string
+}
+
+/** One labelled bucket in an admin chart (a status slice, a month, a week). */
+export interface LabelCount {
+  label: string
+  count: number
+}
+
+export interface AdminAnalytics {
+  total_cases: number
+  case_status: LabelCount[]
+  case_growth: LabelCount[]
+  ai_usage: LabelCount[]
+  documents: { total: number; summarized: number; awaiting_summary: number; deleted: number }
+  storage: { used_bytes: number; quota_bytes: number }
+}
+
+export interface PlatformSettings {
+  maintenance_mode: boolean
+  new_signup_alerts: boolean
+  weekly_reports: boolean
+  auto_backup: boolean
+}

@@ -1,7 +1,11 @@
-/** Admin console "Settings" tab: tabbed profile/security/platform/appearance/about panels backed entirely by local state (no API persistence -- "Save" just calls `onSave`). */
-import { useState } from 'react'
+/** Admin console "Settings" tab: profile (`updateOwnProfile()`), security (password reset
+ * via `forgotPassword()`), platform toggles (`getPlatformSettings()`/`updatePlatformSettings()`),
+ * appearance (stored per-browser), and a static about panel. */
+import { useEffect, useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C } from '../../../components/theme'
+import { forgotPassword, getPlatformSettings, updateOwnProfile, updatePlatformSettings } from '../../../api/client'
+import type { PlatformSettings, UserProfile } from '../../../types/api'
 import styles from '../../../components/AppShell.module.css'
 
 const MENU: { key: string; label: string; icon: IconName }[] = [
@@ -12,6 +16,9 @@ const MENU: { key: string; label: string; icon: IconName }[] = [
   { key: 'about', label: 'About', icon: 'info' },
 ]
 
+const THEME_KEY = 'lexflow_theme'
+type Theme = 'Light' | 'Dark' | 'System'
+
 /** Small controlled on/off switch (sliding dot) used throughout this view's toggle rows. */
 function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
   return (
@@ -21,18 +28,60 @@ function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
   )
 }
 
-/** Left-nav-switched settings panels, all driven by local `useState` (no backend calls); "Save Changes" invokes `onSave` (parent shows a toast). */
-export default function SettingsView({ onSave }: { onSave: () => void }) {
+/**
+ * Left-nav-switched settings panels. Profile fields seed from the cached
+ * `lexflow_profile`; platform toggles load from `/admin/settings`. "Save Changes"
+ * writes both back and reports the outcome through `onSave`, which the parent toasts.
+ */
+export default function SettingsView({ profile, onSave, onProfileChange }: { profile: UserProfile | null; onSave: (message: string) => void; onProfileChange: (profile: UserProfile) => void }) {
   const [tab, setTab] = useState('profile')
-  const [fullName, setFullName] = useState('Priya Nair')
-  const [email, setEmail] = useState('admin@lexflow.in')
-  const [phone, setPhone] = useState('+91 98200 11223')
-  const [twoFA, setTwoFA] = useState(true)
-  const [maintenanceMode, setMaintenanceMode] = useState(false)
-  const [newSignupAlerts, setNewSignupAlerts] = useState(true)
-  const [weeklyReports, setWeeklyReports] = useState(true)
-  const [autoBackup, setAutoBackup] = useState(true)
-  const [theme, setTheme] = useState<'Light' | 'Dark' | 'System'>('Light')
+  const [fullName, setFullName] = useState(profile?.full_name ?? '')
+  const [phone, setPhone] = useState(profile?.phone ?? '')
+  const [settings, setSettings] = useState<PlatformSettings | null>(null)
+  const [saving, setSaving] = useState(false)
+  // ponytail: the theme picker is per-browser only -- nothing renders a dark palette yet,
+  // so there's no point round-tripping it to the server until there is.
+  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem(THEME_KEY) as Theme | null) ?? 'Light')
+
+  useEffect(() => {
+    getPlatformSettings().then(setSettings).catch((e: Error) => onSave(e.message))
+  }, [])
+
+  function toggle(key: keyof PlatformSettings) {
+    setSettings((prev) => (prev ? { ...prev, [key]: !prev[key] } : prev))
+  }
+
+  function reset() {
+    setFullName(profile?.full_name ?? '')
+    setPhone(profile?.phone ?? '')
+    setTheme((localStorage.getItem(THEME_KEY) as Theme | null) ?? 'Light')
+    getPlatformSettings().then(setSettings).catch((e: Error) => onSave(e.message))
+  }
+
+  async function save() {
+    setSaving(true)
+    try {
+      const updated = await updateOwnProfile({ full_name: fullName.trim(), phone: phone.trim() })
+      if (profile) onProfileChange({ ...profile, full_name: updated.full_name, phone: updated.phone })
+      if (settings) await updatePlatformSettings(settings)
+      localStorage.setItem(THEME_KEY, theme)
+      onSave('Settings saved.')
+    } catch (e) {
+      onSave((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function sendPasswordReset() {
+    if (!profile) return
+    try {
+      await forgotPassword(profile.email)
+      onSave(`Password reset link sent to ${profile.email}.`)
+    } catch (e) {
+      onSave((e as Error).message)
+    }
+  }
 
   const cardStyle = { background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 24, boxShadow: '0 1px 2px rgba(35, 48, 107,.04)', display: 'flex', flexDirection: 'column' as const, gap: 16 }
   const fieldLabel = { fontSize: 12.5, fontWeight: 600, color: '#575145', marginBottom: 7 }
@@ -43,9 +92,9 @@ export default function SettingsView({ onSave }: { onSave: () => void }) {
   const rowTitle = { fontSize: 13.5, fontWeight: 600, color: C.text }
   const rowDesc = { fontSize: 12, color: C.muted, marginTop: 2 }
   const btnGhost = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 3, cursor: 'pointer', background: '#FCFAF4', color: C.text, border: `1px solid ${C.border}` }
-  const btnPrimary = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 3, cursor: 'pointer', background: C.primary, color: '#FCFAF4', boxShadow: '0 4px 12px rgba(35, 48, 107,.28)' }
+  const btnPrimary = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 3, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1, background: C.primary, color: '#FCFAF4', boxShadow: '0 4px 12px rgba(35, 48, 107,.28)' }
 
-  const adminInitials = fullName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+  const adminInitials = (fullName || '—').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
     <>
@@ -76,7 +125,12 @@ export default function SettingsView({ onSave }: { onSave: () => void }) {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div><div style={fieldLabel}>Full Name</div><div style={inputWrap}><Icon name="user" size={16} color={C.muted} /><input value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} /></div></div>
-                <div><div style={fieldLabel}>Email Address</div><div style={inputWrap}><Icon name="mail" size={16} color={C.muted} /><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} /></div></div>
+                <div>
+                  <div style={fieldLabel}>Email Address</div>
+                  {/* Read-only: email is the only link between a users row and its Supabase Auth
+                      account, so editing it here alone would lock the admin out. */}
+                  <div style={{ ...inputWrap, background: '#EFEBE0' }}><Icon name="mail" size={16} color={C.muted} /><input value={profile?.email ?? ''} readOnly style={{ ...inputStyle, color: C.muted }} /></div>
+                </div>
               </div>
               <div><div style={fieldLabel}>Phone Number</div><div style={inputWrap}><Icon name="phone" size={16} color={C.muted} /><input value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} /></div></div>
             </div>
@@ -86,8 +140,8 @@ export default function SettingsView({ onSave }: { onSave: () => void }) {
             <div style={cardStyle}>
               <div className={styles.cardTitle}>Security</div>
               <div style={rowLastStyle}>
-                <div><div style={rowTitle}>Two-Factor Authentication</div><div style={rowDesc}>Require a verification code at sign-in.</div></div>
-                <Toggle value={twoFA} onChange={() => setTwoFA((v) => !v)} />
+                <div><div style={rowTitle}>Password</div><div style={rowDesc}>Email a reset link to {profile?.email ?? 'your account'}.</div></div>
+                <div style={btnGhost} onClick={sendPasswordReset}>Send reset link</div>
               </div>
             </div>
           )}
@@ -95,10 +149,13 @@ export default function SettingsView({ onSave }: { onSave: () => void }) {
           {tab === 'platform' && (
             <div style={cardStyle}>
               <div className={styles.cardTitle}>Platform Configuration</div>
-              <div style={rowStyle}><div><div style={rowTitle}>Maintenance Mode</div><div style={rowDesc}>Temporarily block user access during upkeep.</div></div><Toggle value={maintenanceMode} onChange={() => setMaintenanceMode((v) => !v)} /></div>
-              <div style={rowStyle}><div><div style={rowTitle}>New Signup Alerts</div><div style={rowDesc}>Notify admins when a new user registers.</div></div><Toggle value={newSignupAlerts} onChange={() => setNewSignupAlerts((v) => !v)} /></div>
-              <div style={rowStyle}><div><div style={rowTitle}>Weekly Reports</div><div style={rowDesc}>Email a platform summary report every week.</div></div><Toggle value={weeklyReports} onChange={() => setWeeklyReports((v) => !v)} /></div>
-              <div style={rowLastStyle}><div><div style={rowTitle}>Automatic Backups</div><div style={rowDesc}>Back up platform data daily.</div></div><Toggle value={autoBackup} onChange={() => setAutoBackup((v) => !v)} /></div>
+              {!settings && <div style={{ fontSize: 13, color: C.muted }}>Loading…</div>}
+              {settings && <>
+                <div style={rowStyle}><div><div style={rowTitle}>Maintenance Mode</div><div style={rowDesc}>Temporarily block user access during upkeep.</div></div><Toggle value={settings.maintenance_mode} onChange={() => toggle('maintenance_mode')} /></div>
+                <div style={rowStyle}><div><div style={rowTitle}>New Signup Alerts</div><div style={rowDesc}>Notify admins when a new user registers.</div></div><Toggle value={settings.new_signup_alerts} onChange={() => toggle('new_signup_alerts')} /></div>
+                <div style={rowStyle}><div><div style={rowTitle}>Weekly Reports</div><div style={rowDesc}>Email a platform summary report every week.</div></div><Toggle value={settings.weekly_reports} onChange={() => toggle('weekly_reports')} /></div>
+                <div style={rowLastStyle}><div><div style={rowTitle}>Automatic Backups</div><div style={rowDesc}>Back up platform data daily.</div></div><Toggle value={settings.auto_backup} onChange={() => toggle('auto_backup')} /></div>
+              </>}
             </div>
           )}
 
@@ -112,6 +169,7 @@ export default function SettingsView({ onSave }: { onSave: () => void }) {
                     <div key={t} style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 600, padding: 11, borderRadius: 3, cursor: 'pointer', background: theme === t ? C.primary : 'transparent', color: theme === t ? '#FCFAF4' : C.text }} onClick={() => setTheme(t)}>{t}</div>
                   ))}
                 </div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Saved in this browser only.</div>
               </div>
             </div>
           )}
@@ -124,8 +182,8 @@ export default function SettingsView({ onSave }: { onSave: () => void }) {
           )}
 
           <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: '16px 20px', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <div style={btnGhost}>Cancel</div>
-            <div style={btnPrimary} onClick={onSave}>Save Changes</div>
+            <div style={btnGhost} onClick={reset}>Cancel</div>
+            <div style={btnPrimary} onClick={() => { if (!saving) save() }}>{saving ? 'Saving…' : 'Save Changes'}</div>
           </div>
         </div>
       </div>
