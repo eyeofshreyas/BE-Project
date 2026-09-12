@@ -137,9 +137,16 @@ export default function UsersView() {
   }
 
   function toggleStatus(user: UserSummary) {
+    setBusy(true)
     setUserStatus(user.id, !user.is_active)
-      .then((updated) => setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u))))
+      .then((updated) => {
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
+        // Keep the open panel in step -- suspending from inside it must flip its own
+        // status pill and button, not just the row behind it.
+        setPanel((prev) => (prev && prev.user.id === updated.id ? { ...prev, user: updated } : prev))
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to update status.'))
+      .finally(() => setBusy(false))
   }
 
   return (
@@ -263,7 +270,7 @@ export default function UsersView() {
 
                 {panel.mode === 'delete' && (
                   <div style={{ background: '#FDEDEC', border: `1px solid ${C.danger}`, borderRadius: 3, padding: '12px 14px', fontSize: 12.5, color: '#7A1F22', lineHeight: 1.5 }}>
-                    This permanently deletes the account and everything listed above. It cannot be undone. Suspending the account instead keeps all of it and blocks sign-in.
+                    This permanently deletes the account and everything listed above. It cannot be undone. Suspend account keeps all of it and just blocks sign-in.
                   </div>
                 )}
               </>
@@ -271,6 +278,14 @@ export default function UsersView() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <div style={BTN_GHOST} onClick={closePanel}>{panel.mode === 'view' ? 'Close' : 'Cancel'}</div>
+              {panel.mode !== 'edit' && (
+                <div
+                  style={{ ...BTN_GHOST, color: panel.user.is_active ? C.warning : C.success, borderColor: panel.user.is_active ? C.warning : C.success, opacity: busy ? 0.6 : 1 }}
+                  onClick={() => { if (!busy) toggleStatus(panel.user) }}
+                >
+                  {panel.user.is_active ? 'Suspend account' : 'Reactivate account'}
+                </div>
+              )}
               {panel.mode === 'edit' && <div style={{ ...BTN_PRIMARY, opacity: busy ? 0.6 : 1 }} onClick={() => { if (!busy) saveEdit() }}>{busy ? 'Saving…' : 'Save changes'}</div>}
               {panel.mode === 'delete' && <div style={{ ...BTN_PRIMARY, background: C.danger, boxShadow: 'none', opacity: busy || !impact ? 0.6 : 1 }} onClick={() => { if (!busy && impact) confirmDelete() }}>{busy ? 'Deleting…' : 'Delete permanently'}</div>}
             </div>
