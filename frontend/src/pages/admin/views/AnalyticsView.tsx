@@ -1,11 +1,24 @@
 /** Admin console "Analytics" tab: case-status donut, monthly filing growth, AI-summary
- * usage trend, document insight cards and storage usage -- all from `getAdminAnalytics()`. */
+ * usage trend, document insight cards, storage usage and AI system status -- all but the
+ * last from `getAdminAnalytics()`. There's no backend concept of service health yet, so
+ * `SERVICES` is a static mock, same as the Reports tab's report library. */
 import { useEffect, useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
-import { C } from '../../../components/theme'
+import { C, pillStyle } from '../../../components/theme'
 import { getAdminAnalytics } from '../../../api/client'
 import type { AdminAnalytics } from '../../../types/api'
 import styles from '../../../components/AppShell.module.css'
+
+type ServiceStatus = 'Operational' | 'Warning' | 'Down'
+const SERVICES: { name: string; icon: IconName; uptime: string; status: ServiceStatus }[] = [
+  { name: 'Translation Service', icon: 'globe', uptime: '97.20%', status: 'Warning' },
+  { name: 'Storage', icon: 'hard-drive', uptime: '98.40%', status: 'Warning' },
+  { name: 'AI Summarization Engine', icon: 'sparkles', uptime: '99.95%', status: 'Operational' },
+  { name: 'Document OCR', icon: 'file-text', uptime: '99.80%', status: 'Operational' },
+  { name: 'Search Index', icon: 'search', uptime: '99.99%', status: 'Operational' },
+  { name: 'Notification Service', icon: 'bell', uptime: '99.90%', status: 'Operational' },
+]
+const SERVICE_STATUS_COLOR: Record<ServiceStatus, string> = { Operational: C.success, Warning: C.warning, Down: C.danger }
 
 const STATUS_COLORS: Record<string, string> = {
   open: C.primary,
@@ -79,6 +92,8 @@ export default function AnalyticsView() {
   ]
 
   const storagePct = Math.min((data.storage.used_bytes / data.storage.quota_bytes) * 100, 100)
+  const degraded = SERVICES.filter((s) => s.status !== 'Operational').length
+  const healthy = SERVICES.length - degraded
 
   return (
     <>
@@ -159,6 +174,30 @@ export default function AnalyticsView() {
             <div style={{ fontSize: 12.5, color: '#6E6759' }}>{formatBytes(data.storage.used_bytes)} of {formatBytes(data.storage.quota_bytes)} used</div>
           </div>
           <div style={{ height: 10, background: '#E6E0CE', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${storagePct}%`, height: '100%', background: 'linear-gradient(90deg,#23306B,#CFC6B0)', borderRadius: 3 }} /></div>
+        </div>
+      </div>
+
+      <div>
+        <div className={styles.pageHeadRow} style={{ marginBottom: 14 }}>
+          <div className={styles.sectionTitle}>AI System Status</div>
+          <div style={{ fontSize: 12, color: C.muted }}>All services checked 2 min ago</div>
+        </div>
+        <div className={styles.card} style={{ padding: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 22px', borderBottom: '1px solid #F1EDE0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: '#33302A' }}>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: degraded > 0 ? C.warning : C.success, flexShrink: 0 }} />
+              <span>{healthy} of {SERVICES.length} services healthy{degraded > 0 ? ` · ${degraded} degraded` : ''}</span>
+            </div>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: C.primary, cursor: 'pointer' }}>View all services</span>
+          </div>
+          {SERVICES.map((s, i) => (
+            <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 22px', borderBottom: i === SERVICES.length - 1 ? 'none' : '1px solid #F1EDE0' }}>
+              <div style={{ width: 34, height: 34, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={s.icon} size={16} color={C.primaryDark} /></div>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: '#1A1A17' }}>{s.name}</div>
+              <div style={{ fontSize: 12.5, color: '#6E6759' }}>Uptime <span style={{ fontWeight: 700, color: '#1A1A17' }}>{s.uptime}</span></div>
+              <span className={styles.pill} style={pillStyle(SERVICE_STATUS_COLOR[s.status])}>{s.status}</span>
+            </div>
+          ))}
         </div>
       </div>
     </>
