@@ -1,46 +1,116 @@
-/** Admin console "Reports" tab: report-library list with search/category filters and a
- * stat summary row. No API calls; all data and filter controls are static mock. */
+/** Admin console "Reports" tab: report-library list with search/category/date/type/status
+ * filters, CSV/PDF export, on-demand report generation, and a per-report printable view.
+ * No backend -- this tab has no report dataset of its own, so "generating" a report just
+ * adds a row to local state and PDF export is a print-dialog window, same trick as
+ * `BillingPage`'s `downloadInvoice`. */
 import { useMemo, useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
+import { formatDate } from '../../../utils/date'
+import { downloadCsv } from '../../../utils/files'
 import styles from '../../../components/AppShell.module.css'
 
-const REPORTS: { label: string; desc: string; icon: IconName; category: string; lastGenerated: string }[] = [
-  { label: 'Case Reports', desc: 'Filing trends, case outcomes and litigation activity', icon: 'scale', category: 'Cases', lastGenerated: '07 Sep 2026' },
-  { label: 'Revenue Reports', desc: 'Monthly billing, collections and payment trends', icon: 'banknote', category: 'Revenue', lastGenerated: '05 Sep 2026' },
-  { label: 'Lawyer Performance', desc: 'Caseload, resolution speed and lawyer activity', icon: 'briefcase', category: 'Lawyers', lastGenerated: '04 Sep 2026' },
-  { label: 'Client Statistics', desc: 'Client growth, engagement and activity', icon: 'users', category: 'Clients', lastGenerated: '03 Sep 2026' },
-  { label: 'AI Usage Report', desc: 'AI summaries, searches, translations and document processing', icon: 'sparkles', category: 'AI', lastGenerated: '02 Sep 2026' },
-  { label: 'Audit & Compliance', desc: 'User activity, access logs and system events', icon: 'shield', category: 'Compliance', lastGenerated: '01 Sep 2026' },
-]
+type ReportType = 'Scheduled' | 'One-off'
+type ReportStatus = 'Ready' | 'Pending'
+type Report = { id: string; label: string; desc: string; icon: IconName; category: string; type: ReportType; status: ReportStatus; generated: Date }
 
 const CATEGORY_CHIPS = ['All Reports', 'Cases', 'Revenue', 'Lawyers', 'Clients', 'AI', 'Compliance']
+const CATEGORY_ICON: Record<string, IconName> = { Cases: 'scale', Revenue: 'banknote', Lawyers: 'briefcase', Clients: 'users', AI: 'sparkles', Compliance: 'shield' }
+const DATE_RANGES = ['This Week', 'This Month', 'This Year'] as const
+const TYPE_FILTERS = ['All Reports', 'Scheduled', 'One-off'] as const
+const STATUS_FILTERS = ['All', 'Ready', 'Pending'] as const
 
-const STATS: { label: string; value: string; caption: string; badge?: { text: string; color: string } }[] = [
-  { label: 'Reports Generated', value: '128', caption: 'Total active dossiers', badge: { text: '+12% this month', color: C.success } },
-  { label: 'Reports This Month', value: '24', caption: 'Platform volume pace', badge: { text: '+8% from last month', color: C.success } },
-  { label: 'Scheduled Reports', value: '8', caption: 'Automated cron cycles', badge: { text: '2 due this week', color: C.warning } },
-]
+function seedReports(): Report[] {
+  const day = (offset: number) => { const d = new Date(); d.setDate(d.getDate() - offset); return d }
+  return [
+    { id: 'seed-1', label: 'Case Reports', desc: 'Filing trends, case outcomes and litigation activity', icon: 'scale', category: 'Cases', type: 'Scheduled', status: 'Ready', generated: day(5) },
+    { id: 'seed-2', label: 'Revenue Reports', desc: 'Monthly billing, collections and payment trends', icon: 'banknote', category: 'Revenue', type: 'Scheduled', status: 'Ready', generated: day(7) },
+    { id: 'seed-3', label: 'Lawyer Performance', desc: 'Caseload, resolution speed and lawyer activity', icon: 'briefcase', category: 'Lawyers', type: 'One-off', status: 'Ready', generated: day(8) },
+    { id: 'seed-4', label: 'Client Statistics', desc: 'Client growth, engagement and activity', icon: 'users', category: 'Clients', type: 'Scheduled', status: 'Pending', generated: day(9) },
+    { id: 'seed-5', label: 'AI Usage Report', desc: 'AI summaries, searches, translations and document processing', icon: 'sparkles', category: 'AI', type: 'One-off', status: 'Ready', generated: day(10) },
+    { id: 'seed-6', label: 'Audit & Compliance', desc: 'User activity, access logs and system events', icon: 'shield', category: 'Compliance', type: 'Scheduled', status: 'Pending', generated: day(11) },
+  ]
+}
+
+function inDateRange(d: Date, range: string, now: Date) {
+  if (range === 'This Week') { const start = new Date(now); start.setDate(now.getDate() - now.getDay()); start.setHours(0, 0, 0, 0); return d >= start && d <= now }
+  if (range === 'This Month') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  return d.getFullYear() === now.getFullYear()
+}
+
+/** Opens a print-ready tab (save-as-PDF via the browser dialog) listing the given reports. */
+function printReports(title: string, rows: Report[]) {
+  const win = window.open('', '_blank')
+  if (!win) return
+  win.document.write(`<!doctype html><html><head><title>${title}</title>
+    <style>
+      body{font-family:'Spectral',serif;color:#1A1A17;padding:48px;max-width:720px;margin:0 auto}
+      .muted{color:#6E6759;font-size:12.5px}
+      table{width:100%;border-collapse:collapse;margin-top:24px}
+      th,td{padding:8px 10px;font-size:13px;border-top:1px solid #CFC6B0;text-align:left}
+    </style></head>
+    <body>
+      <div style="font-size:20px;font-weight:700">LexFlow</div>
+      <div class="muted" style="margin-top:4px">${title} &middot; Exported ${formatDate(new Date().toISOString())}</div>
+      <table>
+        <tr><th>Report</th><th>Category</th><th>Type</th><th>Status</th><th>Last Generated</th></tr>
+        ${rows.map((r) => `<tr><td>${r.label}<div class="muted">${r.desc}</div></td><td>${r.category}</td><td>${r.type}</td><td>${r.status}</td><td>${formatDate(r.generated.toISOString())}</td></tr>`).join('')}
+      </table>
+    </body></html>`)
+  win.document.close()
+  win.focus()
+  win.print()
+}
 
 const FILTER_LABEL = { fontSize: 9.5, fontWeight: 700, color: '#6E6759', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase' as const, letterSpacing: '.12em', marginBottom: 6 }
 const SELECT_STYLE = { background: '#F6F2E9', border: `1.5px solid ${C.border}`, borderRadius: 3, padding: '9px 12px', fontSize: 13, color: C.text, fontFamily: "'Public Sans',sans-serif", outline: 'none' }
 const BTN_GHOST = { fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 3, cursor: 'pointer', background: '#FCFAF4', color: C.text, border: `1px solid ${C.border}` }
 const BTN_PRIMARY = { fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 3, cursor: 'pointer', background: C.primary, color: '#FCFAF4', boxShadow: '0 4px 12px rgba(35, 48, 107,.28)' }
 
-/** Renders the stat summary row and the filterable `REPORTS` list. Search and the category
- * chips filter in memory; the Date/Type/Status selects are cosmetic (mirroring the mock --
- * there's no per-report dataset here to actually range/type-filter). */
-export default function ReportsView() {
+/** `onGenerate`, if given, gets a short message to toast (e.g. "Report generated.") -- optional
+ * because standalone renders of this view (tests, storybook-ish use) shouldn't need a toast host. */
+export default function ReportsView({ onGenerate }: { onGenerate?: (msg: string) => void } = {}) {
+  const [reports, setReports] = useState<Report[]>(seedReports)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All Reports')
+  const [pending, setPending] = useState({ date: 'This Month' as (typeof DATE_RANGES)[number], type: 'All Reports' as (typeof TYPE_FILTERS)[number], status: 'All' as (typeof STATUS_FILTERS)[number] })
+  const [active, setActive] = useState(pending)
   const [exportOpen, setExportOpen] = useState(false)
-  const lastUpdated = useMemo(() => new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), [])
+  const now = useMemo(() => new Date(), [])
+  const lastUpdated = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 
-  const visible = REPORTS.filter((r) => {
+  const visible = reports.filter((r) => {
     if (category !== 'All Reports' && r.category !== category) return false
     if (search && !r.label.toLowerCase().includes(search.toLowerCase()) && !r.desc.toLowerCase().includes(search.toLowerCase())) return false
+    if (active.type !== 'All Reports' && r.type !== active.type) return false
+    if (active.status !== 'All' && r.status !== active.status) return false
+    if (!inDateRange(r.generated, active.date, now)) return false
     return true
   })
+
+  function resetFilters() {
+    setSearch('')
+    setCategory('All Reports')
+    const defaults = { date: 'This Month' as const, type: 'All Reports' as const, status: 'All' as const }
+    setPending(defaults)
+    setActive(defaults)
+  }
+
+  function generateReport() {
+    const cat = category === 'All Reports' ? 'Cases' : category
+    const report: Report = {
+      id: crypto.randomUUID(),
+      label: `${cat} Report — ${now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`,
+      desc: `On-demand summary of ${cat.toLowerCase()} activity, generated just now.`,
+      icon: CATEGORY_ICON[cat] ?? 'file-text',
+      category: cat,
+      type: 'One-off',
+      status: 'Ready',
+      generated: new Date(),
+    }
+    setReports((prev) => [report, ...prev])
+    onGenerate?.('Report generated.')
+  }
 
   return (
     <>
@@ -57,13 +127,12 @@ export default function ReportsView() {
             </div>
             {exportOpen && (
               <div style={{ position: 'absolute', top: '110%', right: 0, background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, boxShadow: '0 8px 24px rgba(35,48,107,.15)', zIndex: 10, minWidth: 150 }}>
-                {['Export PDF', 'Export Excel'].map((opt) => (
-                  <div key={opt} style={{ padding: '10px 14px', fontSize: 13, color: '#33302A', cursor: 'pointer' }} onClick={() => setExportOpen(false)}>{opt}</div>
-                ))}
+                <div style={{ padding: '10px 14px', fontSize: 13, color: '#33302A', cursor: 'pointer' }} onClick={() => { setExportOpen(false); printReports('Report Library', visible) }}>Export PDF</div>
+                <div style={{ padding: '10px 14px', fontSize: 13, color: '#33302A', cursor: 'pointer' }} onClick={() => { setExportOpen(false); downloadCsv('lexflow-reports', ['Report', 'Description', 'Category', 'Type', 'Status', 'Last Generated'], visible.map((r) => [r.label, r.desc, r.category, r.type, r.status, formatDate(r.generated.toISOString())])) }}>Export Excel</div>
               </div>
             )}
           </div>
-          <div style={{ ...BTN_PRIMARY, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ ...BTN_PRIMARY, display: 'flex', alignItems: 'center', gap: 8 }} onClick={generateReport}>
             <Icon name="plus" size={15} color="#FCFAF4" /><span>Generate Report</span>
           </div>
         </div>
@@ -76,28 +145,41 @@ export default function ReportsView() {
             <input placeholder="Search reports..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13.5, flex: 1, fontFamily: "'Public Sans',sans-serif", color: C.text }} />
           </div>
         </div>
-        <div><div style={FILTER_LABEL}>Date</div><select style={SELECT_STYLE}><option>This Month</option><option>This Week</option><option>This Year</option></select></div>
-        <div><div style={FILTER_LABEL}>Type</div><select style={SELECT_STYLE}><option>All Reports</option><option>Scheduled</option><option>One-off</option></select></div>
-        <div><div style={FILTER_LABEL}>Status</div><select style={SELECT_STYLE}><option>All</option><option>Ready</option><option>Pending</option></select></div>
-        <div style={BTN_PRIMARY}>Apply Filters</div>
-        <div style={BTN_GHOST} onClick={() => setSearch('')}>Reset</div>
+        <div><div style={FILTER_LABEL}>Date</div><select value={pending.date} onChange={(e) => setPending((p) => ({ ...p, date: e.target.value as typeof pending.date }))} style={SELECT_STYLE}>{DATE_RANGES.map((d) => <option key={d}>{d}</option>)}</select></div>
+        <div><div style={FILTER_LABEL}>Type</div><select value={pending.type} onChange={(e) => setPending((p) => ({ ...p, type: e.target.value as typeof pending.type }))} style={SELECT_STYLE}>{TYPE_FILTERS.map((t) => <option key={t}>{t}</option>)}</select></div>
+        <div><div style={FILTER_LABEL}>Status</div><select value={pending.status} onChange={(e) => setPending((p) => ({ ...p, status: e.target.value as typeof pending.status }))} style={SELECT_STYLE}>{STATUS_FILTERS.map((s) => <option key={s}>{s}</option>)}</select></div>
+        <div style={BTN_PRIMARY} onClick={() => setActive(pending)}>Apply Filters</div>
+        <div style={BTN_GHOST} onClick={resetFilters}>Reset</div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
-        {STATS.map((s) => (
-          <div key={s.label} className={styles.card} style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={FILTER_LABEL}>{s.label}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ fontFamily: "'Spectral',serif", fontSize: 25, fontWeight: 700, color: '#1A1A17', lineHeight: 1 }}>{s.value}</div>
-              {s.badge && <span className={styles.pill} style={pillStyle(s.badge.color)}>{s.badge.text}</span>}
-            </div>
-            <div style={{ fontSize: 12, color: '#6E6759' }}>{s.caption}</div>
+        <div className={styles.card} style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={FILTER_LABEL}>Reports Generated</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ fontFamily: "'Spectral',serif", fontSize: 25, fontWeight: 700, color: '#1A1A17', lineHeight: 1 }}>{reports.length}</div>
+            <span className={styles.pill} style={pillStyle(C.success)}>{reports.filter((r) => r.type === 'One-off').length} one-off</span>
           </div>
-        ))}
+          <div style={{ fontSize: 12, color: '#6E6759' }}>Total active dossiers</div>
+        </div>
+        <div className={styles.card} style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={FILTER_LABEL}>Reports This Month</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ fontFamily: "'Spectral',serif", fontSize: 25, fontWeight: 700, color: '#1A1A17', lineHeight: 1 }}>{reports.filter((r) => inDateRange(r.generated, 'This Month', now)).length}</div>
+          </div>
+          <div style={{ fontSize: 12, color: '#6E6759' }}>Platform volume pace</div>
+        </div>
+        <div className={styles.card} style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={FILTER_LABEL}>Scheduled Reports</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ fontFamily: "'Spectral',serif", fontSize: 25, fontWeight: 700, color: '#1A1A17', lineHeight: 1 }}>{reports.filter((r) => r.type === 'Scheduled').length}</div>
+            <span className={styles.pill} style={pillStyle(C.warning)}>{reports.filter((r) => r.type === 'Scheduled' && r.status === 'Pending').length} due this week</span>
+          </div>
+          <div style={{ fontSize: 12, color: '#6E6759' }}>Automated cron cycles</div>
+        </div>
         <div className={styles.card} style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={FILTER_LABEL}>Last Generated</div>
           <div style={{ fontFamily: "'Spectral',serif", fontSize: 25, fontWeight: 700, color: '#1A1A17', lineHeight: 1 }}>{lastUpdated} Today</div>
-          <div style={{ fontSize: 12, color: '#6E6759' }}>Case Dispositions Q3</div>
+          <div style={{ fontSize: 12, color: '#6E6759' }}>{reports[0]?.label ?? '—'}</div>
         </div>
       </div>
 
@@ -109,9 +191,9 @@ export default function ReportsView() {
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {CATEGORY_CHIPS.map((c) => {
-              const active = c === category
+              const chipActive = c === category
               return (
-                <div key={c} className={styles.chipBase} style={{ borderRadius: 999, padding: '8px 15px', background: active ? C.primary : '#F1EDE0', color: active ? '#FCFAF4' : '#575145' }} onClick={() => setCategory(c)}>
+                <div key={c} className={styles.chipBase} style={{ borderRadius: 999, padding: '8px 15px', background: chipActive ? C.primary : '#F1EDE0', color: chipActive ? '#FCFAF4' : '#575145' }} onClick={() => setCategory(c)}>
                   {c}
                 </div>
               )
@@ -122,14 +204,15 @@ export default function ReportsView() {
         <div className={styles.card} style={{ padding: 0 }}>
           {visible.length === 0 && <div style={{ padding: '24px 22px', fontSize: 13.5, color: C.muted }}>No reports match this filter.</div>}
           {visible.map((r, i) => (
-            <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '18px 22px', borderBottom: i === visible.length - 1 ? 'none' : `1px solid #F1EDE0` }}>
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '18px 22px', borderBottom: i === visible.length - 1 ? 'none' : `1px solid #F1EDE0` }}>
               <div style={{ width: 40, height: 40, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={r.icon} size={19} color={C.primaryDark} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A17' }}>{r.label}</div>
                 <div style={{ fontSize: 12, color: '#6E6759', marginTop: 2 }}>{r.desc}</div>
               </div>
-              <div style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }}>Last generated: {r.lastGenerated}</div>
-              <div style={{ ...BTN_GHOST, display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
+              <span className={styles.pill} style={pillStyle(r.status === 'Ready' ? C.success : C.warning)}>{r.status}</span>
+              <div style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }}>Last generated: {formatDate(r.generated.toISOString())}</div>
+              <div style={{ ...BTN_GHOST, display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }} onClick={() => printReports(r.label, [r])}>
                 <Icon name="file-text" size={14} color={C.primaryDark} /><span>View Report</span>
               </div>
             </div>
