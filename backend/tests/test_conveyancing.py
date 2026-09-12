@@ -84,3 +84,58 @@ if __name__ == "__main__":
     test_update_matter_rejects_matter_on_out_of_scope_case()
     test_next_matter_seq_skips_numbers_already_in_use()
     print("ok")
+
+
+# ponytail self-check for the appointment count -- a client whose only booked
+# appointment is the Sub-Registrar slot used to see "0 upcoming appointments",
+# because only `meetings` was counted.
+class _SummaryStub:
+    """Stands in for the supabase client across the several tables conveyancing_summary() reads."""
+
+    def __init__(self, matters, meetings, registrations):
+        self.matters, self.meetings, self.registrations = matters, meetings, registrations
+
+    def table(self, name):
+        chain = MagicMock()
+        if name == "conveyancing_matters":
+            chain.select.return_value.order.return_value.execute.return_value.data = self.matters
+            chain.select.return_value.in_.return_value.order.return_value.execute.return_value.data = self.matters
+        elif name == "meetings":
+            chain.select.return_value.in_.return_value.gte.return_value.execute.return_value.data = self.meetings
+        elif name == "property_registrations":
+            chain.select.return_value.in_.return_value.gte.return_value.not_.in_.return_value.execute.return_value.data = self.registrations
+        return chain
+
+
+def _matter(matter_id=20, case_id=15, status="Drafting"):
+    return {
+        "matter_id": matter_id, "case_id": case_id, "matter_number": "MAT-2026-104",
+        "registration_status": status, "transaction_type": "Purchase", "matter_type": "Off-the-Plan Purchase",
+        "properties": None, "conveyancing_parties": [], "cases": None,
+    }
+
+
+def _summary(matters, meetings, registrations):
+    from app.controllers.conveyancing import conveyancing_summary
+    with patch("app.middleware.auth.supabase", MagicMock()), \
+         patch("app.controllers.conveyancing.get_scoped_case_ids", return_value={15}), \
+         patch("app.controllers.conveyancing.supabase", _SummaryStub(matters, meetings, registrations)):
+        return conveyancing_summary({"role_id": 3, "user_id": 26})
+
+
+def test_a_booked_registration_slot_counts_as_an_upcoming_appointment():
+    result = _summary([_matter()], meetings=[], registrations=[{"registration_id": 6}])
+    assert result["stats"]["upcoming_appointments"] == 1
+
+
+def test_meetings_and_registration_slots_are_counted_together():
+    result = _summary([_matter()], meetings=[{"meeting_id": 1}], registrations=[{"registration_id": 6}])
+    assert result["stats"]["upcoming_appointments"] == 2
+
+
+def test_no_meetings_and_no_slots_is_zero():
+    assert _summary([_matter()], meetings=[], registrations=[])["stats"]["upcoming_appointments"] == 0
+
+
+def test_a_client_with_no_matters_queries_nothing():
+    assert _summary([], meetings=[], registrations=[])["stats"]["upcoming_appointments"] == 0

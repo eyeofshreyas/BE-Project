@@ -953,6 +953,29 @@ function MatterDetailModal({ matterId, canEdit = false, onClose }: { matterId: n
                 </div>
               </div>
 
+              {matter.registration && (
+                <div className={styles.panelCard}>
+                  <div className={styles.panelTitle}>Registration Appointment</div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {([
+                      ['Office', matter.registration.office_name ?? '—'],
+                      ['Date', matter.registration.registration_date ? formatDate(matter.registration.registration_date) : 'Not scheduled'],
+                      ['Status', matter.registration.registration_status ?? '—'],
+                      // only filled in once the deed is actually registered
+                      ...(matter.registration.registration_number ? [['Registration No.', matter.registration.registration_number]] : []),
+                      ...(matter.registration.deed_number ? [['Deed No.', matter.registration.deed_number]] : []),
+                      ...(matter.registration.registered_by ? [['Registered by', matter.registration.registered_by]] : []),
+                    ] as [string, string][]).map(([label, value]) => (
+                      <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderTop: '1px solid #F1EDE0', fontSize: 13.5 }}>
+                        <div style={{ color: MUTED, flexShrink: 0 }}>{label}</div>
+                        <div style={{ fontWeight: 700, color: '#1A1A17', textAlign: 'right' }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {matter.registration.remarks && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 10 }}>{matter.registration.remarks}</div>}
+                </div>
+              )}
+
               <div className={styles.panelCard}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
                   <div className={styles.panelTitle} style={{ marginBottom: 0 }}>Shared Documents</div>

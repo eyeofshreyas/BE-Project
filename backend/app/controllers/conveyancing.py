@@ -2,7 +2,7 @@
 detail, due-diligence updates, registration progress, and shared-document uploads."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import Depends, File, HTTPException, UploadFile
 from app.db.supabase_client import supabase
@@ -64,15 +64,30 @@ def conveyancing_summary(profile: dict = Depends(get_current_profile)):
     for r in rows:
         status_counts[r["registration_status"]] = status_counts.get(r["registration_status"], 0) + 1
 
-    case_ids = [r["case_id"] for r in rows if r.get("case_id") is not None]
+    # a separate name from the scoping `case_ids` above, which must not be clobbered
+    matter_case_ids = [r["case_id"] for r in rows if r.get("case_id") is not None]
+    matter_ids = [r["matter_id"] for r in rows]
     upcoming_appointments = 0
-    if case_ids:
+    if matter_case_ids:
         now_iso = datetime.now(timezone.utc).isoformat()
         upcoming_appointments = len(
             supabase.table("meetings")
             .select("meeting_id")
-            .in_("case_id", case_ids)
+            .in_("case_id", matter_case_ids)
             .gte("meeting_date", now_iso)
+            .execute()
+            .data
+        )
+    if matter_ids:
+        # The registration slot at the Sub-Registrar Office is the appointment a client
+        # actually attends, so it counts here alongside internal meetings -- otherwise a
+        # matter with a booked slot and no meeting reads as "0 upcoming appointments".
+        upcoming_appointments += len(
+            supabase.table("property_registrations")
+            .select("registration_id")
+            .in_("matter_id", matter_ids)
+            .gte("registration_date", date.today().isoformat())
+            .not_.in_("registration_status", list(COMPLETED_STATUSES))
             .execute()
             .data
         )
