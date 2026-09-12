@@ -1,9 +1,9 @@
 .page {
   width: 100%;
   min-width: 1024px;
-  background: #FCF9F3;
-  font-family: 'Inter', sans-serif;
-  color: #2A2118;
+  background: #F6F2E9;
+  font-family: 'Public Sans', sans-serif;
+  color: #1A1A17;
 }
 
 .nav {
@@ -11,8 +11,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 20px 64px;
-  background: #F8F3E8;
-  border-bottom: 1px solid #E7DCC6;
+  background: #F1EDE0;
+  border-bottom: 1px solid #CFC6B0;
   position: sticky;
   top: 0;
   z-index: 30;
@@ -38,7 +38,7 @@
 }
 
 .brandName {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
   font-weight: 700;
   font-size: 18px;
   letter-spacing: -.02em;
@@ -61,7 +61,7 @@
 }
 
 .navLink:hover {
-  color: #2A2118 !important;
+  color: #1A1A17 !important;
 }
 
 .navUnderline {
@@ -70,7 +70,7 @@
   bottom: 0;
   height: 2px;
   width: 100%;
-  background: #B08D3E;
+  background: #23306B;
   transform-origin: left center;
   transition: transform .5s cubic-bezier(.22, .61, .36, 1);
   pointer-events: none;
@@ -85,7 +85,7 @@
 .signInLink {
   font-size: 13.5px;
   font-weight: 500;
-  color: #6A5C42;
+  color: #575145;
   text-decoration: none;
 }
 
@@ -96,9 +96,9 @@
   font-size: 13.5px;
   font-weight: 600;
   padding: 10px 20px;
-  border-radius: 11px;
-  background: #2A2118;
-  color: #FFFFFF;
+  border-radius: 3px;
+  background: #23306B;
+  color: #FCFAF4;
   text-decoration: none;
 }
 
@@ -120,18 +120,19 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 11.5px;
+  font-size: 9.5px;
   font-weight: 700;
-  color: #B08D3E;
-  background: #EFE4CB;
+  color: #23306B;
+  background: #E6E0CE;
   padding: 7px 14px;
-  border-radius: 20px;
+  border-radius: 3px;
+  font-family: 'IBM Plex Mono', monospace;
   text-transform: uppercase;
-  letter-spacing: .03em;
+  letter-spacing: .13em;
 }
 
 .heroTitle {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Spectral', serif;
   font-size: 46px;
   font-weight: 700;
   line-height: 1.14;
@@ -142,7 +143,7 @@
 .heroBody {
   font-size: 15px;
   line-height: 1.65;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 20px;
   max-width: 460px;
 }
@@ -160,10 +161,10 @@
   font-size: 13.5px;
   font-weight: 600;
   padding: 13px 24px;
-  border-radius: 11px;
-  background: #B08D3E;
-  color: #FFFFFF;
-  box-shadow: 0 8px 20px rgba(176, 141, 62, .3);
+  border-radius: 3px;
+  background: #23306B;
+  color: #FCFAF4;
+  box-shadow: 0 8px 20px rgba(35, 48, 107, .3);
   text-decoration: none;
 }
 
@@ -174,10 +175,10 @@
   font-size: 13.5px;
   font-weight: 600;
   padding: 13px 24px;
-  border-radius: 11px;
-  background: #FFFFFF;
-  color: #2A2118;
-  border: 1px solid #E7DCC6;
+  border-radius: 3px;
+  background: #FCFAF4;
+  color: #1A1A17;
+  border: 1px solid #CFC6B0;
   text-decoration: none;
 }
 
@@ -189,38 +190,39 @@
 .heroImage {
   display: block;
   width: 100%;
-  border-radius: 20px;
+  border-radius: 3px;
   overflow: hidden;
-  box-shadow: 0 30px 60px rgba(42, 33, 24, .18);
+  box-shadow: 0 30px 60px rgba(35, 48, 107, .18);
   aspect-ratio: 6 / 5;
   object-fit: cover;
-  background: linear-gradient(135deg, #EFE4CB, #D8C79A 55%, #B08D3E);
+  background: linear-gradient(135deg, #E6E0CE, #CFC6B0 55%, #23306B);
 }
 
 .floatCard1 {
   position: absolute;
   top: 16px;
   right: -18px;
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 12px;
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
   padding: 12px 16px;
-  box-shadow: 0 12px 28px rgba(42, 33, 24, .14);
+  box-shadow: 0 12px 28px rgba(35, 48, 107, .14);
   max-width: 190px;
 }
 
 .floatCard1Label {
   font-size: 10px;
   font-weight: 700;
-  color: #A38F66;
+  color: #8C857A;
+  font-family: 'IBM Plex Mono', monospace;
   text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: .13em;
 }
 
 .floatBar {
   height: 5px;
-  background: #EFE4CB;
-  border-radius: 4px;
+  background: #E6E0CE;
+  border-radius: 3px;
   margin-top: 8px;
   overflow: hidden;
 }
@@ -228,19 +230,19 @@
 .floatBarFill {
   width: 70%;
   height: 100%;
-  background: #B08D3E;
-  border-radius: 4px;
+  background: #23306B;
+  border-radius: 3px;
 }
 
 .floatCard2 {
   position: absolute;
   bottom: -20px;
   left: -18px;
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 12px;
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
   padding: 14px 18px;
-  box-shadow: 0 12px 28px rgba(42, 33, 24, .14);
+  box-shadow: 0 12px 28px rgba(35, 48, 107, .14);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -249,8 +251,8 @@
 .floatCard2Icon {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
-  background: #2A2118;
+  border-radius: 3px;
+  background: #23306B;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -265,7 +267,7 @@
 
 .floatCard2Sub {
   font-size: 10.5px;
-  color: #4CAF50;
+  color: #4A6B4E;
   font-weight: 600;
   margin-top: 3px;
   white-space: nowrap;
@@ -277,23 +279,24 @@
 }
 
 .kicker {
-  font-size: 11.5px;
+  font-size: 9.5px;
   font-weight: 700;
-  color: #B08D3E;
+  color: #23306B;
+  font-family: 'IBM Plex Mono', monospace;
   text-transform: uppercase;
-  letter-spacing: .08em;
+  letter-spacing: .13em;
 }
 
 .sectionTitle {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Spectral', serif;
   font-size: 32px;
   font-weight: 700;
   margin-top: 12px;
-  color: #2A2118;
+  color: #1A1A17;
 }
 
 .challengesSection {
-  background: #EFE4CB;
+  background: #E6E0CE;
   padding: 80px 64px;
   text-align: center;
 }
@@ -307,9 +310,9 @@
 }
 
 .challengeCard {
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 16px;
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
   padding: 22px 18px;
   display: flex;
   flex-direction: column;
@@ -319,8 +322,8 @@
 .challengeIconWrap {
   width: 38px;
   height: 38px;
-  border-radius: 10px;
-  background: #EFE4CB;
+  border-radius: 3px;
+  background: #E6E0CE;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -334,7 +337,7 @@
 
 .challengeDesc {
   font-size: 12px;
-  color: #8C7C5E;
+  color: #6E6759;
   line-height: 1.55;
 }
 
@@ -353,7 +356,7 @@
 
 .featuresIntro {
   font-size: 13.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   max-width: 340px;
   line-height: 1.6;
 }
@@ -365,9 +368,9 @@
 }
 
 .featureCard {
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 16px;
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -376,15 +379,15 @@
 }
 
 .featureCard:hover {
-  box-shadow: 0 14px 30px rgba(42, 33, 24, .1);
+  box-shadow: 0 14px 30px rgba(35, 48, 107, .1);
   transform: translateY(-3px);
 }
 
 .featureIconWrap {
   width: 40px;
   height: 40px;
-  border-radius: 11px;
-  background: #EFE4CB;
+  border-radius: 3px;
+  background: #E6E0CE;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -397,12 +400,12 @@
 
 .featureDesc {
   font-size: 12.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   line-height: 1.55;
 }
 
 .whySection {
-  background: #EFE4CB;
+  background: #E6E0CE;
   padding: 88px 64px;
 }
 
@@ -418,17 +421,17 @@
 .whyImage {
   display: block;
   width: 100%;
-  border-radius: 18px;
+  border-radius: 3px;
   overflow: hidden;
-  box-shadow: 0 20px 44px rgba(42, 33, 24, .16);
+  box-shadow: 0 20px 44px rgba(35, 48, 107, .16);
   aspect-ratio: 5 / 4;
   object-fit: cover;
-  background: linear-gradient(150deg, #2A2118, #4a3626 60%, #8C6A2E);
+  background: linear-gradient(150deg, #1A1A17, #3B4680 60%, #8A6A2F);
 }
 
 .whyBody {
   font-size: 14.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   line-height: 1.65;
   margin-top: 16px;
   max-width: 440px;
@@ -451,7 +454,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #B08D3E;
+  background: #23306B;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -466,7 +469,7 @@
 
 .whyPointDesc {
   font-size: 12.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 3px;
   line-height: 1.5;
 }
@@ -488,7 +491,7 @@
   left: 6%;
   right: 6%;
   height: 1.5px;
-  background: #E7DCC6;
+  background: #CFC6B0;
   z-index: 0;
 }
 
@@ -506,15 +509,15 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #FFFFFF;
-  border: 1.5px solid #B08D3E;
-  color: #B08D3E;
+  background: #FCFAF4;
+  border: 1.5px solid #23306B;
+  color: #23306B;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
   font-weight: 700;
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
 }
 
 .onboardingLabel {
@@ -529,15 +532,15 @@
 .contactBox {
   max-width: 1200px;
   margin: 0 auto;
-  background: #2A2118;
-  border-radius: 24px;
+  background: #23306B;
+  border-radius: 3px;
   padding: 64px 48px;
   text-align: center;
-  color: #FCF9F3;
+  color: #F6F2E9;
 }
 
 .contactTitle {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Spectral', serif;
   font-size: 30px;
   font-weight: 700;
 }
@@ -566,16 +569,16 @@
   font-size: 13.5px;
   font-weight: 600;
   padding: 13px 24px;
-  border-radius: 11px;
+  border-radius: 3px;
   cursor: pointer;
   border: 1px solid rgba(252, 249, 243, .3);
-  color: #FCF9F3;
+  color: #F6F2E9;
 }
 
 .footer {
-  border-top: 1px solid #E7DCC6;
+  border-top: 1px solid #CFC6B0;
   padding: 48px 64px;
-  background: #F8F3E8;
+  background: #F1EDE0;
 }
 
 .footerInner {
@@ -594,25 +597,26 @@
 }
 
 .footerBrand {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
   font-weight: 700;
   font-size: 16px;
 }
 
 .footerTagline {
   font-size: 12.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 12px;
   max-width: 240px;
   line-height: 1.6;
 }
 
 .footerColTitle {
-  font-size: 11.5px;
+  font-size: 9.5px;
   font-weight: 700;
-  color: #2A2118;
+  color: #1A1A17;
+  font-family: 'IBM Plex Mono', monospace;
   text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: .13em;
   margin-bottom: 14px;
 }
 
@@ -624,7 +628,7 @@
 
 .footerLink {
   font-size: 13px;
-  color: #8C7C5E;
+  color: #6E6759;
   text-decoration: none;
 }
 
@@ -632,9 +636,9 @@
   max-width: 1200px;
   margin: 36px auto 0;
   padding-top: 20px;
-  border-top: 1px solid #E7DCC6;
+  border-top: 1px solid #CFC6B0;
   display: flex;
   justify-content: space-between;
   font-size: 11.5px;
-  color: #A38F66;
+  color: #8C857A;
 }

@@ -8,6 +8,7 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
 from supabase_auth.errors import AuthApiError
 from postgrest.exceptions import APIError as PostgrestAPIError
@@ -40,8 +41,23 @@ from app.routes.client_requests import router as client_requests_router
 from app.routes.clients import router as clients_router
 from app.routes.judgements import router as judgements_router
 from app.routes.messages import router as messages_router
+from app.routes.admin import router as admin_router
 
 app = FastAPI()
+
+
+@app.middleware("http")
+async def unhandled_errors_as_json(request, call_next):
+    """Turn an unhandled exception into a JSON 500 instead of letting Starlette re-raise it.
+    Re-raising kills the response before CORSMiddleware can touch it, so the browser only ever
+    saw "Failed to fetch" -- no status, no message -- for every unexpected backend error.
+    Registered before CORSMiddleware so it runs *inside* it and the 500 keeps its CORS headers."""
+    try:
+        return await call_next(request)
+    except Exception:
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse(status_code=500, content={"detail": "Something went wrong on our side. Please try again."})
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -68,6 +84,7 @@ app.include_router(client_requests_router)
 app.include_router(clients_router)
 app.include_router(judgements_router)
 app.include_router(messages_router)
+app.include_router(admin_router)
 
 ROLE_IDS = {"lawyer": 2, "client": 3}
 
@@ -122,7 +139,16 @@ def signup(data: SignupRequest):
             "password_hash": "managed_by_supabase_auth",
             "phone": data.phone,
         }).execute().data[0]
+    except PostgrestAPIError as e:
+        if e.code == "23505":
+            raise HTTPException(status_code=409, detail="An account with this email already exists. Try logging in instead.")
+        logger.exception("User row insert failed after auth signup for %s", data.email)
+        raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
+    except Exception:
+        logger.exception("User row insert failed after auth signup for %s", data.email)
+        raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
 
+    try:
         if data.role == "lawyer":
             supabase.table("lawyers").insert({
                 "user_id": user_row["user_id"],
@@ -149,15 +175,15 @@ def signup(data: SignupRequest):
                     "notification_type": "client_request",
                     "is_read": False,
                 }).execute()
-    except PostgrestAPIError as e:
-        if e.code == "23505":
-            raise HTTPException(status_code=409, detail="An account with this email already exists. Try logging in instead.")
-        # ponytail: auth account now exists without a profile row if this
-        # fails partway; a reconciliation job is the ceiling, not built yet.
+    except Exception as e:
+        # A users row without its lawyers/clients row logs in fine but 400s on every
+        # role endpoint ("No lawyer profile for this account"), so undo it by hand --
+        # there is no transaction across REST calls. The auth account survives; signing
+        # up again reuses it.
+        supabase.table("users").delete().eq("user_id", user_row["user_id"]).execute()
         logger.exception("Profile setup failed after auth signup for %s", data.email)
-        raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
-    except Exception:
-        logger.exception("Profile setup failed after auth signup for %s", data.email)
+        if data.role == "lawyer" and isinstance(e, PostgrestAPIError) and e.code == "23505":
+            raise HTTPException(status_code=409, detail="That bar council number is already registered.")
         raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
 
     return {"message": "Signup successful. Check your email to verify your account."}

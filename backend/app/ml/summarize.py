@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.db.supabase_client import supabase
+from app.controllers.documents import extract_document_text
 from app.middleware.auth import ADMIN, LAWYER, require_roles, ensure_case_access
 from app.ml.subprocess_utils import run_ml_subprocess
 
@@ -19,8 +20,10 @@ SUMMARIZE_RUNNER = Path(__file__).resolve().parent / "runners" / "summarize_runn
 
 
 class SummarizeRequest(BaseModel):
-    """Request body: raw text plus an optional document_id to persist the result against."""
-    text: str
+    """Request body: a document_id, raw text, or both. With a document_id and no text, the text
+    is read out of the stored file; text wins when both are given, so a scanned document can
+    still be summarized by pasting it."""
+    text: str = ""
     document_id: int | None = None
 
 
@@ -31,21 +34,37 @@ class SummarizeResponse(BaseModel):
 
 @router.post("/summarize", response_model=SummarizeResponse)
 def summarize_text(data: SummarizeRequest, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
-    """Summarize `data.text` via the LoRA model subprocess; if document_id is given, checks case
-    access and upserts the result into ai_summaries. Calls: `ensure_case_access()`,
-    `run_ml_subprocess()`, `supabase.table("ai_summaries").upsert()`."""
+    """Summarize text via the LoRA model subprocess. With a document_id, checks case access,
+    falls back to the stored file's own text when none was posted, and upserts the result into
+    ai_summaries. Calls: `ensure_case_access()`, `extract_document_text()`, `run_ml_subprocess()`,
+    `supabase.table("ai_summaries").upsert()`."""
+    text = data.text.strip()
     if data.document_id is not None:
-        doc_rows = supabase.table("documents").select("case_id").eq("document_id", data.document_id).execute().data
+        doc_rows = (
+            supabase.table("documents")
+            .select("case_id,file_path,mime_type")
+            .eq("document_id", data.document_id)
+            .execute()
+            .data
+        )
         if not doc_rows:
             raise HTTPException(status_code=404, detail="Document not found")
         ensure_case_access(doc_rows[0]["case_id"], profile)
+        if not text:
+            text = extract_document_text(doc_rows[0]["file_path"], doc_rows[0]["mime_type"])
+
+    if not text:
+        raise HTTPException(
+            status_code=400,
+            detail="No text to summarize -- this file has no text layer (a scan?). Paste its text instead.",
+        )
 
     # ponytail: reloads the 1B model + LoRA adapter on every call (tens of
     # seconds on a laptop GPU). Fine for now; a long-lived worker is the
     # upgrade path if latency matters.
     result = run_ml_subprocess(
         [str(FINETUNE_VENV_PYTHON), str(SUMMARIZE_RUNNER)],
-        {"text": data.text},
+        {"text": text},
         cwd=str(INFERENCE_DIR),
         timeout=600,
     )

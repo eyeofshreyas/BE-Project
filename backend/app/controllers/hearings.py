@@ -3,6 +3,7 @@
 from datetime import date
 
 from fastapi import Depends, HTTPException
+from app.controllers.case_history import add_timeline_event
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.hearings import HearingSummary, HearingCreate, HearingUpdate
@@ -88,6 +89,25 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
     """Create a hearing for a case the caller has access to, and update the case's
     next_hearing_date. Calls: `ensure_case_access()`, `_sync_next_hearing_date()`, `_get_hearing()`."""
     ensure_case_access(data.case_id, profile)
+
+    # A double-submitted form used to land twice, leaving two hearings a person can't tell
+    # apart -- and both then read as two separate listings everywhere the case is summarised.
+    # The repeat is only refused until the caller says it's deliberate, since a case genuinely
+    # can be listed twice at one slot.
+    if not data.allow_duplicate:
+        clash = (
+            supabase.table("hearings").select("hearing_id")
+            .eq("case_id", data.case_id).eq("hearing_date", data.hearing_date)
+            .eq("hearing_time", data.hearing_time).eq("judge_id", data.judge_id)
+            .execute().data
+        )
+        if clash:
+            raise HTTPException(
+                status_code=409,
+                detail="This case already has a hearing at that date and time before that judge. "
+                       "Send allow_duplicate=true if the repeat listing is intended.",
+            )
+
     row = supabase.table("hearings").insert({
         "case_id": data.case_id,
         "judge_id": data.judge_id,
@@ -98,14 +118,28 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
         "hearing_status": "Scheduled",
     }).execute().data[0]
     _sync_next_hearing_date(data.case_id)
-    return _get_hearing(row["hearing_id"])
+
+    hearing = _get_hearing(row["hearing_id"])
+    when = hearing["hearing_date"]
+    if hearing["hearing_time"]:
+        when += f" at {hearing['hearing_time'][:5]}"
+    where = ", ".join(part for part in (hearing["judge_name"], hearing["courtroom"]) if part)
+    add_timeline_event(
+        data.case_id, "hearing_scheduled",
+        f"Hearing scheduled for {when}",
+        f"Listed before {where}." if where else None,
+        profile["user_id"],
+    )
+    return hearing
 
 
 def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
     """Update a hearing's status/outcome/notes; also re-syncs the case's next_hearing_date
-    since a status change can affect which hearing is now the nearest upcoming one.
-    Calls: `_get_hearing()`, `_sync_next_hearing_date()`."""
-    _get_hearing(hearing_id, get_scoped_case_ids(profile))
+    since a status change can affect which hearing is now the nearest upcoming one, and records
+    a timeline event when the hearing reaches a new status -- what happened at a hearing is case
+    history, and the case brief reads the timeline as such.
+    Calls: `_get_hearing()`, `_sync_next_hearing_date()`, `add_timeline_event()`."""
+    before = _get_hearing(hearing_id, get_scoped_case_ids(profile))
 
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if not updates:
@@ -117,4 +151,13 @@ def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends
 
     _sync_next_hearing_date(rows[0]["case_id"])
 
-    return _get_hearing(hearing_id)
+    hearing = _get_hearing(hearing_id)
+    # only a status change is worth an event -- correcting a typo in the notes is not case history
+    if hearing["hearing_status"] != before["hearing_status"]:
+        add_timeline_event(
+            hearing["case_id"], "hearing_updated",
+            f"Hearing of {hearing['hearing_date']} marked {hearing['hearing_status']}",
+            hearing["hearing_outcome"] or hearing["notes"],
+            profile["user_id"],
+        )
+    return hearing

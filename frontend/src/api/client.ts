@@ -34,9 +34,20 @@ import type {
   MatterCreated,
   MatterDetail,
   MatterDocumentSummary,
+  MatterDueDiligence,
+  MatterProgressStage,
   ConversationSummary,
   ConversationDetail,
   MessageSummary,
+  SimilarCaseResult,
+  SimilarCaseDetail,
+  CaseSearchResult,
+  JudgeOption,
+  AdminStats,
+  ActivityEvent,
+  AdminAnalytics,
+  PlatformSettings,
+  UserDeleteImpact,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -85,7 +96,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
 
     const data = await res.json()
-    if (!res.ok) throw new Error(data.detail ?? 'Request failed')
+    if (!res.ok) {
+      // Callers that need to tell one failure from another (a 409 the user can override,
+      // say) shouldn't have to string-match the message.
+      const error = new Error(data.detail ?? 'Request failed') as Error & { status?: number }
+      error.status = res.status
+      throw error
+    }
     return data as T
   }
   throw new Error('Request failed')
@@ -148,8 +165,20 @@ export function createMatter(payload: MatterCreatePayload) {
   return post<MatterCreated>('/conveyancing/matters', payload)
 }
 
+export function updateMatter(matterId: number, payload: { registration_status?: string; registration_date?: string; office_name?: string }) {
+  return patch<{ matter_id: number; registration_status: string | null; registration_date: string | null }>(`/conveyancing/matters/${matterId}`, payload)
+}
+
 export function getMatterDetail(matterId: number) {
   return get<MatterDetail>(`/conveyancing/matters/${matterId}`)
+}
+
+export function updateDueDiligence(matterId: number, payload: Partial<Pick<MatterDueDiligence, 'title_clear' | 'tax_verified' | 'encumbrance_checked' | 'litigation_checked' | 'remarks'>>) {
+  return patch<MatterDueDiligence>(`/conveyancing/matters/${matterId}/due-diligence`, payload)
+}
+
+export function completeProgressStage(matterId: number, progressId: number) {
+  return patch<MatterProgressStage>(`/conveyancing/matters/${matterId}/progress/${progressId}`, {})
 }
 
 export function uploadMatterDocument(matterId: number, file: File) {
@@ -166,8 +195,31 @@ export function getDocumentSummary(documentId: number) {
   return get<AiSummary>(`/documents/${documentId}/summary`)
 }
 
-export function summarizeDocument(documentId: number, text: string) {
+/** Summarizes a document. With no `text`, the backend reads the stored file's own text --
+ * pass text only to override that (a scan, or a file type it can't read). */
+export function summarizeDocument(documentId: number, text = '') {
   return post<{ summary: string }>('/ai/summarize', { text, document_id: documentId })
+}
+
+export function findSimilarCases(query: string, topK = 5) {
+  return post<SimilarCaseResult[]>('/ai/similar-cases', { query, top_k: topK })
+}
+
+export function translateText(text: string, targetLanguage: string, documentId?: number) {
+  return post<{ translated_text: string }>('/ai/translate', { text, target_language: targetLanguage, document_id: documentId ?? null })
+}
+
+export function listSimilarOwnCases(caseId: number) {
+  return get<CaseSearchResult[]>(`/cases/${caseId}/similar`)
+}
+
+/** Semantic search over the caller's own cases (backed by `/ai/case-search`). */
+export function searchOwnCases(query: string, topK = 5) {
+  return post<CaseSearchResult[]>('/ai/case-search', { query, top_k: topK })
+}
+
+export function getSimilarCase(docId: string) {
+  return get<SimilarCaseDetail>(`/ai/similar-cases/${encodeURIComponent(docId)}`)
 }
 
 export function listUsers(role?: string) {
@@ -176,6 +228,43 @@ export function listUsers(role?: string) {
 
 export function setUserStatus(userId: number, isActive: boolean) {
   return patch<UserSummary>(`/users/${userId}/status`, { is_active: isActive })
+}
+
+export function adminUpdateUser(userId: number, payload: { full_name: string; phone: string }) {
+  return patch<UserSummary>(`/users/${userId}`, payload)
+}
+
+export function getUserDeleteImpact(userId: number) {
+  return get<UserDeleteImpact>(`/users/${userId}/impact`)
+}
+
+/** Irreversible: removes the user and everything cascading off them. Show the impact first. */
+export function deleteUser(userId: number) {
+  return del<UserDeleteImpact>(`/users/${userId}`)
+}
+
+export function updateOwnProfile(payload: { full_name: string; phone: string }) {
+  return patch<UserSummary>('/users/me', payload)
+}
+
+export function getAdminStats() {
+  return get<AdminStats>('/admin/stats')
+}
+
+export function listAdminActivity(limit = 15) {
+  return get<ActivityEvent[]>(`/admin/activity?limit=${limit}`)
+}
+
+export function getAdminAnalytics() {
+  return get<AdminAnalytics>('/admin/analytics')
+}
+
+export function getPlatformSettings() {
+  return get<PlatformSettings>('/admin/settings')
+}
+
+export function updatePlatformSettings(payload: PlatformSettings) {
+  return patch<PlatformSettings>('/admin/settings', payload)
 }
 
 export function listNotifications() {
@@ -274,6 +363,44 @@ export function listHearings() {
   return get<HearingSummary[]>('/hearings')
 }
 
+export function listJudges() {
+  return get<JudgeOption[]>('/reference/judges')
+}
+
+/** `allow_duplicate` re-sends a hearing the backend refused as a possible double-submit. */
+export function createHearing(payload: {
+  case_id: number
+  judge_id: number
+  hearing_date: string
+  hearing_time?: string
+  courtroom?: string
+  notes?: string
+  allow_duplicate?: boolean
+}) {
+  return post<HearingSummary>('/hearings', payload)
+}
+
+/** Records what happened at a hearing. Only the fields sent are written. */
+export function updateHearing(hearingId: number, payload: {
+  hearing_status?: string
+  hearing_outcome?: string
+  next_hearing_date?: string
+  notes?: string
+}) {
+  return patch<HearingSummary>(`/hearings/${hearingId}`, payload)
+}
+
+/** Records what came out of a meeting. Only the fields sent are written. */
+export function updateMeeting(meetingId: number, payload: {
+  meeting_status?: string
+  discussion_summary?: string
+  decisions?: string
+  action_items?: string
+  next_meeting_date?: string
+}) {
+  return patch<MeetingSummary>(`/meetings/${meetingId}`, payload)
+}
+
 export function updateHearingStatus(hearingId: number, hearing_status: string) {
   return patch<HearingSummary>(`/hearings/${hearingId}`, { hearing_status })
 }
@@ -321,7 +448,7 @@ export function listAllMeetings() {
   return get<MeetingSummary[]>('/meetings')
 }
 
-export function createMeeting(payload: { case_id: number; conducted_by: number; meeting_title: string; meeting_type?: string; meeting_date: string; agenda?: string }) {
+export function createMeeting(payload: { case_id: number; conducted_by?: number; meeting_title: string; meeting_type?: string; meeting_date: string; agenda?: string }) {
   return post<MeetingSummary>('/meetings', payload)
 }
 

@@ -8,6 +8,9 @@ from fastapi import Depends, HTTPException
 from app.core.config import FRONTEND_URL
 from app.core.email import send_email
 from app.db.supabase_client import supabase
+# Same numbering as a lawyer-created case -- one generator so the two paths can't
+# drift apart and hand out the same case_number.
+from app.controllers.cases import _generate_case_number
 from app.middleware.auth import CLIENT, LAWYER, get_current_profile, require_roles
 from app.models.client_requests import ClientRequestCreate, ClientRequestDecision
 
@@ -36,17 +39,6 @@ def _to_summary(row: dict) -> dict:
         "status": row["status"],
         "created_at": row["created_at"],
     }
-
-
-def _generate_case_number(case_type_name: str) -> str:
-    """Build a case number from the case type's letters + year + sequence, for a case
-    created on request acceptance.
-    ponytail: sequence = count of cases already using this prefix, good enough
-    at this app's scale; move to a DB sequence if concurrent accepts collide."""
-    prefix = "".join(ch for ch in case_type_name.upper() if ch.isalpha())[:3] or "GEN"
-    like_prefix = f"{prefix}{datetime.now(timezone.utc).year}"
-    existing = supabase.table("cases").select("case_number").like("case_number", f"{like_prefix}%").execute().data
-    return f"{like_prefix}{len(existing) + 1:03d}"
 
 
 def send_client_request(data: ClientRequestCreate, profile: dict = Depends(require_roles(LAWYER))):

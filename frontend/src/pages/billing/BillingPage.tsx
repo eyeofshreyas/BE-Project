@@ -39,15 +39,15 @@ function loadProfile(): UserProfile | null {
   }
 }
 
-const MUTED = '#8C7C5E'
-const PRIMARY = '#B08D3E'
+const MUTED = '#6E6759'
+const PRIMARY = '#23306B'
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
-  Paid: ['#2E9E58', '#E4F5EA'],
-  'Partially Paid': ['#B87F1E', '#FFF2E0'],
-  Pending: ['#B87F1E', '#FFF2E0'],
-  Overdue: ['#B05C5C', '#FBEAEA'],
+  Paid: ['#4A6B4E', '#E4EDE5'],
+  'Partially Paid': ['#8A6A2F', '#F3EBD9'],
+  Pending: ['#8A6A2F', '#F3EBD9'],
+  Overdue: ['#B3282D', '#F7E4E5'],
 }
-const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
+const DEFAULT_STATUS_STYLE: [string, string] = ['#575145', '#F0ECDF']
 const TIME_FILTERS = ['All Time', 'This Month', 'This Quarter', 'This Year'] as const
 
 function money(n: number) {
@@ -192,7 +192,7 @@ function StaffBillingView() {
               <div className={styles.statIconWrap}><Icon name="info" size={16} color={PRIMARY} /></div>
             </div>
             <div className={styles.statValue} style={{ fontSize: 22 }}>{moneyRound(totalOutstanding)}</div>
-            <div style={{ fontSize: 11.5, color: '#B05C5C' }}>{pendingCount} Invoices Pending</div>
+            <div style={{ fontSize: 11.5, color: '#B3282D' }}>{pendingCount} Invoices Pending</div>
           </div>
           <div className={styles.statCard} style={{ gap: 4 }}>
             <div className={styles.statIconRow}>
@@ -209,19 +209,19 @@ function StaffBillingView() {
             placeholder="Invoice ID, Client, or Case Name"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ flex: 1, minWidth: 220, padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
+            style={{ flex: 1, minWidth: 220, padding: '9px 14px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}
           />
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '9px 12px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}>
             {['All', 'Paid', 'Partially Paid', 'Pending', 'Overdue'].map((s) => <option key={s} value={s}>{s === 'All' ? 'Status: All' : s}</option>)}
           </select>
-          <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as (typeof TIME_FILTERS)[number])} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}>
+          <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as (typeof TIME_FILTERS)[number])} style={{ padding: '9px 12px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}>
             {TIME_FILTERS.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
-          <div className={styles.ghostChip} style={{ opacity: .5, cursor: 'default' }} title="Report export coming soon"><Icon name="download" size={14} color="#6A5C42" /> Export Report</div>
+          <div className={styles.ghostChip} style={{ opacity: .5, cursor: 'default' }} title="Report export coming soon"><Icon name="download" size={14} color="#575145" /> Export Report</div>
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading invoices…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
         {!loading && !error && (
           <div className={styles.tableCard}>
@@ -243,7 +243,7 @@ function StaffBillingView() {
                   const [color, bg] = STATUS_STYLE_MAP[status] || DEFAULT_STATUS_STYLE
                   return (
                     <tr key={inv.id} className={styles.tr}>
-                      <td className={styles.tdMono} style={{ color: status === 'Overdue' ? '#B05C5C' : undefined, fontWeight: status === 'Overdue' ? 700 : undefined }}>{inv.invoice_number}</td>
+                      <td className={styles.tdMono} style={{ color: status === 'Overdue' ? '#B3282D' : undefined, fontWeight: status === 'Overdue' ? 700 : undefined }}>{inv.invoice_number}</td>
                       <td className={styles.tdClient}>{inv.client ?? '—'}</td>
                       <td className={styles.tdMono}>{inv.case_number ?? '—'}</td>
                       <td className={styles.td}>{money(inv.amount)}</td>
@@ -255,7 +255,7 @@ function StaffBillingView() {
                             {status !== 'Paid' && (
                               <div
                                 onClick={() => remindingId !== inv.id && remind(inv)}
-                                style={{ fontSize: 11.5, fontWeight: 600, color: '#B05C5C', border: '1px solid #E9B8B8', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', opacity: remindingId === inv.id ? 0.6 : 1, whiteSpace: 'nowrap' }}
+                                style={{ fontSize: 11.5, fontWeight: 600, color: '#B3282D', border: '1px solid #E9B8B8', borderRadius: 3, padding: '6px 10px', cursor: 'pointer', opacity: remindingId === inv.id ? 0.6 : 1, whiteSpace: 'nowrap' }}
                               >
                                 {remindingId === inv.id ? 'Sending…' : 'Send Reminder'}
                               </div>
@@ -263,7 +263,7 @@ function StaffBillingView() {
                             {inv.payment_status !== 'Paid' && (
                               <div
                                 onClick={() => navigate(`/billing/invoices/${inv.id}/record-payment`)}
-                                style={{ fontSize: 11.5, fontWeight: 600, color: '#6A5C42', border: '1px solid #E7DCC6', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                style={{ fontSize: 11.5, fontWeight: 600, color: '#575145', border: '1px solid #CFC6B0', borderRadius: 3, padding: '6px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                               >
                                 Record Payment
                               </div>
@@ -289,11 +289,11 @@ function StaffBillingView() {
 }
 
 const TXN_STATUS_STYLE: Record<string, [string, string]> = {
-  Completed: ['#2E9E58', '#E4F5EA'],
-  Pending: ['#B87F1E', '#FFF2E0'],
-  Failed: ['#B05C5C', '#FBEAEA'],
+  Completed: ['#4A6B4E', '#E4EDE5'],
+  Pending: ['#8A6A2F', '#F3EBD9'],
+  Failed: ['#B3282D', '#F7E4E5'],
 }
-const TXN_DEFAULT_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
+const TXN_DEFAULT_STYLE: [string, string] = ['#575145', '#F0ECDF']
 
 /** Client-facing invoice view: loads invoices (`listInvoices()`) plus each one's payments (`listInvoicePayments()`) to compute totals, progress, and a recent-transactions list. Pay Now opens Razorpay Checkout via `payInvoice()`; Download opens a printable summary via `downloadInvoice()`; Download All has no bulk export yet, so it just toasts. */
 /** Opens a new tab with a minimal printable invoice summary and triggers the browser's print dialog (save-as-PDF) -- invoices have no stored line items, only the totals in `InvoiceSummary`, so this isn't the itemized letterhead from GenerateInvoicePage. */
@@ -306,12 +306,12 @@ function downloadInvoice(inv: InvoiceSummary) {
   ]
   win.document.write(`<!doctype html><html><head><title>${inv.invoice_number}</title>
     <style>
-      body{font-family:Georgia,serif;color:#2A2118;padding:48px;max-width:560px;margin:0 auto}
-      .muted{color:#8C7C5E;font-size:12.5px}
+      body{font-family:'Spectral',serif;color:#1A1A17;padding:48px;max-width:560px;margin:0 auto}
+      .muted{color:#6E6759;font-size:12.5px}
       table{width:100%;border-collapse:collapse;margin-top:24px}
-      td{padding:8px 0;font-size:14px;border-top:1px solid #E7DCC6}
+      td{padding:8px 0;font-size:14px;border-top:1px solid #CFC6B0}
       td:last-child{text-align:right;font-weight:600}
-      .total td{font-weight:700;font-size:17px;border-top:2px solid #2A2118}
+      .total td{font-weight:700;font-size:17px;border-top:2px solid #1A1A17}
     </style></head>
     <body>
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -384,7 +384,7 @@ function ClientInvoicesView() {
         name: 'LexFlow',
         description: `Invoice ${inv.invoice_number}`,
         prefill: { name: profile?.full_name, email: profile?.email, contact: profile?.phone },
-        theme: { color: '#B08D3E' },
+        theme: { color: '#23306B' },
         handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
           try {
             await verifyRazorpayPayment(inv.id, response)
@@ -439,19 +439,19 @@ function ClientInvoicesView() {
           placeholder="Search by invoice number or status..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
+          style={{ padding: '9px 14px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}
         />
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading invoices…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
         {!loading && !error && (
           <>
             <div className={styles.statCards} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-              <div className={styles.statCard} style={{ background: '#FEF6EA', border: '1px solid #F3DFAE' }}>
+              <div className={styles.statCard} style={{ background: '#FEF6EA', border: '1px solid #F3EBD9' }}>
                 <div className={styles.statIconRow}>
-                  <div className={styles.statIconWrap} style={{ background: '#F3DFAE' }}><Icon name="clock" size={16} color="#B87F1E" /></div>
-                  <span className={styles.statusBadge} style={{ color: '#B87F1E', background: '#FFF2E0' }}>OPEN</span>
+                  <div className={styles.statIconWrap} style={{ background: '#F3EBD9' }}><Icon name="clock" size={16} color="#8A6A2F" /></div>
+                  <span className={styles.statusBadge} style={{ color: '#8A6A2F', background: '#F3EBD9' }}>OPEN</span>
                 </div>
                 <div className={styles.statValue}>{pendingInvoices.length}</div>
                 <div className={styles.statLabel}>Pending</div>
@@ -459,20 +459,20 @@ function ClientInvoicesView() {
               </div>
               <div className={styles.statCard} style={{ background: '#EEF9F1', border: '1px solid #BFE6CB' }}>
                 <div className={styles.statIconRow}>
-                  <div className={styles.statIconWrap} style={{ background: '#BFE6CB' }}><Icon name="check-circle" size={16} color="#2E9E58" /></div>
-                  <span className={styles.statusBadge} style={{ color: '#2E9E58', background: '#E4F5EA' }}>CLEARED</span>
+                  <div className={styles.statIconWrap} style={{ background: '#BFE6CB' }}><Icon name="check-circle" size={16} color="#4A6B4E" /></div>
+                  <span className={styles.statusBadge} style={{ color: '#4A6B4E', background: '#E4EDE5' }}>CLEARED</span>
                 </div>
                 <div className={styles.statValue}>{paidInvoices.length}</div>
                 <div className={styles.statLabel}>Paid</div>
                 <div style={{ fontSize: 11.5, color: MUTED }}>Settled invoices</div>
               </div>
-              <div className={styles.statCard} style={{ background: '#2A2118', border: '1px solid #2A2118' }}>
+              <div className={styles.statCard} style={{ background: '#23306B', border: '1px solid #23306B' }}>
                 <div className={styles.statIconRow}>
-                  <div className={styles.statIconWrap} style={{ background: '#3D3126' }}><Icon name="banknote" size={16} color="#D8C9A8" /></div>
-                  <span className={styles.statusBadge} style={{ color: '#D8C9A8', background: '#3D3126' }}>TOTAL</span>
+                  <div className={styles.statIconWrap} style={{ background: '#33302A' }}><Icon name="banknote" size={16} color="#CFC6B0" /></div>
+                  <span className={styles.statusBadge} style={{ color: '#CFC6B0', background: '#33302A' }}>TOTAL</span>
                 </div>
-                <div className={styles.statValue} style={{ color: '#FFFFFF' }}>{moneyRound(outstanding)}</div>
-                <div className={styles.statLabel} style={{ color: '#D8C9A8' }}>Total Due</div>
+                <div className={styles.statValue} style={{ color: '#FCFAF4' }}>{moneyRound(outstanding)}</div>
+                <div className={styles.statLabel} style={{ color: '#CFC6B0' }}>Total Due</div>
                 <div style={{ fontSize: 11.5, color: '#A8987C' }}>Across all invoices</div>
               </div>
             </div>
@@ -505,7 +505,7 @@ function ClientInvoicesView() {
                                   {payingId === inv.id ? 'Processing…' : 'Pay Now'}
                                 </div>
                               )}
-                              <span style={{ fontSize: 12, fontWeight: 600, color: '#B08D3E', cursor: 'pointer' }} onClick={() => downloadInvoice(inv)}>Download</span>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: '#23306B', cursor: 'pointer' }} onClick={() => downloadInvoice(inv)}>Download</span>
                             </div>
                           </td>
                         </tr>
@@ -523,18 +523,18 @@ function ClientInvoicesView() {
                   <div className={styles.panelTitle}>Payment Summary</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: MUTED }}>Total Fees</span><strong>{moneyRound(totalFees)}</strong></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: MUTED }}>Amount Paid</span><strong style={{ color: '#2E9E58' }}>{moneyRound(amountPaid)}</strong></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: MUTED }}>Outstanding</span><strong style={{ color: '#B05C5C' }}>{moneyRound(outstanding)}</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: MUTED }}>Amount Paid</span><strong style={{ color: '#4A6B4E' }}>{moneyRound(amountPaid)}</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: MUTED }}>Outstanding</span><strong style={{ color: '#B3282D' }}>{moneyRound(outstanding)}</strong></div>
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em', fontWeight: 700, marginBottom: 6 }}><span>Payment Progress</span><span>{progressPct}%</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', fontWeight: 700, marginBottom: 6 }}><span>Payment Progress</span><span>{progressPct}%</span></div>
                       <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${progressPct}%` }} /></div>
                     </div>
-                    <div style={{ border: '1px solid #E7DCC6', borderRadius: 10, padding: '10px 12px', marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ border: '1px solid #CFC6B0', borderRadius: 3, padding: '10px 12px', marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontSize: 10.5, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em', fontWeight: 700 }}>Next Due Date</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#2A2118', marginTop: 2 }}>{nearestDue ? formatDate(nearestDue) : '—'}</div>
+                        <div style={{ fontSize: 9.5, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', fontWeight: 700 }}>Next Due Date</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A17', marginTop: 2 }}>{nearestDue ? formatDate(nearestDue) : '—'}</div>
                       </div>
-                      <Icon name="calendar" size={18} color="#B08D3E" />
+                      <Icon name="calendar" size={18} color="#23306B" />
                     </div>
                   </div>
                 </div>

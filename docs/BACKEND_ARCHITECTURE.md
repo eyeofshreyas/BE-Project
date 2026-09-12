@@ -75,7 +75,9 @@ they may touch.            rows with is_active=True;      not authorized for *th
 Which controllers use which:
 
 - **`require_roles` only** -- routes with no per-record ownership to check,
-  just a role gate: `users.py` (admin-only user management),
+  just a role gate: `users.py` (admin-only user management; `update_own_profile`
+  uses `get_current_profile` alone, since a user editing their own row needs no
+  role at all), `admin.py` (platform-wide stats/activity/analytics/settings),
   `client_requests.py`'s `send_client_request`/`respond_client_request`
   (ownership is checked by hand against `lawyer_id`/`client_id` instead,
   since there's no case yet), `clients.py`'s `list_clients`.
@@ -191,7 +193,8 @@ into `case_ai_summaries`.
 | Hearings | `routes/hearings.py` | `controllers/hearings.py` | `models/hearings.py` |
 | Judgements | `routes/judgements.py` | `controllers/judgements.py` | `models/judgements.py` |
 | Reference data (courts/case types/judges/roles/document types) | `routes/reference.py` | `controllers/reference.py` | `models/reference.py` |
-| Users (admin) | `routes/users.py` | `controllers/users.py` | `models/users.py` |
+| Users (admin roster, edit, hard delete + self-service profile) | `routes/users.py` | `controllers/users.py` | `models/users.py` |
+| Admin console (stats/activity/analytics/settings) | `routes/admin.py` | `controllers/admin.py` | `models/admin.py` |
 | Notifications | `routes/notifications.py` | `controllers/notifications.py` | `models/notifications.py` |
 | AI: similar cases | mounted in `main.py` from `app/ml/similar_cases.py` | same file (`app/ml/similar_cases.py`) | inline Pydantic models in that file |
 | AI: case search (own cases) | mounted in `main.py` from `app/ml/case_search.py` | same file | inline models in that file |

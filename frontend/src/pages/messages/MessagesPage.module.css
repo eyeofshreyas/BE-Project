@@ -3,8 +3,8 @@
   min-height: 0;
   box-sizing: border-box;
   padding: 24px 32px 28px;
-  background: #FCF9F3;
-  font-family: 'Inter', sans-serif;
+  background: #F6F2E9;
+  font-family: 'Public Sans', sans-serif;
   display: flex;
   flex-direction: column;
 }
@@ -17,15 +17,15 @@
   width: 100%;
   max-width: 1320px;
   margin: 0 auto;
-  background: #FFFFFF;
-  border: 1px solid #E7DCC6;
-  border-radius: 18px;
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(42, 33, 24, .04);
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
 }
 
 .pageError {
-  color: #B05C5C;
+  color: #B3282D;
   font-size: 13.5px;
   padding: 8px 2px;
 }
@@ -33,8 +33,8 @@
 /* ---- thread rail ---- */
 
 .threadList {
-  border-right: 1px solid #E7DCC6;
-  background: #FBF7EE;
+  border-right: 1px solid #CFC6B0;
+  background: #F6F2E9;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -46,16 +46,16 @@
 }
 
 .threadListTitle {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
   font-size: 17px;
   font-weight: 700;
-  color: #2A2118;
+  color: #1A1A17;
   letter-spacing: -.01em;
 }
 
 .threadListCount {
   font-size: 11.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 3px;
 }
 
@@ -65,9 +65,9 @@
   align-items: center;
   gap: 8px;
   padding: 9px 11px;
-  border-radius: 10px;
-  border: 1px solid #E7DCC6;
-  background: #FFFFFF;
+  border-radius: 3px;
+  border: 1px solid #CFC6B0;
+  background: #FCFAF4;
 }
 
 .searchBox input {
@@ -76,7 +76,7 @@
   background: transparent;
   font-size: 12.5px;
   font-family: inherit;
-  color: #2A2118;
+  color: #1A1A17;
   flex: 1;
   min-width: 0;
 }
@@ -102,20 +102,20 @@
 }
 
 .threadRow.active {
-  background: #FFFFFF;
-  border-left-color: #B08D3E;
+  background: #FCFAF4;
+  border-left-color: #23306B;
 }
 
 .avatar {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #B08D3E;
-  color: #FFFFFF;
+  background: #23306B;
+  color: #FCFAF4;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
   font-weight: 700;
   font-size: 13px;
   flex-shrink: 0;
@@ -129,12 +129,12 @@
 .threadName {
   font-size: 13.5px;
   font-weight: 700;
-  color: #2A2118;
+  color: #1A1A17;
 }
 
 .threadPreview {
   font-size: 11.5px;
-  color: #8C7C5E;
+  color: #6E6759;
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -153,11 +153,11 @@
 
 .threadTime {
   font-size: 10.5px;
-  color: #8C7C5E;
+  color: #6E6759;
 }
 
 .unreadPreview {
-  color: #2A2118;
+  color: #1A1A17;
   font-weight: 600;
 }
 
@@ -165,9 +165,9 @@
   min-width: 19px;
   height: 19px;
   padding: 0 6px;
-  border-radius: 10px;
-  background: #B08D3E;
-  color: #FFFFFF;
+  border-radius: 3px;
+  background: #23306B;
+  color: #FCFAF4;
   font-size: 10.5px;
   font-weight: 700;
   line-height: 19px;
@@ -176,7 +176,7 @@
 }
 
 .emptyList {
-  color: #8C7C5E;
+  color: #6E6759;
   font-size: 12.5px;
   text-align: center;
   padding: 24px 16px;
@@ -196,26 +196,27 @@
   align-items: center;
   gap: 12px;
   padding: 15px 26px;
-  border-bottom: 1px solid #E7DCC6;
+  border-bottom: 1px solid #CFC6B0;
   flex-shrink: 0;
 }
 
 .chatName {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Spectral', serif;
   font-size: 15px;
   font-weight: 700;
-  color: #2A2118;
+  color: #1A1A17;
 }
 
 .chatRole {
   font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: .06em;
+  letter-spacing: .13em;
+  font-family: 'IBM Plex Mono', monospace;
   text-transform: uppercase;
-  color: #B08D3E;
+  color: #23306B;
   background: #F3E8CE;
   padding: 2px 8px;
-  border-radius: 20px;
+  border-radius: 3px;
   display: inline-block;
   margin-top: 4px;
 }
@@ -239,12 +240,13 @@
   align-self: center;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: .07em;
+  letter-spacing: .13em;
+  font-family: 'IBM Plex Mono', monospace;
   text-transform: uppercase;
-  color: #8C7C5E;
+  color: #6E6759;
   background: #F3EDE0;
   padding: 4px 12px;
-  border-radius: 20px;
+  border-radius: 3px;
   margin: 8px 0 2px;
 }
 
@@ -270,14 +272,14 @@
   padding: 9px 13px;
   font-size: 13.5px;
   line-height: 1.45;
-  border-radius: 14px;
+  border-radius: 3px;
   overflow-wrap: anywhere;
 }
 
 .bubbleGroup.theirs .bubble {
-  background: #FBF7EE;
-  border: 1px solid #E7DCC6;
-  color: #2A2118;
+  background: #F6F2E9;
+  border: 1px solid #CFC6B0;
+  color: #1A1A17;
 }
 
 .bubbleGroup.theirs .bubble:first-child {
@@ -285,8 +287,8 @@
 }
 
 .bubbleGroup.mine .bubble {
-  background: #8f6743;
-  color: #FFFFFF;
+  background: #1A2551;
+  color: #FCFAF4;
 }
 
 .bubbleGroup.mine .bubble:first-child {
@@ -299,7 +301,7 @@
   font-size: 9.5px;
   line-height: 1;
   letter-spacing: .02em;
-  color: #A2916F;
+  color: #8C857A;
 }
 
 .bubbleGroup.mine .bubbleTime {
@@ -333,18 +335,18 @@
 }
 
 .bubbleGroup.mine .bubble.mediaOnly .attachmentFile {
-  background: #8f6743;
-  border-color: #8f6743;
-  color: #FFFFFF;
+  background: #1A2551;
+  border-color: #1A2551;
+  color: #FCFAF4;
 }
 
 /* Without the brown bubble behind it, the white-on-brown timestamp would vanish. */
 .bubbleGroup.mine .bubble.mediaOnly .bubbleTime {
-  color: #A2916F;
+  color: #8C857A;
 }
 
 .emptyThread {
-  color: #8C7C5E;
+  color: #6E6759;
   font-size: 13px;
   text-align: center;
   padding: 30px 0;
@@ -357,7 +359,7 @@
 .attachmentMedia {
   display: block;
   margin-bottom: 7px;
-  border-radius: 10px;
+  border-radius: 3px;
   overflow: hidden;
   max-width: 260px;
   line-height: 0;
@@ -369,7 +371,7 @@
   width: 100%;
   max-height: 260px;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 3px;
 }
 
 .attachmentFile {
@@ -378,7 +380,7 @@
   gap: 10px;
   margin-bottom: 7px;
   padding: 9px 11px;
-  border-radius: 10px;
+  border-radius: 3px;
   border: 1px solid currentColor;
   color: inherit;
   text-decoration: none;
@@ -387,7 +389,7 @@
 
 .bubbleGroup.theirs .attachmentFile {
   border-color: #E0D3B6;
-  background: #FFFFFF;
+  background: #FCFAF4;
 }
 
 .bubbleGroup.mine .attachmentFile {
@@ -419,7 +421,7 @@
 /* ---- composer ---- */
 
 .composerWrap {
-  border-top: 1px solid #E7DCC6;
+  border-top: 1px solid #CFC6B0;
   flex-shrink: 0;
 }
 
@@ -429,11 +431,11 @@
   gap: 8px;
   margin: 12px 26px 0;
   padding: 8px 12px;
-  border: 1px solid #E7DCC6;
-  border-radius: 10px;
-  background: #FBF7EE;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
+  background: #F6F2E9;
   font-size: 12.5px;
-  color: #2A2118;
+  color: #1A1A17;
 }
 
 .pendingName {
@@ -444,7 +446,7 @@
 }
 
 .pendingSize {
-  color: #8C7C5E;
+  color: #6E6759;
   font-size: 11px;
   flex: 1;
 }
@@ -459,8 +461,8 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 1px solid #E7DCC6;
-  background: #FFFFFF;
+  border: 1px solid #CFC6B0;
+  background: #FCFAF4;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -470,8 +472,8 @@
 }
 
 .attachBtn:hover {
-  background: #FBF7EE;
-  border-color: #B08D3E;
+  background: #F6F2E9;
+  border-color: #23306B;
 }
 
 .composer {
@@ -486,31 +488,31 @@
   flex: 1;
   min-width: 0;
   padding: 11px 16px;
-  border-radius: 22px;
-  border: 1px solid #E7DCC6;
-  background: #FCF9F3;
+  border-radius: 3px;
+  border: 1px solid #CFC6B0;
+  background: #F6F2E9;
   font-size: 13.5px;
   font-family: inherit;
-  color: #2A2118;
+  color: #1A1A17;
   outline: none;
   transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
 }
 
 .composerInput::placeholder {
-  color: #A2916F;
+  color: #8C857A;
 }
 
 .composerInput:focus {
-  background: #FFFFFF;
-  border-color: #B08D3E;
-  box-shadow: 0 0 0 3px rgba(176, 141, 62, .13);
+  background: #FCFAF4;
+  border-color: #23306B;
+  box-shadow: 0 0 0 3px rgba(35, 48, 107, .13);
 }
 
 .sendBtn {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #8f6743;
+  background: #1A2551;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -534,7 +536,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: #8C7C5E;
+  color: #6E6759;
   font-size: 13px;
 }
 

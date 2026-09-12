@@ -2,15 +2,15 @@
 import type { CSSProperties } from 'react'
 
 export const C = {
-  primary: '#B08D3E',
-  primaryDark: '#8f6743',
-  secondary: '#D8C79A',
-  border: '#E7DCC6',
-  text: '#2A2118',
-  muted: '#8C7C5E',
-  success: '#4CAF50',
-  warning: '#FFB74D',
-  danger: '#EF5350',
+  primary: '#23306B',
+  primaryDark: '#1A2551',
+  secondary: '#CFC6B0',
+  border: '#CFC6B0',
+  text: '#1A1A17',
+  muted: '#6E6759',
+  success: '#4A6B4E',
+  warning: '#8A6A2F',
+  danger: '#B3282D',
 }
 
 /** Builds a translucent pill background (color + 12% alpha) with matching text color, for status badges. */

@@ -14,25 +14,17 @@ import { formatDate } from '../../utils/date'
 import shellStyles from '../../components/AppShell.module.css'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
-const PRIMARY_DARK = '#8f6743'
-const MUTED = '#8C7C5E'
+const PRIMARY_DARK = '#1A2551'
+const MUTED = '#6E6759'
 const CLOSED_STATUSES = new Set(['Closed', 'Completed'])
 
-const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
+const DEFAULT_STATUS_STYLE: [string, string] = ['#575145', '#F0ECDF']
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
-  Completed: ['#2E9E58', '#E4F5EA'],
-  Closed: ['#2E9E58', '#E4F5EA'],
-  Open: ['#B87F1E', '#FFF2E0'],
-  'In Progress': ['#B87F1E', '#FFF2E0'],
-  Pending: ['#B87F1E', '#FFF2E0'],
-}
-
-// ponytail: cases aren't stage-tracked (that only exists for conveyancing
-// matters), so this maps status -> a representative progress figure rather
-// than a real measured percentage. Swap for real stage tracking if litigation
-// cases ever get one.
-const STATUS_PROGRESS: Record<string, number> = {
-  Closed: 100, Completed: 100, 'In Progress': 60, Open: 35, Pending: 15,
+  Completed: ['#4A6B4E', '#E4EDE5'],
+  Closed: ['#4A6B4E', '#E4EDE5'],
+  Open: ['#8A6A2F', '#F3EBD9'],
+  'In Progress': ['#8A6A2F', '#F3EBD9'],
+  Pending: ['#8A6A2F', '#F3EBD9'],
 }
 
 function loadProfile(): UserProfile | null {
@@ -129,7 +121,7 @@ export default function ClientDashboardPage() {
   const weekAgoMs = Date.now() - 7 * 86400000
   const recentDocsCount = documents.filter((d) => new Date(d.upload_date).getTime() >= weekAgoMs).length
   const unreadCount = notifications.filter((n) => !n.is_read).length
-  const primaryCase = cases.find((c) => c.lawyer_email) ?? cases.find((c) => c.lawyer)
+  const primaryCase = cases.find((c) => c.lawyer_id) ?? cases.find((c) => c.lawyer_email) ?? cases.find((c) => c.lawyer)
   const recentDocuments = [...documents].sort((a, b) => b.upload_date.localeCompare(a.upload_date)).slice(0, 3)
   const firstName = profile?.full_name.split(' ')[0] ?? 'there'
 
@@ -151,23 +143,31 @@ export default function ClientDashboardPage() {
             <div className={styles.subtitle}>Stay updated with your legal cases, hearings, documents, and AI-generated summaries.</div>
           </div>
           <div className={styles.headerActions}>
-            {primaryCase?.lawyer_email ? (
+            {primaryCase?.lawyer_id ? (
+              <div
+                className={styles.primaryChip}
+                style={{ opacity: messaging ? .6 : 1, cursor: messaging ? 'default' : 'pointer' }}
+                onClick={() => !messaging && openConversation(primaryCase.lawyer_id!)}
+              >
+                <Icon name="phone" size={15} color="#FCFAF4" /> Contact Lawyer
+              </div>
+            ) : primaryCase?.lawyer_email ? (
               <a href={`mailto:${primaryCase.lawyer_email}`} className={styles.primaryChip} style={{ textDecoration: 'none' }}>
-                <Icon name="phone" size={15} color="#FFFFFF" /> Contact Lawyer
+                <Icon name="phone" size={15} color="#FCFAF4" /> Contact Lawyer
               </a>
             ) : (
               <div className={styles.primaryChip} style={{ opacity: .5, cursor: 'default' }} title="No lawyer assigned yet">
-                <Icon name="phone" size={15} color="#FFFFFF" /> Contact Lawyer
+                <Icon name="phone" size={15} color="#FCFAF4" /> Contact Lawyer
               </div>
             )}
             <div className={styles.ghostChip} onClick={() => navigate('/hearings')}>
-              <Icon name="calendar" size={15} color="#2A2118" /> View Upcoming Hearing
+              <Icon name="calendar" size={15} color="#1A1A17" /> View Upcoming Hearing
             </div>
           </div>
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading your dashboard…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
         {!loading && !error && (
           <>
@@ -178,7 +178,7 @@ export default function ClientDashboardPage() {
                   <div>
                     <div className={styles.statValue}>{s.value}</div>
                     <div className={styles.statLabel}>{s.label}</div>
-                    <div style={{ fontSize: 11.5, color: '#B08D3E', fontWeight: 600, marginTop: 4 }}>{s.sublabel}</div>
+                    <div style={{ fontSize: 11.5, color: '#23306B', fontWeight: 600, marginTop: 4 }}>{s.sublabel}</div>
                   </div>
                 </div>
               ))}
@@ -193,21 +193,16 @@ export default function ClientDashboardPage() {
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {cases.map((c) => {
                     const [color, bg] = STATUS_STYLE_MAP[c.status] || DEFAULT_STATUS_STYLE
-                    const pct = STATUS_PROGRESS[c.status] ?? 50
                     return (
-                      <div key={c.id} style={{ padding: '16px 24px', borderTop: '1px solid #F1E9D9', cursor: 'pointer' }} onClick={() => navigate(`/cases/${c.case_id}`)}>
+                      <div key={c.id} style={{ padding: '16px 24px', borderTop: '1px solid #F1EDE0', cursor: 'pointer' }} onClick={() => navigate(`/cases/${c.case_id}`)}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                           <div>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: '#2A2118' }}>{c.case_title ?? c.id}</div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A17' }}>{c.case_title ?? c.id}</div>
                             <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>Assigned to {c.lawyer ?? '—'} · {c.court ?? 'Court TBD'}</div>
                           </div>
                           <span className={styles.statusBadge} style={{ color, background: bg, flexShrink: 0 }}>{c.status}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-                          <div className={styles.progressTrack} style={{ flex: 1 }}><div className={styles.progressFill} style={{ width: `${pct}%` }} /></div>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#2A2118', width: 34, textAlign: 'right' }}>{pct}%</div>
-                        </div>
-                        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 6 }}>Next hearing: {c.hearing ? formatDate(c.hearing) : '—'}</div>
+                        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 8 }}>Next hearing: {c.hearing ? formatDate(c.hearing) : '—'}</div>
                       </div>
                     )
                   })}
@@ -222,13 +217,13 @@ export default function ClientDashboardPage() {
                   <div className={styles.panelTitle}>Recent Documents</div>
                   <div className={styles.quickActionsList}>
                     {recentDocuments.map((d) => (
-                      <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: '1px solid #F1E9D9' }}>
+                      <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: '1px solid #F1EDE0' }}>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file_name}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file_name}</div>
                           <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{d.document_type ?? 'Document'} · {formatDate(d.upload_date)}</div>
                         </div>
                         <div onClick={() => openDocument(d.id)} style={{ display: 'flex', gap: 4, cursor: 'pointer', flexShrink: 0 }} title="Open">
-                          <Icon name="download" size={16} color="#6A5C42" />
+                          <Icon name="download" size={16} color="#575145" />
                         </div>
                       </div>
                     ))}
@@ -241,17 +236,17 @@ export default function ClientDashboardPage() {
                   {primaryCase?.lawyer ? (
                     <>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#B08D3E', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#23306B', color: '#FCFAF4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
                           {primaryCase.lawyer.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>{primaryCase.lawyer}</div>
+                          <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1A17' }}>{primaryCase.lawyer}</div>
                           <div style={{ fontSize: 11.5, color: MUTED }}>Your Lawyer</div>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14, fontSize: 12.5, color: '#6A5C42' }}>
-                        {primaryCase.lawyer_email && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Icon name="mail" size={14} color="#93826d" />{primaryCase.lawyer_email}</div>}
-                        {primaryCase.lawyer_phone && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Icon name="phone" size={14} color="#93826d" />{primaryCase.lawyer_phone}</div>}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14, fontSize: 12.5, color: '#575145' }}>
+                        {primaryCase.lawyer_email && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Icon name="mail" size={14} color="#8C857A" />{primaryCase.lawyer_email}</div>}
+                        {primaryCase.lawyer_phone && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Icon name="phone" size={14} color="#8C857A" />{primaryCase.lawyer_phone}</div>}
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
                         {primaryCase.lawyer_id ? (
@@ -266,11 +261,11 @@ export default function ClientDashboardPage() {
                           <div className={styles.darkBtn} style={{ flex: 1, justifyContent: 'center', opacity: .5 }}>Message</div>
                         )}
                         {primaryCase.lawyer_phone ? (
-                          <a href={`tel:${primaryCase.lawyer_phone}`} className={styles.darkBtn} style={{ flex: 1, justifyContent: 'center', background: '#FFFFFF', color: '#2A2118', border: '1px solid #E7DCC6', textDecoration: 'none' }}>Call</a>
+                          <a href={`tel:${primaryCase.lawyer_phone}`} className={styles.darkBtn} style={{ flex: 1, justifyContent: 'center', background: '#FCFAF4', color: '#1A1A17', border: '1px solid #CFC6B0', textDecoration: 'none' }}>Call</a>
                         ) : (
-                          <div className={styles.darkBtn} style={{ flex: 1, justifyContent: 'center', background: '#FFFFFF', color: '#2A2118', border: '1px solid #E7DCC6', opacity: .5 }}>Call</div>
+                          <div className={styles.darkBtn} style={{ flex: 1, justifyContent: 'center', background: '#FCFAF4', color: '#1A1A17', border: '1px solid #CFC6B0', opacity: .5 }}>Call</div>
                         )}
-                        <div className={styles.darkBtn} style={{ flex: 1, justifyContent: 'center', background: '#FFFFFF', color: '#2A2118', border: '1px solid #E7DCC6', opacity: .5 }} title="Scheduling coming soon">
+                        <div className={styles.darkBtn} style={{ flex: 1, justifyContent: 'center', background: '#FCFAF4', color: '#1A1A17', border: '1px solid #CFC6B0', opacity: .5 }} title="Scheduling coming soon">
                           Schedule<span className={shellStyles.soonPill}>Soon</span>
                         </div>
                       </div>
@@ -285,20 +280,20 @@ export default function ClientDashboardPage() {
                     <div className={styles.panelTitle}>Client Requests</div>
                     <div className={styles.quickActionsList}>
                       {pendingRequests.map((r) => (
-                        <div key={`req-${r.id}`} style={{ padding: '12px 14px', border: '1px solid #E7DCC6', borderRadius: 11, background: '#FBF7EE' }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>{r.lawyer_name ?? 'A lawyer'} wants to represent you</div>
+                        <div key={`req-${r.id}`} style={{ padding: '12px 14px', border: '1px solid #CFC6B0', borderRadius: 3, background: '#F6F2E9' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{r.lawyer_name ?? 'A lawyer'} wants to represent you</div>
                           <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>{r.case_type_name} · {r.court_name}</div>
                           {r.message && <div style={{ fontSize: 12, color: MUTED, marginTop: 3, fontStyle: 'italic' }}>"{r.message}"</div>}
                           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                             <div
                               onClick={() => respondingId !== r.id && respondToRequest(r.id, 'accept')}
-                              style={{ flex: 1, textAlign: 'center', fontSize: 12.5, fontWeight: 600, padding: '7px 0', borderRadius: 8, background: PRIMARY_DARK, color: '#FFFFFF', cursor: 'pointer', opacity: respondingId === r.id ? 0.6 : 1 }}
+                              style={{ flex: 1, textAlign: 'center', fontSize: 12.5, fontWeight: 600, padding: '7px 0', borderRadius: 3, background: PRIMARY_DARK, color: '#FCFAF4', cursor: 'pointer', opacity: respondingId === r.id ? 0.6 : 1 }}
                             >
                               Accept
                             </div>
                             <div
                               onClick={() => respondingId !== r.id && respondToRequest(r.id, 'decline')}
-                              style={{ flex: 1, textAlign: 'center', fontSize: 12.5, fontWeight: 600, padding: '7px 0', borderRadius: 8, border: '1px solid #E7DCC6', color: '#6A5C42', cursor: 'pointer', opacity: respondingId === r.id ? 0.6 : 1 }}
+                              style={{ flex: 1, textAlign: 'center', fontSize: 12.5, fontWeight: 600, padding: '7px 0', borderRadius: 3, border: '1px solid #CFC6B0', color: '#575145', cursor: 'pointer', opacity: respondingId === r.id ? 0.6 : 1 }}
                             >
                               Decline
                             </div>

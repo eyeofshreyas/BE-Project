@@ -23,6 +23,10 @@ CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
+# Supabase Storage has no queryable quota, so the admin analytics bar needs a number
+# to divide by -- set it to whatever the plan actually allows.
+STORAGE_QUOTA_BYTES = int(float(os.getenv("STORAGE_QUOTA_GB", "500")) * 1024 ** 3)
+
 SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER")

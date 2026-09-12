@@ -7,8 +7,8 @@ import { Icon } from '../../components/icons'
 import { formatDate } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
-const MUTED = '#8C7C5E'
-const PRIMARY = '#B08D3E'
+const MUTED = '#6E6759'
+const PRIMARY = '#23306B'
 
 type LineItem = { description: string; qty: string; rate: string }
 
@@ -32,7 +32,7 @@ function loadProfile(): UserProfile | null {
 }
 
 function fieldStyle(): React.CSSProperties {
-  return { width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF', fontFamily: 'inherit' }
+  return { width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4', fontFamily: 'inherit' }
 }
 
 export default function GenerateInvoicePage() {
@@ -143,14 +143,14 @@ export default function GenerateInvoicePage() {
         <div className={styles.header}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div onClick={back} style={{ cursor: 'pointer', color: MUTED, width: 30, height: 30, borderRadius: '50%', border: '1px solid #E7DCC6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div onClick={back} style={{ cursor: 'pointer', color: MUTED, width: 30, height: 30, borderRadius: '50%', border: '1px solid #CFC6B0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <span style={{ display: 'inline-flex', transform: 'rotate(90deg)' }}><Icon name="chevron-down" size={14} strokeWidth={2.2} /></span>
               </div>
               <div className={styles.title}>Generate Invoice</div>
             </div>
             <div className={styles.subtitle} style={{ marginLeft: 40 }}>Create a new billable document for your client.</div>
           </div>
-          <span className={styles.statusBadge} style={{ color: '#8f6743', background: '#EFE4CB' }}>DRAFT STATUS</span>
+          <span className={styles.statusBadge} style={{ color: '#1A2551', background: '#E6E0CE' }}>DRAFT STATUS</span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 20, alignItems: 'start' }}>
@@ -159,7 +159,7 @@ export default function GenerateInvoicePage() {
               <div className={styles.panelTitle}>Client Details</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div ref={clientBoxRef} style={{ position: 'relative' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Client Name</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#575145', marginBottom: 5 }}>Client Name</div>
                   <input
                     value={clientQuery}
                     onChange={(e) => { setClientQuery(e.target.value); setSelectedClient(null); setClientOpen(true) }}
@@ -168,9 +168,9 @@ export default function GenerateInvoicePage() {
                     style={fieldStyle()}
                   />
                   {clientOpen && clientQuery && (
-                    <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#FFFFFF', border: '1px solid #E7DCC6', borderRadius: 10, boxShadow: '0 10px 24px rgba(42,33,24,.12)', maxHeight: 200, overflowY: 'auto', zIndex: 20 }}>
+                    <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#FCFAF4', border: '1px solid #CFC6B0', borderRadius: 3, boxShadow: '0 10px 24px rgba(35, 48, 107,.12)', maxHeight: 200, overflowY: 'auto', zIndex: 20 }}>
                       {clients.filter((c) => c.full_name.toLowerCase().includes(clientQuery.toLowerCase())).map((c) => (
-                        <div key={c.id} onClick={() => pickClient(c)} style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: '#2A2118' }}>
+                        <div key={c.id} onClick={() => pickClient(c)} style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: '#1A1A17' }}>
                           {c.full_name} <span style={{ color: MUTED, fontSize: 11.5 }}>· {c.email}</span>
                         </div>
                       ))}
@@ -181,18 +181,18 @@ export default function GenerateInvoicePage() {
                   )}
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Case / Matter</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#575145', marginBottom: 5 }}>Case / Matter</div>
                   <select value={caseId} onChange={(e) => setCaseId(e.target.value)} style={fieldStyle()}>
                     <option value="">Select active matter...</option>
                     {availableCases.map((c) => <option key={c.case_id} value={c.case_id}>{c.id} — {c.case_title ?? c.client ?? 'Untitled'}</option>)}
                   </select>
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Invoice Date</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#575145', marginBottom: 5 }}>Invoice Date</div>
                   <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} style={fieldStyle()} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6A5C42', marginBottom: 5 }}>Due Date</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#575145', marginBottom: 5 }}>Due Date</div>
                   <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={fieldStyle()} />
                 </div>
               </div>
@@ -201,11 +201,11 @@ export default function GenerateInvoicePage() {
             <div className={styles.panelCard}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div className={styles.panelTitle} style={{ margin: 0 }}>Line Items</div>
-                <div className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12.5 }} onClick={addItem}><Icon name="plus" size={13} color="#6A5C42" /> Add Item</div>
+                <div className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12.5 }} onClick={addItem}><Icon name="plus" size={13} color="#575145" /> Add Item</div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 110px 28px', gap: 8, fontSize: 10.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 110px 28px', gap: 8, fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>
                   <div>Description</div><div>Qty / Hrs</div><div>Rate (₹)</div><div>Amount</div><div />
                 </div>
                 {parsedItems.map((it, i) => (
@@ -213,15 +213,15 @@ export default function GenerateInvoicePage() {
                     <input value={it.description} onChange={(e) => updateItem(i, 'description', e.target.value)} style={fieldStyle()} />
                     <input type="number" min="0" value={it.qty} onChange={(e) => updateItem(i, 'qty', e.target.value)} style={fieldStyle()} />
                     <input type="number" min="0" value={it.rate} onChange={(e) => updateItem(i, 'rate', e.target.value)} style={fieldStyle()} />
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#2A2118', textAlign: 'right' }}>{money(it.amount)}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17', textAlign: 'right' }}>{money(it.amount)}</div>
                     <div onClick={() => items.length > 1 && removeItem(i)} style={{ cursor: items.length > 1 ? 'pointer' : 'default', opacity: items.length > 1 ? 1 : 0.3, display: 'flex', justifyContent: 'center' }}>
-                      <Icon name="trash-2" size={15} color="#B05C5C" />
+                      <Icon name="trash-2" size={15} color="#B3282D" />
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div style={{ borderTop: '1px solid #F1E9D9', marginTop: 16, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ borderTop: '1px solid #F1EDE0', marginTop: 16, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13.5 }}>
                   <span style={{ color: MUTED }}>Subtotal</span><strong>{money(subtotal)}</strong>
                 </div>
@@ -233,7 +233,7 @@ export default function GenerateInvoicePage() {
                   <span style={{ color: MUTED }}>GST (%)</span>
                   <input type="number" min="0" max="100" value={gstPct} onChange={(e) => setGstPct(e.target.value)} style={{ ...fieldStyle(), width: 90 }} />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 16, fontWeight: 700, borderTop: '1px solid #F1E9D9', paddingTop: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 16, fontWeight: 700, borderTop: '1px solid #F1EDE0', paddingTop: 10 }}>
                   <span>Total Due</span><span>{money(totalDue)}</span>
                 </div>
               </div>
@@ -248,12 +248,12 @@ export default function GenerateInvoicePage() {
               />
             </div>
 
-            {error && <div style={{ fontSize: 12.5, color: '#B05C5C' }}>{error}</div>}
+            {error && <div style={{ fontSize: 12.5, color: '#B3282D' }}>{error}</div>}
 
-            <div style={{ position: 'sticky', bottom: 0, background: '#2A2118', borderRadius: 14, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span onClick={back} style={{ color: '#D8C9A8', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>Cancel</span>
+            <div style={{ position: 'sticky', bottom: 0, background: '#23306B', borderRadius: 3, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span onClick={back} style={{ color: '#CFC6B0', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>Cancel</span>
               <div style={{ display: 'flex', gap: 10 }}>
-                <div className={styles.ghostChip} style={{ background: 'transparent', borderColor: '#5A4C3A', color: '#FFFFFF' }} onClick={saveDraft}>Save Draft</div>
+                <div className={styles.ghostChip} style={{ background: 'transparent', borderColor: '#5A4C3A', color: '#FCFAF4' }} onClick={saveDraft}>Save Draft</div>
                 <div className={styles.primaryChip} style={{ opacity: saving ? 0.7 : 1, pointerEvents: saving ? 'none' : 'auto' }} onClick={submit}>
                   {saving ? 'Generating…' : 'Generate Invoice'}
                 </div>
@@ -263,15 +263,15 @@ export default function GenerateInvoicePage() {
 
           <div style={{ position: 'sticky', top: 20 }}>
             <div className={styles.panelCard} style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid #F1E9D9' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em' }}>Live Preview</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid #F1EDE0' }}>
+                <span style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>Live Preview</span>
                 <Icon name="eye" size={15} color={MUTED} />
               </div>
               <div style={{ position: 'relative', padding: 20, overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', top: '38%', left: '50%', transform: 'translate(-50%, -50%) rotate(-24deg)', fontSize: 46, fontWeight: 800, color: 'rgba(176,141,62,.12)', letterSpacing: '.1em', pointerEvents: 'none', whiteSpace: 'nowrap' }}>DRAFT</div>
+                <div style={{ position: 'absolute', top: '38%', left: '50%', transform: 'translate(-50%, -50%) rotate(-24deg)', fontSize: 46, fontWeight: 800, color: 'rgba(35, 48, 107,.12)', letterSpacing: '.1em', pointerEvents: 'none', whiteSpace: 'nowrap' }}>DRAFT</div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 17, fontWeight: 700, color: '#2A2118' }}>LexFlow</div>
+                  <div style={{ fontFamily: "'Spectral', serif", fontSize: 17, fontWeight: 700, color: '#1A1A17' }}>LexFlow</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, letterSpacing: '.05em' }}>INVOICE</div>
                 </div>
                 <div style={{ fontSize: 11.5, color: PRIMARY, fontWeight: 600, marginTop: 2 }}>{profile?.full_name ?? 'No lawyer signed in'}</div>
@@ -282,15 +282,15 @@ export default function GenerateInvoicePage() {
                   <div>{formatDate(invoiceDate)}</div>
                 </div>
 
-                <div style={{ borderTop: '1px solid #F1E9D9', marginTop: 14, paddingTop: 12 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em' }}>Bill To</div>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#2A2118', marginTop: 3 }}>{selectedClient?.full_name ?? 'Client name'}</div>
+                <div style={{ borderTop: '1px solid #F1EDE0', marginTop: 14, paddingTop: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>Bill To</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17', marginTop: 3 }}>{selectedClient?.full_name ?? 'Client name'}</div>
                   <div style={{ fontSize: 11.5, color: MUTED }}>{selectedClient?.email ?? 'client@email.com'}</div>
-                  <div style={{ fontSize: 11.5, color: '#2A2118', fontWeight: 600, marginTop: 4 }}>Matter: {selectedCase ? (selectedCase.case_title ?? selectedCase.id) : 'No matter selected'}</div>
+                  <div style={{ fontSize: 11.5, color: '#1A1A17', fontWeight: 600, marginTop: 4 }}>Matter: {selectedCase ? (selectedCase.case_title ?? selectedCase.id) : 'No matter selected'}</div>
                 </div>
 
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px 60px 70px', gap: 6, fontSize: 9.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em', borderBottom: '1px solid #F1E9D9', paddingBottom: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px 60px 70px', gap: 6, fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', borderBottom: '1px solid #F1EDE0', paddingBottom: 6 }}>
                     <div>Description</div><div>Hrs</div><div>Rate</div><div style={{ textAlign: 'right' }}>Amount</div>
                   </div>
                   {parsedItems.filter((it) => it.description.trim()).map((it, i) => (
@@ -312,9 +312,9 @@ export default function GenerateInvoicePage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: MUTED }}><span>GST ({gstPct}%)</span><span>{money(gstAmt).replace('.00', '')}</span></div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1px solid #E7DCC6', marginTop: 10, paddingTop: 10 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#2A2118' }}>Total Due</span>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: '#2A2118' }}>{money(totalDue).replace('.00', '')}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1px solid #CFC6B0', marginTop: 10, paddingTop: 10 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#1A1A17' }}>Total Due</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: '#1A1A17' }}>{money(totalDue).replace('.00', '')}</span>
                 </div>
                 <div style={{ fontSize: 10.5, color: MUTED, marginTop: 2 }}>Due {formatDate(dueDate)}</div>
               </div>

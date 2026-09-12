@@ -1,14 +1,24 @@
 """Controllers for case documents: list, upload (to Supabase Storage), delete (soft),
-download URL, and fetching an AI-generated summary."""
+download URL, extracting a stored file's text, and fetching an AI-generated summary."""
 
+import io
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import Depends, File, Form, HTTPException, UploadFile
+from storage3.exceptions import StorageApiError
 from app.db.supabase_client import supabase
 from app.middleware.auth import ensure_case_access, get_current_profile, get_scoped_case_ids
 from app.models.documents import DocumentSummary, AiSummary
 
 DOCUMENTS_BUCKET = "documents"
+TEXT_MIME_PREFIX = "text/"
+# Same ceiling message attachments use (see messages.MAX_ATTACHMENT_BYTES).
+MAX_DOCUMENT_BYTES = 25 * 1024 * 1024
+# An hour, matching messages.ATTACHMENT_URL_TTL. It was 5 minutes, which is fine for a
+# PDF the browser fetches once but not for video: a <video> element re-requests byte
+# ranges as it plays and seeks, so a dead URL stalls playback part-way through.
+DOCUMENT_URL_TTL = 3600
 DOCUMENTS_SELECT = (
     "document_id,file_name,mime_type,upload_date,file_size,case_id,file_path,"
     "document_types(type_name),cases(case_number),users(full_name)"
@@ -53,13 +63,34 @@ def list_documents(profile: dict = Depends(get_current_profile)):
 
 
 def delete_document(document_id: int, profile: dict = Depends(get_current_profile)):
-    """Soft-delete a document (sets is_deleted=True) the caller has access to. Calls: `ensure_case_access()`."""
+    """Soft-delete a document the caller has access to: sets is_deleted and stamps deleted_at,
+    which reap_storage.py measures its grace period from. The stored object is left alone --
+    only the reaper removes those. Calls: `ensure_case_access()`."""
     rows = supabase.table("documents").select("case_id").eq("document_id", document_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Document not found")
     ensure_case_access(rows[0]["case_id"], profile)
-    supabase.table("documents").update({"is_deleted": True}).eq("document_id", document_id).execute()
+    supabase.table("documents").update({
+        "is_deleted": True,
+        "deleted_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("document_id", document_id).execute()
     return {"message": "Document deleted"}
+
+
+def read_upload(file: UploadFile) -> bytes:
+    """Read an upload into memory, refusing an empty file or one over MAX_DOCUMENT_BYTES.
+
+    Reads one byte past the cap rather than the whole file, so an oversized upload never
+    gets fully buffered in the API process. Starlette has already spooled the request body
+    by the time a handler runs, so this bounds memory and stops the storage write -- it
+    does not stop the bytes arriving. A Content-Length check in middleware would, if
+    someone uploading 2 GB of video becomes a real problem."""
+    content = file.file.read(MAX_DOCUMENT_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="That file is empty")
+    if len(content) > MAX_DOCUMENT_BYTES:
+        raise HTTPException(status_code=400, detail="Documents are limited to 25 MB")
+    return content
 
 
 def upload_document(
@@ -73,7 +104,7 @@ def upload_document(
     the multipart body. Calls: `ensure_case_access()`, `_to_document_summary()`."""
     ensure_case_access(case_id, profile)
 
-    content = file.file.read()
+    content = read_upload(file)
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     storage_path = f"case-{case_id}/{uuid.uuid4().hex}.{ext}"
     supabase.storage.from_(DOCUMENTS_BUCKET).upload(
@@ -106,8 +137,45 @@ def get_document_download_url(document_id: int, download: bool = False, profile:
         raise HTTPException(status_code=403, detail="You don't have access to this document")
 
     options = {"download": True} if download else None
-    signed = supabase.storage.from_(DOCUMENTS_BUCKET).create_signed_url(rows[0]["file_path"], 300, options)
+    try:
+        signed = supabase.storage.from_(DOCUMENTS_BUCKET).create_signed_url(rows[0]["file_path"], DOCUMENT_URL_TTL, options)
+    except StorageApiError:
+        # The documents row outlived its stored object (seed rows that were never
+        # uploaded, a file cleared from the bucket). Say so instead of 500ing --
+        # every preview/open/download button routes through here.
+        raise HTTPException(status_code=404, detail="This document's file is no longer in storage.")
     return {"url": signed["signedURL"]}
+
+
+def extract_document_text(file_path: str, mime_type: str | None) -> str:
+    """Download a stored document and return its text, for feeding to the summarizer.
+
+    Handles the two kinds that carry a text layer: PDFs (via pypdf) and text/* files. A scanned
+    PDF is all image, so pypdf returns nothing -- the caller reports that rather than summarizing
+    an empty string.
+    ponytail: no OCR, and no Word/image support -- pasting the text still works for those. Add
+    an OCR pass if scanned uploads turn out to be common."""
+    try:
+        content = supabase.storage.from_(DOCUMENTS_BUCKET).download(file_path)
+    except StorageApiError:
+        raise HTTPException(status_code=404, detail="This document's file is no longer in storage.")
+
+    if (mime_type or "").startswith(TEXT_MIME_PREFIX):
+        return content.decode("utf-8", "replace").strip()
+
+    if mime_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail="Text can only be read from PDF and text files. Paste the text to summarize it.",
+        )
+
+    from pypdf import PdfReader  # local import: only the summarize path pays for it
+
+    try:
+        pages = PdfReader(io.BytesIO(content)).pages
+    except Exception:
+        raise HTTPException(status_code=400, detail="This PDF could not be read. Paste the text instead.")
+    return "\n".join(page.extract_text() or "" for page in pages).strip()
 
 
 def get_document_summary(document_id: int, profile: dict = Depends(get_current_profile)):

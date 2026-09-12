@@ -6,8 +6,8 @@ import type { CaseSummary, HearingSummary, ClientSummary, InvoiceSummary, Docume
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
-const MUTED = '#8C7C5E'
-const PRIMARY_DARK = '#8f6743'
+const MUTED = '#6E6759'
+const PRIMARY_DARK = '#1A2551'
 const CLOSED_STATUSES = new Set(['Closed', 'Completed'])
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -124,14 +124,14 @@ export default function LawyerDashboardPage() {
             <div className={styles.subtitle}>Here's what's happening across your cases today, {todayLabel}.</div>
           </div>
           <div className={styles.headerActions}>
-            <div className={styles.primaryChip} onClick={() => navigate('/cases/new')}><Icon name="plus" size={15} color="#FFFFFF" /> New Case</div>
-            <div className={styles.ghostChip} onClick={() => navigate('/documents')}><Icon name="file-text" size={15} color="#2A2118" /> Upload Document</div>
-            <div className={styles.ghostChip} style={{ opacity: .5, cursor: 'default' }} title="Hearing scheduling coming soon"><Icon name="calendar" size={15} color="#2A2118" /> Schedule Hearing</div>
+            <div className={styles.primaryChip} onClick={() => navigate('/cases/new')}><Icon name="plus" size={15} color="#FCFAF4" /> New Case</div>
+            <div className={styles.ghostChip} onClick={() => navigate('/documents')}><Icon name="file-text" size={15} color="#1A1A17" /> Upload Document</div>
+            <div className={styles.ghostChip} style={{ opacity: .5, cursor: 'default' }} title="Hearing scheduling coming soon"><Icon name="calendar" size={15} color="#1A1A17" /> Schedule Hearing</div>
           </div>
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading your dashboard…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
         {!loading && !error && (
           <>
@@ -140,11 +140,11 @@ export default function LawyerDashboardPage() {
                 <div key={s.label} className={styles.statCard} style={{ gap: 8 }}>
                   <div className={styles.statIconRow}>
                     <div className={styles.statIconWrap}><Icon name={s.icon} size={19} color={PRIMARY_DARK} /></div>
-                    {s.pill && <span className={styles.statusBadge} style={{ background: '#EFE4CB', color: PRIMARY_DARK }}>{s.pill}</span>}
+                    {s.pill && <span className={styles.statusBadge} style={{ background: '#E6E0CE', color: PRIMARY_DARK }}>{s.pill}</span>}
                   </div>
                   <div>
                     <div className={styles.statValue}>{s.value}</div>
-                    <div className={styles.statLabel} style={{ textTransform: 'uppercase', fontSize: 11, fontWeight: 700, letterSpacing: '.03em' }}>{s.label}</div>
+                    <div className={styles.statLabel} style={{ fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', fontSize: 9.5, fontWeight: 700, letterSpacing: '.13em' }}>{s.label}</div>
                   </div>
                   <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: '100%' }} /></div>
                 </div>
@@ -161,7 +161,7 @@ export default function LawyerDashboardPage() {
                   </div>
                 </div>
                 {pctChange !== null && (
-                  <span className={styles.statusBadge} style={pctChange >= 0 ? { color: '#2E9E58', background: '#E4F5EA' } : { color: '#B05C5C', background: '#FBEAEA' }}>
+                  <span className={styles.statusBadge} style={pctChange >= 0 ? { color: '#4A6B4E', background: '#E4EDE5' } : { color: '#B3282D', background: '#F7E4E5' }}>
                     {pctChange >= 0 ? '↗' : '↘'} {pctChange >= 0 ? '+' : ''}{pctChange}% vs last period
                   </span>
                 )}
@@ -174,7 +174,7 @@ export default function LawyerDashboardPage() {
                   return (
                     <div key={i} className={styles.barCol}>
                       {isCurrent && count > 0 && <span className={styles.barValueBadge}>{count}</span>}
-                      <div className={styles.bar} style={{ height: `${heightPct}%`, background: isCurrent ? PRIMARY_DARK : '#D8C79A' }} title={`${count} case${count === 1 ? '' : 's'}`} />
+                      <div className={styles.bar} style={{ height: `${heightPct}%`, background: isCurrent ? PRIMARY_DARK : '#CFC6B0' }} title={`${count} case${count === 1 ? '' : 's'}`} />
                       <div className={styles.barMonthLabel}>{MONTH_LABELS[month]}</div>
                     </div>
                   )
@@ -188,16 +188,16 @@ export default function LawyerDashboardPage() {
                 {upcomingHearings.map((h) => {
                   const badge = dateBadge(h.hearing_date)
                   return (
-                    <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderTop: '1px solid #F1E9D9', cursor: 'pointer' }} onClick={() => navigate(`/cases/${h.case_id}`)}>
-                      <div style={{ width: 50, height: 50, borderRadius: 10, background: '#F5EFDF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: '#2A2118', lineHeight: 1.1 }}>{badge.day}</div>
-                        <div style={{ fontSize: 9.5, fontWeight: 700, color: '#8C7C5E' }}>{badge.month}</div>
+                    <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderTop: '1px solid #F1EDE0', cursor: 'pointer' }} onClick={() => navigate(`/cases/${h.case_id}`)}>
+                      <div style={{ width: 50, height: 50, borderRadius: 3, background: '#F1EDE0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: '#1A1A17', lineHeight: 1.1 }}>{badge.day}</div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: '#6E6759' }}>{badge.month}</div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#2A2118' }}>{h.case_title ?? h.case_number ?? 'Hearing'}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A17' }}>{h.case_title ?? h.case_number ?? 'Hearing'}</div>
                         <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{h.court_name ?? 'Court TBD'} · {h.hearing_time?.slice(0, 5) ?? '—'}</div>
                       </div>
-                      <span className={styles.statusBadge} style={{ color: PRIMARY_DARK, background: '#EFE4CB', flexShrink: 0 }}>Hearing</span>
+                      <span className={styles.statusBadge} style={{ color: PRIMARY_DARK, background: '#E6E0CE', flexShrink: 0 }}>Hearing</span>
                     </div>
                   )
                 })}

@@ -67,12 +67,16 @@ def list_cases(profile: dict = Depends(get_current_profile)):
 
 def _generate_case_number(case_type_name: str) -> str:
     """Build a case number like "CIV2026001" from the case type's letters + year + sequence.
-    ponytail: sequence = count of cases already using this prefix, same
-    scheme as client_requests._generate_case_number."""
+    Counting rows breaks as soon as one number in the run is missing (deleted case, seed data
+    that starts at 003), so take the highest number in use for the prefix instead -- a count
+    would hand back a case_number that already exists and the insert would fail.
+    ponytail: read-then-insert, fine at this app's scale; move to a DB sequence if
+    concurrent creates ever race for the same number."""
     prefix = "".join(ch for ch in case_type_name.upper() if ch.isalpha())[:3] or "GEN"
     like_prefix = f"{prefix}{datetime.now(timezone.utc).year}"
     existing = supabase.table("cases").select("case_number").like("case_number", f"{like_prefix}%").execute().data
-    return f"{like_prefix}{len(existing) + 1:03d}"
+    used = [int(r["case_number"][len(like_prefix):]) for r in existing if r["case_number"][len(like_prefix):].isdigit()]
+    return f"{like_prefix}{max(used, default=0) + 1:03d}"
 
 
 def create_case(data: CaseCreate, profile: dict = Depends(require_roles(LAWYER))):

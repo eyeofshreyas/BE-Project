@@ -6,9 +6,9 @@ import type { CourtOption, CaseTypeOption, ClientSummary, DocumentTypeOption } f
 import { Icon, type IconName } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
-const MUTED = '#8C7C5E'
+const MUTED = '#6E6759'
 const PRIORITIES = ['Low', 'Medium', 'High'] as const
-const PRIORITY_DOT: Record<(typeof PRIORITIES)[number], string> = { Low: '#4CAF6D', Medium: '#B08D3E', High: '#D64545' }
+const PRIORITY_DOT: Record<(typeof PRIORITIES)[number], string> = { Low: '#4CAF6D', Medium: '#23306B', High: '#D64545' }
 
 const CASE_TYPE_META: Record<string, { icon: IconName; blurb: string }> = {
   civil: { icon: 'scale', blurb: 'Disputes & torts' },
@@ -27,13 +27,13 @@ function metaFor(name: string) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6A5C42', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 9.5, fontWeight: 700, color: '#575145', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', marginBottom: 6 }}>{label}</div>
       {children}
     </div>
   )
 }
 
-const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }
+const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }
 
 /**
  * Loads reference data (`listCourts()`, `listCaseTypes()`, `listClients()`,
@@ -139,7 +139,7 @@ export default function CreateCasePage() {
   return (
     <div className={styles.page}>
       <div className={styles.wrap}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#8f6743', fontWeight: 600, cursor: 'pointer', width: 'fit-content' }} onClick={() => navigate('/cases')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#1A2551', fontWeight: 600, cursor: 'pointer', width: 'fit-content' }} onClick={() => navigate('/cases')}>
           <span style={{ display: 'inline-flex', transform: 'rotate(90deg)' }}><Icon name="chevron-down" size={14} strokeWidth={2.2} /></span> Back to Cases
         </div>
 
@@ -166,17 +166,17 @@ export default function CreateCasePage() {
                   <div
                     key={c.case_type_id}
                     onClick={() => setCaseTypeId(String(c.case_type_id))}
-                    style={{ border: selected ? '1.5px solid #B08D3E' : '1px solid #E7DCC6', background: selected ? '#FBF0D6' : '#FFFFFF', borderRadius: 12, padding: '14px 12px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}
+                    style={{ border: selected ? '1.5px solid #23306B' : '1px solid #CFC6B0', background: selected ? '#F3EBD9' : '#FCFAF4', borderRadius: 3, padding: '14px 12px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}
                   >
                     {selected && (
-                      <div style={{ position: 'absolute', top: 10, right: 10, width: 18, height: 18, borderRadius: '50%', background: '#B08D3E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon name="check-circle" size={12} color="#FFFFFF" />
+                      <div style={{ position: 'absolute', top: 10, right: 10, width: 18, height: 18, borderRadius: '50%', background: '#23306B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="check-circle" size={12} color="#FCFAF4" />
                       </div>
                     )}
-                    <div style={{ width: 34, height: 34, borderRadius: 9, background: selected ? '#8f6743' : '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name={meta.icon} size={16} color={selected ? '#FFFFFF' : '#8f6743'} />
+                    <div style={{ width: 34, height: 34, borderRadius: 3, background: selected ? '#1A2551' : '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name={meta.icon} size={16} color={selected ? '#FCFAF4' : '#1A2551'} />
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#2A2118' }}>{c.case_type_name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1A17' }}>{c.case_type_name}</div>
                     <div style={{ fontSize: 11.5, color: MUTED }}>{c.description || meta.blurb}</div>
                   </div>
                 )
@@ -188,10 +188,10 @@ export default function CreateCasePage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="Case Name"><input placeholder="e.g. Smith vs. Johnson" value={caseName} onChange={(e) => setCaseName(e.target.value)} style={inputStyle} /></Field>
             <Field label="Priority">
-              <div style={{ display: 'flex', gap: 6, background: '#FBF7EE', border: '1.5px solid #E7DCC6', borderRadius: 9, padding: 4 }}>
+              <div style={{ display: 'flex', gap: 6, background: '#F6F2E9', border: '1.5px solid #CFC6B0', borderRadius: 3, padding: 4 }}>
                 {PRIORITIES.map((p) => (
-                  <div key={p} onClick={() => setPriority(p)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 0', borderRadius: 7, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: priority === p ? '#FFFFFF' : '#6A5C42', background: priority === p ? '#B08D3E' : 'transparent' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: priority === p ? '#FFFFFF' : PRIORITY_DOT[p] }} /> {p}
+                  <div key={p} onClick={() => setPriority(p)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 0', borderRadius: 3, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: priority === p ? '#FCFAF4' : '#575145', background: priority === p ? '#23306B' : 'transparent' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: priority === p ? '#FCFAF4' : PRIORITY_DOT[p] }} /> {p}
                   </div>
                 ))}
               </div>
@@ -210,7 +210,7 @@ export default function CreateCasePage() {
                   />
                 </div>
                 {clientDropdownOpen && filteredClients.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: '#FFFFFF', border: '1px solid #E7DCC6', borderRadius: 9, boxShadow: '0 8px 20px rgba(0,0,0,.08)', zIndex: 10, maxHeight: 200, overflowY: 'auto' }}>
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: '#FCFAF4', border: '1px solid #CFC6B0', borderRadius: 3, boxShadow: '0 8px 20px rgba(0,0,0,.08)', zIndex: 10, maxHeight: 200, overflowY: 'auto' }}>
                     {filteredClients.map((c) => (
                       <div key={c.id} onMouseDown={() => pickClient(c)} style={{ padding: '9px 12px', fontSize: 13, cursor: 'pointer' }}>
                         {c.full_name} <span style={{ color: MUTED, fontSize: 11.5 }}>· {c.email}</span>
@@ -222,8 +222,8 @@ export default function CreateCasePage() {
             </Field>
             <Field label="Next Hearing"><input type="date" value={nextHearing} onChange={(e) => setNextHearing(e.target.value)} style={inputStyle} /></Field>
 
-            <Field label="Email ID"><input type="email" placeholder="e.g. client@email.com" value={email} readOnly style={{ ...inputStyle, background: '#FBF7EE', color: MUTED }} /></Field>
-            <Field label="Phone Number"><input placeholder="e.g. +91 98765 43210" value={phone} readOnly style={{ ...inputStyle, background: '#FBF7EE', color: MUTED }} /></Field>
+            <Field label="Email ID"><input type="email" placeholder="e.g. client@email.com" value={email} readOnly style={{ ...inputStyle, background: '#F6F2E9', color: MUTED }} /></Field>
+            <Field label="Phone Number"><input placeholder="e.g. +91 98765 43210" value={phone} readOnly style={{ ...inputStyle, background: '#F6F2E9', color: MUTED }} /></Field>
           </div>
 
           <Field label="Court / Jurisdiction">
@@ -251,21 +251,21 @@ export default function CreateCasePage() {
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
               onDrop={(e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files) }}
-              style={{ border: `1.5px dashed ${dragOver ? '#B08D3E' : '#E0CE9E'}`, borderRadius: 12, padding: '32px 16px', textAlign: 'center', background: dragOver ? '#F5EAD0' : '#FBF7EE', cursor: 'pointer' }}
+              style={{ border: `1.5px dashed ${dragOver ? '#23306B' : '#E6E0CE'}`, borderRadius: 3, padding: '32px 16px', textAlign: 'center', background: dragOver ? '#F5EAD0' : '#F6F2E9', cursor: 'pointer' }}
             >
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
-                <Icon name="download" size={17} color="#8f6743" strokeWidth={1.8} />
+              <div style={{ width: 40, height: 40, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+                <Icon name="download" size={17} color="#1A2551" strokeWidth={1.8} />
               </div>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>Drop files here, or click to browse</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1A17' }}>Drop files here, or click to browse</div>
               <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>PDF, Word, images, or video · uploaded once the case is created</div>
             </div>
 
             {files.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
                 {files.map((f) => (
-                  <div key={f.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12.5, background: '#FFFFFF', border: '1px solid #E7DCC6', borderRadius: 8, padding: '7px 10px' }}>
+                  <div key={f.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12.5, background: '#FCFAF4', border: '1px solid #CFC6B0', borderRadius: 3, padding: '7px 10px' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                      <Icon name="file-text" size={14} color="#8f6743" />
+                      <Icon name="file-text" size={14} color="#1A2551" />
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
@@ -281,7 +281,7 @@ export default function CreateCasePage() {
           </Field>
         </div>
 
-        {error && <div style={{ fontSize: 12.5, color: '#B05C5C' }}>{error}</div>}
+        {error && <div style={{ fontSize: 12.5, color: '#B3282D' }}>{error}</div>}
       </div>
     </div>
   )

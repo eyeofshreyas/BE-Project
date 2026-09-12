@@ -25,6 +25,19 @@ def _to_note(row: dict) -> dict:
     }
 
 
+def add_timeline_event(case_id: int, event_type: str, title: str, description: str | None, created_by: int) -> None:
+    """Record one thing happening on a case. The timeline is what the case page and the AI
+    summary both read as the case's history, so anything a lawyer would expect to see there
+    has to come through here."""
+    supabase.table("case_timeline").insert({
+        "case_id": case_id,
+        "event_type": event_type,
+        "event_title": title,
+        "event_description": description,
+        "created_by": created_by,
+    }).execute()
+
+
 def _to_timeline_event(row: dict) -> dict:
     """Shape a raw `case_timeline` row into the TimelineEvent dict."""
     user = row.get("users")
@@ -52,8 +65,11 @@ def _to_status_history(row: dict) -> dict:
     }
 
 
-def list_case_notes(case_id: int, profile: dict = Depends(get_current_profile)):
-    """List notes for a case the caller has access to. Calls: `ensure_case_access()`, `_to_note()`."""
+def list_case_notes(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+    """List notes for a case the caller has access to. Notes are the firm's internal work
+    product -- only staff may read them, so this is role-gated as well as case-scoped, and
+    so is the AI summary built from them (see case_ai_summary.get_case_ai_summary).
+    Calls: `ensure_case_access()`, `_to_note()`."""
     ensure_case_access(case_id, profile)
     rows = supabase.table("case_notes").select(NOTES_SELECT).eq("case_id", case_id).order("created_at", desc=True).execute().data
     return [_to_note(row) for row in rows]
@@ -132,13 +148,12 @@ def change_case_status(case_id: int, data: StatusChange, profile: dict = Depends
         "changed_by": changed_by,
     }).execute().data[0]
 
-    supabase.table("case_timeline").insert({
-        "case_id": case_id,
-        "event_type": "status_change",
-        "event_title": f"Status changed to {data.new_status}",
-        "event_description": f"Status changed from {previous_status} to {data.new_status}",
-        "created_by": changed_by,
-    }).execute()
+    add_timeline_event(
+        case_id, "status_change",
+        f"Status changed to {data.new_status}",
+        f"Status changed from {previous_status} to {data.new_status}",
+        changed_by,
+    )
 
     rows = supabase.table("case_status_history").select(STATUS_HISTORY_SELECT).eq("history_id", history_row["history_id"]).execute().data
     return _to_status_history(rows[0])

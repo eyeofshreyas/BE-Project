@@ -41,22 +41,30 @@ def _searchable_text(row: dict, summary_text: str | None) -> str:
     return "\n".join(part for part in (row.get("case_title"), row.get("description"), summary_text) if part)
 
 
-@router.post("/case-search", response_model=list[CaseSearchResult])
-def case_search(data: CaseSearchRequest, profile: dict = Depends(get_current_profile)):
+def _excerpt(row: dict, summary_text: str | None) -> str:
+    """What a hit shows beneath its title: description and summary only, since callers already
+    render the title above it. Falls back to the matched text when a case has neither."""
+    body = "\n".join(part for part in (row.get("description"), summary_text) if part)
+    return (body or _searchable_text(row, summary_text))[:EXCERPT_CHARS]
+
+
+def search_own_cases(profile: dict, query: str, top_k: int = 5, exclude_case_id: int | None = None) -> list[dict]:
     """Semantically rank the caller's own cases against a free-text query.
 
     Scoped through `get_scoped_case_ids()` the same way `list_cases()` is, so a lawyer only
     ever searches cases they're actively assigned to and a client only their own -- the
-    subprocess is handed that filtered corpus and never sees anything wider.
+    subprocess is handed that filtered corpus and never sees anything wider. `exclude_case_id`
+    drops one case from the corpus, for "cases like this one", which would otherwise rank
+    itself first at a perfect score.
     Calls: `get_scoped_case_ids()`, `_searchable_text()`, `run_ml_subprocess()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None and not case_ids:
         return []
 
-    query = supabase.table("cases").select(CASE_SEARCH_SELECT)
+    db_query = supabase.table("cases").select(CASE_SEARCH_SELECT)
     if case_ids is not None:
-        query = query.in_("case_id", list(case_ids))
-    rows = query.execute().data
+        db_query = db_query.in_("case_id", list(case_ids))
+    rows = [row for row in db_query.execute().data if row["case_id"] != exclude_case_id]
     if not rows:
         return []
 
@@ -70,6 +78,7 @@ def case_search(data: CaseSearchRequest, profile: dict = Depends(get_current_pro
     summaries = {row["case_id"]: row["summary_text"] for row in summary_rows}
 
     texts = {row["case_id"]: _searchable_text(row, summaries.get(row["case_id"])) for row in rows}
+    excerpts = {row["case_id"]: _excerpt(row, summaries.get(row["case_id"])) for row in rows}
     # a case with no title, description or summary has nothing to match on
     docs = [{"case_id": cid, "text": text} for cid, text in texts.items() if text.strip()]
     if not docs:
@@ -77,7 +86,7 @@ def case_search(data: CaseSearchRequest, profile: dict = Depends(get_current_pro
 
     hits = run_ml_subprocess(
         [str(FINETUNE_VENV_PYTHON), str(CASE_SEARCH_RUNNER)],
-        {"query": data.query, "top_k": data.top_k, "docs": docs},
+        {"query": query, "top_k": top_k, "docs": docs},
         timeout=120,
     )
 
@@ -88,7 +97,13 @@ def case_search(data: CaseSearchRequest, profile: dict = Depends(get_current_pro
             "case_number": by_id[hit["case_id"]].get("case_number"),
             "case_title": by_id[hit["case_id"]].get("case_title"),
             "score": hit["score"],
-            "excerpt": texts[hit["case_id"]][:EXCERPT_CHARS],
+            "excerpt": excerpts[hit["case_id"]],
         }
         for hit in hits
     ]
+
+
+@router.post("/case-search", response_model=list[CaseSearchResult])
+def case_search(data: CaseSearchRequest, profile: dict = Depends(get_current_profile)):
+    """Free-text semantic search over the caller's own cases. Calls: `search_own_cases()`."""
+    return search_own_cases(profile, data.query, data.top_k)

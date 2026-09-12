@@ -1,10 +1,9 @@
 /** `/conveyancing` route: role-dispatches to `StaffConveyancingView` (lawyer/admin) or `ClientConveyancingView`, both driven by `getConveyancingSummary()`. */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { getConveyancingSummary, listAllMeetings, getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument } from '../../api/client'
-import type { ConveyancingSummary, MeetingSummary, UserProfile, MatterDetail } from '../../types/api'
+import { getConveyancingSummary, listAllMeetings, updateMatter, uploadMatterDocument } from '../../api/client'
+import type { ConveyancingSummary, MeetingSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
-import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from './ConveyancingDashboardPage.module.css'
 
@@ -17,9 +16,9 @@ function loadProfile(): UserProfile | null {
   }
 }
 
-const PRIMARY = '#B08D3E'
-const PRIMARY_DARK = '#8f6743'
-const MUTED = '#8C7C5E'
+const PRIMARY = '#23306B'
+const PRIMARY_DARK = '#1A2551'
+const MUTED = '#6E6759'
 
 const iconProps = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: PRIMARY_DARK, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
 
@@ -34,34 +33,40 @@ const TransferIcon = () => <svg {...iconProps} width={16} height={16}><path d="M
 const KeyIcon = () => <svg {...iconProps} width={16} height={16}><circle cx={8} cy={15} r={4} /><path d="M11 12l9-9" /><path d="M17 6l3 3" /><path d="M14 9l2 2" /></svg>
 const CloseIcon = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><line x1={18} y1={6} x2={6} y2={18} /><line x1={6} y1={6} x2={18} y2={18} /></svg>
 
-const DONUT_COLORS = [PRIMARY, '#D9822B', '#4CAF50', '#5C8AB0', '#9E5CB0', '#B05C5C']
+const DONUT_COLORS = [PRIMARY, '#D9822B', '#4A6B4E', '#5C8AB0', '#9E5CB0', '#B3282D']
 
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
-  'Documents Pending': ['#B87F1E', '#FFF2E0'],
-  Drafting: ['#6A5C42', '#EFEAE1'],
-  Lodged: ['#2E9E58', '#E4F5EA'],
-  Completed: ['#2E9E58', '#E4F5EA'],
-  Registered: ['#2E9E58', '#E4F5EA'],
-  'In Progress': ['#B87F1E', '#FFF2E0'],
-  'Registration Scheduled': ['#6A5C42', '#EFEAE1'],
-  Pending: ['#B87F1E', '#FFF2E0'],
+  'Documents Pending': ['#8A6A2F', '#F3EBD9'],
+  Drafting: ['#575145', '#F0ECDF'],
+  Lodged: ['#4A6B4E', '#E4EDE5'],
+  Completed: ['#4A6B4E', '#E4EDE5'],
+  Registered: ['#4A6B4E', '#E4EDE5'],
+  'In Progress': ['#8A6A2F', '#F3EBD9'],
+  'Registration Scheduled': ['#575145', '#F0ECDF'],
+  Pending: ['#8A6A2F', '#F3EBD9'],
 }
-const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
+const DEFAULT_STATUS_STYLE: [string, string] = ['#575145', '#F0ECDF']
 
-const QUICK_ACTIONS = ['Schedule Registration', 'Upload Documents', 'Request Settlement Funds']
+type ActionMode = 'schedule' | 'upload'
+const QUICK_ACTIONS: { label: string; mode: ActionMode }[] = [
+  { label: 'Schedule Registration', mode: 'schedule' },
+  { label: 'Upload Documents', mode: 'upload' },
+]
+const REG_STATUSES = ['Pending', 'Drafting', 'Documents Pending', 'Registration Scheduled', 'Lodged', 'Registered', 'Completed']
+const FILTER_PRIORITIES = ['Any', 'Low', 'Medium', 'High'] as const
 const MATTERS_PAGE_SIZE = 6
 
 const FILTER_STATUSES: { label: string; dot: string }[] = [
-  { label: 'Drafting', dot: '#6A5C42' },
-  { label: 'Pending', dot: '#B87F1E' },
+  { label: 'Drafting', dot: '#575145' },
+  { label: 'Pending', dot: '#8A6A2F' },
   { label: 'Lodged', dot: '#5C8AB0' },
-  { label: 'Completed', dot: '#2E9E58' },
+  { label: 'Completed', dot: '#4A6B4E' },
 ]
 const FILTER_MATTER_TYPES: { label: string; icon: React.ReactNode }[] = [
-  { label: 'Sale', icon: <Icon name="home" size={16} color="#6A5C42" /> },
-  { label: 'Purchase', icon: <Icon name="briefcase" size={16} color="#6A5C42" /> },
+  { label: 'Sale', icon: <Icon name="home" size={16} color="#575145" /> },
+  { label: 'Purchase', icon: <Icon name="briefcase" size={16} color="#575145" /> },
   { label: 'Transfer', icon: <TransferIcon /> },
-  { label: 'Mortgage', icon: <Icon name="home" size={16} color="#6A5C42" /> },
+  { label: 'Mortgage', icon: <Icon name="home" size={16} color="#575145" /> },
   { label: 'Lease', icon: <KeyIcon /> },
 ]
 const FILTER_DATE_RANGES = ['Today', 'This Week', 'This Month']
@@ -80,6 +85,26 @@ function relativeDateTime(iso: string) {
 
 function formatDate(iso: string) {
   return formatDateWith(iso, { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+/** True when `iso` falls inside the Date Created filter's range (null range = no filtering). */
+function withinDateRange(iso: string | null, range: string | null) {
+  if (!range) return true
+  if (!iso) return false
+  const d = new Date(iso)
+  const now = new Date()
+  if (range === 'Today') return d.toDateString() === now.toDateString()
+  const start = new Date(now)
+  if (range === 'This Week') start.setDate(now.getDate() - now.getDay())
+  else start.setDate(1)
+  start.setHours(0, 0, 0, 0)
+  return d >= start
+}
+
+/** Filter facets are coarse ("Purchase", "Pending") while matter values are specific
+ * ("Off-the-Plan Purchase", "Documents Pending"), so match on containment, not equality. */
+function matchesFacet(value: string | null, filter: string) {
+  return filter === 'All' || (value ?? '').toLowerCase().includes(filter.toLowerCase())
 }
 
 /** Page numbers to render around `current`, with '...' gaps -- always keeps 1, `total`, and current±1. */
@@ -136,9 +161,9 @@ export default function ConveyancingDashboardPage() {
  * Loads `getConveyancingSummary()` (stats, status donut, matters list) and
  * `listAllMeetings()` (for upcoming appointments); supports matter
  * search/type/status filtering with pagination, a "New Matter" button
- * that navigates to `/conveyancing/matters/new`, and a "Filter" popover
- * (status/matter type feed the real search filters; priority/date
- * created are display-only, matters carry no such fields yet).
+ * that navigates to `/conveyancing/matters/new`, a "Filter" popover
+ * (status/matter type/priority/date created all feed the matters list), and
+ * the Quick Actions + row Edit button, which open `MatterActionModal`.
  */
 function StaffConveyancingView() {
   const navigate = useNavigate()
@@ -152,19 +177,27 @@ function StaffConveyancingView() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [priorityFilter, setPriorityFilter] = useState('Any')
+  const [dateFilter, setDateFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
   const [filterOpen, setFilterOpen] = useState(false)
   const [draftStatus, setDraftStatus] = useState('All')
   const [draftType, setDraftType] = useState('All')
-  const [draftPriority, setDraftPriority] = useState<'Low' | 'Medium' | 'High'>('Medium')
+  const [draftPriority, setDraftPriority] = useState('Any')
   const [draftDateRange, setDraftDateRange] = useState<string | null>(null)
 
-  useEffect(() => {
-    getConveyancingSummary()
+  const [action, setAction] = useState<{ mode: ActionMode; matterId?: number } | null>(null)
+
+  function refresh() {
+    return getConveyancingSummary()
       .then(setSummary)
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load conveyancing data.'))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    refresh()
     listAllMeetings().then(setMeetings).catch(() => {})
   }, [])
 
@@ -175,29 +208,35 @@ function StaffConveyancingView() {
     return () => clearTimeout(timer)
   }, [toast])
 
-  function fireAction(label: string) {
-    setToast(`${label}…`)
-    setTimeout(() => setToast(null), 1800)
-  }
-
   function openFilters() {
     setDraftStatus(statusFilter)
     setDraftType(typeFilter)
+    setDraftPriority(priorityFilter)
+    setDraftDateRange(dateFilter)
     setFilterOpen(true)
   }
 
   function clearFilters() {
     setDraftStatus('All')
     setDraftType('All')
-    setDraftPriority('Medium')
+    setDraftPriority('Any')
     setDraftDateRange(null)
   }
 
   function applyFilters() {
     setStatusFilter(draftStatus)
     setTypeFilter(draftType)
+    setPriorityFilter(draftPriority)
+    setDateFilter(draftDateRange)
     setPage(1)
     setFilterOpen(false)
+  }
+
+  /** Closes an action modal, flashes its result and reloads the dashboard so stats/table reflect the change. */
+  function finishAction(message: string) {
+    setAction(null)
+    setToast(message)
+    refresh()
   }
 
   const total = summary?.status_breakdown.reduce((sum, s) => sum + s.count, 0) ?? 0
@@ -209,7 +248,7 @@ function StaffConveyancingView() {
         donutAcc += pct
         return `${DONUT_COLORS[i % DONUT_COLORS.length]} ${start}% ${donutAcc}%`
       }).join(', ')
-    : '#E7DCC6 0% 100%'
+    : '#CFC6B0 0% 100%'
 
   const statCards = summary ? [
     { label: 'Active Matters', value: String(summary.stats.active_matters), icon: <BriefcaseIcon /> },
@@ -229,8 +268,10 @@ function StaffConveyancingView() {
   const matterStatuses = ['All', ...new Set(matters.map((m) => m.status))]
   const searchLower = search.toLowerCase()
   const filteredMatters = matters.filter((m) =>
-    (typeFilter === 'All' || m.type === typeFilter) &&
-    (statusFilter === 'All' || m.status === statusFilter) &&
+    matchesFacet(m.type, typeFilter) &&
+    matchesFacet(m.status, statusFilter) &&
+    (priorityFilter === 'Any' || m.priority === priorityFilter) &&
+    withinDateRange(m.created_at, dateFilter) &&
     (!searchLower || m.number.toLowerCase().includes(searchLower) || (m.client ?? '').toLowerCase().includes(searchLower))
   )
   const totalPages = Math.max(1, Math.ceil(filteredMatters.length / MATTERS_PAGE_SIZE))
@@ -253,21 +294,21 @@ function StaffConveyancingView() {
             {filterOpen && (
               <>
                 <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setFilterOpen(false)} />
-                <div style={{ position: 'absolute', top: 'calc(100% + 10px)', left: 0, width: 380, background: '#FFFBF2', borderRadius: 20, boxShadow: '0 20px 48px rgba(0,0,0,.18)', padding: 22, zIndex: 41 }}>
+                <div style={{ position: 'absolute', top: 'calc(100% + 10px)', left: 0, width: 380, background: '#FFFBF2', borderRadius: 3, boxShadow: '0 20px 48px rgba(0,0,0,.18)', padding: 22, zIndex: 41 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 17, fontWeight: 700, color: '#2A2118' }}>Filters</div>
+                      <div style={{ fontFamily: "'Spectral', serif", fontSize: 17, fontWeight: 700, color: '#1A1A17' }}>Filters</div>
                       <div style={{ fontSize: 12.5, color: MUTED, marginTop: 2 }}>Refine your view</div>
                     </div>
                     <div onClick={() => setFilterOpen(false)} style={{ cursor: 'pointer', padding: 2 }}><CloseIcon /></div>
                   </div>
-                  <div style={{ height: 1, background: '#E7DCC6', margin: '14px 0' }} />
+                  <div style={{ height: 1, background: '#CFC6B0', margin: '14px 0' }} />
 
-                  <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Status</div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', marginBottom: 10 }}>Status</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
                     <div
                       onClick={() => setDraftStatus('All')}
-                      style={{ padding: '7px 16px', borderRadius: 20, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', color: draftStatus === 'All' ? '#FFFFFF' : '#6A5C42', background: draftStatus === 'All' ? PRIMARY_DARK : '#FFFFFF', border: `1px solid ${draftStatus === 'All' ? PRIMARY_DARK : '#E7DCC6'}` }}
+                      style={{ padding: '7px 16px', borderRadius: 3, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', color: draftStatus === 'All' ? '#FCFAF4' : '#575145', background: draftStatus === 'All' ? PRIMARY_DARK : '#FCFAF4', border: `1px solid ${draftStatus === 'All' ? PRIMARY_DARK : '#CFC6B0'}` }}
                     >
                       All
                     </div>
@@ -275,14 +316,14 @@ function StaffConveyancingView() {
                       <div
                         key={s.label}
                         onClick={() => setDraftStatus(s.label)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 20, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: draftStatus === s.label ? '#FFFFFF' : '#6A5C42', background: draftStatus === s.label ? PRIMARY_DARK : '#FFFFFF', border: `1px solid ${draftStatus === s.label ? PRIMARY_DARK : '#E7DCC6'}` }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 3, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: draftStatus === s.label ? '#FCFAF4' : '#575145', background: draftStatus === s.label ? PRIMARY_DARK : '#FCFAF4', border: `1px solid ${draftStatus === s.label ? PRIMARY_DARK : '#CFC6B0'}` }}
                       >
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: draftStatus === s.label ? '#FFFFFF' : s.dot }} />{s.label}
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: draftStatus === s.label ? '#FCFAF4' : s.dot }} />{s.label}
                       </div>
                     ))}
                   </div>
 
-                  <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Matter Type</div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', marginBottom: 10 }}>Matter Type</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 18 }}>
                     {FILTER_MATTER_TYPES.map((t) => {
                       const selected = draftType === t.label
@@ -290,31 +331,31 @@ function StaffConveyancingView() {
                         <div
                           key={t.label}
                           onClick={() => setDraftType(selected ? 'All' : t.label)}
-                          style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: selected ? '#FBF0D6' : '#FFFFFF', border: `1.5px solid ${selected ? '#B08D3E' : '#E7DCC6'}` }}
+                          style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px', borderRadius: 3, cursor: 'pointer', background: selected ? '#F3EBD9' : '#FCFAF4', border: `1.5px solid ${selected ? '#23306B' : '#CFC6B0'}` }}
                         >
                           {t.icon}
-                          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#2A2118' }}>{t.label}</span>
+                          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1A1A17' }}>{t.label}</span>
                         </div>
                       )
                     })}
                   </div>
 
-                  <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Priority</div>
-                  <div style={{ display: 'flex', gap: 6, background: '#F1E9D6', borderRadius: 9, padding: 4, marginBottom: 18 }}>
-                    {(['Low', 'Medium', 'High'] as const).map((p) => (
-                      <div key={p} onClick={() => setDraftPriority(p)} style={{ flex: 1, textAlign: 'center', padding: '7px 0', borderRadius: 7, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: draftPriority === p ? '#2A2118' : MUTED, background: draftPriority === p ? '#FFFFFF' : 'transparent' }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', marginBottom: 10 }}>Priority</div>
+                  <div style={{ display: 'flex', gap: 6, background: '#F1E9D6', borderRadius: 3, padding: 4, marginBottom: 18 }}>
+                    {FILTER_PRIORITIES.map((p) => (
+                      <div key={p} onClick={() => setDraftPriority(p)} style={{ flex: 1, textAlign: 'center', padding: '7px 0', borderRadius: 3, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: draftPriority === p ? '#1A1A17' : MUTED, background: draftPriority === p ? '#FCFAF4' : 'transparent' }}>
                         {p}
                       </div>
                     ))}
                   </div>
 
-                  <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Date Created</div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', marginBottom: 10 }}>Date Created</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
                     {FILTER_DATE_RANGES.map((d) => (
                       <div
                         key={d}
                         onClick={() => setDraftDateRange(draftDateRange === d ? null : d)}
-                        style={{ padding: '7px 14px', borderRadius: 20, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: draftDateRange === d ? '#FFFFFF' : '#6A5C42', background: draftDateRange === d ? PRIMARY_DARK : '#FFFFFF', border: `1px solid ${draftDateRange === d ? PRIMARY_DARK : '#E7DCC6'}` }}
+                        style={{ padding: '7px 14px', borderRadius: 3, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: draftDateRange === d ? '#FCFAF4' : '#575145', background: draftDateRange === d ? PRIMARY_DARK : '#FCFAF4', border: `1px solid ${draftDateRange === d ? PRIMARY_DARK : '#CFC6B0'}` }}
                       >
                         {d}
                       </div>
@@ -332,7 +373,7 @@ function StaffConveyancingView() {
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading conveyancing data…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
         {summary && (
           <>
@@ -371,9 +412,9 @@ function StaffConveyancingView() {
               <div className={styles.panelCard}>
                 <div className={styles.panelTitle}>Quick Actions</div>
                 <div className={styles.quickActionsList}>
-                  {QUICK_ACTIONS.map((label) => (
-                    <div key={label} className={styles.quickAction} onClick={() => fireAction(label)}>
-                      <span>{label}</span><ChevronRightIcon />
+                  {QUICK_ACTIONS.map((a) => (
+                    <div key={a.label} className={styles.quickAction} onClick={() => setAction({ mode: a.mode })}>
+                      <span>{a.label}</span><ChevronRightIcon />
                     </div>
                   ))}
                 </div>
@@ -387,7 +428,7 @@ function StaffConveyancingView() {
                       <span style={{ width: 9, height: 9, borderRadius: '50%', marginTop: 5, flexShrink: 0, background: i === 0 ? PRIMARY_DARK : 'transparent', border: `2px solid ${PRIMARY_DARK}` }} />
                       <div>
                         <div style={{ fontSize: 12.5, fontWeight: 700, color: PRIMARY_DARK }}>{relativeDateTime(m.meeting_date)}</div>
-                        <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118', marginTop: 2 }}>{m.meeting_title ?? m.case_number ?? 'Meeting'}</div>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1A17', marginTop: 2 }}>{m.meeting_title ?? m.case_number ?? 'Meeting'}</div>
                         {m.case_number && <div style={{ fontSize: 12, color: MUTED, marginTop: 1 }}>{m.case_number}</div>}
                       </div>
                     </div>
@@ -407,7 +448,7 @@ function StaffConveyancingView() {
                 placeholder="Search by number or client..."
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                style={{ flex: 1, minWidth: 220, padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
+                style={{ flex: 1, minWidth: 220, padding: '9px 14px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}
               />
               <Dropdown
                 value={typeFilter}
@@ -442,7 +483,7 @@ function StaffConveyancingView() {
                     const [color, bg] = STATUS_STYLE_MAP[m.status] || DEFAULT_STATUS_STYLE
                     return (
                       <tr key={m.matter_id} className={styles.tr}>
-                        <td className={styles.tdMono}>{m.number}</td>
+                        <td className={styles.tdMono}><span style={{ cursor: 'pointer', color: PRIMARY }} onClick={() => navigate(`/conveyancing/matters/${m.matter_id}`)}>{m.number}</span></td>
                         <td className={styles.tdClient}>{m.title}</td>
                         <td className={styles.td}>{m.client ?? '—'}</td>
                         <td className={styles.td}>{m.type}</td>
@@ -451,9 +492,9 @@ function StaffConveyancingView() {
                         <td className={styles.td}>
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                             {m.case_id ? (
-                              <div onClick={() => navigate(`/cases/${m.case_id}`)} style={{ cursor: 'pointer', display: 'flex' }} title="View case"><Icon name="eye" size={16} color="#6A5C42" /></div>
+                              <div onClick={() => navigate(`/cases/${m.case_id}`)} style={{ cursor: 'pointer', display: 'flex' }} title="View case"><Icon name="eye" size={16} color="#575145" /></div>
                             ) : <span style={{ width: 16 }} />}
-                            <div style={{ cursor: 'default', display: 'flex', opacity: .4 }} title="Editing matters coming soon"><Icon name="edit" size={16} color="#6A5C42" /></div>
+                            <div onClick={() => setAction({ mode: 'schedule', matterId: m.matter_id })} style={{ cursor: 'pointer', display: 'flex' }} title="Edit matter"><Icon name="edit" size={16} color="#575145" /></div>
                           </div>
                         </td>
                       </tr>
@@ -465,7 +506,7 @@ function StaffConveyancingView() {
                 </tbody>
               </table>
               {filteredMatters.length > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderTop: '1px solid #E7DCC6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderTop: '1px solid #CFC6B0' }}>
                   <span style={{ fontSize: 12.5, color: MUTED }}>Showing {pageStart + 1} to {Math.min(pageStart + MATTERS_PAGE_SIZE, filteredMatters.length)} of {filteredMatters.length} entries</span>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <div className={styles.ghostChip} style={{ padding: '6px 12px', opacity: currentPage === 1 ? .5 : 1, cursor: currentPage === 1 ? 'default' : 'pointer' }} onClick={() => currentPage > 1 && setPage(currentPage - 1)}>Previous</div>
@@ -473,7 +514,7 @@ function StaffConveyancingView() {
                       p === '...' ? (
                         <div key={`gap-${i}`} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, color: MUTED }}>…</div>
                       ) : (
-                        <div key={p} onClick={() => setPage(p)} style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', background: p === currentPage ? PRIMARY_DARK : 'transparent', color: p === currentPage ? '#FFFFFF' : '#6A5C42' }}>{p}</div>
+                        <div key={p} onClick={() => setPage(p)} style={{ width: 32, height: 32, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', background: p === currentPage ? PRIMARY_DARK : 'transparent', color: p === currentPage ? '#FCFAF4' : '#575145' }}>{p}</div>
                       )
                     )}
                     <div className={styles.ghostChip} style={{ padding: '6px 12px', opacity: currentPage === totalPages ? .5 : 1, cursor: currentPage === totalPages ? 'default' : 'pointer' }} onClick={() => currentPage < totalPages && setPage(currentPage + 1)}>Next</div>
@@ -484,6 +525,16 @@ function StaffConveyancingView() {
           </>
         )}
 
+        {action && (
+          <MatterActionModal
+            mode={action.mode}
+            matters={matters}
+            initialMatterId={action.matterId}
+            onClose={() => setAction(null)}
+            onDone={finishAction}
+          />
+        )}
+
         {toast && <div className={styles.toast}>{toast}</div>}
 
       </div>
@@ -491,12 +542,132 @@ function StaffConveyancingView() {
   )
 }
 
+const modalInput: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }
+
+function ModalField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: '#575145', marginBottom: 6 }}>{label}</div>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * The one modal behind every write action on the staff dashboard, picked by `mode`:
+ * `schedule` patches the matter's registration status/date/office via `updateMatter()`
+ * (also what the row Edit button opens, pre-selected) and `upload` attaches a file with
+ * `uploadMatterDocument()`. Both need a matter, so the picker is always shown.
+ */
+function MatterActionModal({ mode, matters, initialMatterId, onClose, onDone }: {
+  mode: ActionMode
+  matters: ConveyancingSummary['recent_matters']
+  initialMatterId?: number
+  onClose: () => void
+  onDone: (message: string) => void
+}) {
+  const [matterId, setMatterId] = useState(initialMatterId ?? matters[0]?.matter_id ?? 0)
+  const matter = matters.find((m) => m.matter_id === matterId)
+
+  const [status, setStatus] = useState(matter?.status ?? 'Registration Scheduled')
+  const [regDate, setRegDate] = useState(matter?.reg_date?.slice(0, 10) ?? '')
+  const [office, setOffice] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  // Status/date belong to the selected matter, so re-seed them whenever it changes.
+  function pickMatter(id: number) {
+    const next = matters.find((m) => m.matter_id === id)
+    setMatterId(id)
+    setStatus(next?.status ?? 'Registration Scheduled')
+    setRegDate(next?.reg_date?.slice(0, 10) ?? '')
+  }
+
+  const title = mode === 'schedule' ? (initialMatterId ? 'Edit Matter' : 'Schedule Registration') : 'Upload Documents'
+
+  async function submit() {
+    if (!matter) { setError('Select a matter first.'); return }
+    setSaving(true)
+    setError('')
+    try {
+      if (mode === 'schedule') {
+        await updateMatter(matter.matter_id, {
+          registration_status: status,
+          registration_date: regDate || undefined,
+          office_name: office.trim() || undefined,
+        })
+        onDone(`${matter.number} updated.`)
+      } else {
+        if (!file) { setError('Choose a file to upload.'); setSaving(false); return }
+        await uploadMatterDocument(matter.matter_id, file)
+        onDone(`${file.name} uploaded to ${matter.number}.`)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Action failed.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(35, 48, 107,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24 }} onClick={onClose}>
+      <div style={{ background: '#F6F2E9', borderRadius: 3, width: 'min(460px, 100%)', padding: 24, boxShadow: '0 20px 48px rgba(0,0,0,.3)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div style={{ fontFamily: "'Spectral', serif", fontSize: 18, fontWeight: 700, color: '#1A1A17' }}>{title}</div>
+          <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={18} color={MUTED} /></span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <ModalField label="Matter">
+            <select value={matterId} onChange={(e) => pickMatter(Number(e.target.value))} style={modalInput} disabled={initialMatterId != null}>
+              {matters.length === 0 && <option value={0}>No matters available</option>}
+              {matters.map((m) => <option key={m.matter_id} value={m.matter_id}>{m.number} — {m.title}</option>)}
+            </select>
+          </ModalField>
+
+          {mode === 'schedule' && (
+            <>
+              <ModalField label="Registration Status">
+                <select value={status} onChange={(e) => setStatus(e.target.value)} style={modalInput}>
+                  {[...new Set([...REG_STATUSES, status])].map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </ModalField>
+              <ModalField label="Registration Date">
+                <input type="date" value={regDate} onChange={(e) => setRegDate(e.target.value)} style={modalInput} />
+              </ModalField>
+              <ModalField label="Registrar Office (optional)">
+                <input value={office} onChange={(e) => setOffice(e.target.value)} placeholder="Sub-Registrar Office…" style={modalInput} />
+              </ModalField>
+            </>
+          )}
+
+          {mode === 'upload' && (
+            <ModalField label="Document">
+              <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={modalInput} />
+            </ModalField>
+          )}
+
+          {error && <div style={{ color: '#B3282D', fontSize: 12.5 }}>{error}</div>}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+            <div className={styles.ghostChip} onClick={onClose}>Cancel</div>
+            <div className={styles.primaryChip} style={{ opacity: saving ? .7 : 1, pointerEvents: saving ? 'none' : 'auto' }} onClick={submit}>
+              {saving ? 'Saving…' : 'Confirm'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** Client's own conveyancing matters: loads `getConveyancingSummary()` and renders stat cards + a read-only matters table (row links to `/cases/:caseId` when linked). */
 function ClientConveyancingView() {
+  const navigate = useNavigate()
   const [summary, setSummary] = useState<ConveyancingSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [selectedMatterId, setSelectedMatterId] = useState<number | null>(null)
 
   useEffect(() => {
     getConveyancingSummary()
@@ -523,7 +694,7 @@ function ClientConveyancingView() {
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading conveyancing data…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
         {summary && (
           <>
@@ -534,7 +705,7 @@ function ClientConveyancingView() {
                   <div>
                     <div className={styles.statValue}>{s.value}</div>
                     <div className={styles.statLabel}>{s.label}</div>
-                    <div style={{ fontSize: 11.5, color: '#B08D3E', fontWeight: 600, marginTop: 4 }}>{s.sublabel}</div>
+                    <div style={{ fontSize: 11.5, color: '#23306B', fontWeight: 600, marginTop: 4 }}>{s.sublabel}</div>
                   </div>
                 </div>
               ))}
@@ -568,7 +739,7 @@ function ClientConveyancingView() {
                         <td className={styles.td}>{m.lawyer ?? '—'}</td>
                         <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{m.status}</span></td>
                         <td className={styles.td}>
-                          <span className={styles.viewAll} onClick={() => setSelectedMatterId(m.matter_id)}>View Details</span>
+                          <span className={styles.viewAll} onClick={() => navigate(`/conveyancing/matters/${m.matter_id}`)}>View Details</span>
                         </td>
                       </tr>
                     )
@@ -583,187 +754,6 @@ function ClientConveyancingView() {
         )}
       </div>
 
-      {selectedMatterId != null && (
-        <MatterDetailModal matterId={selectedMatterId} onClose={() => setSelectedMatterId(null)} />
-      )}
-    </div>
-  )
-}
-
-/** Builds the Overview description from real matter/property/progress fields -- there's no free-text description column, so this reads as one. */
-function matterDescription(m: MatterDetail): string {
-  if (!m.property) return `${m.transaction_type ?? m.matter_type ?? 'Matter'} in progress.`
-  const kind = m.property.property_type ? `${m.property.property_type.toLowerCase()} ` : ''
-  const place = [m.property.address, m.property.city].filter(Boolean).join(', ')
-  const base = `${m.transaction_type ?? m.matter_type ?? 'Transaction'} of ${kind}property at ${place}.`
-  const next = m.progress.find((s) => !s.completed)
-  const tail = next ? ` Currently in the ${next.stage_name} stage.` : m.progress.length > 0 ? ' Registration complete.' : ''
-  return base + tail
-}
-
-function formatArea(property: MatterDetail['property']) {
-  const value = property?.builtup_area ?? property?.land_area
-  return value != null ? `${value.toLocaleString()} sq ft` : '—'
-}
-
-/**
- * "View Details" popup opened from a client's conveyancing matter row. Loads full detail
- * via `getMatterDetail()`: overview, property, registration-progress stepper, and shared
- * documents (preview/download via the existing document endpoints, upload via
- * `uploadMatterDocument()` -- appends the new doc to `matter.documents` on success).
- */
-function MatterDetailModal({ matterId, onClose }: { matterId: number; onClose: () => void }) {
-  const [matter, setMatter] = useState<MatterDetail | null>(null)
-  const [error, setError] = useState('')
-  const [previewDoc, setPreviewDoc] = useState<{ id: number; fileName: string; mimeType: string } | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    getMatterDetail(matterId)
-      .then(setMatter)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load this matter.'))
-  }, [matterId])
-
-  async function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setUploading(true)
-    setUploadError('')
-    try {
-      const created = await uploadMatterDocument(matterId, file)
-      setMatter((prev) => (prev ? { ...prev, documents: [...prev.documents, created] } : prev))
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Failed to upload document.')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  async function downloadDoc(documentId: number) {
-    const tab = window.open('', '_blank')
-    try {
-      const { url } = await getDocumentDownloadUrl(documentId)
-      if (tab) tab.location.href = url
-    } catch {
-      tab?.close()
-    }
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24 }} onClick={onClose}>
-      <div style={{ background: '#FCF9F3', borderRadius: 18, width: 'min(880px, 100%)', maxHeight: '90vh', overflowY: 'auto', padding: 26, boxShadow: '0 20px 48px rgba(0,0,0,.3)' }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 19, fontWeight: 700, color: '#2A2118' }}>
-            Matter Details{matter ? `: ${matter.matter_number}` : ''}
-          </div>
-          <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={18} color={MUTED} /></span>
-        </div>
-
-        {!matter && !error && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading matter…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
-
-        {matter && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div className={styles.panelCard}>
-                <div className={styles.panelTitle}>Overview</div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em' }}>Description</div>
-                <div style={{ fontSize: 13.5, color: '#2A2118', marginTop: 6, lineHeight: 1.5 }}>{matterDescription(matter)}</div>
-                <div style={{ display: 'flex', gap: 24, marginTop: 16 }}>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em' }}>Initiated</div>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118', marginTop: 4 }}>{matter.created_at ? formatDate(matter.created_at) : '—'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em' }}>Target Completion</div>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118', marginTop: 4 }}>{matter.expected_completion_date ? formatDate(matter.expected_completion_date) : '—'}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.panelCard}>
-                <div className={styles.panelTitle}>Property Details</div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {([
-                    ['Type', matter.property?.property_type ?? '—'],
-                    ['Survey No.', matter.property?.survey_number ?? '—'],
-                    ['Area', formatArea(matter.property)],
-                  ] as [string, string][]).map(([label, value]) => (
-                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid #F1E9D9', fontSize: 13.5 }}>
-                      <div style={{ color: MUTED }}>{label}</div>
-                      <div style={{ fontWeight: 700, color: '#2A2118' }}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div className={styles.panelCard}>
-                <div className={styles.panelTitle}>Registration Progress</div>
-                <div className={styles.timeline}>
-                  {matter.progress.map((s) => (
-                    <div key={s.progress_id} className={styles.timelineItem}>
-                      <span className={styles.timelineDot} style={{ background: s.completed ? PRIMARY_DARK : '#FFFFFF', border: `2px solid ${PRIMARY_DARK}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {s.completed && <Icon name="check-circle" size={9} color="#FFFFFF" strokeWidth={3} />}
-                      </span>
-                      <div className={styles.timelineTitle} style={{ fontWeight: 700 }}>{s.stage_name}</div>
-                      <div className={styles.timelineMeta}>{s.completed ? (s.completed_at ? formatDate(s.completed_at) : 'Completed') : 'Pending'}</div>
-                    </div>
-                  ))}
-                  {matter.progress.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No progress stages yet.</div>}
-                </div>
-              </div>
-
-              <div className={styles.panelCard}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
-                  <div className={styles.panelTitle} style={{ marginBottom: 0 }}>Shared Documents</div>
-                  <div className={styles.primaryChip} style={{ opacity: uploading ? .6 : 1, cursor: uploading ? 'default' : 'pointer' }} onClick={() => !uploading && fileInputRef.current?.click()}>
-                    <Icon name="upload-cloud" size={15} color="#FFFFFF" /> {uploading ? 'Uploading…' : 'Upload Requested Document'}
-                  </div>
-                  <input ref={fileInputRef} type="file" onChange={handleFileChosen} style={{ display: 'none' }} />
-                </div>
-                {uploadError && <div style={{ color: '#B05C5C', fontSize: 12.5, marginBottom: 10 }}>{uploadError}</div>}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {matter.documents.map((d) => (
-                    <div key={d.matter_document_id} style={{ padding: '10px 14px', border: '1px solid #E7DCC6', borderRadius: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <Icon name="file-text" size={17} color={MUTED} />
-                        <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>{d.file_name ?? 'Document'}</div>
-                        <span className={styles.statusBadge} style={d.is_verified ? { color: '#2E9E58', background: '#E4F5EA' } : { color: '#B87F1E', background: '#FFF2E0' }}>
-                          {d.is_verified ? 'Verified' : d.is_required ? 'Required' : 'Pending'}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
-                        <span
-                          style={{ fontSize: 12.5, fontWeight: 600, color: '#B08D3E', cursor: 'pointer' }}
-                          onClick={() => (d.mime_type && isPreviewable(d.mime_type) ? setPreviewDoc({ id: d.document_id, fileName: d.file_name ?? 'Document', mimeType: d.mime_type }) : downloadDoc(d.document_id))}
-                        >
-                          Preview
-                        </span>
-                        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#B08D3E', cursor: 'pointer' }} onClick={() => downloadDoc(d.document_id)}>Download</span>
-                      </div>
-                    </div>
-                  ))}
-                  {matter.documents.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No shared documents yet.</div>}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {previewDoc && (
-        <DocumentPreviewModal
-          documentId={previewDoc.id}
-          fileName={previewDoc.fileName}
-          mimeType={previewDoc.mimeType}
-          onClose={() => setPreviewDoc(null)}
-        />
-      )}
     </div>
   )
 }

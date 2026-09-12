@@ -24,12 +24,22 @@ class MeetingSummary(BaseModel):
 class MeetingCreate(BaseModel):
     """Request body for scheduling a meeting."""
     case_id: int
-    conducted_by: int
+    conducted_by: int | None = None
     meeting_title: str | None = None
     meeting_type: str | None = None
     meeting_date: str
     duration_minutes: int | None = None
     agenda: str | None = None
+    next_meeting_date: str | None = None
+
+
+class MeetingUpdate(BaseModel):
+    """Request body for recording what came out of a meeting. Every field is optional; only the
+    ones sent are written."""
+    meeting_status: str | None = None
+    discussion_summary: str | None = None
+    decisions: str | None = None
+    action_items: str | None = None
     next_meeting_date: str | None = None
 
 

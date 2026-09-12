@@ -29,6 +29,8 @@ class MatterSummary(BaseModel):
     lawyer: str | None
     reg_date: str | None
     status: str
+    priority: str | None
+    created_at: str | None
 
 
 class ConveyancingSummary(BaseModel):
@@ -125,6 +127,20 @@ class MatterCreated(BaseModel):
     """Response after creating a matter."""
     matter_id: int
     matter_number: str
+
+
+class MatterUpdate(BaseModel):
+    """Request body for editing a matter's registration status / scheduled registration."""
+    registration_status: str | None = None
+    registration_date: str | None = None
+    office_name: str | None = None
+
+
+class MatterUpdated(BaseModel):
+    """Response after updating a matter's registration status / date."""
+    matter_id: int
+    registration_status: str | None
+    registration_date: str | None
 
 
 class MatterDetail(BaseModel):

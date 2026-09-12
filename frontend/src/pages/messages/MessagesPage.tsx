@@ -9,7 +9,7 @@ import { formatDate, timeAgo } from '../../utils/date'
 import { Icon } from '../../components/icons'
 import styles from './MessagesPage.module.css'
 
-const MUTED = '#8C7C5E'
+const MUTED = '#6E6759'
 const CLIENT_ROLE_ID = 3
 const POLL_MS = 12000
 
@@ -274,7 +274,7 @@ export default function MessagesPage() {
 
                   <div className={styles.msgScroll}>
                     <div className={styles.msgStack}>
-                      {threadError && <div style={{ color: '#B05C5C', fontSize: 13 }}>{threadError}</div>}
+                      {threadError && <div style={{ color: '#B3282D', fontSize: 13 }}>{threadError}</div>}
                       {groups.map((g, i) => (
                         <Fragment key={i}>
                           {g.dayLabel && <div className={styles.dayDivider}>{g.dayLabel}</div>}
@@ -327,7 +327,7 @@ export default function MessagesPage() {
                         disabled={sending}
                       />
                       <div className={styles.sendBtn} style={{ opacity: sending ? 0.6 : 1 }} onClick={() => !sending && handleSend()}>
-                        <Icon name="send" size={17} color="#FFFFFF" />
+                        <Icon name="send" size={17} color="#FCFAF4" />
                       </div>
                     </div>
                   </div>

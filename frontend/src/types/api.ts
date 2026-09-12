@@ -193,7 +193,7 @@ export interface ConveyancingSummary {
     upcoming_appointments: number
   }
   status_breakdown: { label: string; count: number }[]
-  recent_matters: { matter_id: number; case_id: number | null; number: string; title: string; client: string | null; type: string; property: string | null; lawyer: string | null; reg_date: string | null; status: string }[]
+  recent_matters: { matter_id: number; case_id: number | null; number: string; title: string; client: string | null; type: string; property: string | null; lawyer: string | null; reg_date: string | null; status: string; priority: string | null; created_at: string | null }[]
 }
 
 export interface DocumentSummary {
@@ -290,6 +290,14 @@ export interface JudgementCreatePayload {
   tags?: string[]
 }
 
+export interface JudgeOption {
+  judge_id: number
+  judge_name: string
+  designation: string | null
+  court_id: number
+  court_name: string | null
+}
+
 export interface DocumentTypeOption {
   document_type_id: number
   type_name: string
@@ -341,6 +349,27 @@ export interface HearingSummary {
   hearing_outcome: string | null
   next_hearing_date: string | null
   notes: string | null
+}
+
+export interface SimilarCaseResult {
+  doc_id: string
+  score: number
+  excerpt: string
+}
+
+export interface CaseSearchResult {
+  case_id: number
+  case_number: string | null
+  case_title: string | null
+  score: number
+  excerpt: string
+}
+
+export interface SimilarCaseDetail {
+  doc_id: string
+  citation: string | null
+  summary: string | null
+  text: string
 }
 
 export interface RazorpayOrder {
@@ -413,4 +442,63 @@ export interface ConversationDetail {
   other_party_name: string | null
   other_party_role: 'lawyer' | 'client'
   messages: MessageSummary[]
+}
+
+/** What a hard delete of one user would destroy, from `GET /users/:id/impact`. */
+export interface UserDeleteImpact {
+  user_id: number
+  is_lawyer: boolean
+  is_client: boolean
+  cases: number
+  matters: number
+  documents: number
+  conversations: number
+  invoices: number
+  hearings: number
+  meetings: number
+  notifications: number
+  case_assignments: number
+}
+
+export interface AdminStats {
+  total_users: number
+  active_lawyers: number
+  registered_clients: number
+  active_cases: number
+  documents_uploaded: number
+  ai_summaries: number
+  revenue_this_month: number
+  pending_hearings: number
+}
+
+export interface ActivityEvent {
+  id: number
+  event_type: string
+  event_title: string
+  event_description: string | null
+  case_number: string | null
+  actor: string | null
+  created_at: string
+}
+
+/** One labelled bucket in an admin chart (a status slice, a month, a week). */
+export interface LabelCount {
+  label: string
+  count: number
+}
+
+export interface AdminAnalytics {
+  total_cases: number
+  case_status: LabelCount[]
+  case_growth: LabelCount[]
+  ai_usage: LabelCount[]
+  documents: { total: number; summarized: number; awaiting_summary: number; deleted: number }
+  storage: { used_bytes: number; quota_bytes: number }
+}
+
+export interface PlatformSettings {
+  maintenance_mode: boolean
+  new_signup_alerts: boolean
+  weekly_reports: boolean
+  auto_backup: boolean
 }

@@ -1,28 +1,33 @@
-/** `/cases` route: role-dispatches to `StaffCasesView` (lawyer/admin, filterable table) or `ClientCasesView` (client, stats + progress cards). */
+/** `/cases` route: role-dispatches to `StaffCasesView` (lawyer/admin, sortable table) or `ClientCasesView` (client, one card per case). */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listCases, listHearings, listCaseTimeline } from '../../api/client'
-import type { CaseSummary, HearingSummary, TimelineEvent, UserProfile } from '../../types/api'
+import { listCases, listHearings, listCaseTimeline, searchOwnCases } from '../../api/client'
+import type { CaseSummary, CaseSearchResult, HearingSummary, TimelineEvent, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { formatDate, timeAgo } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
+import cd from './cases.module.css'
 
-const MUTED = '#8C7C5E'
+const MUTED = '#6E6759'
 const CLOSED_STATUSES = new Set(['Closed', 'Completed'])
+const ACTIVE_STATUSES = new Set(['Open', 'In Progress'])
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
-  Completed: ['#2E9E58', '#E4F5EA'],
-  Closed: ['#2E9E58', '#E4F5EA'],
-  Open: ['#B87F1E', '#FFF2E0'],
-  'In Progress': ['#B87F1E', '#FFF2E0'],
-  Pending: ['#B87F1E', '#FFF2E0'],
+  Completed: ['#4A6B4E', '#E4EDE5'],
+  Closed: ['#4A6B4E', '#E4EDE5'],
+  Open: ['#8A6A2F', '#F3EBD9'],
+  'In Progress': ['#8A6A2F', '#F3EBD9'],
+  Pending: ['#8A6A2F', '#F3EBD9'],
 }
-const DEFAULT_STATUS_STYLE: [string, string] = ['#6A5C42', '#EFEAE1']
+const DEFAULT_STATUS_STYLE: [string, string] = ['#575145', '#F0ECDF']
 const STATUS_LABELS: Record<string, string> = { Open: 'Active' }
 function statusLabel(s: string) {
   return STATUS_LABELS[s] ?? s
 }
+
+const PRIORITY_COLORS: Record<string, string> = { High: '#B3282D', Medium: '#8A6A2F', Low: '#4A6B4E' }
+const PRIORITY_RANK: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
+
 const FILTERS = ['All', 'Active', 'Pending', 'Closed']
-const ACTIVE_STATUSES = new Set(['Open', 'In Progress'])
 
 function matchesFilter(status: string, filter: string) {
   if (filter === 'All') return true
@@ -32,10 +37,30 @@ function matchesFilter(status: string, filter: string) {
   return true
 }
 
-// ponytail: same status->progress approximation used on the client dashboard --
-// litigation cases have no real stage tracking, only conveyancing matters do.
-const STATUS_PROGRESS: Record<string, number> = {
-  Closed: 100, Completed: 100, 'In Progress': 60, Open: 35, Pending: 15,
+const DAY_MS = 86400000
+
+/** Days from today to `iso`, ignoring clock time -- negative once the date has passed. */
+function daysUntil(iso: string) {
+  return Math.round((new Date(iso).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / DAY_MS)
+}
+
+/**
+ * A hearing date is only useful as a distance: "In 6 days" answers the question
+ * a bare "Sep 15, 2026" makes you work out. Beyond a fortnight the date itself
+ * is the clearer form, so it takes over.
+ */
+function hearingLabel(iso: string) {
+  const days = daysUntil(iso)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Tomorrow'
+  if (days > 1 && days <= 14) return `In ${days} days`
+  return formatDate(iso)
+}
+
+function hearingColor(iso: string) {
+  const days = daysUntil(iso)
+  if (days < 0) return MUTED
+  return days <= 7 ? '#8A6A2F' : '#1A1A17'
 }
 
 function loadProfile(): UserProfile | null {
@@ -49,14 +74,31 @@ function loadProfile(): UserProfile | null {
 
 // Same role-based split pattern as DashboardPage.tsx: one route, two
 // completely different views (client sees their own cases read-only,
-// lawyer/admin get filters, bulk actions, and "New Case").
+// lawyer/admin get filters, sorting, and "New case").
 export default function CasesListPage() {
   const profile = loadProfile()
   if (profile?.role_id === 3) return <ClientCasesView />
   return <StaffCasesView />
 }
 
-/** Loads all cases via `listCases()`; supports search + status-tab filtering; row click and "New Case" navigate to `/cases/:caseId` and `/cases/new`. */
+type SortKey = 'case' | 'client' | 'type' | 'priority' | 'status' | 'hearing'
+
+/** Sort value per column. Cases with no hearing sort to the end of an ascending sort. */
+const SORT_VALUES: Record<SortKey, (c: CaseSummary) => string | number> = {
+  case: (c) => (c.case_title ?? c.id).toLowerCase(),
+  client: (c) => (c.client ?? '').toLowerCase(),
+  type: (c) => (c.case_type ?? '').toLowerCase(),
+  priority: (c) => PRIORITY_RANK[c.priority] ?? 9,
+  status: (c) => statusLabel(c.status),
+  hearing: (c) => (c.hearing ? new Date(c.hearing).getTime() : Number.MAX_SAFE_INTEGER),
+}
+
+/**
+ * Loads all cases via `listCases()`. Search, status tabs and column sorting all
+ * filter one list in place; a row or "New case" navigates to `/cases/:caseId`
+ * or `/cases/new`. Defaults to the soonest hearing first, which is the order a
+ * caseload is actually worked in.
+ */
 function StaffCasesView() {
   const navigate = useNavigate()
   const [cases, setCases] = useState<CaseSummary[]>([])
@@ -64,6 +106,7 @@ function StaffCasesView() {
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: 'hearing', asc: true })
 
   useEffect(() => {
     listCases()
@@ -72,59 +115,79 @@ function StaffCasesView() {
       .finally(() => setLoading(false))
   }, [])
 
-  const searchLower = search.toLowerCase()
-  const filtered = cases.filter((c) => {
-    const matchesStatus = matchesFilter(c.status, statusFilter)
-    const matchesSearch = !searchLower || c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower) || (c.client ?? '').toLowerCase().includes(searchLower)
-    return matchesStatus && matchesSearch
-  })
-  const activeCount = cases.filter((c) => ACTIVE_STATUSES.has(c.status)).length
+  function sortBy(key: SortKey) {
+    setSort((prev) => ({ key, asc: prev.key === key ? !prev.asc : true }))
+  }
+
+  const searchLower = search.trim().toLowerCase()
+  const filtered = cases
+    .filter((c) => {
+      const matchesStatus = matchesFilter(c.status, statusFilter)
+      const matchesSearch = !searchLower || c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower) || (c.client ?? '').toLowerCase().includes(searchLower)
+      return matchesStatus && matchesSearch
+    })
+    .sort((a, b) => {
+      const [x, y] = [SORT_VALUES[sort.key](a), SORT_VALUES[sort.key](b)]
+      return (x < y ? -1 : x > y ? 1 : 0) * (sort.asc ? 1 : -1)
+    })
+
+  const countFor = (f: string) => cases.filter((c) => matchesFilter(c.status, f)).length
+
+  function SortHead({ label, sortKey, align }: { label: string; sortKey: SortKey; align?: 'right' }) {
+    const active = sort.key === sortKey
+    return (
+      <th className={styles.th} style={align === 'right' ? { textAlign: 'right' } : undefined}>
+        <button className={cd.sortHead} style={align === 'right' ? { marginLeft: 'auto' } : undefined} onClick={() => sortBy(sortKey)}>
+          {label}
+          <span className={`${cd.caret} ${active ? '' : cd.caretOff} ${active && !sort.asc ? cd.caretUp : ''}`}>
+            <Icon name="chevron-down" size={12} color="#1A2551" strokeWidth={2.4} />
+          </span>
+        </button>
+      </th>
+    )
+  }
 
   return (
     <div className={styles.page}>
       <div className={styles.wrap}>
         <div className={styles.header}>
-          <div>
-            <div className={styles.title}>Cases</div>
-            <div className={styles.subtitle}>{cases.length} total · {activeCount} active</div>
-          </div>
-          <div className={styles.primaryChip} onClick={() => navigate('/cases/new')}><Icon name="plus" size={15} color="#FFFFFF" /> New Case</div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <input
-            placeholder="Search by case name, client, or number..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ flex: 1, minWidth: 240, padding: '9px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
-          />
-          <div style={{ display: 'flex', gap: 4, background: '#EFE4CB', borderRadius: 10, padding: 4 }}>
-            {FILTERS.map((f) => (
-              <div
-                key={f}
-                onClick={() => setStatusFilter(f)}
-                style={{ padding: '7px 12px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: statusFilter === f ? '#2A2118' : '#6A5C42', background: statusFilter === f ? '#FFFFFF' : 'transparent' }}
-              >
-                {f}
-              </div>
-            ))}
-          </div>
+          <div className={styles.title}>Cases</div>
+          <div className={styles.primaryChip} onClick={() => navigate('/cases/new')}><Icon name="plus" size={15} color="#FCFAF4" /> New case</div>
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading cases…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
         {!loading && !error && (
           <div className={styles.tableCard}>
+            <div className={cd.toolbar}>
+              <div className={cd.searchBox} style={{ flex: 1, minWidth: 240 }}>
+                <Icon name="search" size={15} color="#8C857A" />
+                <input
+                  placeholder="Search by case, client or number…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className={cd.plainInput}
+                />
+              </div>
+              <div className={cd.tabs}>
+                {FILTERS.map((f) => (
+                  <button key={f} className={`${cd.tab} ${statusFilter === f ? cd.tabOn : ''}`} onClick={() => setStatusFilter(f)}>
+                    {f}<span className={cd.tabCount}>{countFor(f)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th className={styles.th}>Case</th>
-                  <th className={styles.th}>Client</th>
-                  <th className={styles.th}>Type</th>
-                  <th className={styles.th}>Status</th>
-                  <th className={styles.th}>Next Hearing</th>
-                  <th className={styles.th}></th>
+                  <SortHead label="Case" sortKey="case" />
+                  <SortHead label="Client" sortKey="client" />
+                  <SortHead label="Type" sortKey="type" />
+                  <SortHead label="Priority" sortKey="priority" />
+                  <SortHead label="Status" sortKey="status" />
+                  <SortHead label="Next hearing" sortKey="hearing" align="right" />
                 </tr>
               </thead>
               <tbody>
@@ -134,18 +197,38 @@ function StaffCasesView() {
                     <tr key={c.id} className={styles.tr} onClick={() => navigate(`/cases/${c.case_id}`)}>
                       <td className={styles.tdClient}>
                         <div style={{ fontWeight: 700 }}>{c.case_title ?? c.id}</div>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: '#B08D3E', fontWeight: 500, marginTop: 2 }}>{c.id}</div>
+                        <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: '#23306B', marginTop: 2 }}>{c.id}</div>
                       </td>
-                      <td className={styles.td}>{c.client ?? '—'}</td>
+                      <td className={styles.td}>{c.client ?? 'No client'}</td>
                       <td className={styles.td}>{c.case_type ?? '—'}</td>
-                      <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{c.status}</span></td>
-                      <td className={styles.td}>{c.hearing ? formatDate(c.hearing) : '—'}</td>
-                      <td className={styles.td} style={{ textAlign: 'right' }}><span style={{ display: 'inline-flex', transform: 'rotate(-90deg)' }}><Icon name="chevron-down" size={15} color="#B08D3E" strokeWidth={2.2} /></span></td>
+                      <td className={styles.td}>
+                        <span className={cd.priority}>
+                          <span className={cd.priorityDot} style={{ background: PRIORITY_COLORS[c.priority] ?? '#C9BC9E' }} />
+                          {c.priority}
+                        </span>
+                      </td>
+                      <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{statusLabel(c.status)}</span></td>
+                      <td className={styles.td} style={{ textAlign: 'right', color: c.hearing ? hearingColor(c.hearing) : MUTED, fontWeight: c.hearing ? 600 : 400 }}>
+                        {c.hearing ? hearingLabel(c.hearing) : 'Not scheduled'}
+                      </td>
                     </tr>
                   )
                 })}
                 {filtered.length === 0 && (
-                  <tr><td className={styles.td} colSpan={6} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No cases match your filters.</td></tr>
+                  <tr>
+                    <td className={styles.td} colSpan={6} style={{ padding: '28px 22px' }}>
+                      <div className={cd.empty}>
+                        {cases.length === 0 ? 'No cases on file yet.' : 'No cases match this search.'}
+                      </div>
+                      <div className={cd.emptyRow}>
+                        {cases.length === 0 ? (
+                          <div className={styles.ghostChip} onClick={() => navigate('/cases/new')}><Icon name="plus" size={15} color={MUTED} /> New case</div>
+                        ) : (
+                          <button className={cd.linkAction} onClick={() => { setSearch(''); setStatusFilter('All') }}>Clear search and filters</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -156,13 +239,24 @@ function StaffCasesView() {
   )
 }
 
+/** One labelled fact inside a client case card. */
+function CardFact({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div>
+      <div className={cd.factLabel}>{label}</div>
+      <div className={cd.factValue} style={{ fontSize: 13.5, marginTop: 4, color }}>{value}</div>
+    </div>
+  )
+}
+
 /**
- * Loads the client's cases (`listCases()`), hearings (`listHearings()`) for
- * the "next hearing" stat, and each case's timeline (`listCaseTimeline()`)
- * to build a flattened "Recent Updates" feed. Renders stat cards + a
- * progress-bar card per case.
+ * Loads the client's cases (`listCases()`), hearings (`listHearings()`) for the
+ * "next hearing" stat, and each case's timeline (`listCaseTimeline()`) for the
+ * latest-activity line and the Recent updates feed. One card per case, each
+ * opening the full `/cases/:caseId` page.
  */
 function ClientCasesView() {
+  const navigate = useNavigate()
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [hearings, setHearings] = useState<HearingSummary[]>([])
   const [updates, setUpdates] = useState<TimelineEvent[]>([])
@@ -170,7 +264,11 @@ function ClientCasesView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
-  const [selectedCase, setSelectedCase] = useState<CaseSummary | null>(null)
+  // Enter escalates from the instant substring filter to the backend's semantic
+  // ranking; null means no AI search is in effect and the plain filter applies.
+  const [aiHits, setAiHits] = useState<CaseSearchResult[] | null>(null)
+  const [aiSearching, setAiSearching] = useState(false)
+  const [aiError, setAiError] = useState('')
 
   useEffect(() => {
     Promise.all([listCases(), listHearings()])
@@ -188,22 +286,47 @@ function ClientCasesView() {
       .finally(() => setLoading(false))
   }, [])
 
-  const searchLower = search.toLowerCase()
-  const filtered = cases.filter((c) =>
-    !searchLower || c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower) || (c.lawyer ?? '').toLowerCase().includes(searchLower)
-  )
+  const searchLower = search.trim().toLowerCase()
+  const filtered = aiHits
+    ? aiHits.map((h) => cases.find((c) => c.case_id === h.case_id)).filter((c): c is CaseSummary => !!c)
+    : cases.filter((c) =>
+        !searchLower || c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower) || (c.lawyer ?? '').toLowerCase().includes(searchLower)
+      )
+  const excerptByCase = Object.fromEntries((aiHits ?? []).map((h) => [h.case_id, h.excerpt]))
+
+  async function runAiSearch() {
+    const query = search.trim()
+    if (!query) { clearSearch(); return }
+    setAiSearching(true)
+    setAiError('')
+    try {
+      setAiHits(await searchOwnCases(query, 10))
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Search failed.')
+      setAiHits(null)
+    } finally {
+      setAiSearching(false)
+    }
+  }
+
+  function clearSearch() {
+    setSearch('')
+    setAiHits(null)
+    setAiError('')
+  }
 
   const activeCases = cases.filter((c) => !CLOSED_STATUSES.has(c.status))
   const closedCases = cases.filter((c) => CLOSED_STATUSES.has(c.status))
   const todayIso = new Date().toISOString().slice(0, 10)
   const scheduledHearings = hearings.filter((h) => h.hearing_status === 'Scheduled' && h.hearing_date >= todayIso)
   const nextHearing = [...scheduledHearings].sort((a, b) => a.hearing_date.localeCompare(b.hearing_date))[0]
+  const caseNumbers = Object.fromEntries(cases.map((c) => [c.case_id, c.id]))
 
   const statCards = [
-    { label: 'Total Cases', value: cases.length, sublabel: `${cases.length} on file`, icon: 'briefcase' as const },
-    { label: 'Active Cases', value: activeCases.length, sublabel: 'In progress', icon: 'bar-chart-2' as const },
-    { label: 'Upcoming Hearings', value: scheduledHearings.length, sublabel: nextHearing ? `Next ${formatDate(nextHearing.hearing_date)}` : 'None scheduled', icon: 'calendar' as const },
-    { label: 'Closed Cases', value: closedCases.length, sublabel: 'Resolved', icon: 'check-circle' as const },
+    { label: 'Cases on file', value: cases.length, sublabel: null, icon: 'briefcase' as const },
+    { label: 'Open', value: activeCases.length, sublabel: null, icon: 'bar-chart-2' as const },
+    { label: 'Hearings ahead', value: scheduledHearings.length, sublabel: nextHearing ? `Next ${hearingLabel(nextHearing.hearing_date).toLowerCase()}` : null, icon: 'calendar' as const },
+    { label: 'Closed', value: closedCases.length, sublabel: null, icon: 'check-circle' as const },
   ]
 
   return (
@@ -211,23 +334,24 @@ function ClientCasesView() {
       <div className={styles.wrap}>
         <div className={styles.header}>
           <div>
-            <div className={styles.title}>My Cases</div>
-            <div className={styles.subtitle}>Track progress across all your active and closed cases.</div>
+            <div className={styles.title}>My cases</div>
+            <div className={styles.subtitle}>Where each of your matters stands right now.</div>
           </div>
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading your cases…</div>}
-        {error && <div style={{ padding: '24px 4px', color: '#B05C5C', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
         {!loading && !error && (
           <>
             <div className={styles.statCards}>
               {statCards.map((s) => (
                 <div key={s.label} className={styles.statCard}>
-                  <div className={styles.statLabel} style={{ textTransform: 'uppercase', fontSize: 11, letterSpacing: '.03em', fontWeight: 700 }}>{s.label}</div>
-                  <div className={styles.statValue}>{String(s.value).padStart(2, '0')}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#B08D3E', fontWeight: 600 }}>
-                    <Icon name={s.icon} size={13} color="#B08D3E" />{s.sublabel}
+                  <div className={styles.statIconRow}><div className={styles.statIconWrap}><Icon name={s.icon} size={18} color="#1A2551" /></div></div>
+                  <div>
+                    <div className={styles.statValue}>{s.value}</div>
+                    <div className={styles.statLabel}>{s.label}</div>
+                    {s.sublabel && <div style={{ fontSize: 12, color: '#23306B', fontWeight: 600, marginTop: 5 }}>{s.sublabel}</div>}
                   </div>
                 </div>
               ))}
@@ -235,140 +359,108 @@ function ClientCasesView() {
 
             <div className={styles.midGrid}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <input
-                  placeholder="Filter by case ID, title or lawyer..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }}
-                />
+                <div className={cd.searchBox}>
+                  <Icon name="search" size={15} color="#8C857A" />
+                  <input
+                    placeholder="Search your cases, or describe one and press Enter…"
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); setAiHits(null); setAiError('') }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !aiSearching) runAiSearch() }}
+                    className={cd.plainInput}
+                  />
+                  {aiSearching && <span style={{ fontSize: 12, color: MUTED, flexShrink: 0 }}>Searching…</span>}
+                  {search && !aiSearching && (
+                    <button className={cd.linkAction} style={{ flexShrink: 0 }} onClick={clearSearch}>Clear</button>
+                  )}
+                </div>
+
+                {aiError && <div style={{ fontSize: 12.5, color: '#B3282D' }}>{aiError}</div>}
+                {aiHits && !aiError && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
+                    <Icon name="sparkles" size={14} color="#23306B" />
+                    {aiHits.length > 0
+                      ? `Closest matches for "${search.trim()}", ranked by meaning rather than wording.`
+                      : `Nothing on your file reads like "${search.trim()}".`}
+                  </div>
+                )}
+
                 {filtered.map((c) => {
                   const [color, bg] = STATUS_STYLE_MAP[c.status] || DEFAULT_STATUS_STYLE
-                  const pct = STATUS_PROGRESS[c.status] ?? 50
+                  const latest = latestByCase[c.case_id]
                   return (
-                    <div key={c.id} className={styles.panelCard}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                        <div>
-                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#B08D3E', fontWeight: 600 }}>{c.id}</div>
-                          <div style={{ fontSize: 15, fontWeight: 700, color: '#2A2118', marginTop: 2 }}>{c.case_title ?? c.id}</div>
-                          <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{c.court ?? 'Court TBD'}</div>
+                    <button key={c.id} className={cd.caseCard} onClick={() => navigate(`/cases/${c.case_id}`)}>
+                      <div className={cd.caseCardTop}>
+                        <div style={{ minWidth: 0 }}>
+                          <div className={cd.caseNumber}>{c.id}</div>
+                          <div style={{ fontFamily: "'Spectral', serif", fontSize: 16, fontWeight: 700, color: '#1A1A17', marginTop: 3 }}>{c.case_title ?? c.id}</div>
+                          <div style={{ fontSize: 12.5, color: MUTED, marginTop: 3 }}>{c.court ?? 'Court not set'}</div>
                         </div>
-                        <span className={styles.statusBadge} style={{ color, background: bg, flexShrink: 0 }}>{c.status}</span>
+                        <span className={styles.statusBadge} style={{ color, background: bg, flexShrink: 0 }}>{statusLabel(c.status)}</span>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginTop: 16 }}>
-                        <div>
-                          <div style={{ fontSize: 10.5, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em', fontWeight: 700 }}>Lead Lawyer</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118', marginTop: 4 }}>{c.lawyer ?? '—'}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 10.5, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em', fontWeight: 700 }}>Next Hearing</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118', marginTop: 4 }}>{c.hearing ? formatDate(c.hearing) : '—'}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 10.5, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em', fontWeight: 700 }}>Progress</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                            <div className={styles.progressTrack} style={{ flex: 1 }}><div className={styles.progressFill} style={{ width: `${pct}%` }} /></div>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#2A2118' }}>{pct}%</div>
-                          </div>
-                        </div>
+                      <div className={cd.caseCardFacts}>
+                        <CardFact label="Your lawyer" value={c.lawyer ?? 'Not assigned'} />
+                        <CardFact
+                          label="Next hearing"
+                          value={c.hearing ? hearingLabel(c.hearing) : 'Not scheduled'}
+                          color={c.hearing ? hearingColor(c.hearing) : MUTED}
+                        />
+                        <CardFact label="Filed" value={c.filing_date ? formatDate(c.filing_date) : 'Not recorded'} />
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 16 }}>
-                        {latestByCase[c.case_id] ? (
-                          <div style={{ fontSize: 12, color: MUTED, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#B08D3E', flexShrink: 0 }} />
-                            {latestByCase[c.case_id].event_title}
-                          </div>
-                        ) : <div />}
-                        <div className={styles.darkBtn} onClick={() => setSelectedCase(c)}>View Details →</div>
-                      </div>
-                    </div>
+                      {excerptByCase[c.case_id] ? (
+                        <div className={cd.activityLine} style={{ alignItems: 'flex-start', lineHeight: 1.5 }}>
+                          <Icon name="sparkles" size={13} color="#23306B" />
+                          <span style={{ color: MUTED }}>{excerptByCase[c.case_id]}</span>
+                        </div>
+                      ) : latest && (
+                        <div className={cd.activityLine}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#23306B', flexShrink: 0 }} />
+                          {latest.event_title}
+                          <span style={{ color: '#8C857A' }}>{timeAgo(latest.created_at)}</span>
+                        </div>
+                      )}
+                    </button>
                   )
                 })}
+
                 {filtered.length === 0 && (
-                  <div className={styles.panelCard} style={{ color: MUTED, textAlign: 'center' }}>No cases match your filter.</div>
+                  <div className={styles.panelCard}>
+                    <div className={cd.empty}>
+                      {cases.length === 0 ? 'You have no cases on file yet. Your lawyer opens these for you.' : 'No cases match that search.'}
+                    </div>
+                    {cases.length > 0 && (
+                      <div className={cd.emptyRow}>
+                        {!aiHits && <button className={cd.linkAction} onClick={() => !aiSearching && runAiSearch()}>Try searching by meaning</button>}
+                        <button className={cd.linkAction} onClick={clearSearch}>Clear search</button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
               <div className={styles.sideCol}>
                 <div className={styles.panelCard}>
-                  <div className={styles.panelTitle}>Recent Updates</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div className={styles.panelTitle}>Recent updates</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
                     {updates.map((u) => (
-                      <div key={u.id} style={{ display: 'flex', gap: 8, borderTop: '1px solid #F1E9D9', paddingTop: 12 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#B08D3E', marginTop: 6, flexShrink: 0 }} />
+                      <div key={u.id} className={cd.updateRow}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#23306B', marginTop: 6, flexShrink: 0 }} />
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>{u.event_title}</div>
-                          {u.event_description && <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>{u.event_description}</div>}
-                          <div style={{ fontSize: 11, color: '#A38F66', marginTop: 4, textTransform: 'uppercase', letterSpacing: '.02em' }}>{timeAgo(u.created_at)}</div>
+                          <div className={cd.updateCase}>{caseNumbers[u.case_id] ?? ''}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17', marginTop: 2 }}>{u.event_title}</div>
+                          {u.event_description && <div style={{ fontSize: 12, color: MUTED, marginTop: 3, lineHeight: 1.5 }}>{u.event_description}</div>}
+                          <div style={{ fontSize: 11.5, color: '#8C857A', marginTop: 4 }}>{timeAgo(u.created_at)}</div>
                         </div>
                       </div>
                     ))}
-                    {updates.length === 0 && <div style={{ color: MUTED, fontSize: 13 }}>No recent activity.</div>}
+                    {updates.length === 0 && <div className={cd.empty}>Nothing has happened on your cases yet. Filings, hearings and documents show up here.</div>}
                   </div>
                 </div>
               </div>
             </div>
           </>
         )}
-      </div>
-
-      {selectedCase && (
-        <CaseDetailModal
-          caseInfo={selectedCase}
-          latestActivity={latestByCase[selectedCase.case_id]}
-          onClose={() => setSelectedCase(null)}
-        />
-      )}
-    </div>
-  )
-}
-
-/** Lightweight read-only "View Details" popup opened from a client's case card -- not the full `/cases/:caseId` page (that's the lawyer-facing management view). */
-function CaseDetailModal({ caseInfo, latestActivity, onClose }: { caseInfo: CaseSummary; latestActivity?: TimelineEvent; onClose: () => void }) {
-  const [color, bg] = STATUS_STYLE_MAP[caseInfo.status] || DEFAULT_STATUS_STYLE
-  const pct = STATUS_PROGRESS[caseInfo.status] ?? 50
-  const rows: [string, string][] = [
-    ['Court', caseInfo.court ?? '—'],
-    ['Lead Lawyer', caseInfo.lawyer ?? '—'],
-    ['Filed On', caseInfo.filing_date ? formatDate(caseInfo.filing_date) : '—'],
-    ['Next Hearing', caseInfo.hearing ? formatDate(caseInfo.hearing) : '—'],
-  ]
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24 }} onClick={onClose}>
-      <div style={{ background: '#FFFFFF', borderRadius: 18, width: 'min(440px, 100%)', padding: 26, boxShadow: '0 20px 48px rgba(0,0,0,.3)' }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#B08D3E', fontWeight: 600 }}>{caseInfo.id}</div>
-          <span className={styles.statusBadge} style={{ color, background: bg, flexShrink: 0 }}>{statusLabel(caseInfo.status)}</span>
-        </div>
-        <div style={{ fontSize: 19, fontWeight: 700, color: '#2A2118', marginTop: 4 }}>{caseInfo.case_title ?? caseInfo.id}</div>
-        {caseInfo.description && <div style={{ fontSize: 13, color: MUTED, marginTop: 8, lineHeight: 1.5 }}>{caseInfo.description}</div>}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 20 }}>
-          {rows.map(([label, value]) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13.5 }}>
-              <div style={{ color: MUTED }}>{label}</div>
-              <div style={{ fontWeight: 600, color: '#2A2118' }}>{value}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ marginTop: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em', fontWeight: 700 }}>
-            <span>Progress</span><span>{pct}%</span>
-          </div>
-          <div className={styles.progressTrack} style={{ marginTop: 8 }}><div className={styles.progressFill} style={{ width: `${pct}%` }} /></div>
-        </div>
-
-        {latestActivity && (
-          <div style={{ fontSize: 12.5, color: MUTED, display: 'flex', alignItems: 'center', gap: 6, marginTop: 14 }}>
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#B08D3E', flexShrink: 0 }} />
-            {latestActivity.event_title}
-          </div>
-        )}
-
-        <div className={styles.darkBtn} style={{ justifyContent: 'center', width: '100%', marginTop: 22, padding: '11px 0' }} onClick={onClose}>Close</div>
       </div>
     </div>
   )

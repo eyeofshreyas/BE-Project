@@ -12,19 +12,19 @@ import DashboardView from './views/DashboardView'
 import UsersView from './views/UsersView'
 import CasesView from './views/CasesView'
 import DocumentsView from './views/DocumentsView'
+import NotificationsView from './views/NotificationsView'
 import ReportsView from './views/ReportsView'
 import AnalyticsView from './views/AnalyticsView'
 import SettingsView from './views/SettingsView'
 import { listNotifications, markNotificationRead } from '../../api/client'
 import type { UserProfile, NotificationSummary } from '../../types/api'
-import { timeAgo } from '../../utils/date'
 import styles from '../../components/AppShell.module.css'
 
-type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'reports' | 'analytics' | 'settings'
+type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'notifications' | 'reports' | 'analytics' | 'settings'
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Super Admin', 2: 'Lawyer', 3: 'Client' }
 
-const NOTIF_COLORS: Record<string, string> = { Hearing: C.warning, Payment: C.success, Document: C.primary }
+const TODAY = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
 function initialsOf(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
@@ -56,10 +56,9 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
  */
 export default function AdminConsolePage() {
   const [activePage, setActivePage] = useState<PageKey>('dashboard')
-  const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [profile] = useState<UserProfile | null>(loadProfile)
+  const [profile, setProfile] = useState<UserProfile | null>(loadProfile)
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
   const navigate = useNavigate()
 
@@ -68,13 +67,15 @@ export default function AdminConsolePage() {
     listNotifications().then(setNotifications).catch(() => {})
   }, [profile])
 
-  function openNotification(n: NotificationSummary) {
-    if (!n.is_read) {
-      markNotificationRead(n.id)
-        .then((updated) => setNotifications((prev) => prev.map((x) => (x.id === updated.id ? updated : x))))
-        .catch(() => {})
-    }
-    goTo('dashboard')
+  function markRead(n: NotificationSummary) {
+    markNotificationRead(n.id)
+      .then((updated) => setNotifications((prev) => prev.map((x) => (x.id === updated.id ? updated : x))))
+      .catch(() => {})
+  }
+
+  function saveProfile(updated: UserProfile) {
+    setProfile(updated)
+    localStorage.setItem('lexflow_profile', JSON.stringify(updated))
   }
 
   function logout() {
@@ -84,7 +85,6 @@ export default function AdminConsolePage() {
   }
 
   function closeMenus() {
-    setNotifOpen(false)
     setProfileOpen(false)
   }
 
@@ -99,10 +99,7 @@ export default function AdminConsolePage() {
   }
 
   const quickActions = [
-    { label: 'Add New Lawyer', icon: 'user-plus' as const, primary: true, onClick: () => goTo('users') },
-    { label: 'Add New Client', icon: 'user-plus' as const, onClick: () => goTo('users') },
-    { label: 'Create Case', icon: 'plus' as const, onClick: () => goTo('cases') },
-    { label: 'Generate Report', icon: 'file-text' as const, onClick: () => goTo('reports') },
+    { label: 'Generate Report', icon: 'file-text' as const, primary: true, onClick: () => goTo('reports') },
   ]
 
   return (
@@ -119,21 +116,21 @@ export default function AdminConsolePage() {
           {NAV_ITEMS.map((item) => {
             const active = item.key === activePage
             return (
-              <div key={item.key} className={styles.navRow} style={{ background: active ? '#E9DCC8' : 'transparent' }} onClick={() => goTo(item.key)} title={item.label}>
-                <span className={styles.navIcon}><Icon name={item.icon} size={18} color={active ? C.primaryDark : '#93826d'} /></span>
-                <span className={styles.navLabel} style={{ fontWeight: active ? 600 : 500, color: active ? C.text : '#6A5C42' }}>{item.label}</span>
+              <div key={item.key} className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => goTo(item.key)} title={item.label}>
+                <span className={styles.navIcon}><Icon name={item.icon} size={18} color={active ? C.primaryDark : '#8C857A'} /></span>
+                <span className={styles.navLabel} style={{ fontWeight: active ? 600 : 500, color: active ? C.text : '#575145' }}>{item.label}</span>
               </div>
             )
           })}
         </div>
         <div className={styles.sidebarFooter}>
-          <div className={styles.navRow} style={{ background: activePage === 'settings' ? '#E9DCC8' : 'transparent' }} onClick={() => goTo('settings')} title="Settings">
-            <span className={styles.navIcon}><Icon name="settings" size={18} color={activePage === 'settings' ? C.primaryDark : '#93826d'} /></span>
-            <span className={styles.navLabel} style={{ fontWeight: activePage === 'settings' ? 600 : 500, color: activePage === 'settings' ? C.text : '#6A5C42' }}>Settings</span>
+          <div className={styles.navRow} style={{ background: activePage === 'settings' ? '#E6E0CE' : 'transparent' }} onClick={() => goTo('settings')} title="Settings">
+            <span className={styles.navIcon}><Icon name="settings" size={18} color={activePage === 'settings' ? C.primaryDark : '#8C857A'} /></span>
+            <span className={styles.navLabel} style={{ fontWeight: activePage === 'settings' ? 600 : 500, color: activePage === 'settings' ? C.text : '#575145' }}>Settings</span>
           </div>
           <div className={styles.logoutRow} onClick={logout} title="Logout">
-            <span className={styles.navIcon}><Icon name="log-out" size={18} color="#93826d" /></span>
-            <span style={{ fontSize: 13.5, fontWeight: 500, color: '#6A5C42' }}>Logout</span>
+            <span className={styles.navIcon}><Icon name="log-out" size={18} color="#8C857A" /></span>
+            <span style={{ fontSize: 13.5, fontWeight: 500, color: '#575145' }}>Logout</span>
           </div>
         </div>
       </div>
@@ -141,38 +138,21 @@ export default function AdminConsolePage() {
       <div className={styles.main}>
         <div className={styles.topbar}>
           <div className={styles.searchBox}>
-            <Icon name="search" size={17} color="#A38F66" />
+            <Icon name="search" size={17} color="#8C857A" />
             <input placeholder="Search users, lawyers, clients, cases, documents..." className={styles.searchInput} />
           </div>
           <div className={styles.topbarRight}>
-            <div className={styles.todayLabel}>Friday, August 7, 2026</div>
-            <div style={{ position: 'relative' }}>
-              <div className={styles.bellBtn} style={{ background: notifOpen ? '#EFE4CB' : 'transparent' }} onClick={(e) => { e.stopPropagation(); setNotifOpen((v) => !v); setProfileOpen(false) }}>
-                <Icon name="bell" size={19} color="#6A5C42" />
-                {notifications.some((n) => !n.is_read) && <span className={styles.bellDot} />}
-              </div>
-              {notifOpen && (
-                <div className={styles.notifDropdown}>
-                  <div className={styles.notifDropdownTitle}>Notifications</div>
-                  {notifications.length === 0 && <div style={{ padding: '10px 4px', fontSize: 12.5, color: '#A38F66' }}>No notifications.</div>}
-                  {notifications.map((n) => (
-                    <div key={n.id} className={styles.notifDropdownRow} onClick={() => openNotification(n)}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 5, flexShrink: 0, background: n.is_read ? '#D8C79A' : (NOTIF_COLORS[n.notification_type] ?? C.primary) }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12.5, color: '#2A2118', lineHeight: 1.4 }}>{n.title ?? n.message}</div>
-                        <div style={{ fontSize: 11, color: '#A38F66', marginTop: 2 }}>{timeAgo(n.created_at)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className={styles.todayLabel}>{TODAY}</div>
+            <div className={styles.bellBtn} onClick={() => goTo('notifications')}>
+              <Icon name="bell" size={19} color="#575145" />
+              {notifications.some((n) => !n.is_read) && <span className={styles.bellDot} />}
             </div>
             <div className={styles.vDivider} />
             <div style={{ position: 'relative' }}>
-              <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v); setNotifOpen(false) }}>
+              <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v) }}>
                 <div className={styles.avatarCircle}>{profile ? initialsOf(profile.full_name) : '—'}</div>
-                <div style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>{profile?.full_name ?? 'Unknown user'}</div><div style={{ fontSize: 11, color: '#A38F66' }}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'User') : ''}</div></div>
-                <span style={{ color: '#A38F66', display: 'flex' }}><Icon name="chevron-down" size={15} color="#A38F66" /></span>
+                <div style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{profile?.full_name ?? 'Unknown user'}</div><div style={{ fontSize: 11, color: '#8C857A' }}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'User') : ''}</div></div>
+                <span style={{ color: '#8C857A', display: 'flex' }}><Icon name="chevron-down" size={15} color="#8C857A" /></span>
               </div>
               {profileOpen && (
                 <div className={styles.profileDropdown}>
@@ -184,13 +164,14 @@ export default function AdminConsolePage() {
         </div>
 
         <div className={styles.content} onClick={closeMenus}>
-          {activePage === 'dashboard' && <DashboardView quickActions={quickActions} />}
+          {activePage === 'dashboard' && <DashboardView quickActions={quickActions} adminName={profile?.full_name ?? null} />}
           {activePage === 'users' && <UsersView />}
           {activePage === 'cases' && <CasesView />}
           {activePage === 'documents' && <DocumentsView />}
-          {activePage === 'reports' && <ReportsView />}
+          {activePage === 'notifications' && <NotificationsView notifications={notifications} onMarkRead={markRead} />}
+          {activePage === 'reports' && <ReportsView onToast={showToast} />}
           {activePage === 'analytics' && <AnalyticsView />}
-          {activePage === 'settings' && <SettingsView onSave={() => showToast('Settings saved.')} />}
+          {activePage === 'settings' && <SettingsView profile={profile} onSave={showToast} onProfileChange={saveProfile} />}
         </div>
       </div>
 

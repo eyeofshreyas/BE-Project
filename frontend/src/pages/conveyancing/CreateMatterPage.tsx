@@ -6,15 +6,15 @@ import type { ClientSummary } from '../../types/api'
 import { Icon } from '../../components/icons'
 import styles from './ConveyancingDashboardPage.module.css'
 
-const MUTED = '#8C7C5E'
+const MUTED = '#6E6759'
 const MATTER_TYPES = ['Sale', 'Purchase', 'Mortgage', 'Lease', 'Other']
 const PROPERTY_TYPES = ['Residential House', 'Apartment', 'Commercial', 'Land', 'Other']
-const PRIORITIES = ['Low', 'Normal', 'High'] as const
+const PRIORITIES = ['Low', 'Medium', 'High'] as const
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: '#6A5C42', marginBottom: 6 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: '#575145', marginBottom: 6 }}>
         {label}{required && <span style={{ color: '#D64545' }}> *</span>}
       </div>
       {children}
@@ -24,13 +24,13 @@ function Field({ label, required, children }: { label: string; required?: boolea
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#8C7C5E', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid #E7DCC6', paddingBottom: 10, marginBottom: 4 }}>
+    <div style={{ fontSize: 9.5, fontWeight: 700, color: '#6E6759', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', borderBottom: '1px solid #CFC6B0', paddingBottom: 10, marginBottom: 4 }}>
       {children}
     </div>
   )
 }
 
-const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }
+const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }
 
 /**
  * Loads `listClients()` for the client search on mount, then on submit calls
@@ -39,8 +39,8 @@ const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box'
  * that carries the client/priority -- `cases.client_id` is required) and
  * navigates back to `/conveyancing`. Client selection is required for that
  * reason even though the mockup doesn't mark it so. Responsible Lawyer is
- * decorative: the backend assigns whoever is creating the matter instead,
- * since there's no accessible lawyer-directory endpoint for non-admins.
+ * read-only: the backend assigns whoever is creating the matter, since there's
+ * no accessible lawyer-directory endpoint for non-admins.
  */
 export default function CreateMatterPage() {
   const navigate = useNavigate()
@@ -48,8 +48,7 @@ export default function CreateMatterPage() {
 
   const [matterName, setMatterName] = useState('')
   const [matterType, setMatterType] = useState(MATTER_TYPES[0])
-  const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>('Normal')
-  const [lawyerQuery, setLawyerQuery] = useState('')
+  const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>('Medium')
 
   const [clientQuery, setClientQuery] = useState('')
   const [clientId, setClientId] = useState('')
@@ -105,7 +104,7 @@ export default function CreateMatterPage() {
   return (
     <div className={styles.page}>
       <div className={styles.wrap}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#8f6743', fontWeight: 600, cursor: 'pointer', width: 'fit-content' }} onClick={() => navigate('/conveyancing')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#1A2551', fontWeight: 600, cursor: 'pointer', width: 'fit-content' }} onClick={() => navigate('/conveyancing')}>
           <span style={{ display: 'inline-flex', transform: 'rotate(90deg)' }}><Icon name="chevron-down" size={14} strokeWidth={2.2} /></span> Back to Conveyancing
         </div>
 
@@ -136,20 +135,20 @@ export default function CreateMatterPage() {
               </select>
             </Field>
             <Field label="Matter Number">
-              <input value="Auto-generated on save" readOnly style={{ ...inputStyle, background: '#FBF7EE', color: MUTED }} />
+              <input value="Auto-generated on save" readOnly style={{ ...inputStyle, background: '#F6F2E9', color: MUTED }} />
             </Field>
 
             <Field label="Priority">
-              <div style={{ display: 'flex', gap: 6, background: '#FBF7EE', border: '1.5px solid #E7DCC6', borderRadius: 9, padding: 4 }}>
+              <div style={{ display: 'flex', gap: 6, background: '#F6F2E9', border: '1.5px solid #CFC6B0', borderRadius: 3, padding: 4 }}>
                 {PRIORITIES.map((p) => (
-                  <div key={p} onClick={() => setPriority(p)} style={{ flex: 1, textAlign: 'center', padding: '7px 0', borderRadius: 7, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: priority === p ? '#FFFFFF' : '#6A5C42', background: priority === p ? '#B08D3E' : 'transparent' }}>
+                  <div key={p} onClick={() => setPriority(p)} style={{ flex: 1, textAlign: 'center', padding: '7px 0', borderRadius: 3, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: priority === p ? '#FCFAF4' : '#575145', background: priority === p ? '#23306B' : 'transparent' }}>
                     {p}
                   </div>
                 ))}
               </div>
             </Field>
             <Field label="Responsible Lawyer">
-              <input placeholder="Search lawyer..." value={lawyerQuery} onChange={(e) => setLawyerQuery(e.target.value)} style={inputStyle} />
+              <input value="Assigned to you on save" readOnly style={{ ...inputStyle, background: '#F6F2E9', color: MUTED }} />
             </Field>
           </div>
 
@@ -169,7 +168,7 @@ export default function CreateMatterPage() {
                   />
                 </div>
                 {clientDropdownOpen && filteredClients.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: '#FFFFFF', border: '1px solid #E7DCC6', borderRadius: 9, boxShadow: '0 8px 20px rgba(0,0,0,.08)', zIndex: 10, maxHeight: 200, overflowY: 'auto' }}>
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: '#FCFAF4', border: '1px solid #CFC6B0', borderRadius: 3, boxShadow: '0 8px 20px rgba(0,0,0,.08)', zIndex: 10, maxHeight: 200, overflowY: 'auto' }}>
                     {filteredClients.map((c) => (
                       <div key={c.id} onMouseDown={() => pickClient(c)} style={{ padding: '9px 12px', fontSize: 13, cursor: 'pointer' }}>
                         {c.full_name} <span style={{ color: MUTED, fontSize: 11.5 }}>· {c.email}</span>
@@ -179,7 +178,7 @@ export default function CreateMatterPage() {
                 )}
               </div>
               <a href="/clients/new" target="_blank" rel="noreferrer" className={styles.ghostChip} style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}>
-                <Icon name="plus" size={14} color="#8f6743" /> Add New Client
+                <Icon name="plus" size={14} color="#1A2551" /> Add New Client
               </a>
             </div>
           </Field>
@@ -209,7 +208,7 @@ export default function CreateMatterPage() {
           </div>
         </div>
 
-        {error && <div style={{ fontSize: 12.5, color: '#B05C5C' }}>{error}</div>}
+        {error && <div style={{ fontSize: 12.5, color: '#B3282D' }}>{error}</div>}
       </div>
     </div>
   )

@@ -10,21 +10,21 @@ import type { CourtOption, CaseTypeOption } from '../../types/api'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
-const MUTED = '#8C7C5E'
+const MUTED = '#6E6759'
 const TYPES = ['Individual', 'Organization'] as const
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6A5C42', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 6 }}>
-        {label}{required && <span style={{ color: '#B05C5C' }}> *</span>}
+      <div style={{ fontSize: 9.5, fontWeight: 700, color: '#575145', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', marginBottom: 6 }}>
+        {label}{required && <span style={{ color: '#B3282D' }}> *</span>}
       </div>
       {children}
     </div>
   )
 }
 
-const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 9, border: '1.5px solid #E7DCC6', fontSize: 13.5, background: '#FFFFFF' }
+const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }
 
 /** Loads courts/case types for the matter section; `reviewAndConfirm` validates and opens a confirm dialog, `submit` calls `sendClientRequest()` and navigates to `/clients`. */
 export default function CreateClientPage() {
@@ -114,7 +114,7 @@ export default function CreateClientPage() {
   return (
     <div className={styles.page}>
       <div className={styles.wrap}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#8f6743', fontWeight: 600, cursor: 'pointer', width: 'fit-content' }} onClick={() => navigate('/clients')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#1A2551', fontWeight: 600, cursor: 'pointer', width: 'fit-content' }} onClick={() => navigate('/clients')}>
           <span style={{ display: 'inline-flex', transform: 'rotate(90deg)' }}><Icon name="chevron-down" size={14} strokeWidth={2.2} /></span> Back to Clients
         </div>
 
@@ -128,12 +128,12 @@ export default function CreateClientPage() {
         <div className={styles.midGrid}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className={styles.panelCard} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', gap: 4, background: '#EFE4CB', borderRadius: 10, padding: 4, width: 'fit-content' }}>
+              <div style={{ display: 'flex', gap: 4, background: '#E6E0CE', borderRadius: 3, padding: 4, width: 'fit-content' }}>
                 {TYPES.map((t) => (
                   <div
                     key={t}
                     onClick={() => setClientType(t)}
-                    style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: clientType === t ? '#2A2118' : '#6A5C42', background: clientType === t ? '#FFFFFF' : 'transparent' }}
+                    style={{ padding: '7px 14px', borderRadius: 3, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: clientType === t ? '#1A1A17' : '#575145', background: clientType === t ? '#FCFAF4' : 'transparent' }}
                   >
                     {t}
                   </div>
@@ -142,16 +142,16 @@ export default function CreateClientPage() {
 
               {isOrg && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <label style={{ width: 64, height: 64, borderRadius: 14, border: '1.5px dashed #E0CE9E', background: '#FBF7EE', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, overflow: 'hidden' }}>
+                  <label style={{ width: 64, height: 64, borderRadius: 3, border: '1.5px dashed #E6E0CE', background: '#F6F2E9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, overflow: 'hidden' }}>
                     {logoPreview ? (
                       <img src={logoPreview} alt="Organization logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <Icon name="briefcase" size={20} color="#8f6743" />
+                      <Icon name="briefcase" size={20} color="#1A2551" />
                     )}
                     <input type="file" accept="image/*" onChange={pickLogo} style={{ display: 'none' }} />
                   </label>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>{logoPreview ? 'Logo selected' : 'Upload Logo'}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{logoPreview ? 'Logo selected' : 'Upload Logo'}</div>
                     <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>Preview only for now — re-attach it to their profile once the client accepts.</div>
                   </div>
                 </div>
@@ -189,12 +189,12 @@ export default function CreateClientPage() {
                       <div
                         key={c.case_type_id}
                         onClick={() => setCaseTypeId(String(c.case_type_id))}
-                        style={{ border: selected ? '1.5px solid #B08D3E' : '1px solid #E7DCC6', background: selected ? '#FBF0D6' : '#FFFFFF', borderRadius: 12, padding: '14px 12px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8 }}
+                        style={{ border: selected ? '1.5px solid #23306B' : '1px solid #CFC6B0', background: selected ? '#F3EBD9' : '#FCFAF4', borderRadius: 3, padding: '14px 12px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8 }}
                       >
-                        <div style={{ width: 32, height: 32, borderRadius: 9, background: selected ? '#8f6743' : '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon name="briefcase" size={15} color={selected ? '#FFFFFF' : '#8f6743'} />
+                        <div style={{ width: 32, height: 32, borderRadius: 3, background: selected ? '#1A2551' : '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Icon name="briefcase" size={15} color={selected ? '#FCFAF4' : '#1A2551'} />
                         </div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2A2118' }}>{c.case_type_name}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{c.case_type_name}</div>
                       </div>
                     )
                   })}
@@ -218,11 +218,11 @@ export default function CreateClientPage() {
 
             <div className={styles.panelCard} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div className={styles.panelTitle} style={{ marginBottom: 0 }}>Initial Documents</div>
-              <div style={{ border: '1.5px dashed #E0CE9E', borderRadius: 12, padding: '32px 16px', textAlign: 'center', background: '#FBF7EE', opacity: .6 }} title="Available once the client accepts and a case is created">
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
-                  <Icon name="download" size={17} color="#8f6743" strokeWidth={1.8} />
+              <div style={{ border: '1.5px dashed #E6E0CE', borderRadius: 3, padding: '32px 16px', textAlign: 'center', background: '#F6F2E9', opacity: .6 }} title="Available once the client accepts and a case is created">
+                <div style={{ width: 40, height: 40, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+                  <Icon name="download" size={17} color="#1A2551" strokeWidth={1.8} />
                 </div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: '#2A2118' }}>Available after the client accepts</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1A17' }}>Available after the client accepts</div>
                 <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>Document uploads unlock once a case exists for this client.</div>
               </div>
             </div>
@@ -236,35 +236,35 @@ export default function CreateClientPage() {
           <div className={styles.sideCol}>
             <div className={styles.panelCard}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#EFE4CB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="user-plus" size={16} color="#8f6743" />
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="user-plus" size={16} color="#1A2551" />
                 </div>
                 <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#2A2118', fontFamily: "'Poppins', sans-serif" }}>{fullName || 'New Client'}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17', fontFamily: "'Spectral', serif" }}>{fullName || 'New Client'}</div>
                   <div style={{ fontSize: 11.5, color: MUTED }}>Pending invite</div>
                 </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12.5 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: MUTED }}>Type</span><span className={styles.statusBadge} style={{ background: '#EFE4CB', color: '#6A5C42' }}>{clientType}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: MUTED }}>Type</span><span className={styles.statusBadge} style={{ background: '#E6E0CE', color: '#575145' }}>{clientType}</span></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: MUTED }}>Matter</span><strong>{selectedCaseType?.case_type_name ?? '—'}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: MUTED }}>Documents</span><strong>0 Attached</strong></div>
               </div>
 
               <div style={{ marginTop: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '.03em', fontWeight: 700, marginBottom: 6 }}><span>Profile Completion</span><span>{completion}%</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', fontWeight: 700, marginBottom: 6 }}><span>Profile Completion</span><span>{completion}%</span></div>
                 <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${completion}%` }} /></div>
               </div>
             </div>
 
-            <div className={styles.panelCard} style={{ background: '#FBF7EE', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <Icon name="info" size={16} color="#8f6743" />
-              <div style={{ fontSize: 12, color: '#6A5C42' }}>We'll email this client an invite to LexFlow. Once they accept, a case is created and they'll appear on your client list.</div>
+            <div className={styles.panelCard} style={{ background: '#F6F2E9', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <Icon name="info" size={16} color="#1A2551" />
+              <div style={{ fontSize: 12, color: '#575145' }}>We'll email this client an invite to LexFlow. Once they accept, a case is created and they'll appear on your client list.</div>
             </div>
           </div>
         </div>
 
-        {error && <div style={{ fontSize: 12.5, color: '#B05C5C' }}>{error}</div>}
+        {error && <div style={{ fontSize: 12.5, color: '#B3282D' }}>{error}</div>}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
           <div className={styles.ghostChip} onClick={() => navigate('/clients')}>Cancel</div>
@@ -272,12 +272,12 @@ export default function CreateClientPage() {
         </div>
 
         {confirmOpen && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(42,33,24,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={() => !sending && setConfirmOpen(false)}>
-            <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 24, width: 400, boxShadow: '0 20px 48px rgba(0,0,0,.2)' }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 16, fontWeight: 700, color: '#2A2118', marginBottom: 4 }}>Send invite to {fullName || 'this client'}?</div>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(35, 48, 107,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={() => !sending && setConfirmOpen(false)}>
+            <div style={{ background: '#FCFAF4', borderRadius: 3, padding: 24, width: 400, boxShadow: '0 20px 48px rgba(0,0,0,.2)' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ fontFamily: "'Spectral', serif", fontSize: 16, fontWeight: 700, color: '#1A1A17', marginBottom: 4 }}>Send invite to {fullName || 'this client'}?</div>
               <div style={{ fontSize: 12.5, color: MUTED, marginBottom: 16 }}>Review before sending — this emails them a real invite.</div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, background: '#FBF7EE', border: '1px solid #E7DCC6', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, background: '#F6F2E9', border: '1px solid #CFC6B0', borderRadius: 3, padding: '12px 14px', marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: MUTED }}>Type</span><strong>{clientType}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: MUTED }}>Email</span><strong>{email}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: MUTED }}>Matter</span><strong>{selectedCaseType?.case_type_name ?? '—'}</strong></div>
