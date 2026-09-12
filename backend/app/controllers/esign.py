@@ -100,6 +100,9 @@ def handle_esign_webhook(payload: dict):
     ponytail: no timeline event here -- there's no LexFlow user to attribute it to, and
     `esign_status` is already queryable on the document itself.
     Calls: `_verify_leegality_mac()`."""
+    if not LEEGALITY_PRIVATE_SALT:
+        raise HTTPException(status_code=500, detail="e-signature is not configured on this server.")
+
     document_id = payload.get("documentId", "")
     if not document_id or not _verify_leegality_mac(document_id, payload.get("mac", "")):
         raise HTTPException(status_code=401, detail="Invalid webhook signature.")

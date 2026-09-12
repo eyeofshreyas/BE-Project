@@ -8,7 +8,9 @@ import hmac
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
+from app.main import app
 from app.middleware import auth
 from app.controllers.esign import handle_esign_webhook, request_signature
 from app.models.documents import SignatureRequestCreate, SignerInfo
@@ -137,6 +139,25 @@ def test_request_signature_writes_status_and_timeline_event():
 
         timeline_writes = [p for (t, p) in writes if t == "case_timeline"]
         assert timeline_writes[0]["event_type"] == "esign_requested"
+
+
+# caught by actually curling the live dev server, not by any of the tests above: every other
+# webhook test patches LEEGALITY_PRIVATE_SALT to a real string, so none of them exercised what
+# happens when it's genuinely unset (the real state of an unconfigured server) -- _verify_
+# leegality_mac() called .encode() on None and 500'd with a raw traceback instead of the same
+# clean "not configured" message every other unconfigured-vendor path gives. This test goes
+# through the real FastAPI route (TestClient), not the bare controller function, since that's
+# what actually caught it.
+def test_unconfigured_webhook_gives_clean_error_not_a_crash():
+    """Verifies POST /webhooks/leegality with no LEEGALITY_PRIVATE_SALT set returns a clean 500,
+    not an unhandled AttributeError. Exercises: `POST /webhooks/leegality`
+    (`esign.handle_esign_webhook()`) through the real app, matching `test_error_handling.py`'s
+    pattern for proving errors come back as JSON, not a crash."""
+    with patch("app.controllers.esign.LEEGALITY_PRIVATE_SALT", None):
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/webhooks/leegality", json={"documentId": "LEG123", "documentStatus": "Sent", "mac": "anything"})
+        assert resp.status_code == 500
+        assert resp.json()["detail"] == "e-signature is not configured on this server."
 
 
 def test_webhook_rejects_bad_mac():
@@ -322,4 +343,5 @@ if __name__ == "__main__":
     test_webhook_downloads_signed_file_on_completion()
     test_webhook_marks_rejected_distinctly_from_pending()
     test_webhook_marks_expired_distinctly_from_pending()
+    test_unconfigured_webhook_gives_clean_error_not_a_crash()
     print("ok")
