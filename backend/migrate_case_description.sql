@@ -29,6 +29,13 @@ from (values
   ('PROP2026103', 'Buyer-side purchase of the Williams Apartment at 7 Residency Road, Bengaluru (survey SY-410), at about 98 lakh. Stamp duty has been paid and the instrument lodged with the Sub-Registrar; awaiting the registered deed.'),
   ('PROP2026104', 'Off-the-plan purchase of an apartment that has not been built yet, at Sarjapur Road Phase 2, Bengaluru (survey SY-512), for about 72 lakh. The builder''s agreement to sell is being drafted, with possession timelines, construction-linked payment milestones and delay compensation the open points.'),
   ('PROP2026105', 'Mortgage over Unit 8, a commercial shop at 8 Commercial Street, Bengaluru (survey SY-88) valued at about 43 lakh, charged as security for a loan. The mortgage deed has been registered and the transaction is complete.'),
-  ('PROP2026106', 'Transfer of the Smith family residential estate at Trust Estate, Jayanagar, Bengaluru (survey SY-777), worth about 1.5 crore, into a family trust by trust deed. The deed has been settled and registration at the Sub-Registrar Office is scheduled.')
+  ('PROP2026106', 'Transfer of the Smith family residential estate at Trust Estate, Jayanagar, Bengaluru (survey SY-777), worth about 1.5 crore, into a family trust by trust deed. The deed has been settled and registration at the Sub-Registrar Office is scheduled.'),
+
+  -- The two remaining test fixtures. Described as what they are rather than
+  -- dressed up as real matters, so nobody reads them as a client's actual case
+  -- and so a search for "test" surfaces them. See cleanup_qa_cases.sql for why
+  -- they were kept when the QA probe cases were removed.
+  ('TEST2026001', 'Test fixture, not a real matter. A near-empty civil case before the Pune District Court, kept because it carries invoice INV-182822 and its payment row, which the billing flow is exercised against.'),
+  ('CIV2026002', 'Test fixture, not a real matter. A civil case before the Pune District Court used as the end-to-end API test case: it carries a completed hearing on 15 October 2026, a completed kickoff meeting, uploaded documents, a generated AI summary, and a partially paid invoice with its payment row. Deleting it would break those flows.')
 ) as v(case_number, description)
 where cases.case_number = v.case_number;
