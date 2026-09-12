@@ -121,7 +121,7 @@ export default function ClientDashboardPage() {
   const weekAgoMs = Date.now() - 7 * 86400000
   const recentDocsCount = documents.filter((d) => new Date(d.upload_date).getTime() >= weekAgoMs).length
   const unreadCount = notifications.filter((n) => !n.is_read).length
-  const primaryCase = cases.find((c) => c.lawyer_email) ?? cases.find((c) => c.lawyer)
+  const primaryCase = cases.find((c) => c.lawyer_id) ?? cases.find((c) => c.lawyer_email) ?? cases.find((c) => c.lawyer)
   const recentDocuments = [...documents].sort((a, b) => b.upload_date.localeCompare(a.upload_date)).slice(0, 3)
   const firstName = profile?.full_name.split(' ')[0] ?? 'there'
 
@@ -143,7 +143,15 @@ export default function ClientDashboardPage() {
             <div className={styles.subtitle}>Stay updated with your legal cases, hearings, documents, and AI-generated summaries.</div>
           </div>
           <div className={styles.headerActions}>
-            {primaryCase?.lawyer_email ? (
+            {primaryCase?.lawyer_id ? (
+              <div
+                className={styles.primaryChip}
+                style={{ opacity: messaging ? .6 : 1, cursor: messaging ? 'default' : 'pointer' }}
+                onClick={() => !messaging && openConversation(primaryCase.lawyer_id!)}
+              >
+                <Icon name="phone" size={15} color="#FCFAF4" /> Contact Lawyer
+              </div>
+            ) : primaryCase?.lawyer_email ? (
               <a href={`mailto:${primaryCase.lawyer_email}`} className={styles.primaryChip} style={{ textDecoration: 'none' }}>
                 <Icon name="phone" size={15} color="#FCFAF4" /> Contact Lawyer
               </a>
