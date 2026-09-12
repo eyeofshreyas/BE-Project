@@ -19,8 +19,8 @@ const STATUS_COLORS: Record<string, string> = {
 const PRIORITY_COLORS: Record<string, string> = { High: C.danger, Medium: C.warning, Low: C.success }
 
 /** Fetches all cases via `listCases()` and renders them as a status/priority-badged table.
- * The case number and the eye both open `/cases/:caseId`; the document icon opens the
- * library pre-filtered to that case. */
+ * Admin doesn't get into a case's own detail page (notes, AI summary, documents) from here
+ * -- only the document icon, which opens the library pre-filtered to that case. */
 export default function CasesView() {
   const navigate = useNavigate()
   const [cases, setCases] = useState<CaseSummary[]>([])
@@ -65,7 +65,7 @@ export default function CasesView() {
                 {cases.map((row) => (
                   <tr key={row.id} className={styles.tr}>
                     <td className={styles.td}>
-                      <span style={{ fontWeight: 700, color: '#8A6A2F', cursor: 'pointer' }} onClick={() => navigate(`/cases/${row.case_id}`)}>{row.id}</span>
+                      <span style={{ fontWeight: 700, color: '#8A6A2F' }}>{row.id}</span>
                     </td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{row.client ?? '—'}</td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{row.lawyer ?? '—'}</td>
@@ -75,7 +75,6 @@ export default function CasesView() {
                     <td className={styles.td}><span className={styles.pill} style={pillStyle(PRIORITY_COLORS[row.priority] ?? C.muted)}>{row.priority}</span></td>
                     <td className={styles.td}>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <span className={styles.actionBtn} title="View case" onClick={() => navigate(`/cases/${row.case_id}`)}><Icon name="eye" size={15} color="#575145" /></span>
                         <span className={styles.actionBtn} title="View documents" onClick={() => navigate(`/documents?q=${encodeURIComponent(row.id)}`)}><Icon name="file-text" size={15} color="#575145" /></span>
                       </div>
                     </td>
