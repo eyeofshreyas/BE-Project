@@ -47,7 +47,6 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
   { key: 'users', label: 'Users', icon: 'users' },
   { key: 'cases', label: 'Cases', icon: 'scale' },
   { key: 'documents', label: 'Documents', icon: 'file-text' },
-  { key: 'notifications', label: 'Notifications', icon: 'bell' },
   { key: 'reports', label: 'Reports', icon: 'bar-chart-2' },
   { key: 'analytics', label: 'Analytics', icon: 'pie-chart' },
 ]
