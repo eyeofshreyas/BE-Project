@@ -18,14 +18,11 @@ import AnalyticsView from './views/AnalyticsView'
 import SettingsView from './views/SettingsView'
 import { listNotifications, markNotificationRead } from '../../api/client'
 import type { UserProfile, NotificationSummary } from '../../types/api'
-import { timeAgo } from '../../utils/date'
 import styles from '../../components/AppShell.module.css'
 
 type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'notifications' | 'reports' | 'analytics' | 'settings'
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Super Admin', 2: 'Lawyer', 3: 'Client' }
-
-const NOTIF_COLORS: Record<string, string> = { hearing: C.warning, invoice_reminder: C.success, client_request: C.primary }
 
 const TODAY = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -59,12 +56,10 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
  */
 export default function AdminConsolePage() {
   const [activePage, setActivePage] = useState<PageKey>('dashboard')
-  const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(loadProfile)
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
-  const [openNotifId, setOpenNotifId] = useState<number | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -72,14 +67,10 @@ export default function AdminConsolePage() {
     listNotifications().then(setNotifications).catch(() => {})
   }, [profile])
 
-  function openNotification(n: NotificationSummary) {
-    if (!n.is_read) {
-      markNotificationRead(n.id)
-        .then((updated) => setNotifications((prev) => prev.map((x) => (x.id === updated.id ? updated : x))))
-        .catch(() => {})
-    }
-    setOpenNotifId(n.id)
-    goTo('notifications')
+  function markRead(n: NotificationSummary) {
+    markNotificationRead(n.id)
+      .then((updated) => setNotifications((prev) => prev.map((x) => (x.id === updated.id ? updated : x))))
+      .catch(() => {})
   }
 
   function saveProfile(updated: UserProfile) {
@@ -94,7 +85,6 @@ export default function AdminConsolePage() {
   }
 
   function closeMenus() {
-    setNotifOpen(false)
     setProfileOpen(false)
   }
 
@@ -156,30 +146,13 @@ export default function AdminConsolePage() {
           </div>
           <div className={styles.topbarRight}>
             <div className={styles.todayLabel}>{TODAY}</div>
-            <div style={{ position: 'relative' }}>
-              <div className={styles.bellBtn} style={{ background: notifOpen ? '#E6E0CE' : 'transparent' }} onClick={(e) => { e.stopPropagation(); setNotifOpen((v) => !v); setProfileOpen(false) }}>
-                <Icon name="bell" size={19} color="#575145" />
-                {notifications.some((n) => !n.is_read) && <span className={styles.bellDot} />}
-              </div>
-              {notifOpen && (
-                <div className={styles.notifDropdown}>
-                  <div className={styles.notifDropdownTitle}>Notifications</div>
-                  {notifications.length === 0 && <div style={{ padding: '10px 4px', fontSize: 12.5, color: '#8C857A' }}>No notifications.</div>}
-                  {notifications.map((n) => (
-                    <div key={n.id} className={styles.notifDropdownRow} onClick={() => openNotification(n)}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 5, flexShrink: 0, background: n.is_read ? '#CFC6B0' : (NOTIF_COLORS[n.notification_type.toLowerCase()] ?? C.primary) }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12.5, color: '#1A1A17', lineHeight: 1.4 }}>{n.title ?? n.message}</div>
-                        <div style={{ fontSize: 11, color: '#8C857A', marginTop: 2 }}>{timeAgo(n.created_at)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className={styles.bellBtn} onClick={() => goTo('notifications')}>
+              <Icon name="bell" size={19} color="#575145" />
+              {notifications.some((n) => !n.is_read) && <span className={styles.bellDot} />}
             </div>
             <div className={styles.vDivider} />
             <div style={{ position: 'relative' }}>
-              <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v); setNotifOpen(false) }}>
+              <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v) }}>
                 <div className={styles.avatarCircle}>{profile ? initialsOf(profile.full_name) : '—'}</div>
                 <div style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{profile?.full_name ?? 'Unknown user'}</div><div style={{ fontSize: 11, color: '#8C857A' }}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'User') : ''}</div></div>
                 <span style={{ color: '#8C857A', display: 'flex' }}><Icon name="chevron-down" size={15} color="#8C857A" /></span>
@@ -198,7 +171,7 @@ export default function AdminConsolePage() {
           {activePage === 'users' && <UsersView />}
           {activePage === 'cases' && <CasesView />}
           {activePage === 'documents' && <DocumentsView />}
-          {activePage === 'notifications' && <NotificationsView notifications={notifications} selectedId={openNotifId} onOpen={openNotification} onClose={() => setOpenNotifId(null)} />}
+          {activePage === 'notifications' && <NotificationsView notifications={notifications} onMarkRead={markRead} />}
           {activePage === 'reports' && <ReportsView onToast={showToast} />}
           {activePage === 'analytics' && <AnalyticsView />}
           {activePage === 'settings' && <SettingsView profile={profile} onSave={showToast} onProfileChange={saveProfile} />}

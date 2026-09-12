@@ -5,14 +5,12 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import logo from '../assets/logo.svg'
 import { Icon, type IconName } from './icons'
 import { C } from './theme'
-import { listNotifications, markNotificationRead, listConversations } from '../api/client'
+import { listNotifications, listConversations } from '../api/client'
 import type { UserProfile, NotificationSummary } from '../types/api'
-import { timeAgo } from '../utils/date'
 import styles from './AppShell.module.css'
 
 const ROLE_LABELS: Record<number, string> = { 2: 'Lawyer', 3: 'Client' }
 const BRAND_SUB_LABELS: Record<number, string> = { 2: 'Legal Intelligence', 3: 'Client Portal' }
-const NOTIF_COLORS: Record<string, string> = { Hearing: C.warning, Payment: C.success, Document: C.primary }
 const UNREAD_POLL_MS = 30000
 
 type NavDef = { label: string; icon: IconName; path?: string }
@@ -65,7 +63,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation()
   const [profile] = useState<UserProfile | null>(loadProfile)
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
-  const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
 
@@ -86,15 +83,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     return () => clearInterval(interval)
   }, [location.pathname])
 
-  function openNotification(n: NotificationSummary) {
-    if (!n.is_read) {
-      markNotificationRead(n.id)
-        .then((updated) => setNotifications((prev) => prev.map((x) => (x.id === updated.id ? updated : x))))
-        .catch(() => {})
-    }
-    setNotifOpen(false)
-  }
-
   function logout() {
     localStorage.removeItem('lexflow_token')
     localStorage.removeItem('lexflow_profile')
@@ -102,7 +90,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   function closeMenus() {
-    setNotifOpen(false)
     setProfileOpen(false)
   }
 
@@ -161,30 +148,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </div>
           <div className={styles.topbarRight}>
             <div className={styles.todayLabel}>{new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
-            <div style={{ position: 'relative' }}>
-              <div className={styles.bellBtn} style={{ background: notifOpen ? '#E6E0CE' : 'transparent' }} onClick={(e) => { e.stopPropagation(); setNotifOpen((v) => !v); setProfileOpen(false) }}>
-                <Icon name="bell" size={19} color="#575145" />
-                {notifications.some((n) => !n.is_read) && <span className={styles.bellDot} />}
-              </div>
-              {notifOpen && (
-                <div className={styles.notifDropdown}>
-                  <div className={styles.notifDropdownTitle}>Notifications</div>
-                  {notifications.length === 0 && <div style={{ padding: '10px 4px', fontSize: 12.5, color: '#8C857A' }}>No notifications.</div>}
-                  {notifications.map((n) => (
-                    <div key={n.id} className={styles.notifDropdownRow} onClick={() => openNotification(n)}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 5, flexShrink: 0, background: n.is_read ? '#CFC6B0' : (NOTIF_COLORS[n.notification_type] ?? C.primary) }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12.5, color: '#1A1A17', lineHeight: 1.4 }}>{n.title ?? n.message}</div>
-                        <div style={{ fontSize: 11, color: '#8C857A', marginTop: 2 }}>{timeAgo(n.created_at)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className={styles.bellBtn} onClick={() => navigate('/notifications')}>
+              <Icon name="bell" size={19} color="#575145" />
+              {notifications.some((n) => !n.is_read) && <span className={styles.bellDot} />}
             </div>
             <div className={styles.vDivider} />
             <div style={{ position: 'relative' }}>
-              <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v); setNotifOpen(false) }}>
+              <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v) }}>
                 <div className={styles.avatarCircle}>{profile ? initialsOf(profile.full_name) : '—'}</div>
                 <div style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{profile?.full_name ?? 'Unknown user'}</div><div style={{ fontSize: 11, color: '#8C857A' }}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'User') : ''}</div></div>
                 <span style={{ color: '#8C857A', display: 'flex' }}><Icon name="chevron-down" size={15} color="#8C857A" /></span>

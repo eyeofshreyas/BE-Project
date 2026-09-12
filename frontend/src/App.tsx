@@ -25,6 +25,7 @@ import JudgementsPage from './pages/judgements/JudgementsPage'
 import JudgementDetailPage from './pages/judgements/JudgementDetailPage'
 import ReferenceJudgementPage from './pages/judgements/ReferenceJudgementPage'
 import SettingsPage from './pages/settings/SettingsPage'
+import NotificationsPage from './pages/notifications/NotificationsPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/AppLayout'
 
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/judgements" element={<ProtectedRoute><AppLayout><JudgementsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/messages" element={<ProtectedRoute><AppLayout><MessagesPage /></AppLayout></ProtectedRoute>} />
         <Route path="/messages/:conversationId" element={<ProtectedRoute><AppLayout><MessagesPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><AppLayout><NotificationsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>

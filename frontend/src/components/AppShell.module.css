@@ -218,39 +218,6 @@
   border: 1.5px solid #F1EDE0;
 }
 
-.notifDropdown {
-  position: absolute;
-  top: 44px;
-  right: 0;
-  width: 320px;
-  background: #FCFAF4;
-  border: 1px solid #CFC6B0;
-  border-radius: 3px;
-  box-shadow: 0 12px 32px rgba(35, 48, 107, .14);
-  padding: 8px;
-  animation: lf-fade .15s ease-out;
-  z-index: 40;
-}
-
-.notifDropdownTitle {
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 10px;
-  color: #1A1A17;
-}
-
-.notifDropdownRow {
-  display: flex;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.notifDropdownRow:hover {
-  background: #E6E0CE;
-}
-
 .vDivider {
   width: 1px;
   height: 26px;
