@@ -9,8 +9,8 @@ import { listNotifications, listConversations } from '../api/client'
 import type { UserProfile, NotificationSummary } from '../types/api'
 import styles from './AppShell.module.css'
 
-const ROLE_LABELS: Record<number, string> = { 2: 'Lawyer', 3: 'Client' }
-const BRAND_SUB_LABELS: Record<number, string> = { 2: 'Legal Intelligence', 3: 'Client Portal' }
+const ROLE_LABELS: Record<number, string> = { 1: 'Super Admin', 2: 'Lawyer', 3: 'Client' }
+const BRAND_SUB_LABELS: Record<number, string> = { 1: 'Admin Console', 2: 'Legal Intelligence', 3: 'Client Portal' }
 const UNREAD_POLL_MS = 30000
 
 type NavDef = { label: string; icon: IconName; path?: string }
@@ -25,6 +25,15 @@ const LAWYER_NAV: NavDef[] = [
   { label: 'Judgements', icon: 'gavel', path: '/judgements' },
   { label: 'Calendar', icon: 'calendar', path: '/hearings' },
   { label: 'Billing', icon: 'receipt', path: '/billing' },
+]
+
+// An admin drilling into a case/document/etc. lands in this same shared shell (it's built
+// for lawyer use, but the backend permits admin on all of it too) -- swap the Dashboard
+// link for one back to the admin console, since /dashboard is the lawyer's own dashboard
+// and an admin arriving here has no other way back to /admin.
+const ADMIN_STAFF_NAV: NavDef[] = [
+  { label: 'Admin Console', icon: 'grid', path: '/admin' },
+  ...LAWYER_NAV.slice(1),
 ]
 
 const CLIENT_NAV: NavDef[] = [
@@ -93,7 +102,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     setProfileOpen(false)
   }
 
-  const navItems = profile?.role_id === 3 ? CLIENT_NAV : LAWYER_NAV
+  const navItems = profile?.role_id === 3 ? CLIENT_NAV : profile?.role_id === 1 ? ADMIN_STAFF_NAV : LAWYER_NAV
 
   return (
     <div className={styles.page}>

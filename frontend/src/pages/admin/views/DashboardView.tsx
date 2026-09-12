@@ -35,6 +35,18 @@ const EVENT_ICONS: Record<string, IconName> = {
   note_added: 'edit',
 }
 
+/** Buckets a timeline `event_type` into a filter chip label. Substring matching (rather than
+ * an exact-value map) survives the mixed casing/spelling seen in older rows (e.g. "Case
+ * Created" vs "case_created"). */
+function categoryOf(type: string): string {
+  const t = type.toLowerCase()
+  if (t.includes('hearing')) return 'Hearings'
+  if (t.includes('status')) return 'Status Changes'
+  if (t.includes('document')) return 'Documents'
+  if (t.includes('case') || t.includes('created') || t.includes('filed') || t.includes('registered')) return 'Filings'
+  return 'Other'
+}
+
 /**
  * Renders `quickActions` (passed from `AdminConsolePage`), the overview stat grid and
  * the recent-activity feed. Stats and activity load on mount.
@@ -43,12 +55,16 @@ export default function DashboardView({ quickActions, adminName }: { quickAction
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [activity, setActivity] = useState<ActivityEvent[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [activityFilter, setActivityFilter] = useState('All')
 
   useEffect(() => {
     Promise.all([getAdminStats(), listAdminActivity()])
       .then(([s, a]) => { setStats(s); setActivity(a) })
       .catch((e: Error) => setError(e.message))
   }, [])
+
+  const activityChips = ['All', ...new Set(activity.map((a) => categoryOf(a.event_type)))]
+  const visibleActivity = activityFilter === 'All' ? activity : activity.filter((a) => categoryOf(a.event_type) === activityFilter)
 
   return (
     <>
@@ -89,11 +105,29 @@ export default function DashboardView({ quickActions, adminName }: { quickAction
       </div>
 
       <div>
-        <div className={styles.sectionTitle} style={{ marginBottom: 14 }}>Recent Activity</div>
+        <div className={styles.pageHeadRow} style={{ marginBottom: 14 }}>
+          <div className={styles.sectionTitle}>Recent Activity</div>
+          {activityChips.length > 1 && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {activityChips.map((c) => {
+                const active = c === activityFilter
+                return (
+                  <div key={c} className={styles.chipBase} style={{ borderRadius: 999, padding: '7px 14px', fontSize: 12, background: active ? C.primary : '#F1EDE0', color: active ? '#FCFAF4' : '#575145' }} onClick={() => setActivityFilter(c)}>
+                    {c}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
         <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: '10px 22px', boxShadow: '0 1px 2px rgba(35, 48, 107,.04)', display: 'flex', flexDirection: 'column' }}>
-          {activity.length === 0 && <div style={{ padding: '14px 0', fontSize: 12.5, color: '#8C857A' }}>{stats ? 'No activity recorded yet.' : 'Loading activity…'}</div>}
-          {activity.map((a, i) => (
-            <div key={a.id} style={{ display: 'flex', gap: 12, padding: '9px 0', borderBottom: i === activity.length - 1 ? 'none' : '1px solid #F1EDE0' }}>
+          {visibleActivity.length === 0 && (
+            <div style={{ padding: '14px 0', fontSize: 12.5, color: '#8C857A' }}>
+              {!stats ? 'Loading activity…' : activityFilter === 'All' ? 'No activity recorded yet.' : `No ${activityFilter.toLowerCase()} in recent activity.`}
+            </div>
+          )}
+          {visibleActivity.map((a, i) => (
+            <div key={a.id} style={{ display: 'flex', gap: 12, padding: '9px 0', borderBottom: i === visibleActivity.length - 1 ? 'none' : '1px solid #F1EDE0' }}>
               <div style={{ width: 28, height: 28, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Icon name={EVENT_ICONS[a.event_type] ?? 'clock'} size={14} color={C.primaryDark} />
               </div>
