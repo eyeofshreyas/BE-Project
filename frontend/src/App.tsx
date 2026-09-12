@@ -33,7 +33,7 @@ import AppLayout from './components/AppLayout'
  * Single top-level route table for the SPA. Gated routes are wrapped in
  * `ProtectedRoute` (redirects unauthenticated/unauthorized users); most are
  * further wrapped in `AppLayout` for the sidebar/topbar shell -- `/admin`
- * and `/settings` opt out since they render their own chrome.
+ * opts out since it renders its own chrome.
  */
 export default function App() {
   return (
@@ -66,7 +66,7 @@ export default function App() {
         <Route path="/messages" element={<ProtectedRoute><AppLayout><MessagesPage /></AppLayout></ProtectedRoute>} />
         <Route path="/messages/:conversationId" element={<ProtectedRoute><AppLayout><MessagesPage /></AppLayout></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><AppLayout><NotificationsPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><AppLayout><SettingsPage /></AppLayout></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   )
