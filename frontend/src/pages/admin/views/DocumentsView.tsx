@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { C } from '../../../components/theme'
 import { listDocuments } from '../../../api/client'
 import type { DocumentSummary } from '../../../types/api'
+import { formatDate } from '../../../utils/date'
 import styles from '../../../components/AppShell.module.css'
 
 const DOC_COLUMNS = ['File', 'Type', 'Case', 'Uploaded By', 'Upload Date']
@@ -46,7 +47,7 @@ export default function DocumentsView() {
                     <td className={styles.td} style={{ color: '#33302A' }}>{doc.document_type ?? '—'}</td>
                     <td className={styles.td} style={{ color: '#6E6759' }}>{doc.case_number ?? '—'}</td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{doc.uploaded_by ?? '—'}</td>
-                    <td className={styles.td} style={{ color: '#33302A' }}>{doc.upload_date}</td>
+                    <td className={styles.td} style={{ color: '#33302A' }}>{formatDate(doc.upload_date)}</td>
                   </tr>
                 ))}
                 {documents.length === 0 && (
