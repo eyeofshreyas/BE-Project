@@ -15,7 +15,6 @@ import type {
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
 import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
-import SimilarCaseModal from '../../components/SimilarCaseModal'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import cd from './cases.module.css'
@@ -143,7 +142,6 @@ export default function CaseDetailPage() {
   const [savingNote, setSavingNote] = useState(false)
 
   const [aiSummary, setAiSummary] = useState<CaseAiSummary | null>(null)
-  const [openPrecedent, setOpenPrecedent] = useState<string | null>(null)
   const [similarCases, setSimilarCases] = useState<CaseSearchResult[] | null>(null)
   const [similarLoading, setSimilarLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -194,7 +192,6 @@ export default function CaseDetailPage() {
     // React Router keeps this component mounted when one case links to another, so anything
     // scoped to a single case has to be cleared by hand or it is read as the new case's.
     setSimilarCases(null)
-    setOpenPrecedent(null)
     Promise.all([listCases(), canManage ? listCaseNotes(numericCaseId) : Promise.resolve([]), listCaseTimeline(numericCaseId), listDocuments(), listMeetings(numericCaseId), listHearings()])
       .then(([cases, n, t, docs, m, h]) => {
         const found = cases.find((c) => c.case_id === numericCaseId)
@@ -619,7 +616,7 @@ export default function CaseDetailPage() {
                       {aiSummary.related_cases.map((r, i) => (
                         <span key={r.doc_id}>
                           {i > 0 && ', '}
-                          <button className={cd.linkAction} onClick={() => setOpenPrecedent(r.doc_id)} title="Read this judgement">
+                          <button className={cd.linkAction} onClick={() => navigate(`/judgements/reference/${encodeURIComponent(r.doc_id)}`)} title="Read this judgement">
                             {r.doc_id} ({Math.round(r.score * 100)}%)
                           </button>
                         </span>
@@ -1105,7 +1102,6 @@ export default function CaseDetailPage() {
         {toast && <div className={styles.toast}>{toast}</div>}
       </div>
 
-      {openPrecedent && <SimilarCaseModal docId={openPrecedent} onClose={() => setOpenPrecedent(null)} />}
 
       {previewDoc && (
         <DocumentPreviewModal

@@ -21,6 +21,8 @@ import CreateClientPage from './pages/clients/CreateClientPage'
 import ClientDetailPage from './pages/clients/ClientDetailPage'
 import MessagesPage from './pages/messages/MessagesPage'
 import JudgementsPage from './pages/judgements/JudgementsPage'
+import JudgementDetailPage from './pages/judgements/JudgementDetailPage'
+import ReferenceJudgementPage from './pages/judgements/ReferenceJudgementPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/AppLayout'
@@ -55,6 +57,8 @@ export default function App() {
         <Route path="/clients/new" element={<ProtectedRoute><AppLayout><CreateClientPage /></AppLayout></ProtectedRoute>} />
         <Route path="/clients/:clientId" element={<ProtectedRoute><AppLayout><ClientDetailPage /></AppLayout></ProtectedRoute>} />
         <Route path="/clients" element={<ProtectedRoute><AppLayout><ClientsPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/judgements/reference/:docId" element={<ProtectedRoute><AppLayout><ReferenceJudgementPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/judgements/:judgementId" element={<ProtectedRoute><AppLayout><JudgementDetailPage /></AppLayout></ProtectedRoute>} />
         <Route path="/judgements" element={<ProtectedRoute><AppLayout><JudgementsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/messages" element={<ProtectedRoute><AppLayout><MessagesPage /></AppLayout></ProtectedRoute>} />
         <Route path="/messages/:conversationId" element={<ProtectedRoute><AppLayout><MessagesPage /></AppLayout></ProtectedRoute>} />

@@ -1,5 +1,6 @@
 /** `/judgements` route: list of pronounced judgements with derived stats (success rate, avg. time, relief), search/outcome filtering, and an "Add Judgement" modal form. */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { listJudgements, createJudgement, listCases } from '../../api/client'
 import type { JudgementSummary, JudgementOutcome, CaseSummary } from '../../types/api'
 import { Icon } from '../../components/icons'
@@ -29,14 +30,13 @@ function monthsBetween(a: string, b: string) {
 
 /** Loads judgements (`listJudgements()`) and cases (`listCases()`, for the form's case picker); `submitForm` validates and calls `createJudgement()`. */
 export default function JudgementsPage() {
+  const navigate = useNavigate()
   const [judgements, setJudgements] = useState<JudgementSummary[]>([])
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [outcomeFilter, setOutcomeFilter] = useState<'All' | JudgementOutcome>('All')
-
-  const [selected, setSelected] = useState<JudgementSummary | null>(null)
 
   const [formOpen, setFormOpen] = useState(false)
   const [caseId, setCaseId] = useState('')
@@ -199,7 +199,7 @@ export default function JudgementsPage() {
             {filtered.map((j) => {
               const [color, bg] = OUTCOME_STYLE[j.outcome]
               return (
-                <div key={j.id} onClick={() => setSelected(j)} className={styles.panelCard} style={{ display: 'flex', flexDirection: 'column', gap: 12, cursor: 'pointer' }}>
+                <div key={j.id} onClick={() => navigate(`/judgements/${j.id}`)} className={styles.panelCard} style={{ display: 'flex', flexDirection: 'column', gap: 12, cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                     <div style={{ display: 'flex', gap: 12 }}>
                       <div style={{ width: 38, height: 38, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -293,7 +293,6 @@ export default function JudgementsPage() {
           </div>
         )}
 
-        {selected && <JudgementDetailModal judgement={selected} onClose={() => setSelected(null)} />}
       </div>
     </div>
   )
@@ -306,79 +305,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <div style={{ fontSize: 12, fontWeight: 600, color: '#575145', marginBottom: 5 }}>{label}</div>
       {children}
-    </div>
-  )
-}
-
-function GridCell({ label, value }: { label?: string; value?: React.ReactNode }) {
-  return (
-    <div style={{ background: '#F6F2E9', padding: '12px 14px' }}>
-      {label && <div style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>{label}</div>}
-      {value != null && <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17', marginTop: 4 }}>{value}</div>}
-    </div>
-  )
-}
-
-function JudgementDetailModal({ judgement: j, onClose }: { judgement: JudgementSummary; onClose: () => void }) {
-  const [color, bg] = OUTCOME_STYLE[j.outcome]
-  const monthsCount = j.filing_date ? Math.round(monthsBetween(j.filing_date, j.judgement_date)) : null
-  const timeToJudgement = monthsCount != null ? `${monthsCount} month${monthsCount === 1 ? '' : 's'}` : '—'
-  const relief = j.relief_amount != null ? money(j.relief_amount) : (j.relief_text ?? '—')
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(35, 48, 107,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }} onClick={onClose}>
-      <div style={{ background: '#FCFAF4', borderRadius: 3, padding: 24, width: 620, maxHeight: '86vh', overflowY: 'auto', boxShadow: '0 20px 48px rgba(0,0,0,.2)' }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 3, background: '#E6E0CE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Icon name="gavel" size={19} color={PRIMARY} />
-            </div>
-            <div>
-              <div style={{ fontFamily: "'Spectral', serif", fontSize: 17, fontWeight: 700, color: '#1A1A17' }}>{j.case_title ?? j.case_number ?? 'Untitled matter'}</div>
-              <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{j.citation} · Pronounced {formatDate(j.judgement_date)}</div>
-            </div>
-          </div>
-          <span className={styles.statusBadge} style={{ color, background: bg, whiteSpace: 'nowrap' }}>{j.outcome}</span>
-        </div>
-
-        <div style={{ borderTop: '1px solid #F1EDE0', marginTop: 16, paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <div style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', marginBottom: 4 }}>Held</div>
-            <div style={{ fontSize: 13.5, color: '#33302A', lineHeight: 1.5 }}>{j.summary}</div>
-          </div>
-          {j.reasoning && (
-            <div>
-              <div style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', marginBottom: 4 }}>Reasoning</div>
-              <div style={{ fontSize: 13.5, color: '#33302A', lineHeight: 1.5 }}>{j.reasoning}</div>
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: '#CFC6B0', border: '1px solid #CFC6B0', borderRadius: 3, overflow: 'hidden', marginTop: 16 }}>
-          <GridCell label="Citation" value={j.citation} />
-          <GridCell label="Court" value={j.court} />
-          <GridCell label="Bench" value={j.bench} />
-          <GridCell label="Pronounced" value={formatDate(j.judgement_date)} />
-          <GridCell label="Case Number" value={j.case_number ?? '—'} />
-          <GridCell label="Client" value={j.client_name ?? '—'} />
-          <GridCell label="Matter Type" value={j.matter_type ?? '—'} />
-          <GridCell label="Relief" value={relief} />
-          <GridCell label="Time to Judgement" value={timeToJudgement} />
-          <GridCell label="Appeal Status" value={j.appeal_status ?? '—'} />
-          <GridCell />
-          <GridCell />
-        </div>
-
-        {j.tags && j.tags.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 16 }}>
-            {j.tags.map((t) => <span key={t} className={styles.ghostChip} style={{ fontSize: 11.5, padding: '4px 10px' }}>{t}</span>)}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #F1EDE0', marginTop: 20, paddingTop: 16 }}>
-          <div className={styles.primaryChip} onClick={onClose}>Close</div>
-        </div>
-      </div>
     </div>
   )
 }
