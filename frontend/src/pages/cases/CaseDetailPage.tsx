@@ -8,11 +8,11 @@ import {
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
   unassignLawyer, getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
   listHearings, createHearing, listJudges, updateHearing, updateMeeting, deleteDocument,
-  setCaseCnr, syncCaseEcourts, requestSignature,
+  setCaseCnr, syncCaseEcourts, requestSignature, listCaseParties, addCaseParty,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
-  DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption,
+  DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption, PartySummary,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
 import { canRenderInline, uploadRejection, ESIGN_RESENDABLE, esignPill } from '../../utils/files'
@@ -196,6 +196,13 @@ export default function CaseDetailPage() {
   const [signing, setSigning] = useState(false)
   const [signError, setSignError] = useState('')
 
+  const [parties, setParties] = useState<PartySummary[]>([])
+  const [partyName, setPartyName] = useState('')
+  const [partyRole, setPartyRole] = useState('Opposing Party')
+  const [partyFormOpen, setPartyFormOpen] = useState(false)
+  const [addingParty, setAddingParty] = useState(false)
+  const [partyError, setPartyError] = useState('')
+
   const numericCaseId = Number(caseId)
 
   useEffect(() => {
@@ -219,6 +226,7 @@ export default function CaseDetailPage() {
     if (canUploadDocs) listDocumentTypes().then(setDocumentTypes).catch(() => {})
     if (canManage) listJudges().then(setJudges).catch(() => {})
     if (canManage) getCaseAiSummary(numericCaseId).then(setAiSummary).catch(() => setAiSummary(null))
+    if (canManage) listCaseParties(numericCaseId).then(setParties).catch(() => {})
   }, [numericCaseId, canUploadDocs, canManage])
 
   function showToast(msg: string) {
@@ -478,6 +486,27 @@ export default function CaseDetailPage() {
       setSignError(err instanceof Error ? err.message : 'Failed to send for e-signature.')
     } finally {
       setSigning(false)
+    }
+  }
+
+  /** Adds a non-client party (opposing party, co-party, etc.) to this case
+   * (`POST /cases/:id/parties`) -- this is what makes the name searchable for the next
+   * lawyer's conflict check, not just a case-detail note. */
+  async function submitParty() {
+    if (!partyName.trim()) return
+    setAddingParty(true)
+    setPartyError('')
+    try {
+      const created = await addCaseParty(numericCaseId, partyName.trim(), partyRole.trim() || 'Opposing Party')
+      setParties((prev) => [...prev, created])
+      setPartyName('')
+      setPartyRole('Opposing Party')
+      setPartyFormOpen(false)
+      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+    } catch (err) {
+      setPartyError(err instanceof Error ? err.message : 'Failed to add party.')
+    } finally {
+      setAddingParty(false)
     }
   }
 
@@ -1134,6 +1163,43 @@ export default function CaseDetailPage() {
                     </a>
                   )}
                 </div>
+              </Card>
+            )}
+
+            {canManage && (
+              <Card
+                title="Parties"
+                count={parties.length}
+                action={!partyFormOpen ? <button className={cd.linkAction} onClick={() => setPartyFormOpen(true)}>Add</button> : undefined}
+              >
+                {partyFormOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                    <input value={partyName} onChange={(e) => setPartyName(e.target.value)} placeholder="Name" style={inputStyle} />
+                    <input value={partyRole} onChange={(e) => setPartyRole(e.target.value)} placeholder="Role (e.g. Opposing Party)" style={inputStyle} />
+                    {partyError && <div style={{ fontSize: 12, color: '#B3282D' }}>{partyError}</div>}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div className={styles.primaryChip} style={{ opacity: addingParty || !partyName.trim() ? 0.6 : 1 }} onClick={addingParty ? undefined : submitParty}>
+                        {addingParty ? 'Adding…' : 'Add party'}
+                      </div>
+                      <div className={styles.ghostChip} onClick={() => { setPartyFormOpen(false); setPartyError('') }}>Cancel</div>
+                    </div>
+                  </div>
+                )}
+                {parties.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {parties.map((p) => (
+                      <div key={p.id} className={cd.listRow}>
+                        <div className={cd.rowTitle}>{p.name}</div>
+                        <div className={cd.metaRow}><span>{p.role}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : !partyFormOpen && (
+                  <Empty action={<div className={styles.ghostChip} onClick={() => setPartyFormOpen(true)}><Icon name="user-plus" size={15} color={MUTED} /> Add a party</div>}>
+                    No other parties recorded. Adding the opposing party here makes their name
+                    searchable in future conflict checks, firm-wide.
+                  </Empty>
+                )}
               </Card>
             )}
 

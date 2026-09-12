@@ -506,3 +506,20 @@ export interface PlatformSettings {
   weekly_reports: boolean
   auto_backup: boolean
 }
+
+export interface PartySummary {
+  id: number
+  case_id: number
+  name: string
+  role: string
+  created_at: string
+}
+
+export interface ConflictMatch {
+  source: 'client' | 'party'
+  name: string
+  case_id: number
+  case_number: string
+  lawyer: string | null
+  role: string | null
+}

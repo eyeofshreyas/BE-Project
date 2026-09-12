@@ -52,8 +52,8 @@ Not started. Ordered by the priority set in the market brief.
 | 1 | ~~eCourts / CNR sync~~ | Done (§1) | Manual sync only — see follow-ups above |
 | 2 | ~~Document OCR~~ | Done (§1.1 below) | Scanned PDFs and image uploads now feed the existing summarize/translate pipeline |
 | 3 | ~~E-signatures~~ | Done (§4 below) | Leegality, PDF documents only |
-| 4 | Conflict-of-interest check | Ethics-adjacent, expected by bar associations | Lower urgency than 5 |
-| 5 | Basic trust accounting / reconciliation | Table stakes at every competitor; MyCase's automated 3-way reconciliation is the bar | Lower urgency than 4 |
+| 4 | ~~Conflict-of-interest check~~ | Done (§5 below) | Firm-wide name search, MyCase-style — not Clio's full report/status workflow |
+| 5 | Basic trust accounting / reconciliation | Table stakes at every competitor; MyCase's automated 3-way reconciliation is the bar | Next up |
 
 ### Document OCR — how it landed
 
@@ -107,6 +107,34 @@ to keep serving it.
   falling back to `documentStatus`, sets `esign_status` to `REJECTED`/`EXPIRED`
   distinctly, and the Documents page shows a red pill plus a "Resend" action for either,
   instead of the document looking stuck pending forever.
+
+### Conflict-of-interest check — how it landed
+
+Researched Clio's approach (a full workflow: multi-field search, flex/exact matching,
+per-result status marking, a closeable PDF report associated with a matter) against
+MyCase's (no dedicated feature at all — "conflict checking" is just their existing global
+search bar). Built the MyCase-style version: the ethical requirement is catching the match
+*before* opening the file, not generating an audit-ready report on day one.
+
+The real gap this exposed: a `case` only ever recorded **the client** — there was nowhere
+to record the **opposing party**, the single most important name a conflict check needs.
+Added `case_parties` (`case_id`, `name`, `role`) for that. `GET /conflict-check?name=...`
+(`app/controllers/conflict_check.py`) is deliberately **not** scoped to the caller's own
+cases the way every other list endpoint in this app is — it fetches every case and every
+party firm-wide and matches in Python (plain case-insensitive substring, not fuzzy/
+phonetic — fine at a small firm's scale). Scoping it would hide exactly the conflicts that
+matter: a colleague's client you'd never otherwise see. Wired into `CreateCasePage` as an
+advisory search (doesn't block case creation) and into the case detail page as a "Parties"
+card for recording the opposing party, which is what makes that name searchable for the
+*next* lawyer's check.
+
+**Left out of v1, deliberately** (Clio's fuller workflow, not needed yet):
+
+- Conflict-status marking (clear / potential / waived) per result.
+- A generated, downloadable, shareable report tied to a matter as an audit record.
+- Fuzzy/phonetic name matching — a real search index (`pg_trgm`, `similarity()`) is the
+  upgrade path if plain substring matching starts missing real matches, or the firm's data
+  grows large enough that fetching every case/party per search gets slow.
 
 ---
 

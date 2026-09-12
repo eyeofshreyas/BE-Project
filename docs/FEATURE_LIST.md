@@ -114,6 +114,22 @@ per-conversation participant membership.
 breadth being available to a lawyer who should only see their own cases, or a client who
 should only see their own matter — and that needs to be enforced, not just assumed by the UI.
 
+### Conflict-of-interest check
+**How it works:** `GET /conflict-check?name=...` is the one endpoint in this app that's
+deliberately *not* scoped to the caller's own cases — it searches every client and every
+`case_parties` row (the case's non-client parties: opposing party, co-party) across the
+whole firm, plain case-insensitive substring matching, and returns which case and which
+lawyer each match belongs to. Run from the "Create Case" form before a new matter is
+opened (advisory, doesn't block creation), and the case detail page's "Parties" card is
+where the opposing party gets recorded — which is what makes that name searchable for the
+*next* lawyer's check.
+
+**Why it matters:** representing a client your firm already opposes (or once represented
+against them) can get a case thrown out, trigger discipline, and exposes the firm to a
+malpractice claim — it's a bar-ethics requirement to check *before* taking on
+representation, not something undoable after the fact. Before this, LexFlow had nowhere
+to even record who's on the other side of a case, so there was nothing to check against.
+
 ---
 
 ## 2. AI capabilities

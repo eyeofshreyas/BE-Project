@@ -48,6 +48,8 @@ import type {
   AdminAnalytics,
   PlatformSettings,
   UserDeleteImpact,
+  PartySummary,
+  ConflictMatch,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -203,6 +205,18 @@ export function summarizeDocument(documentId: number, text = '') {
 
 export function requestSignature(documentId: number, signers: { name: string; email: string }[]) {
   return post<DocumentSummary>(`/documents/${documentId}/request-signature`, { signers })
+}
+
+export function listCaseParties(caseId: number) {
+  return get<PartySummary[]>(`/cases/${caseId}/parties`)
+}
+
+export function addCaseParty(caseId: number, name: string, role?: string) {
+  return post<PartySummary>(`/cases/${caseId}/parties`, { name, role })
+}
+
+export function searchConflicts(name: string) {
+  return get<ConflictMatch[]>(`/conflict-check?name=${encodeURIComponent(name)}`)
 }
 
 export function findSimilarCases(query: string, topK = 5) {
