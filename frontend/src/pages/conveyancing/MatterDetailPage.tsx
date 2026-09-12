@@ -8,7 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument, updateDueDiligence, completeProgressStage } from '../../api/client'
 import type { MatterDetail, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
-import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
+import { isPreviewable } from '../../utils/files'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from './ConveyancingDashboardPage.module.css'
 
@@ -64,7 +64,6 @@ export default function MatterDetailPage() {
 
   const [matter, setMatter] = useState<MatterDetail | null>(null)
   const [error, setError] = useState('')
-  const [previewDoc, setPreviewDoc] = useState<{ id: number; fileName: string; mimeType: string } | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -266,7 +265,7 @@ export default function MatterDetailPage() {
                       <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
                         <span
                           style={{ fontSize: 12.5, fontWeight: 600, color: '#23306B', cursor: 'pointer' }}
-                          onClick={() => (d.mime_type && isPreviewable(d.mime_type) ? setPreviewDoc({ id: d.document_id, fileName: d.file_name ?? 'Document', mimeType: d.mime_type }) : downloadDoc(d.document_id))}
+                          onClick={() => (d.mime_type && isPreviewable(d.mime_type) ? navigate(`/documents/${d.document_id}`) : downloadDoc(d.document_id))}
                         >
                           Preview
                         </span>
@@ -281,15 +280,6 @@ export default function MatterDetailPage() {
           </div>
         )}
       </div>
-
-      {previewDoc && (
-        <DocumentPreviewModal
-          documentId={previewDoc.id}
-          fileName={previewDoc.fileName}
-          mimeType={previewDoc.mimeType}
-          onClose={() => setPreviewDoc(null)}
-        />
-      )}
     </div>
   )
 }

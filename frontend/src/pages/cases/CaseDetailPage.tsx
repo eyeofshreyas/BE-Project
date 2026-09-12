@@ -1,5 +1,5 @@
 /** `/cases/:caseId` route: full case detail with an AI-generated case summary, notes (with
- * optional checklists), timeline, meetings, and documents (preview via `DocumentPreviewModal`).
+ * optional checklists), timeline, meetings, and documents (preview on `/documents/:documentId`).
  * Role controls which actions (status change, unassign, add/edit note, upload) are shown. */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -14,7 +14,7 @@ import type {
   DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
-import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
+import { isPreviewable } from '../../utils/files'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import cd from './cases.module.css'
@@ -507,11 +507,10 @@ export default function CaseDetailPage() {
     }
   }
 
-  const [previewDoc, setPreviewDoc] = useState<DocumentSummary | null>(null)
 
-  /** Dispatches on mime type: previewable types open `DocumentPreviewModal`, others go straight to `downloadDocument()`. */
+  /** Dispatches on mime type: previewable types open the document preview page, others go straight to `downloadDocument()`. */
   function openDocument(d: DocumentSummary) {
-    if (isPreviewable(d.mime_type)) setPreviewDoc(d)
+    if (isPreviewable(d.mime_type)) navigate(`/documents/${d.id}`)
     else downloadDocument(d.id)
   }
 
@@ -1101,16 +1100,6 @@ export default function CaseDetailPage() {
 
         {toast && <div className={styles.toast}>{toast}</div>}
       </div>
-
-
-      {previewDoc && (
-        <DocumentPreviewModal
-          documentId={previewDoc.id}
-          fileName={previewDoc.file_name}
-          mimeType={previewDoc.mime_type}
-          onClose={() => setPreviewDoc(null)}
-        />
-      )}
     </div>
   )
 }

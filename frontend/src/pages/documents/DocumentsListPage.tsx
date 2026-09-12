@@ -1,4 +1,4 @@
-/** `/documents` route: full document library with drag-drop upload, AI-summary cards, search/type filtering, and a detail table. Uses `DocumentPreviewModal` for inline preview. */
+/** `/documents` route: full document library with drag-drop upload, AI-summary cards, search/type filtering, and a detail table. Opens a file on `/documents/:documentId`. */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -8,7 +8,7 @@ import {
 } from '../../api/client'
 import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption } from '../../types/api'
 import { Icon } from '../../components/icons'
-import DocumentPreviewModal, { isPreviewable } from '../../components/DocumentPreviewModal'
+import { isPreviewable, formatSize } from '../../utils/files'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import shellStyles from '../../components/AppShell.module.css'
@@ -32,18 +32,13 @@ function matchesQuick(d: DocumentSummary, filter: QuickFilter, weekAgoMs: number
   return true
 }
 
-function formatSize(bytes: number | null) {
-  if (bytes == null) return '—'
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 /**
  * Loads documents/cases/document-types in parallel (`listDocuments()`,
  * `listCases()`, `listDocumentTypes()`). Upload picks a file then confirms
  * case+type before calling `uploadDocument()`; row actions call
  * `getDocumentSummary()`, `getDocumentDownloadUrl()`/`openPreview` (via
- * `DocumentPreviewModal`), and `deleteDocument()`.
+ * the document preview page), and `deleteDocument()`.
  */
 export default function DocumentsListPage() {
   const navigate = useNavigate()
@@ -202,10 +197,9 @@ export default function DocumentsListPage() {
     }
   }
 
-  const [previewDoc, setPreviewDoc] = useState<DocumentSummary | null>(null)
 
   function openPreview(d: DocumentSummary) {
-    if (isPreviewable(d.mime_type)) setPreviewDoc(d)
+    if (isPreviewable(d.mime_type)) navigate(`/documents/${d.id}`)
     else openDocument(d.id)
   }
 
@@ -523,16 +517,6 @@ export default function DocumentsListPage() {
       </div>
 
       {toast && <div className={styles.toast}>{toast}</div>}
-
-
-      {previewDoc && (
-        <DocumentPreviewModal
-          documentId={previewDoc.id}
-          fileName={previewDoc.file_name}
-          mimeType={previewDoc.mime_type}
-          onClose={() => setPreviewDoc(null)}
-        />
-      )}
     </div>
   )
 }
