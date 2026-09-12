@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Icon } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
 import { listCases } from '../../../api/client'
+import { formatDate } from '../../../utils/date'
 import type { CaseSummary } from '../../../types/api'
 import styles from '../../../components/AppShell.module.css'
 
@@ -57,7 +58,7 @@ export default function CasesView() {
                     <td className={styles.td} style={{ color: '#33302A' }}>{row.lawyer ?? '—'}</td>
                     <td className={styles.td} style={{ color: '#6E6759' }}>{row.court ?? '—'}</td>
                     <td className={styles.td}><span className={styles.pill} style={pillStyle(STATUS_COLORS[row.status] ?? C.muted)}>{row.status}</span></td>
-                    <td className={styles.td} style={{ color: '#33302A' }}>{row.hearing ?? '—'}</td>
+                    <td className={styles.td} style={{ color: '#33302A' }}>{row.hearing ? formatDate(row.hearing) : '—'}</td>
                     <td className={styles.td}><span className={styles.pill} style={pillStyle(PRIORITY_COLORS[row.priority] ?? C.muted)}>{row.priority}</span></td>
                     <td className={styles.td}>
                       <div style={{ display: 'flex', gap: 4 }}>

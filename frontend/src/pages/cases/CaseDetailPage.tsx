@@ -334,11 +334,11 @@ export default function CaseDetailPage() {
     updateStatus('Closed')
   }
 
-  async function messageClient() {
-    if (!caseInfo?.client_id) return
+  async function openConversation(userId: number | null) {
+    if (!userId) return
     setMessaging(true)
     try {
-      const conversation = await getOrCreateConversation(caseInfo.client_id)
+      const conversation = await getOrCreateConversation(userId)
       navigate(`/messages/${conversation.id}`)
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to open conversation.')
@@ -580,10 +580,17 @@ export default function CaseDetailPage() {
           <div className={cd.facts}>
             <Fact label="Client" value={caseInfo.client ?? 'Not recorded'} />
             <Fact label="Case type" value={caseInfo.case_type ?? 'Not set'} />
-            <Fact label="Next hearing" value={caseInfo.hearing ?? 'Not scheduled'} />
+            <Fact label="Next hearing" value={caseInfo.hearing ? formatDay(caseInfo.hearing) : 'Not scheduled'}>
+              {caseInfo.hearing && (
+                <div className={cd.factAction} onClick={() => navigate('/hearings')}>View in calendar</div>
+              )}
+            </Fact>
             <Fact label="Responsible lawyer" value={caseInfo.lawyer ?? 'Not assigned'}>
               {canManage && caseInfo.lawyer && (
                 <div className={cd.factAction} onClick={() => !unassigning && unassign()}>{unassigning ? 'Removing…' : 'Unassign'}</div>
+              )}
+              {!canManage && caseInfo.lawyer_id && (
+                <div className={cd.factAction} onClick={() => !messaging && openConversation(caseInfo.lawyer_id)}>{messaging ? 'Opening…' : 'Message'}</div>
               )}
             </Fact>
           </div>
@@ -934,7 +941,7 @@ export default function CaseDetailPage() {
                   <div
                     className={styles.primaryChip}
                     style={{ flex: 1, justifyContent: 'center', opacity: messaging || !caseInfo.client_id ? 0.6 : 1, cursor: messaging || !caseInfo.client_id ? 'default' : 'pointer' }}
-                    onClick={() => !messaging && messageClient()}
+                    onClick={() => !messaging && openConversation(caseInfo.client_id)}
                   >
                     <Icon name="message-circle" size={15} color="#FCFAF4" /> {messaging ? 'Opening…' : 'Message'}
                   </div>
