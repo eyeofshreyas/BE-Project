@@ -8,7 +8,7 @@ import {
 } from '../../api/client'
 import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption } from '../../types/api'
 import { Icon } from '../../components/icons'
-import { canRenderInline, formatSize, uploadRejection } from '../../utils/files'
+import { canRenderInline, formatSize, uploadRejection, ESIGN_RESENDABLE, esignPill } from '../../utils/files'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import shellStyles from '../../components/AppShell.module.css'
@@ -18,17 +18,6 @@ const PRIMARY = '#23306B'
 // the languages /ai/translate maps to FLORES codes; it also accepts a raw code
 const LANGUAGES = ['Hindi', 'Marathi', 'Tamil', 'Telugu', 'Bengali', 'Gujarati']
 
-// esign_status values that mean "nobody signed it" -- the Sign action reopens as "Resend"
-// for these instead of staying hidden, same as a document that was never sent.
-const ESIGN_RESENDABLE = new Set(['REJECTED', 'EXPIRED'])
-const ESIGN_PILL: Record<string, { label: string; color: string; background: string }> = {
-  COMPLETED: { label: 'Signed', color: '#4A6B4E', background: '#E4EDE5' },
-  REJECTED: { label: 'Signature rejected', color: '#B3282D', background: '#F6E3E1' },
-  EXPIRED: { label: 'Signature invite expired', color: '#B3282D', background: '#F6E3E1' },
-}
-function esignPill(status: string) {
-  return ESIGN_PILL[status] ?? { label: 'Awaiting signature', color: '#8A6A2F', background: '#F3EBD9' }
-}
 
 function formatDate(iso: string) {
   return formatDateWith(iso, { month: 'short', day: 'numeric' })

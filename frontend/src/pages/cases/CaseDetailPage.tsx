@@ -8,14 +8,14 @@ import {
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
   unassignLawyer, getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
   listHearings, createHearing, listJudges, updateHearing, updateMeeting, deleteDocument,
-  setCaseCnr, syncCaseEcourts,
+  setCaseCnr, syncCaseEcourts, requestSignature,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
   DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
-import { canRenderInline, uploadRejection } from '../../utils/files'
+import { canRenderInline, uploadRejection, ESIGN_RESENDABLE, esignPill } from '../../utils/files'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import cd from './cases.module.css'
@@ -189,6 +189,12 @@ export default function CaseDetailPage() {
   const [uploadDragOver, setUploadDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadFormOpen, setUploadFormOpen] = useState(false)
+
+  const [signId, setSignId] = useState<number | null>(null)
+  const [signerName, setSignerName] = useState('')
+  const [signerEmail, setSignerEmail] = useState('')
+  const [signing, setSigning] = useState(false)
+  const [signError, setSignError] = useState('')
 
   const numericCaseId = Number(caseId)
 
@@ -443,6 +449,35 @@ export default function CaseDetailPage() {
       showToast('Document deleted.')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to delete the document.')
+    }
+  }
+
+  function toggleSign(id: number) {
+    if (signId === id) { setSignId(null); return }
+    setSignId(id)
+    // Pre-fill from this case's own client -- on the case page there's only one client
+    // it could reasonably be, unlike the firm-wide Documents library. Still editable, for
+    // a signer who isn't the case's client (a builder, opposing counsel, etc.).
+    setSignerName(caseInfo.client ?? '')
+    setSignerEmail(caseInfo.client_email ?? '')
+    setSignError('')
+  }
+
+  /** Sends the document to Leegality for e-signature (`POST /documents/:id/request-signature`). */
+  async function submitSign(id: number) {
+    if (!signerName.trim() || !signerEmail.trim()) return
+    setSigning(true)
+    setSignError('')
+    try {
+      const updated = await requestSignature(id, [{ name: signerName.trim(), email: signerEmail.trim() }])
+      setDocuments((prev) => prev.map((d) => (d.id === id ? updated : d)))
+      setSignId(null)
+      showToast('Sent for e-signature.')
+      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+    } catch (err) {
+      setSignError(err instanceof Error ? err.message : 'Failed to send for e-signature.')
+    } finally {
+      setSigning(false)
     }
   }
 
@@ -985,33 +1020,73 @@ export default function CaseDetailPage() {
               {documents.length > 0 ? (
                 <div className={styles.quickActionsList}>
                   {documents.map((d) => (
-                    <div key={d.id} className={styles.quickAction} onClick={() => openDocument(d)}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                        <Icon name="file-text" size={18} color={MUTED} />
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file_name}</div>
-                          <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{formatDay(d.upload_date)}</div>
+                    <div key={d.id}>
+                      <div className={styles.quickAction} onClick={() => openDocument(d)}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                          <Icon name="file-text" size={18} color={MUTED} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file_name}</div>
+                            <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{formatDay(d.upload_date)}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                          <span className={styles.statusBadge} style={d.has_summary ? { color: '#4A6B4E', background: '#E4EDE5' } : { color: '#8A6A2F', background: '#F3EBD9' }}>
+                            {d.has_summary ? 'Summarised' : 'Not summarised'}
+                          </span>
+                          {d.esign_status && (
+                            <span className={styles.statusBadge} style={{ color: esignPill(d.esign_status).color, background: esignPill(d.esign_status).background }}>
+                              {esignPill(d.esign_status).label}
+                            </span>
+                          )}
+                          {canManage && d.mime_type === 'application/pdf' && (!d.esign_status || ESIGN_RESENDABLE.has(d.esign_status)) && (
+                            <button className={cd.iconBtn} onClick={() => toggleSign(d.id)} title={d.esign_status ? 'Resend for e-signature' : 'Send for e-signature'} aria-label={d.esign_status ? 'Resend for e-signature' : 'Send for e-signature'}>
+                              <Icon name="edit" size={14} color={MUTED} />
+                            </button>
+                          )}
+                          {canUploadDocs && (
+                            // two-step rather than a window.confirm: deleting a filing is worth a
+                            // deliberate second click, and a modal dialog here blocks the page
+                            confirmDeleteDoc === d.id ? (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeDocument(d.id)}>Delete</button>
+                                <button className={cd.linkAction} onClick={() => setConfirmDeleteDoc(null)}>Keep</button>
+                              </span>
+                            ) : (
+                              <button className={cd.iconBtn} onClick={() => setConfirmDeleteDoc(d.id)} title="Delete document" aria-label="Delete document">
+                                <Icon name="trash-2" size={14} color="#B3282D" />
+                              </button>
+                            )
+                          )}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-                        <span className={styles.statusBadge} style={d.has_summary ? { color: '#4A6B4E', background: '#E4EDE5' } : { color: '#8A6A2F', background: '#F3EBD9' }}>
-                          {d.has_summary ? 'Summarised' : 'Not summarised'}
-                        </span>
-                        {canUploadDocs && (
-                          // two-step rather than a window.confirm: deleting a filing is worth a
-                          // deliberate second click, and a modal dialog here blocks the page
-                          confirmDeleteDoc === d.id ? (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                              <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeDocument(d.id)}>Delete</button>
-                              <button className={cd.linkAction} onClick={() => setConfirmDeleteDoc(null)}>Keep</button>
-                            </span>
-                          ) : (
-                            <button className={cd.iconBtn} onClick={() => setConfirmDeleteDoc(d.id)} title="Delete document" aria-label="Delete document">
-                              <Icon name="trash-2" size={14} color="#B3282D" />
-                            </button>
-                          )
-                        )}
-                      </div>
+                      {signId === d.id && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px', background: '#FCFAF4', border: '1px solid #F1EDE0', borderTop: 'none', borderRadius: '0 0 3px 3px' }}>
+                          <input
+                            value={signerName}
+                            onChange={(e) => setSignerName(e.target.value)}
+                            placeholder="Signer's name"
+                            style={inputStyle}
+                          />
+                          <input
+                            value={signerEmail}
+                            onChange={(e) => setSignerEmail(e.target.value)}
+                            placeholder="Signer's email"
+                            type="email"
+                            style={inputStyle}
+                          />
+                          {signError && <div style={{ fontSize: 12, color: '#B3282D' }}>{signError}</div>}
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <div
+                              className={styles.primaryChip}
+                              style={{ opacity: signing || !signerName.trim() || !signerEmail.trim() ? 0.6 : 1, cursor: signing ? 'default' : 'pointer' }}
+                              onClick={signing ? undefined : () => submitSign(d.id)}
+                            >
+                              {signing ? 'Sending…' : 'Send for signature'}
+                            </div>
+                            <div className={styles.ghostChip} onClick={() => setSignId(null)}>Cancel</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

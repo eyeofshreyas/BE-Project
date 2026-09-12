@@ -36,6 +36,20 @@ export function uploadRejection(file: File) {
   return ''
 }
 
+// esign_status values that mean "nobody signed it" -- the Sign action reopens as "Resend"
+// for these instead of staying hidden, same as a document that was never sent. Shared
+// between the Documents library and a case's own Documents card, which both show the
+// e-signature status -- one implementation instead of two independently drifting ones.
+export const ESIGN_RESENDABLE = new Set(['REJECTED', 'EXPIRED'])
+const ESIGN_PILL: Record<string, { label: string; color: string; background: string }> = {
+  COMPLETED: { label: 'Signed', color: '#4A6B4E', background: '#E4EDE5' },
+  REJECTED: { label: 'Signature rejected', color: '#B3282D', background: '#F6E3E1' },
+  EXPIRED: { label: 'Signature invite expired', color: '#B3282D', background: '#F6E3E1' },
+}
+export function esignPill(status: string) {
+  return ESIGN_PILL[status] ?? { label: 'Awaiting signature', color: '#8A6A2F', background: '#F3EBD9' }
+}
+
 /** Quote a CSV field: double any embedded quotes, wrap the lot. Names, case titles and
  * court names carry commas often enough that a naive join shifts the columns. */
 function csvCell(value: string | number | null) {
