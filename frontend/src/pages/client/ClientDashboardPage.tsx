@@ -27,14 +27,6 @@ const STATUS_STYLE_MAP: Record<string, [string, string]> = {
   Pending: ['#8A6A2F', '#F3EBD9'],
 }
 
-// ponytail: cases aren't stage-tracked (that only exists for conveyancing
-// matters), so this maps status -> a representative progress figure rather
-// than a real measured percentage. Swap for real stage tracking if litigation
-// cases ever get one.
-const STATUS_PROGRESS: Record<string, number> = {
-  Closed: 100, Completed: 100, 'In Progress': 60, Open: 35, Pending: 15,
-}
-
 function loadProfile(): UserProfile | null {
   try {
     const raw = localStorage.getItem('lexflow_profile')
@@ -193,7 +185,6 @@ export default function ClientDashboardPage() {
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {cases.map((c) => {
                     const [color, bg] = STATUS_STYLE_MAP[c.status] || DEFAULT_STATUS_STYLE
-                    const pct = STATUS_PROGRESS[c.status] ?? 50
                     return (
                       <div key={c.id} style={{ padding: '16px 24px', borderTop: '1px solid #F1EDE0', cursor: 'pointer' }} onClick={() => navigate(`/cases/${c.case_id}`)}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
@@ -203,11 +194,7 @@ export default function ClientDashboardPage() {
                           </div>
                           <span className={styles.statusBadge} style={{ color, background: bg, flexShrink: 0 }}>{c.status}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-                          <div className={styles.progressTrack} style={{ flex: 1 }}><div className={styles.progressFill} style={{ width: `${pct}%` }} /></div>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A17', width: 34, textAlign: 'right' }}>{pct}%</div>
-                        </div>
-                        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 6 }}>Next hearing: {c.hearing ? formatDate(c.hearing) : '—'}</div>
+                        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 8 }}>Next hearing: {c.hearing ? formatDate(c.hearing) : '—'}</div>
                       </div>
                     )
                   })}
