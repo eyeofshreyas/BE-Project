@@ -193,7 +193,7 @@ into `case_ai_summaries`.
 | Hearings | `routes/hearings.py` | `controllers/hearings.py` | `models/hearings.py` |
 | Judgements | `routes/judgements.py` | `controllers/judgements.py` | `models/judgements.py` |
 | Reference data (courts/case types/judges/roles/document types) | `routes/reference.py` | `controllers/reference.py` | `models/reference.py` |
-| Users (admin roster + self-service profile) | `routes/users.py` | `controllers/users.py` | `models/users.py` |
+| Users (admin roster, edit, hard delete + self-service profile) | `routes/users.py` | `controllers/users.py` | `models/users.py` |
 | Admin console (stats/activity/analytics/settings) | `routes/admin.py` | `controllers/admin.py` | `models/admin.py` |
 | Notifications | `routes/notifications.py` | `controllers/notifications.py` | `models/notifications.py` |
 | AI: similar cases | mounted in `main.py` from `app/ml/similar_cases.py` | same file (`app/ml/similar_cases.py`) | inline Pydantic models in that file |

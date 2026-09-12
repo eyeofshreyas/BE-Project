@@ -47,6 +47,7 @@ import type {
   ActivityEvent,
   AdminAnalytics,
   PlatformSettings,
+  UserDeleteImpact,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -227,6 +228,19 @@ export function listUsers(role?: string) {
 
 export function setUserStatus(userId: number, isActive: boolean) {
   return patch<UserSummary>(`/users/${userId}/status`, { is_active: isActive })
+}
+
+export function adminUpdateUser(userId: number, payload: { full_name: string; phone: string }) {
+  return patch<UserSummary>(`/users/${userId}`, payload)
+}
+
+export function getUserDeleteImpact(userId: number) {
+  return get<UserDeleteImpact>(`/users/${userId}/impact`)
+}
+
+/** Irreversible: removes the user and everything cascading off them. Show the impact first. */
+export function deleteUser(userId: number) {
+  return del<UserDeleteImpact>(`/users/${userId}`)
 }
 
 export function updateOwnProfile(payload: { full_name: string; phone: string }) {

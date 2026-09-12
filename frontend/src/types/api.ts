@@ -444,6 +444,22 @@ export interface ConversationDetail {
   messages: MessageSummary[]
 }
 
+/** What a hard delete of one user would destroy, from `GET /users/:id/impact`. */
+export interface UserDeleteImpact {
+  user_id: number
+  is_lawyer: boolean
+  is_client: boolean
+  cases: number
+  matters: number
+  documents: number
+  conversations: number
+  invoices: number
+  hearings: number
+  meetings: number
+  notifications: number
+  case_assignments: number
+}
+
 export interface AdminStats {
   total_users: number
   active_lawyers: number

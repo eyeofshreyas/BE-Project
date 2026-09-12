@@ -1,10 +1,12 @@
-/** Admin console "Users" tab: filterable table of all users (`listUsers()`) with a
- * suspend/reactivate toggle (`setUserStatus()`) and a CSV export of the current filter. */
+/** Admin console "Users" tab: filterable table of all users (`listUsers()`) with a CSV
+ * export of the current filter, a suspend/reactivate toggle (`setUserStatus()`), and a
+ * view/edit/delete panel over `getUserDeleteImpact()`, `adminUpdateUser()` and
+ * `deleteUser()`. */
 import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
-import { listUsers, setUserStatus } from '../../../api/client'
-import type { UserSummary } from '../../../types/api'
+import { adminUpdateUser, deleteUser, getUserDeleteImpact, listUsers, setUserStatus } from '../../../api/client'
+import type { UserDeleteImpact, UserSummary } from '../../../types/api'
 import styles from '../../../components/AppShell.module.css'
 
 const USER_COLUMNS = ['User', 'Role', 'Email', 'Phone', 'Status', 'Registered', 'Actions']
@@ -18,6 +20,31 @@ const FILTERS: { label: string; role: string | null }[] = [
   { label: 'Clients', role: 'Client' },
   { label: 'Admins', role: 'Admin' },
 ]
+
+type PanelMode = 'view' | 'edit' | 'delete'
+
+/** Impact fields worth showing, in reading order. Zero rows are hidden -- a delete preview
+ * listing eight zeroes buries the one number that matters. */
+const IMPACT_ROWS: { key: keyof UserDeleteImpact; label: string }[] = [
+  { key: 'cases', label: 'Cases' },
+  { key: 'matters', label: 'Conveyancing matters' },
+  { key: 'documents', label: 'Documents' },
+  { key: 'invoices', label: 'Invoices' },
+  { key: 'hearings', label: 'Hearings' },
+  { key: 'meetings', label: 'Meetings' },
+  { key: 'conversations', label: 'Conversations' },
+  { key: 'notifications', label: 'Notifications' },
+  { key: 'case_assignments', label: 'Case assignments' },
+]
+
+const FIELD_LABEL = { fontSize: 12.5, fontWeight: 600, color: '#575145', marginBottom: 6 }
+const INPUT = { width: '100%', boxSizing: 'border-box' as const, background: '#F6F2E9', border: `1.5px solid ${C.border}`, borderRadius: 3, padding: '11px 13px', fontSize: 13.5, color: C.text, fontFamily: "'Public Sans',sans-serif", outline: 'none' }
+const BTN_GHOST = { fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 3, cursor: 'pointer', background: '#FCFAF4', color: C.text, border: `1px solid ${C.border}` }
+const BTN_PRIMARY = { fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 3, cursor: 'pointer', background: C.primary, color: '#FCFAF4', boxShadow: '0 4px 12px rgba(35, 48, 107,.28)' }
+
+function attachedRows(impact: UserDeleteImpact) {
+  return IMPACT_ROWS.filter((r) => (impact[r.key] as number) > 0)
+}
 
 function initialsOf(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
@@ -57,6 +84,10 @@ export default function UsersView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [role, setRole] = useState<string | null>(null)
+  const [panel, setPanel] = useState<{ user: UserSummary; mode: PanelMode } | null>(null)
+  const [impact, setImpact] = useState<UserDeleteImpact | null>(null)
+  const [draft, setDraft] = useState({ full_name: '', phone: '' })
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     listUsers()
@@ -66,6 +97,44 @@ export default function UsersView() {
   }, [])
 
   const visible = useMemo(() => (role ? users.filter((u) => u.role === role) : users), [users, role])
+
+  function openPanel(user: UserSummary, mode: PanelMode) {
+    setPanel({ user, mode })
+    setDraft({ full_name: user.full_name, phone: user.phone })
+    if (mode === 'edit') return
+    // View and delete both want the same answer: what is attached to this person?
+    setImpact(null)
+    getUserDeleteImpact(user.id).then(setImpact).catch(() => setImpact(null))
+  }
+
+  function closePanel() {
+    setPanel(null)
+    setImpact(null)
+  }
+
+  function saveEdit() {
+    if (!panel) return
+    setBusy(true)
+    adminUpdateUser(panel.user.id, { full_name: draft.full_name.trim(), phone: draft.phone.trim() })
+      .then((updated) => {
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
+        closePanel()
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to save user.'))
+      .finally(() => setBusy(false))
+  }
+
+  function confirmDelete() {
+    if (!panel) return
+    setBusy(true)
+    deleteUser(panel.user.id)
+      .then(() => {
+        setUsers((prev) => prev.filter((u) => u.id !== panel.user.id))
+        closePanel()
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to delete user.'))
+      .finally(() => setBusy(false))
+  }
 
   function toggleStatus(user: UserSummary) {
     setUserStatus(user.id, !user.is_active)
@@ -131,11 +200,14 @@ export default function UsersView() {
                     <td className={styles.td} style={{ color: '#33302A' }}>{formatRegistered(u.created_at)}</td>
                     <td className={styles.td}>
                       <div style={{ display: 'flex', gap: 4 }}>
+                        <span className={styles.actionBtn} title="View" onClick={() => openPanel(u, 'view')}><Icon name="eye" size={15} color="#575145" /></span>
+                        <span className={styles.actionBtn} title="Edit" onClick={() => openPanel(u, 'edit')}><Icon name="edit" size={15} color="#575145" /></span>
                         {u.is_active ? (
-                          <span className={styles.actionBtnDanger} title="Suspend" onClick={() => toggleStatus(u)}><Icon name="ban" size={15} color={C.danger} /></span>
+                          <span className={styles.actionBtn} title="Suspend" onClick={() => toggleStatus(u)}><Icon name="ban" size={15} color={C.warning} /></span>
                         ) : (
                           <span className={styles.actionBtn} title="Reactivate" onClick={() => toggleStatus(u)}><Icon name="check-circle" size={15} color={C.success} /></span>
                         )}
+                        <span className={styles.actionBtnDanger} title="Delete permanently" onClick={() => openPanel(u, 'delete')}><Icon name="trash-2" size={15} color={C.danger} /></span>
                       </div>
                     </td>
                   </tr>
@@ -145,6 +217,66 @@ export default function UsersView() {
           </div>
         )}
       </div>
+
+      {panel && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(35, 48, 107,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }} onClick={closePanel}>
+          <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 28, width: 'min(520px,100%)', maxHeight: '86vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 18 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: C.secondary, color: C.primaryDark, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, fontFamily: "'Spectral',serif", flexShrink: 0 }}>{initialsOf(panel.user.full_name)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Spectral',serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{panel.user.full_name}</div>
+                <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>{panel.user.role ?? 'No role'} · joined {formatRegistered(panel.user.created_at)}</div>
+              </div>
+              <span className={styles.actionBtn} onClick={closePanel} title="Close"><Icon name="x" size={15} color="#6E6759" /></span>
+            </div>
+
+            {panel.mode === 'edit' ? (
+              <>
+                <div>
+                  <div style={FIELD_LABEL}>Full Name</div>
+                  <input value={draft.full_name} onChange={(e) => setDraft((d) => ({ ...d, full_name: e.target.value }))} style={INPUT} />
+                </div>
+                <div>
+                  <div style={FIELD_LABEL}>Phone Number</div>
+                  <input value={draft.phone} onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))} style={INPUT} />
+                </div>
+                <div style={{ fontSize: 12, color: C.muted }}>Email can't be changed here — it's the only link between this row and the account's login.</div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div><div style={FIELD_LABEL}>Email</div><div style={{ fontSize: 13.5, color: C.text, wordBreak: 'break-all' }}>{panel.user.email}</div></div>
+                  <div><div style={FIELD_LABEL}>Phone</div><div style={{ fontSize: 13.5, color: C.text }}>{panel.user.phone}</div></div>
+                  <div><div style={FIELD_LABEL}>Status</div><span className={styles.pill} style={pillStyle(panel.user.is_active ? C.success : C.danger)}>{panel.user.is_active ? 'Active' : 'Suspended'}</span></div>
+                </div>
+
+                <div>
+                  <div style={FIELD_LABEL}>{panel.mode === 'delete' ? 'This will also be destroyed' : 'Attached records'}</div>
+                  {!impact && <div style={{ fontSize: 13, color: C.muted }}>Loading…</div>}
+                  {impact && attachedRows(impact).length === 0 && <div style={{ fontSize: 13, color: C.muted }}>Nothing is attached to this account.</div>}
+                  {impact && attachedRows(impact).map((r) => (
+                    <div key={r.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '7px 0', borderBottom: '1px solid #F1EDE0' }}>
+                      <span style={{ color: '#33302A' }}>{r.label}</span><span style={{ fontWeight: 700, color: C.text }}>{impact[r.key] as number}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {panel.mode === 'delete' && (
+                  <div style={{ background: '#FDEDEC', border: `1px solid ${C.danger}`, borderRadius: 3, padding: '12px 14px', fontSize: 12.5, color: '#7A1F22', lineHeight: 1.5 }}>
+                    This permanently deletes the account and everything listed above. It cannot be undone. Suspending the account instead keeps all of it and blocks sign-in.
+                  </div>
+                )}
+              </>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={BTN_GHOST} onClick={closePanel}>{panel.mode === 'view' ? 'Close' : 'Cancel'}</div>
+              {panel.mode === 'edit' && <div style={{ ...BTN_PRIMARY, opacity: busy ? 0.6 : 1 }} onClick={() => { if (!busy) saveEdit() }}>{busy ? 'Saving…' : 'Save changes'}</div>}
+              {panel.mode === 'delete' && <div style={{ ...BTN_PRIMARY, background: C.danger, boxShadow: 'none', opacity: busy || !impact ? 0.6 : 1 }} onClick={() => { if (!busy && impact) confirmDelete() }}>{busy ? 'Deleting…' : 'Delete permanently'}</div>}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
