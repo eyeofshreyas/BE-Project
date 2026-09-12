@@ -1,0 +1,21 @@
+"""Binds meeting URLs to controllers.meetings functions. No logic."""
+
+from fastapi import APIRouter
+from app.controllers.meetings import (
+    list_meetings,
+    get_meeting,
+    create_meeting,
+    update_meeting,
+    list_participants,
+    add_participant,
+)
+from app.models.meetings import MeetingSummary, ParticipantSummary
+
+router = APIRouter(prefix="/meetings", tags=["meetings"])
+
+router.get("", response_model=list[MeetingSummary])(list_meetings)
+router.get("/{meeting_id}", response_model=MeetingSummary)(get_meeting)
+router.post("", response_model=MeetingSummary)(create_meeting)
+router.patch("/{meeting_id}", response_model=MeetingSummary)(update_meeting)
+router.get("/{meeting_id}/participants", response_model=list[ParticipantSummary])(list_participants)
+router.post("/{meeting_id}/participants", response_model=ParticipantSummary)(add_participant)

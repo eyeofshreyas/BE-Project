@@ -1,0 +1,608 @@
+.page {
+  min-height: 100vh;
+  min-width: 1024px;
+  background: #F6F2E9;
+  font-family: 'Public Sans', sans-serif;
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+.wrap {
+  max-width: 1320px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.title {
+  font-family: 'Spectral', serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1A1A17;
+  letter-spacing: -.01em;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #6E6759;
+  margin-top: 6px;
+}
+
+.headerActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ghostChip, .primaryChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ghostChip {
+  background: #FCFAF4;
+  color: #1A1A17;
+  border: 1px solid #CFC6B0;
+}
+
+.primaryChip {
+  background: #23306B;
+  color: #FCFAF4;
+  box-shadow: 0 4px 12px rgba(35, 48, 107, .28);
+}
+
+.topGrid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.statCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+
+.statCard {
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
+  transition: box-shadow .15s, transform .15s;
+}
+
+.statCard:hover {
+  box-shadow: 0 10px 24px rgba(35, 48, 107, .09);
+  transform: translateY(-2px);
+}
+
+.statIconRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.statIconWrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 3px;
+  background: #E6E0CE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.statValue {
+  font-family: 'Spectral', serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1A1A17;
+  line-height: 1;
+}
+
+.statLabel {
+  font-size: 12.5px;
+  color: #6E6759;
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.donutCard {
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.donut {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.donutHole {
+  width: 60px;
+  height: 60px;
+  background: #FCFAF4;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.donutTotal {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1A17;
+  font-family: 'Spectral', serif;
+  line-height: 1;
+}
+
+.donutTotalLabel {
+  font-size: 9.5px;
+  color: #6E6759;
+  margin-top: 1px;
+}
+
+.legendCol {
+  flex: 1;
+  min-width: 0;
+}
+
+.legendTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1A1A17;
+  font-family: 'Spectral', serif;
+  margin-bottom: 8px;
+}
+
+.legendList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #575145;
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.midGrid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.tableCard {
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
+}
+
+.tableHead {
+  padding: 18px 24px;
+  border-bottom: 1px solid #CFC6B0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #F6F2E9;
+}
+
+.tableHeadTitle {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #1A1A17;
+  font-family: 'Spectral', serif;
+}
+
+.viewAll {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #23306B;
+  cursor: pointer;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.th {
+  text-align: left;
+  padding: 12px 24px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #6E6759;
+  font-family: 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: .13em;
+  background: #F6F2E9;
+}
+
+.tr {
+  border-top: 1px solid #CFC6B0;
+  cursor: pointer;
+}
+
+.tr:hover {
+  background: #F6F2E9;
+}
+
+.td {
+  padding: 14px 16px;
+  font-size: 13.5px;
+  color: #1A1A17;
+}
+
+.tdMono {
+  padding: 14px 24px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12.5px;
+  color: #23306B;
+}
+
+.tdClient {
+  padding: 14px 16px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #1A1A17;
+}
+
+.statusBadge {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.sideCol {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.panelCard {
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
+  padding: 22px;
+  box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
+}
+
+.panelTitle {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #1A1A17;
+  font-family: 'Spectral', serif;
+  margin-bottom: 14px;
+}
+
+.quickActionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quickAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #1A1A17;
+}
+
+.quickAction:hover {
+  border-color: #23306B;
+  background: #F6F2E9;
+}
+
+.timeline {
+  position: relative;
+  margin-left: 21px;
+  border-left: 2px solid #CFC6B0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.timelineItem {
+  position: relative;
+  padding-left: 22px;
+}
+
+.timelineDot {
+  position: absolute;
+  left: -7px;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.timelineTime {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.timelineTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1A1A17;
+  margin-top: 3px;
+}
+
+.timelineMeta {
+  font-size: 12px;
+  color: #6E6759;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+}
+
+.toast {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  background: #23306B;
+  color: #F6F2E9;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 18px;
+  border-radius: 3px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .2);
+}
+
+.progressTrack {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #E6E0CE;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 3px;
+  background: #23306B;
+}
+
+.barChartArea {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  height: 180px;
+  padding: 26px 4px 0;
+}
+
+.barCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  position: relative;
+}
+
+.bar {
+  width: 60%;
+  border-radius: 3px 6px 0 0;
+  background: #CFC6B0;
+  min-height: 4px;
+}
+
+.barMonthLabel {
+  font-size: 11px;
+  color: #6E6759;
+  margin-top: 8px;
+}
+
+.barValueBadge {
+  position: absolute;
+  top: -24px;
+  background: #1A2551;
+  color: #FCFAF4;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #6E6759;
+}
+
+.breadcrumb span:last-child {
+  color: #1A1A17;
+  font-weight: 600;
+}
+
+.calendarNavBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 3px;
+  border: 1px solid #CFC6B0;
+  background: #FCFAF4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.calendarNavBtn:hover {
+  background: #F6F2E9;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendarDowCell {
+  padding: 10px 8px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #6E6759;
+  font-family: 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: .13em;
+  text-align: left;
+  background: #F6F2E9;
+  border-bottom: 1px solid #CFC6B0;
+}
+
+.calendarCell {
+  min-height: 90px;
+  padding: 8px;
+  border-right: 1px solid #F1EDE0;
+  border-bottom: 1px solid #F1EDE0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calendarDayNum {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1A1A17;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.calendarChip {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: #E6E0CE;
+  color: #575145;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdownBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 3px;
+  border: 1px solid #CFC6B0;
+  font-size: 13px;
+  font-weight: 500;
+  background: #FCFAF4;
+  color: #1A1A17;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 210px;
+  background: #FCFAF4;
+  border-radius: 3px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, .14);
+  padding: 8px;
+  z-index: 41;
+}
+
+.dropdownItem {
+  padding: 10px 14px;
+  border-radius: 3px;
+  font-size: 13.5px;
+  color: #1A1A17;
+  cursor: pointer;
+}
+
+.dropdownItem:hover {
+  background: #F6F2E9;
+}
+
+.darkBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 3px;
+  background: #23306B;
+  color: #FCFAF4;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Matter detail page: two columns of panels, stacking on a narrow screen. */
+.matterGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+@media (max-width: 860px) {
+  .matterGrid { grid-template-columns: 1fr; }
+}

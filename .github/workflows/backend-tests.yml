@@ -1,0 +1,30 @@
+name: backend-tests
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+        env:
+          # ponytail: dummy values -- tests mock the supabase client, this
+          # just satisfies config.py's _require() so imports don't crash.
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_KEY: test-key

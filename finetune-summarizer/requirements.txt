@@ -1,0 +1,18 @@
+requests
+tqdm
+rouge-score
+
+# fine-tuning/eval/inference deps -- 1B model + QLoRA fits on a 4GB GPU (see SETUP.md)
+# install torch first: pip install torch --index-url https://download.pytorch.org/whl/cu126
+unsloth
+torch
+transformers
+trl
+peft
+accelerate
+bitsandbytes
+datasets
+
+# similar case discovery deps (same venv as above)
+sentence-transformers
+faiss-cpu

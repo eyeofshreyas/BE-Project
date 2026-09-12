@@ -1,0 +1,267 @@
+/** Signup form at `/signup`. Does not auto-login -- on success it redirects to `/login`, not into the app. */
+import { useState, type CSSProperties } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import logo from '../../assets/logo.svg'
+import { signup } from '../../api/client'
+import styles from './SignUpPage.module.css'
+import { Icon } from '../../components/icons'
+
+const PRIMARY = '#23306B'
+const BORDER = '#CFC6B0'
+const TEXT = '#1A1A17'
+const MUTED = '#6E6759'
+const BG = '#F6F2E9'
+
+const iconProps = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: MUTED, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+
+const LockIcon = () => <svg {...iconProps}><rect x={4} y={11} width={16} height={9} rx={2} /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+const ClockIcon = () => <svg {...iconProps}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l4 2" /></svg>
+const LanguagesIcon = () => <svg {...iconProps}><circle cx={12} cy={12} r={9} /><path d="M3 12h18" /><path d="M12 3a15 15 0 0 1 0 18" /><path d="M12 3a15 15 0 0 0 0 18" /></svg>
+const MapPinIcon = () => <svg {...iconProps}><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z" /><circle cx={12} cy={9.5} r={2.3} /></svg>
+const AlertIcon = () => <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#B3282D" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={9} /><path d="M12 8v5" /><path d="M12 16h.01" /></svg>
+const ArrowIcon = () => <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+const CheckIcon = () => <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+const EyeIcon = ({ off }: { off: boolean }) => off ? (
+  <svg {...iconProps}><path d="M2 12s3.5-7 10-7c1.8 0 3.4.5 4.7 1.2M22 12s-3.5 7-10 7c-1.8 0-3.4-.5-4.7-1.2" /><path d="M3 3l18 18" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>
+) : (
+  <svg {...iconProps}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx={12} cy={12} r={3} /></svg>
+)
+
+const PRACTICE_OPTIONS = ['Corporate Law', 'Family Law', 'Criminal Law', 'Property / Real Estate', 'Tax Law', 'Litigation', 'Other']
+const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Tamil', 'Bengali', 'Marathi', 'Other']
+
+function isValidEmail(v: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+}
+
+function passwordScore(pw: string) {
+  let score = 0
+  if (pw.length >= 8) score++
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++
+  if (/\d/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+  return score
+}
+
+const STRENGTH_META = [
+  { label: '', color: BORDER },
+  { label: 'Weak', color: '#B3282D' },
+  { label: 'Fair', color: '#8A6A2F' },
+  { label: 'Good', color: '#CFC6B0', textColor: '#1A2551' },
+  { label: 'Strong', color: '#4A6B4E' },
+]
+
+type FocusName = 'fullName' | 'phone' | 'email' | 'password' | 'confirm' | 'bar' | 'practice' | 'years' | 'language' | 'address' | null
+
+/** Renders the role-toggled signup form (extra fields for lawyer vs client); validates locally then calls `handleSubmit` -> `signup()`. */
+export default function SignUpPage() {
+  const navigate = useNavigate()
+  const [role, setRole] = useState<'lawyer' | 'client'>('lawyer')
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [barNumber, setBarNumber] = useState('')
+  const [practiceArea, setPracticeArea] = useState('Corporate Law')
+  const [yearsExp, setYearsExp] = useState('')
+  const [preferredLanguage, setPreferredLanguage] = useState('English')
+  const [address, setAddress] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [focused, setFocused] = useState<FocusName>(null)
+  const [agreeTerms, setAgreeTerms] = useState(false)
+  const [agreePrivacy, setAgreePrivacy] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [toast, setToast] = useState<string | null>(null)
+
+  const isLawyer = role === 'lawyer'
+  const score = passwordScore(password)
+  const meta = STRENGTH_META[score] || STRENGTH_META[0]
+  const canSubmit = agreeTerms && agreePrivacy
+
+  const wrapStyle = (name: FocusName): CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 9, background: BG,
+    border: `1.5px solid ${focused === name ? PRIMARY : BORDER}`, borderRadius: 3, padding: '11px 13px',
+    width: '100%', minWidth: 0, boxSizing: 'border-box', transition: 'border-color .15s', position: 'relative',
+  })
+  const mkFocus = (name: FocusName) => () => setFocused(name)
+
+  /** Validates all fields (role-dependent), then calls `signup()` and redirects to `/login` on success. */
+  async function handleSubmit() {
+    if (!fullName.trim()) { setError('Enter your full name.'); return }
+    if (!isValidEmail(email)) { setError('Enter a valid email address.'); return }
+    if (!phone.trim()) { setError('Enter your phone number.'); return }
+    if (passwordScore(password) < 2) { setError('Choose a stronger password.'); return }
+    if (password !== confirmPassword) { setError('Passwords do not match.'); return }
+    if (isLawyer && !barNumber.trim()) { setError('Enter your Bar Council registration number.'); return }
+    if (!isLawyer && !address.trim()) { setError('Enter your address.'); return }
+    if (!canSubmit) { setError('Please accept the Terms & Conditions and Privacy Policy.'); return }
+    setLoading(true)
+    setError('')
+    try {
+      await signup({
+        email,
+        password,
+        full_name: fullName,
+        phone,
+        role,
+        ...(isLawyer
+          ? { bar_council_number: barNumber, specialization: practiceArea, experience_years: Number(yearsExp) || undefined }
+          : { address, preferred_language: preferredLanguage }),
+      })
+      setToast('Account created — redirecting to sign in…')
+      setTimeout(() => navigate('/login'), 1400)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Signup failed.')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.wrap}>
+        <div className={styles.brandRow}>
+          <img src={logo} alt="LexFlow" className={styles.logo} />
+          <div className={styles.brandName}>LexFlow</div>
+        </div>
+
+        <div className={styles.card}>
+          <div className={styles.cardHead}>
+            <div className={styles.title}>Create your account</div>
+            <div className={styles.subtitle}>Join LexFlow to manage cases with AI-powered intelligence</div>
+          </div>
+
+          <div className={styles.fields}>
+            <div>
+              <div className={styles.label}>I am a</div>
+              <div className={styles.roleToggle}>
+                <div className={styles.roleOption} style={{ background: isLawyer ? '#FCFAF4' : 'transparent', color: isLawyer ? TEXT : MUTED, boxShadow: isLawyer ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('lawyer')}>
+                  <Icon name="briefcase" size={15} /><span>Lawyer</span>
+                </div>
+                <div className={styles.roleOption} style={{ background: !isLawyer ? '#FCFAF4' : 'transparent', color: !isLawyer ? TEXT : MUTED, boxShadow: !isLawyer ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('client')}>
+                  <Icon name="users" size={15} /><span>Client</span>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.row2}>
+              <div>
+                <div className={styles.label}>Full Name</div>
+                <div style={wrapStyle('fullName')}><Icon name="user" size={16} color={MUTED} /><input placeholder="Adv. Meera Kulkarni" value={fullName} onChange={(e) => setFullName(e.target.value)} onFocus={mkFocus('fullName')} onBlur={mkFocus(null)} className={styles.input} /></div>
+              </div>
+              <div>
+                <div className={styles.label}>Phone Number</div>
+                <div style={wrapStyle('phone')}><Icon name="phone" size={16} color={MUTED} /><input placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} onFocus={mkFocus('phone')} onBlur={mkFocus(null)} className={styles.input} /></div>
+              </div>
+            </div>
+
+            <div>
+              <div className={styles.label}>Email Address</div>
+              <div style={wrapStyle('email')}><Icon name="mail" size={16} color={MUTED} /><input type="email" placeholder="you@lawfirm.com" value={email} onChange={(e) => { setEmail(e.target.value); setError('') }} onFocus={mkFocus('email')} onBlur={mkFocus(null)} className={styles.input} /></div>
+            </div>
+
+            <div className={styles.row2}>
+              <div>
+                <div className={styles.label}>Password</div>
+                <div style={wrapStyle('password')}>
+                  <LockIcon />
+                  <input type={showPassword ? 'text' : 'password'} placeholder="Create a password" value={password} onChange={(e) => { setPassword(e.target.value); setError('') }} onFocus={mkFocus('password')} onBlur={mkFocus(null)} className={styles.input} />
+                  <span className={styles.eyeBtn} onClick={() => setShowPassword((s) => !s)}><EyeIcon off={showPassword} /></span>
+                </div>
+              </div>
+              <div>
+                <div className={styles.label}>Confirm Password</div>
+                <div style={wrapStyle('confirm')}>
+                  <LockIcon />
+                  <input type={showConfirm ? 'text' : 'password'} placeholder="Re-enter password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setError('') }} onFocus={mkFocus('confirm')} onBlur={mkFocus(null)} className={styles.input} />
+                  <span className={styles.eyeBtn} onClick={() => setShowConfirm((s) => !s)}><EyeIcon off={showConfirm} /></span>
+                </div>
+              </div>
+            </div>
+
+            {password.length > 0 && (
+              <div style={{ marginTop: -8 }}>
+                <div className={styles.strengthBars}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className={styles.strengthBar} style={{ background: i < score ? meta.color : '#E6E0CE' }} />
+                  ))}
+                </div>
+                <div className={styles.strengthLabel} style={{ color: meta.textColor || meta.color }}>{meta.label}</div>
+              </div>
+            )}
+            {confirmPassword.length > 0 && confirmPassword !== password && (
+              <div className={styles.errorRow} style={{ marginTop: -8 }}><AlertIcon />Passwords do not match.</div>
+            )}
+
+            {isLawyer ? (
+              <div className={styles.section}>
+                <div className={styles.sectionTitle}>Lawyer Details</div>
+                <div>
+                  <div className={styles.label}>Bar Council Registration Number</div>
+                  <div style={wrapStyle('bar')}><Icon name="shield" size={16} color={MUTED} /><input placeholder="e.g. D/1234/2015" value={barNumber} onChange={(e) => setBarNumber(e.target.value)} onFocus={mkFocus('bar')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                </div>
+                <div className={styles.row2}>
+                  <div>
+                    <div className={styles.label}>Practice Area</div>
+                    <div style={wrapStyle('practice')}>
+                      <Icon name="scale" size={16} color={MUTED} />
+                      <select value={practiceArea} onChange={(e) => setPracticeArea(e.target.value)} className={styles.select}>
+                        {PRACTICE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                      <Icon name="chevron-down" size={14} color={MUTED} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className={styles.label}>Years of Experience</div>
+                    <div style={wrapStyle('years')}><ClockIcon /><input type="number" min={0} placeholder="5" value={yearsExp} onChange={(e) => setYearsExp(e.target.value)} onFocus={mkFocus('years')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.section}>
+                <div className={styles.sectionTitle}>Client Details</div>
+                <div>
+                  <div className={styles.label}>Preferred Language</div>
+                  <div style={wrapStyle('language')}>
+                    <LanguagesIcon />
+                    <select value={preferredLanguage} onChange={(e) => setPreferredLanguage(e.target.value)} className={styles.select}>
+                      {LANGUAGE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                    <Icon name="chevron-down" size={14} color={MUTED} />
+                  </div>
+                </div>
+                <div>
+                  <div className={styles.label}>Address</div>
+                  <div style={wrapStyle('address')}><MapPinIcon /><input placeholder="House no., street, city, state" value={address} onChange={(e) => setAddress(e.target.value)} onFocus={mkFocus('address')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                </div>
+              </div>
+            )}
+
+            <div className={styles.agreements}>
+              <div className={styles.agreeRow} onClick={() => setAgreeTerms((v) => !v)}>
+                <div className={styles.checkbox} style={{ background: agreeTerms ? PRIMARY : 'transparent', border: agreeTerms ? 'none' : `1.5px solid ${BORDER}` }}>{agreeTerms && <CheckIcon />}</div>
+                <div className={styles.agreeLabel}>I agree to the <a href="#" onClick={(e) => e.preventDefault()}>Terms &amp; Conditions</a></div>
+              </div>
+              <div className={styles.agreeRow} onClick={() => setAgreePrivacy((v) => !v)}>
+                <div className={styles.checkbox} style={{ background: agreePrivacy ? PRIMARY : 'transparent', border: agreePrivacy ? 'none' : `1.5px solid ${BORDER}` }}>{agreePrivacy && <CheckIcon />}</div>
+                <div className={styles.agreeLabel}>I agree to the <a href="#" onClick={(e) => e.preventDefault()}>Privacy Policy</a></div>
+              </div>
+            </div>
+
+            {error && <div className={styles.errorRow}><AlertIcon />{error}</div>}
+
+            <div className={styles.submitBtn} style={{ opacity: loading ? 0.85 : 1 }} onClick={handleSubmit}>
+              {loading ? <span className={styles.spinner} /> : (<><span>Create Account</span><ArrowIcon /></>)}
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.footerLine}>Already have an account? <Link to="/login">Sign In</Link></div>
+      </div>
+
+      {toast && <div className={styles.toast}>{toast}</div>}
+    </div>
+  )
+}

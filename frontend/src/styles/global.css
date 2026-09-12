@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700;800&family=Public+Sans:wght@300..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --lf-primary: #23306B;
+  --lf-primary-dark: #1A2551;
+  --lf-secondary: #CFC6B0;
+  --lf-bg: #F6F2E9;
+  --lf-surface: #FCFAF4;
+  --lf-border: #CFC6B0;
+  --lf-text: #1A1A17;
+  --lf-muted: #6E6759;
+  --lf-muted-2: #8C857A;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Public Sans', sans-serif;
+}
+
+::selection {
+  background: #CFC6B0;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CFC6B0;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+a {
+  color: var(--lf-primary);
+}
+
+a:hover {
+  color: #1A2551;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--lf-muted-2);
+}
+
+select {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+@keyframes lf-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes lf-slide-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes lf-pulse {
+  0%, 100% { opacity: .35; }
+  50% { opacity: 1; }
+}
+
+@keyframes lf-spin {
+  to { transform: rotate(360deg); }
+}

@@ -1,0 +1,7 @@
+# Needs Python 3.11 and its own venv -- see the note at the top of translate.py
+# for why this can't share the finetune/eval venv.
+transformers==4.38.0
+accelerate
+IndicTransToolkit
+sentencepiece
+# torch installed separately: pip install torch --index-url https://download.pytorch.org/whl/cu126

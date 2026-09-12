@@ -1,0 +1,14 @@
+backend/.venv/
+backend/.env
+__pycache__/
+*.pyc
+.pytest_cache/
+design-concepts/
+docs/superpowers/
+LexFlow UI Mockups (4)/
+graphify-out/
+logs/
+.worktrees/
+.firecrawl/
+mermaid-skill/
+CLAUDE.md

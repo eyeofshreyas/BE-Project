@@ -1,0 +1,1853 @@
+{
+  "info": {
+    "name": "LexFlow Backend",
+    "description": "Auto-generated from the FastAPI OpenAPI schema by backend/gen_postman.py -- do not hand-edit; re-run the script after changing routes. Start the backend first (cd backend && source .venv/bin/activate && uvicorn app.main:app --reload). Every endpoint except Root/Signup/Login/Forgot Password requires auth: run Login once with a real account and its test script fills the access_token collection variable. Path params are {{variables}} -- set them in the collection Variables tab. Bodies are schema-derived placeholders; replace the sample values.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "case_id",
+      "value": ""
+    },
+    {
+      "key": "conversation_id",
+      "value": ""
+    },
+    {
+      "key": "document_id",
+      "value": ""
+    },
+    {
+      "key": "hearing_id",
+      "value": ""
+    },
+    {
+      "key": "invoice_id",
+      "value": ""
+    },
+    {
+      "key": "matter_id",
+      "value": ""
+    },
+    {
+      "key": "meeting_id",
+      "value": ""
+    },
+    {
+      "key": "note_id",
+      "value": ""
+    },
+    {
+      "key": "notification_id",
+      "value": ""
+    },
+    {
+      "key": "progress_id",
+      "value": ""
+    },
+    {
+      "key": "request_id",
+      "value": ""
+    },
+    {
+      "key": "user_id",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Ai",
+      "item": [
+        {
+          "name": "Case Search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/case-search",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai",
+                "case-search"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"string\",\n  \"top_k\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Similar Cases",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/similar-cases",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai",
+                "similar-cases"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"string\",\n  \"top_k\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Summarize Text",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/summarize",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai",
+                "summarize"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"string\",\n  \"document_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Translate Text",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai/translate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai",
+                "translate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"string\",\n  \"target_language\": \"string\",\n  \"document_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "item": [
+        {
+          "name": "List Invoices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/billing/invoices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "invoices"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/billing/invoices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "invoices"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_id\": 1,\n  \"invoice_number\": \"string\",\n  \"amount\": 1.0,\n  \"tax\": 0,\n  \"total_amount\": 1.0,\n  \"issue_date\": \"string\",\n  \"due_date\": \"string\",\n  \"remarks\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get Invoice",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/billing/invoices/{{invoice_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "invoices",
+                "{{invoice_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send Invoice Reminder",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/billing/invoices/{{invoice_id}}/remind",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "invoices",
+                "{{invoice_id}}",
+                "remind"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Invoice Payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/billing/invoices/{{invoice_id}}/payments",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "invoices",
+                "{{invoice_id}}",
+                "payments"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/billing/payments",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoice_id\": 1,\n  \"amount\": 1.0,\n  \"payment_method\": \"string\",\n  \"transaction_reference\": \"string\",\n  \"payment_date\": \"string\",\n  \"payment_status\": \"Completed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create Razorpay Order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/billing/invoices/{{invoice_id}}/razorpay-order",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "invoices",
+                "{{invoice_id}}",
+                "razorpay-order"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify Razorpay Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/billing/invoices/{{invoice_id}}/razorpay-verify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "invoices",
+                "{{invoice_id}}",
+                "razorpay-verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpay_order_id\": \"string\",\n  \"razorpay_payment_id\": \"string\",\n  \"razorpay_signature\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List Expenses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/billing/expenses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "expenses"
+              ],
+              "query": [
+                {
+                  "key": "matter_id",
+                  "value": "1",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Expense",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/billing/expenses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "billing",
+                "expenses"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matter_id\": 1,\n  \"expense_type\": \"string\",\n  \"description\": \"string\",\n  \"amount\": 1.0,\n  \"expense_date\": \"string\",\n  \"receipt_document_id\": 1,\n  \"created_by\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Case History",
+      "item": [
+        {
+          "name": "List Case Notes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/notes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "notes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Case Note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/notes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "notes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"string\",\n  \"title\": \"string\",\n  \"checklist\": [\n    null\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Case Note",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/notes/{{note_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "notes",
+                "{{note_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"string\",\n  \"note\": \"string\",\n  \"checklist\": [\n    null\n  ],\n  \"pinned\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Case Note",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/notes/{{note_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "notes",
+                "{{note_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Case Timeline",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/timeline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "timeline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Status History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/status-history",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "status-history"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Change Case Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"new_status\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cases",
+      "item": [
+        {
+          "name": "List Cases",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cases",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_type_id\": 1,\n  \"case_title\": \"string\",\n  \"client_id\": 1,\n  \"court_id\": 1,\n  \"priority\": \"Medium\",\n  \"next_hearing_date\": \"string\",\n  \"description\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Unassign Lawyer",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/unassign-lawyer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "unassign-lawyer"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Case Ai Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/ai-summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "ai-summary"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Generate Case Ai Summary",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/ai-summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "ai-summary"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Client Requests",
+      "item": [
+        {
+          "name": "Send Client Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/client-requests",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client-requests"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"string\",\n  \"court_id\": 1,\n  \"case_type_id\": 1,\n  \"message\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List Client Requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/client-requests",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client-requests"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Respond Client Request",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/client-requests/{{request_id}}/respond",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client-requests",
+                "{{request_id}}",
+                "respond"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"accept\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clients",
+      "item": [
+        {
+          "name": "List Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/clients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "clients"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Conveyancing",
+      "item": [
+        {
+          "name": "Conveyancing Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/conveyancing/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conveyancing",
+                "summary"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Matter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/conveyancing/matters",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conveyancing",
+                "matters"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matter_name\": \"string\",\n  \"matter_type\": \"string\",\n  \"client_id\": 1,\n  \"priority\": \"Medium\",\n  \"property_address\": \"string\",\n  \"property_type\": \"string\",\n  \"title_number\": \"string\",\n  \"sale_value\": 1.0,\n  \"target_settlement_date\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get Matter Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/conveyancing/matters/{{matter_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conveyancing",
+                "matters",
+                "{{matter_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upload Matter Document",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/conveyancing/matters/{{matter_id}}/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conveyancing",
+                "matters",
+                "{{matter_id}}",
+                "documents"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Due Diligence",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/conveyancing/matters/{{matter_id}}/due-diligence",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conveyancing",
+                "matters",
+                "{{matter_id}}",
+                "due-diligence"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title_clear\": true,\n  \"tax_verified\": true,\n  \"encumbrance_checked\": true,\n  \"litigation_checked\": true,\n  \"remarks\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Complete Progress Stage",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/conveyancing/matters/{{matter_id}}/progress/{{progress_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conveyancing",
+                "matters",
+                "{{matter_id}}",
+                "progress",
+                "{{progress_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "List Documents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "documents"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Document Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/documents/{{document_id}}/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "documents",
+                "{{document_id}}",
+                "summary"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Document Download Url",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/documents/{{document_id}}/download",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "documents",
+                "{{document_id}}",
+                "download"
+              ],
+              "query": [
+                {
+                  "key": "download",
+                  "value": "False",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upload Document",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "documents"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "document_type_id",
+                  "type": "text",
+                  "value": "1"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Document",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/documents/{{document_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "documents",
+                "{{document_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "General",
+      "item": [
+        {
+          "name": "Read Root",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": []
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/signup",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "signup"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"string\",\n  \"full_name\": \"string\",\n  \"phone\": \"string\",\n  \"role\": \"lawyer\",\n  \"bar_council_number\": \"string\",\n  \"specialization\": \"string\",\n  \"experience_years\": 1,\n  \"address\": \"string\",\n  \"preferred_language\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.access_token) { pm.collectionVariables.set('access_token', data.access_token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/forgot-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "forgot-password"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Protected Route",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/protected",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "protected"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hearings",
+      "item": [
+        {
+          "name": "List Hearings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/hearings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hearings"
+              ],
+              "query": [
+                {
+                  "key": "case_id",
+                  "value": "1",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Hearing",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hearings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hearings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_id\": 1,\n  \"judge_id\": 1,\n  \"hearing_date\": \"string\",\n  \"hearing_time\": \"string\",\n  \"courtroom\": \"string\",\n  \"notes\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get Hearing",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/hearings/{{hearing_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hearings",
+                "{{hearing_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Hearing",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hearings/{{hearing_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hearings",
+                "{{hearing_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hearing_status\": \"string\",\n  \"hearing_outcome\": \"string\",\n  \"next_hearing_date\": \"string\",\n  \"notes\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Judgements",
+      "item": [
+        {
+          "name": "List Judgements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/judgements",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "judgements"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Judgement",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/judgements",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "judgements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_id\": 1,\n  \"citation\": \"string\",\n  \"court\": \"string\",\n  \"bench\": \"string\",\n  \"judgement_date\": \"string\",\n  \"outcome\": \"Favourable\",\n  \"summary\": \"string\",\n  \"reasoning\": \"string\",\n  \"relief_text\": \"string\",\n  \"relief_amount\": 1.0,\n  \"appeal_status\": \"string\",\n  \"tags\": [\n    \"string\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Meetings",
+      "item": [
+        {
+          "name": "List Meetings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/meetings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings"
+              ],
+              "query": [
+                {
+                  "key": "case_id",
+                  "value": "1",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Meeting",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/meetings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_id\": 1,\n  \"conducted_by\": 1,\n  \"meeting_title\": \"string\",\n  \"meeting_type\": \"string\",\n  \"meeting_date\": \"string\",\n  \"duration_minutes\": 1,\n  \"agenda\": \"string\",\n  \"next_meeting_date\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get Meeting",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/meetings/{{meeting_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings",
+                "{{meeting_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Participants",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/meetings/{{meeting_id}}/participants",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings",
+                "{{meeting_id}}",
+                "participants"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Participant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/meetings/{{meeting_id}}/participants",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings",
+                "{{meeting_id}}",
+                "participants"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 1,\n  \"participant_role\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messages",
+      "item": [
+        {
+          "name": "List Conversations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/messages/conversations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "messages",
+                "conversations"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Or Create Conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/messages/conversations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "messages",
+                "conversations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"other_party_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get Conversation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/messages/conversations/{{conversation_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "messages",
+                "conversations",
+                "{{conversation_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/messages/conversations/{{conversation_id}}/messages",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "messages",
+                "conversations",
+                "{{conversation_id}}",
+                "messages"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "body",
+                  "type": "text",
+                  "value": ""
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "unread_only",
+                  "value": "False",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/notifications/{{notification_id}}/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "{{notification_id}}",
+                "read"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/notifications/read-all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "read-all"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reference",
+      "item": [
+        {
+          "name": "List Roles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reference/roles",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reference",
+                "roles"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Case Types",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reference/case-types",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reference",
+                "case-types"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Courts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reference/courts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reference",
+                "courts"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Judges",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reference/judges",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reference",
+                "judges"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Document Types",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reference/document-types",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reference",
+                "document-types"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "string",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Set User Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
