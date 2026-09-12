@@ -99,10 +99,7 @@ export default function AdminConsolePage() {
   }
 
   const quickActions = [
-    { label: 'Add New Lawyer', icon: 'user-plus' as const, primary: true, onClick: () => goTo('users') },
-    { label: 'Add New Client', icon: 'user-plus' as const, onClick: () => goTo('users') },
-    { label: 'Create Case', icon: 'plus' as const, onClick: () => goTo('cases') },
-    { label: 'Generate Report', icon: 'file-text' as const, onClick: () => goTo('reports') },
+    { label: 'Generate Report', icon: 'file-text' as const, primary: true, onClick: () => goTo('reports') },
   ]
 
   return (
