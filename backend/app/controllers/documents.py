@@ -3,6 +3,7 @@ download URL, extracting a stored file's text, and fetching an AI-generated summ
 
 import io
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import Depends, File, Form, HTTPException, UploadFile
 from storage3.exceptions import StorageApiError
@@ -62,12 +63,17 @@ def list_documents(profile: dict = Depends(get_current_profile)):
 
 
 def delete_document(document_id: int, profile: dict = Depends(get_current_profile)):
-    """Soft-delete a document (sets is_deleted=True) the caller has access to. Calls: `ensure_case_access()`."""
+    """Soft-delete a document the caller has access to: sets is_deleted and stamps deleted_at,
+    which reap_storage.py measures its grace period from. The stored object is left alone --
+    only the reaper removes those. Calls: `ensure_case_access()`."""
     rows = supabase.table("documents").select("case_id").eq("document_id", document_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Document not found")
     ensure_case_access(rows[0]["case_id"], profile)
-    supabase.table("documents").update({"is_deleted": True}).eq("document_id", document_id).execute()
+    supabase.table("documents").update({
+        "is_deleted": True,
+        "deleted_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("document_id", document_id).execute()
     return {"message": "Document deleted"}
 
 
