@@ -7,6 +7,7 @@ import { Icon } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
 import { adminUpdateUser, deleteUser, getUserDeleteImpact, listUsers, setUserStatus } from '../../../api/client'
 import type { UserDeleteImpact, UserSummary } from '../../../types/api'
+import { downloadCsv } from '../../../utils/files'
 import styles from '../../../components/AppShell.module.css'
 
 const USER_COLUMNS = ['User', 'Role', 'Email', 'Phone', 'Status', 'Registered', 'Actions']
@@ -54,24 +55,12 @@ function formatRegistered(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-/** Quote a CSV field: double any embedded quotes, wrap the lot. Names and addresses carry
- * commas often enough that a naive join corrupts the columns. */
-function csvCell(value: string | null) {
-  return `"${(value ?? '').replace(/"/g, '""')}"`
-}
-
 function exportCsv(rows: UserSummary[]) {
-  const csv = [
-    ['Name', 'Role', 'Email', 'Phone', 'Status', 'Registered'].join(','),
-    ...rows.map((u) => [u.full_name, u.role, u.email, u.phone, u.is_active ? 'Active' : 'Suspended', formatRegistered(u.created_at)].map(csvCell).join(',')),
-  ].join('\n')
-
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `lexflow-users-${new Date().toISOString().slice(0, 10)}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
+  downloadCsv(
+    'lexflow-users',
+    ['Name', 'Role', 'Email', 'Phone', 'Status', 'Registered'],
+    rows.map((u) => [u.full_name, u.role, u.email, u.phone, u.is_active ? 'Active' : 'Suspended', formatRegistered(u.created_at)]),
+  )
 }
 
 /**

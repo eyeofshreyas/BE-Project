@@ -35,3 +35,21 @@ export function uploadRejection(file: File) {
   if (file.size > MAX_DOCUMENT_BYTES) return 'That file is over the 25 MB limit.'
   return ''
 }
+
+/** Quote a CSV field: double any embedded quotes, wrap the lot. Names, case titles and
+ * court names carry commas often enough that a naive join shifts the columns. */
+function csvCell(value: string | number | null) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`
+}
+
+/** Build a CSV from a header row plus body rows and hand it to the browser as a download,
+ * datestamped. Used by the admin console's "Export list" links. */
+export function downloadCsv(name: string, header: string[], rows: (string | number | null)[][]) {
+  const csv = [header.join(','), ...rows.map((r) => r.map(csvCell).join(','))].join('\n')
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${name}-${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}

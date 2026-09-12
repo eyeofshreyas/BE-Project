@@ -86,7 +86,7 @@ All calls go through named functions in `api/client.ts`; each wraps a
 | `admin/views/AnalyticsView` | `getAdminAnalytics` | `GET /admin/analytics` |
 | `admin/views/SettingsView` | `getPlatformSettings`, `updatePlatformSettings`, `updateOwnProfile`, `forgotPassword` | `GET`/`PATCH /admin/settings`, `PATCH /users/me`, `POST /forgot-password` |
 | `admin/views/UsersView` | `listUsers`, `setUserStatus`, `adminUpdateUser`, `getUserDeleteImpact`, `deleteUser` | `GET /users`, `PATCH /users/:id/status`, `PATCH /users/:id`, `GET /users/:id/impact`, `DELETE /users/:id` |
-| `admin/views/CasesView` | `listCases` | `GET /cases` |
+| `admin/views/CasesView` | `listCases` | `GET /cases` (rows link out to `/cases/:id` and `/documents?q=`) |
 | `admin/views/DocumentsView` | `listDocuments`, `getDocumentSummary` | `GET /documents`, `GET /documents/:id/summary` |
 | `ConveyancingDashboardPage` | `getConveyancingSummary`, `listAllMeetings`, `getMatterDetail`, `uploadMatterDocument`, `getDocumentDownloadUrl` | `GET /conveyancing/summary`, `GET /meetings`, `GET /conveyancing/matters/:id`, `POST /conveyancing/matters/:id/documents`, `GET /documents/:id/download` |
 | `CreateMatterPage` | `listClients`, `createMatter` | `GET /clients`, `POST /conveyancing/matters` |

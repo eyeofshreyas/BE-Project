@@ -1,6 +1,6 @@
 /** `/documents` route: full document library with drag-drop upload, AI-summary cards, search/type filtering, and a detail table. Opens a file on `/documents/:documentId`. */
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   listDocuments, getDocumentSummary, getDocumentDownloadUrl, deleteDocument,
   listCases, listDocumentTypes, uploadDocument, summarizeDocument,
@@ -71,7 +71,10 @@ export default function DocumentsListPage() {
   const [translateError, setTranslateError] = useState('')
 
   const [toast, setToast] = useState('')
-  const [search, setSearch] = useState('')
+  // ?q= lets another page link straight to a filtered library (the admin console's
+  // Cases tab links here by case number). Seeded once; the box is the owner after that.
+  const [searchParams] = useSearchParams()
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [typeFilter, setTypeFilter] = useState('')
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('')
   const [filtersOpen, setFiltersOpen] = useState(false)
