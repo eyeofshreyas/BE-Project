@@ -32,6 +32,7 @@ CHUNK_TOKENS = 1200  # leaves room for instruction + template + generated summar
 REPETITION_PENALTY = 1.15
 NO_REPEAT_NGRAM = 6  # legal prose reuses short phrases ("the High Court held"); 6 spares those
 MAX_NEW_TOKENS = 400  # 220 cut briefs off mid-clause; trim_to_sentence() handles the tail
+MAX_REDUCE_PASSES = 4  # safety stop for the reduce loop; 4 covers ~books' worth of chunks
 SENTENCE_ENDINGS = (".", "!", "?")
 
 CASE_MAP_PROMPT = """### Instruction:
@@ -127,11 +128,23 @@ def prompts_for(mode):
     return (CASE_MAP_PROMPT, CASE_REDUCE_PROMPT) if mode == "case" else (MAP_PROMPT, REDUCE_PROMPT)
 
 
+def reduce_budget(tokenizer, reduce_prompt):
+    """How many tokens of section summaries fit in one reduce pass, once the prompt wording and
+    the generated output have taken their share of MAX_SEQ_LENGTH."""
+    overhead = len(tokenizer(reduce_prompt.format(text=""), add_special_tokens=False)["input_ids"])
+    return MAX_SEQ_LENGTH - MAX_NEW_TOKENS - overhead
+
+
 def summarize(model, tokenizer, text, mode="judgment"):
     """Map-reduce summarization: chunks text, summarizes each chunk, then (if more than one chunk)
     reduces those into one final summary. A single-chunk case file still goes through the reduce
     prompt, because that is the one that asks for a brief rather than a section summary.
-    Calls: `prompts_for()`, `chunk_by_tokens()`, `generate()`."""
+
+    A long document produces more section summaries than fit in one reduce prompt; feeding them
+    all in at once let the tokenizer silently truncate away the later sections *and* the trailing
+    instruction, so a 60-page file was summarized from its first few pages only. Instead the
+    summaries are reduced in budget-sized groups, repeatedly, until they fit in a single pass.
+    Calls: `prompts_for()`, `chunk_by_tokens()`, `reduce_budget()`, `generate()`."""
     map_prompt, reduce_prompt = prompts_for(mode)
     chunks = chunk_by_tokens(tokenizer, text)
 
@@ -140,9 +153,16 @@ def summarize(model, tokenizer, text, mode="judgment"):
             return generate(model, tokenizer, map_prompt.format(text=chunks[0]))
         return generate(model, tokenizer, reduce_prompt.format(text=chunks[0]))
 
-    chunk_summaries = [generate(model, tokenizer, map_prompt.format(text=c)) for c in chunks]
-    combined = "\n".join(chunk_summaries)
-    return generate(model, tokenizer, reduce_prompt.format(text=combined))
+    summaries = [generate(model, tokenizer, map_prompt.format(text=c)) for c in chunks]
+    budget = reduce_budget(tokenizer, reduce_prompt)
+    # Each pass shrinks the text by roughly CHUNK_TOKENS/MAX_NEW_TOKENS, so this bottoms out in a
+    # few rounds; the cap is only there so a degenerate non-shrinking pass can't spin forever.
+    for _ in range(MAX_REDUCE_PASSES):
+        groups = chunk_by_tokens(tokenizer, "\n".join(summaries), budget)
+        if len(groups) == 1:
+            return generate(model, tokenizer, reduce_prompt.format(text=groups[0]))
+        summaries = [generate(model, tokenizer, reduce_prompt.format(text=g)) for g in groups]
+    return generate(model, tokenizer, reduce_prompt.format(text=summaries[0]))
 
 
 def _demo():
@@ -163,6 +183,12 @@ def _demo():
     assert trim_to_sentence("  no ending here  ") == "no ending here"
     assert prompts_for("case")[1] is CASE_REDUCE_PROMPT
     assert prompts_for("judgment")[0] is MAP_PROMPT
+
+    # a long document's section summaries must be reduced in groups that fit the window,
+    # never handed to the model in one lump for the tokenizer to truncate
+    budget = reduce_budget(tok, REDUCE_PROMPT)
+    assert budget < MAX_SEQ_LENGTH - MAX_NEW_TOKENS
+    assert all(len(g.split()) <= budget for g in chunk_by_tokens(tok, "word " * 5000, budget))
     print("demo passed")
 
 
