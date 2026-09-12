@@ -1,6 +1,7 @@
 """Controllers for case documents: list, upload (to Supabase Storage), delete (soft),
-download URL, and fetching an AI-generated summary."""
+download URL, extracting a stored file's text, and fetching an AI-generated summary."""
 
+import io
 import uuid
 
 from fastapi import Depends, File, Form, HTTPException, UploadFile
@@ -10,6 +11,7 @@ from app.middleware.auth import ensure_case_access, get_current_profile, get_sco
 from app.models.documents import DocumentSummary, AiSummary
 
 DOCUMENTS_BUCKET = "documents"
+TEXT_MIME_PREFIX = "text/"
 DOCUMENTS_SELECT = (
     "document_id,file_name,mime_type,upload_date,file_size,case_id,file_path,"
     "document_types(type_name),cases(case_number),users(full_name)"
@@ -115,6 +117,37 @@ def get_document_download_url(document_id: int, download: bool = False, profile:
         # every preview/open/download button routes through here.
         raise HTTPException(status_code=404, detail="This document's file is no longer in storage.")
     return {"url": signed["signedURL"]}
+
+
+def extract_document_text(file_path: str, mime_type: str | None) -> str:
+    """Download a stored document and return its text, for feeding to the summarizer.
+
+    Handles the two kinds that carry a text layer: PDFs (via pypdf) and text/* files. A scanned
+    PDF is all image, so pypdf returns nothing -- the caller reports that rather than summarizing
+    an empty string.
+    ponytail: no OCR, and no Word/image support -- pasting the text still works for those. Add
+    an OCR pass if scanned uploads turn out to be common."""
+    try:
+        content = supabase.storage.from_(DOCUMENTS_BUCKET).download(file_path)
+    except StorageApiError:
+        raise HTTPException(status_code=404, detail="This document's file is no longer in storage.")
+
+    if (mime_type or "").startswith(TEXT_MIME_PREFIX):
+        return content.decode("utf-8", "replace").strip()
+
+    if mime_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail="Text can only be read from PDF and text files. Paste the text to summarize it.",
+        )
+
+    from pypdf import PdfReader  # local import: only the summarize path pays for it
+
+    try:
+        pages = PdfReader(io.BytesIO(content)).pages
+    except Exception:
+        raise HTTPException(status_code=400, detail="This PDF could not be read. Paste the text instead.")
+    return "\n".join(page.extract_text() or "" for page in pages).strip()
 
 
 def get_document_summary(document_id: int, profile: dict = Depends(get_current_profile)):

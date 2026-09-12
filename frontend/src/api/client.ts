@@ -190,7 +190,9 @@ export function getDocumentSummary(documentId: number) {
   return get<AiSummary>(`/documents/${documentId}/summary`)
 }
 
-export function summarizeDocument(documentId: number, text: string) {
+/** Summarizes a document. With no `text`, the backend reads the stored file's own text --
+ * pass text only to override that (a scan, or a file type it can't read). */
+export function summarizeDocument(documentId: number, text = '') {
   return post<{ summary: string }>('/ai/summarize', { text, document_id: documentId })
 }
 

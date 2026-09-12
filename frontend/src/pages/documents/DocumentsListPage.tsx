@@ -159,7 +159,6 @@ export default function DocumentsListPage() {
   // accepted for now; upgrade path is fine-tuning on this app's own document
   // types or a larger base model.
   async function generateSummary(id: number) {
-    if (!genText.trim()) { setGenError('Paste the document text to summarize.'); return }
     setGenerating(true)
     setGenError('')
     try {
@@ -385,11 +384,11 @@ export default function DocumentsListPage() {
                         )}
                         {!summaryLoading && !summary && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            <div style={{ color: MUTED }}>{summaryError || 'No AI summary yet.'}</div>
+                            <div style={{ color: MUTED }}>{summaryError || "No AI summary yet -- generate one from the stored file's text."}</div>
                             <textarea
                               value={genText}
                               onChange={(e) => setGenText(e.target.value)}
-                              placeholder="Paste the document text to generate an AI summary…"
+                              placeholder="Optional: paste the text instead (for scans, or file types with no text layer)…"
                               rows={3}
                               style={{ padding: '8px 10px', borderRadius: 3, border: '1.5px solid #CFC6B0', fontSize: 12.5, fontFamily: 'inherit', resize: 'vertical' }}
                             />
