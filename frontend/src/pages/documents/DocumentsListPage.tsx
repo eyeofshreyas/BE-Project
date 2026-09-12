@@ -18,6 +18,18 @@ const PRIMARY = '#23306B'
 // the languages /ai/translate maps to FLORES codes; it also accepts a raw code
 const LANGUAGES = ['Hindi', 'Marathi', 'Tamil', 'Telugu', 'Bengali', 'Gujarati']
 
+// esign_status values that mean "nobody signed it" -- the Sign action reopens as "Resend"
+// for these instead of staying hidden, same as a document that was never sent.
+const ESIGN_RESENDABLE = new Set(['REJECTED', 'EXPIRED'])
+const ESIGN_PILL: Record<string, { label: string; color: string; background: string }> = {
+  COMPLETED: { label: 'Signed', color: '#4A6B4E', background: '#E4EDE5' },
+  REJECTED: { label: 'Signature rejected', color: '#B3282D', background: '#F6E3E1' },
+  EXPIRED: { label: 'Signature invite expired', color: '#B3282D', background: '#F6E3E1' },
+}
+function esignPill(status: string) {
+  return ESIGN_PILL[status] ?? { label: 'Awaiting signature', color: '#8A6A2F', background: '#F3EBD9' }
+}
+
 function formatDate(iso: string) {
   return formatDateWith(iso, { month: 'short', day: 'numeric' })
 }
@@ -399,15 +411,8 @@ export default function DocumentsListPage() {
                             {d.has_summary ? 'Completed' : 'Processing'}
                           </span>
                           {d.esign_status && (
-                            <span
-                              className={shellStyles.pill}
-                              style={
-                                d.esign_status === 'COMPLETED' ? { color: '#4A6B4E', background: '#E4EDE5', flexShrink: 0 }
-                                : d.esign_status === 'REJECTED' ? { color: '#B3282D', background: '#F6E3E1', flexShrink: 0 }
-                                : { color: '#8A6A2F', background: '#F3EBD9', flexShrink: 0 }
-                              }
-                            >
-                              {d.esign_status === 'COMPLETED' ? 'Signed' : d.esign_status === 'REJECTED' ? 'Signature rejected' : 'Awaiting signature'}
+                            <span className={shellStyles.pill} style={{ color: esignPill(d.esign_status).color, background: esignPill(d.esign_status).background, flexShrink: 0 }}>
+                              {esignPill(d.esign_status).label}
                             </span>
                           )}
                         </div>
@@ -421,9 +426,9 @@ export default function DocumentsListPage() {
                       <div onClick={() => toggleTranslate(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: translateId === d.id ? '#E6E0CE' : '#FCFAF4' }} title="Translate the summary">
                         <Icon name="globe" size={13} color="#575145" /> Translate
                       </div>
-                      {d.mime_type === 'application/pdf' && (!d.esign_status || d.esign_status === 'REJECTED') && (
-                        <div onClick={() => toggleSign(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: signId === d.id ? '#E6E0CE' : '#FCFAF4' }} title={d.esign_status === 'REJECTED' ? 'Resend for e-signature' : 'Send for e-signature'}>
-                          <Icon name="edit" size={13} color="#575145" /> {d.esign_status === 'REJECTED' ? 'Resend' : 'Sign'}
+                      {d.mime_type === 'application/pdf' && (!d.esign_status || ESIGN_RESENDABLE.has(d.esign_status)) && (
+                        <div onClick={() => toggleSign(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: signId === d.id ? '#E6E0CE' : '#FCFAF4' }} title={d.esign_status ? 'Resend for e-signature' : 'Send for e-signature'}>
+                          <Icon name="edit" size={13} color="#575145" /> {d.esign_status ? 'Resend' : 'Sign'}
                         </div>
                       )}
                     </div>

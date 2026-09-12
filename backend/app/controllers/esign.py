@@ -89,11 +89,13 @@ def handle_esign_webhook(payload: dict):
     the request is genuine instead. On a completed document, downloads the signed PDF back
     into LexFlow's own storage immediately, since Leegality's CDN link expires in 15 seconds.
 
-    A rejection's `documentStatus` is still "Sent" -- identical to "nobody's acted yet" --
-    so REJECTED has to come from `request.action` instead, or a rejected document would
-    read as merely pending forever with no way to resend it. This same handler receives both
-    Leegality's "Webhook URL" (success) and "Error Webhook URL" (rejection/failure) events --
-    both need pointing at this endpoint in the Leegality dashboard Workflow, see SETUP.md.
+    Both a rejection and an expiry leave `documentStatus` as "Sent" -- identical to "nobody's
+    acted yet" -- so the real terminal state has to come from the `request` object instead,
+    or either would read as merely pending forever with no way to resend it: a rejection has
+    `request.action == "Rejected"`, an expiry has `request.expired == true` with `action`
+    left `null`. This same handler receives both Leegality's "Webhook URL" (success) and
+    "Error Webhook URL" (rejection/expiry/failure) events -- both need pointing at this
+    endpoint in the Leegality dashboard Workflow, see SETUP.md.
 
     ponytail: no timeline event here -- there's no LexFlow user to attribute it to, and
     `esign_status` is already queryable on the document itself.
@@ -107,9 +109,11 @@ def handle_esign_webhook(payload: dict):
         return {"message": "ignored"}
     doc = rows[0]
 
-    action = str((payload.get("request") or {}).get("action", "")).upper()
-    if action == "REJECTED":
+    invitee = payload.get("request") or {}
+    if str(invitee.get("action", "")).upper() == "REJECTED":
         status = "REJECTED"
+    elif invitee.get("expired") is True:
+        status = "EXPIRED"
     else:
         status = str(payload.get("documentStatus", "SENT")).upper()
     update: dict = {"esign_status": status}

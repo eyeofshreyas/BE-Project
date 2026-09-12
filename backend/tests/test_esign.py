@@ -253,6 +253,67 @@ def test_webhook_marks_rejected_distinctly_from_pending():
         assert writes[0]["esign_status"] == "REJECTED"
 
 
+def test_webhook_marks_expired_distinctly_from_pending():
+    """Verifies an expired invite sets esign_status to EXPIRED, not the raw documentStatus
+    value -- Leegality leaves documentStatus as "Sent" on expiry too, and unlike a rejection
+    leaves request.action null, so the signal is request.expired == true. Payload shape is
+    Leegality's real documented example for this event. Exercises: `POST /webhooks/leegality`
+    (`esign.handle_esign_webhook()`)."""
+    salt = "shh"
+    document_id = "LEG456"
+    mac = hmac.new(salt.encode(), document_id.encode(), hashlib.sha1).hexdigest()
+
+    writes = []
+    fake = MagicMock()
+
+    def table(name):
+        m = MagicMock()
+        if name == "documents":
+            m.select.return_value.eq.return_value.execute.return_value.data = [
+                {"document_id": 2, "case_id": 10, "file_name": "Deed.pdf"}
+            ]
+
+            def update(payload):
+                writes.append(payload)
+                return MagicMock(eq=MagicMock(return_value=MagicMock(execute=MagicMock())))
+            m.update.side_effect = update
+        return m
+
+    fake.table.side_effect = table
+
+    # Leegality's own documented example payload for "Document Expired".
+    payload = {
+        "webhookType": "Error",
+        "documentId": document_id,
+        "documentStatus": "Sent",
+        "irn": None,
+        "mac": mac,
+        "messages": [],
+        "verification": None,
+        "request": {
+            "inviteeType": "Signer",
+            "name": "Abhishek 2nd User",
+            "email": "abhishek@example.com",
+            "phone": None,
+            "invitationUrl": "https://sandbox.leegality.com/sign/uuid-here",
+            "active": True,
+            "action": None,
+            "error": "Transaction timed out.",
+            "expired": True,
+            "expiryDate": None,
+            "rejectionMessage": None,
+            "signType": None,
+        },
+    }
+
+    with patch("app.controllers.esign.supabase", fake), \
+         patch("app.controllers.esign.LEEGALITY_PRIVATE_SALT", salt):
+        result = handle_esign_webhook(payload)
+
+        assert result == {"message": "ok"}
+        assert writes[0]["esign_status"] == "EXPIRED"
+
+
 if __name__ == "__main__":
     test_request_signature_rejects_out_of_scope_case()
     test_request_signature_rejects_non_pdf()
@@ -260,4 +321,5 @@ if __name__ == "__main__":
     test_webhook_rejects_bad_mac()
     test_webhook_downloads_signed_file_on_completion()
     test_webhook_marks_rejected_distinctly_from_pending()
+    test_webhook_marks_expired_distinctly_from_pending()
     print("ok")
