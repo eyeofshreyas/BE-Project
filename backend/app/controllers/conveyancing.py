@@ -6,7 +6,7 @@ from datetime import date, datetime, timezone
 
 from fastapi import Depends, File, HTTPException, UploadFile
 from app.db.supabase_client import supabase
-from app.controllers.documents import DOCUMENTS_BUCKET
+from app.controllers.documents import DOCUMENTS_BUCKET, read_upload
 from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.conveyancing import Stats, StatusCount, MatterSummary, ConveyancingSummary, Property, DueDiligence, DueDiligenceUpdate, ProgressStage, PropertyRegistration, MatterDocument, MatterDetail, MatterCreate, MatterUpdate
 
@@ -328,7 +328,7 @@ def upload_matter_document(
     _ensure_matter_access(matter_id, profile)
     case_id = supabase.table("conveyancing_matters").select("case_id").eq("matter_id", matter_id).execute().data[0]["case_id"]
 
-    content = file.file.read()
+    content = read_upload(file)
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     storage_path = f"case-{case_id}/{uuid.uuid4().hex}.{ext}"
     supabase.storage.from_(DOCUMENTS_BUCKET).upload(

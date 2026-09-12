@@ -8,7 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument, updateDueDiligence, completeProgressStage } from '../../api/client'
 import type { MatterDetail, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
-import { isPreviewable } from '../../utils/files'
+import { isPreviewable, uploadRejection } from '../../utils/files'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from './ConveyancingDashboardPage.module.css'
 
@@ -80,6 +80,8 @@ export default function MatterDetailPage() {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
+    const rejection = uploadRejection(file)
+    if (rejection) { setUploadError(rejection); return }
     setUploading(true)
     setUploadError('')
     try {

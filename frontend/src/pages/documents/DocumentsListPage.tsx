@@ -8,7 +8,7 @@ import {
 } from '../../api/client'
 import type { DocumentSummary, AiSummary, CaseSummary, DocumentTypeOption } from '../../types/api'
 import { Icon } from '../../components/icons'
-import { isPreviewable, formatSize } from '../../utils/files'
+import { isPreviewable, formatSize, uploadRejection } from '../../utils/files'
 import { formatDate as formatDateWith } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import shellStyles from '../../components/AppShell.module.css'
@@ -215,6 +215,8 @@ export default function DocumentsListPage() {
 
   function pickFile(file: File | undefined | null) {
     if (!file) return
+    const rejection = uploadRejection(file)
+    if (rejection) { setUploadError(rejection); setPendingFile(null); return }
     setUploadError('')
     setPendingFile(file)
     setPickCaseId(cases.length === 1 ? String(cases[0].case_id) : '')

@@ -12,6 +12,8 @@ from app.models.documents import DocumentSummary, AiSummary
 
 DOCUMENTS_BUCKET = "documents"
 TEXT_MIME_PREFIX = "text/"
+# Same ceiling message attachments use (see messages.MAX_ATTACHMENT_BYTES).
+MAX_DOCUMENT_BYTES = 25 * 1024 * 1024
 DOCUMENTS_SELECT = (
     "document_id,file_name,mime_type,upload_date,file_size,case_id,file_path,"
     "document_types(type_name),cases(case_number),users(full_name)"
@@ -65,6 +67,22 @@ def delete_document(document_id: int, profile: dict = Depends(get_current_profil
     return {"message": "Document deleted"}
 
 
+def read_upload(file: UploadFile) -> bytes:
+    """Read an upload into memory, refusing an empty file or one over MAX_DOCUMENT_BYTES.
+
+    Reads one byte past the cap rather than the whole file, so an oversized upload never
+    gets fully buffered in the API process. Starlette has already spooled the request body
+    by the time a handler runs, so this bounds memory and stops the storage write -- it
+    does not stop the bytes arriving. A Content-Length check in middleware would, if
+    someone uploading 2 GB of video becomes a real problem."""
+    content = file.file.read(MAX_DOCUMENT_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="That file is empty")
+    if len(content) > MAX_DOCUMENT_BYTES:
+        raise HTTPException(status_code=400, detail="Documents are limited to 25 MB")
+    return content
+
+
 def upload_document(
     case_id: int,
     document_type_id: int = Form(...),
@@ -76,7 +94,7 @@ def upload_document(
     the multipart body. Calls: `ensure_case_access()`, `_to_document_summary()`."""
     ensure_case_access(case_id, profile)
 
-    content = file.file.read()
+    content = read_upload(file)
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     storage_path = f"case-{case_id}/{uuid.uuid4().hex}.{ext}"
     supabase.storage.from_(DOCUMENTS_BUCKET).upload(

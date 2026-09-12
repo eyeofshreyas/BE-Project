@@ -14,7 +14,7 @@ import type {
   DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
-import { isPreviewable } from '../../utils/files'
+import { isPreviewable, uploadRejection } from '../../utils/files'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import cd from './cases.module.css'
@@ -481,6 +481,8 @@ export default function CaseDetailPage() {
 
   async function submitUpload() {
     if (!uploadFile || !uploadTypeId) return
+    const rejection = uploadRejection(uploadFile)
+    if (rejection) { showToast(rejection); return }
     setUploading(true)
     try {
       const created = await uploadDocument(numericCaseId, uploadFile, Number(uploadTypeId))
