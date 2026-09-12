@@ -31,8 +31,17 @@ cp .env.example .env      # then fill in SUPABASE_URL and SUPABASE_KEY
 
 `SUPABASE_URL` / `SUPABASE_KEY` are required — the server refuses to start
 without them. Get them from the Supabase project dashboard (Settings → API; use
-the **service role** key). SMTP and Razorpay vars are optional; invite emails
-are logged instead of sent and "Pay Now" returns 500 until they're set.
+the **service role** key). SMTP, Razorpay, and eCourts vars are optional;
+invite emails are logged instead of sent, "Pay Now" returns 500 until Razorpay
+is set, and "Sync with eCourts" returns 500 until `ECOURTS_API_KEY` is set.
+
+OCR on scanned PDFs/images (used by `/ai/summarize` and `/ai/translate` via
+`extract_document_text()`) needs the `tesseract-ocr` and `poppler-utils`
+system packages — `sudo apt install tesseract-ocr poppler-utils` on Debian/
+Ubuntu (see your OS's package manager otherwise). It's part of the main
+backend venv, not a separate one like the AI models below. Without it, a
+scanned document 500s with "OCR is not configured on this server" instead of
+being read.
 
 If this is a fresh Supabase project, run `backend/seed.sql` and the
 `backend/migrate_*.sql` files in the Supabase SQL editor, then

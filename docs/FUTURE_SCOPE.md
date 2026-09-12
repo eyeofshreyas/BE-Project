@@ -50,10 +50,20 @@ Not started. Ordered by the priority set in the market brief.
 | # | Feature | Why it's next | Notes |
 |---|---|---|---|
 | 1 | ~~eCourts / CNR sync~~ | Done (§1) | Manual sync only — see follow-ups above |
-| 2 | Document OCR | Extends the existing summarize/similar-case/translate pipeline (`app/ml/`) to scanned FIRs, chargesheets, and orders — same subprocess-per-venv pattern, not a new pipeline | The natural next AI feature; every India-market competitor researched has this |
+| 2 | ~~Document OCR~~ | Done (§1.1 below) | Scanned PDFs and image uploads now feed the existing summarize/translate pipeline |
 | 3 | E-signatures | Table stakes across every competitor researched (Clio, MyCase, PracticePanther, JuniorLawyer); conveyancing work depends on it directly | Needs a vendor decision (e.g. Leegality, DocuSign) — not researched yet |
-| 4 | Conflict-of-interest check | Ethics-adjacent, expected by bar associations | Lower urgency than 2–3 |
-| 5 | Basic trust accounting / reconciliation | Table stakes at every competitor; MyCase's automated 3-way reconciliation is the bar | Lower urgency than 2–3 |
+| 4 | Conflict-of-interest check | Ethics-adjacent, expected by bar associations | Lower urgency than 3 |
+| 5 | Basic trust accounting / reconciliation | Table stakes at every competitor; MyCase's automated 3-way reconciliation is the bar | Lower urgency than 3 |
+
+### Document OCR — how it landed
+
+Turned out not to need the subprocess-per-venv treatment guessed at above: Tesseract via
+`pytesseract` is a thin wrapper around a system binary, not a torch/GPU model, so it lives
+directly in `extract_document_text()` (`app/controllers/documents.py`) next to the
+existing pypdf path — same pattern pypdf already used, no new venv. A PDF with no text
+layer (a scan) now renders each page via `pdf2image` and OCRs it; `image/*` uploads OCR
+directly. Requires the `tesseract-ocr` and `poppler-utils` system packages (see
+`SETUP.md`) — missing either degrades to a clear 500, not a crash.
 
 ---
 
