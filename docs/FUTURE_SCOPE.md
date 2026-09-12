@@ -99,10 +99,14 @@ to keep serving it.
   whatever's configured on the Workflow itself in the Leegality dashboard. Fine for a
   single deployment; would need setting explicitly if LexFlow ever runs multiple
   environments against one Leegality account.
-- **Rejection/expiry events aren't distinguished from a normal in-progress signature** — the
-  webhook handler stores whatever `documentStatus` string Leegality sends as-is, but
-  doesn't yet surface "signer rejected" or "invite expired" differently in the UI from
-  "still pending."
+- **~~Rejection events weren't distinguished from a normal in-progress signature~~ — fixed.**
+  Leegality's own rejection payload leaves `documentStatus` as `"Sent"`, identical to a
+  document nobody's acted on yet — the real signal is `request.action == "Rejected"`. The
+  webhook handler now checks that first, sets `esign_status = "REJECTED"` distinctly, and
+  the Documents page shows a red "Signature rejected" pill plus a "Resend" action instead
+  of the document looking stuck pending forever. Still open: **expiry** isn't handled the
+  same way yet — an expired invite likely needs the same `request`-field treatment
+  (`request.expired == true`), not yet confirmed against a live payload.
 
 ---
 

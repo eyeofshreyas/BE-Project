@@ -198,7 +198,8 @@ verify their identity and sign entirely on Leegality's side, not LexFlow's. The 
 they sign, Leegality calls a webhook back with the result — verified via an HMAC signature
 computed from a private key, since it's Leegality calling in, not a logged-in user — and
 LexFlow immediately downloads the completed PDF from Leegality's short-lived link before
-it expires.
+it expires. If they reject instead, a separate webhook event marks the document
+distinctly (not just "still pending") and reopens the Sign action so the lawyer can resend.
 
 **Why it matters:** conveyancing deeds, lease agreements, POAs, and vakalatnamas all need
 signatures, and the manual process (print, sign, scan, re-upload) is slow and easy to lose

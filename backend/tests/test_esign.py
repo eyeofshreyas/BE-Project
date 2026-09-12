@@ -192,10 +192,72 @@ def test_webhook_downloads_signed_file_on_completion():
         assert writes[0]["esign_signed_file_path"] == "case-10/signed-LEG123.pdf"
 
 
+def test_webhook_marks_rejected_distinctly_from_pending():
+    """Verifies a rejection sets esign_status to REJECTED, not the raw documentStatus value --
+    Leegality's own payload leaves documentStatus as "Sent" on a rejection, identical to a
+    document nobody's acted on yet, so the signal has to come from request.action instead.
+    Payload shape is Leegality's real documented example for this event. Exercises:
+    `POST /webhooks/leegality` (`esign.handle_esign_webhook()`)."""
+    salt = "shh"
+    document_id = "LEG123"
+    mac = hmac.new(salt.encode(), document_id.encode(), hashlib.sha1).hexdigest()
+
+    writes = []
+    fake = MagicMock()
+
+    def table(name):
+        m = MagicMock()
+        if name == "documents":
+            m.select.return_value.eq.return_value.execute.return_value.data = [
+                {"document_id": 1, "case_id": 10, "file_name": "Deed.pdf"}
+            ]
+
+            def update(payload):
+                writes.append(payload)
+                return MagicMock(eq=MagicMock(return_value=MagicMock(execute=MagicMock())))
+            m.update.side_effect = update
+        return m
+
+    fake.table.side_effect = table
+
+    # Leegality's own documented example payload for "Signer Rejected".
+    payload = {
+        "webhookType": "Error",
+        "documentId": document_id,
+        "documentStatus": "Sent",
+        "irn": None,
+        "mac": mac,
+        "messages": [],
+        "verification": None,
+        "request": {
+            "inviteeType": "Signer",
+            "name": "Abhishek Sharma",
+            "email": "abhishek@example.com",
+            "phone": None,
+            "invitationUrl": "https://sandbox.leegality.com/sign/uuid-here",
+            "active": True,
+            "action": "Rejected",
+            "error": "Invitation rejected by the signer.",
+            "expired": False,
+            "expiryDate": "03-04-2026 23:59:59",
+            "rejectionMessage": None,
+            "signType": None,
+        },
+    }
+
+    with patch("app.controllers.esign.supabase", fake), \
+         patch("app.controllers.esign.LEEGALITY_PRIVATE_SALT", salt):
+        result = handle_esign_webhook(payload)
+
+        assert result == {"message": "ok"}
+        assert writes[0]["esign_status"] == "REJECTED"
+
+
 if __name__ == "__main__":
     test_request_signature_rejects_out_of_scope_case()
     test_request_signature_rejects_non_pdf()
     test_request_signature_writes_status_and_timeline_event()
     test_webhook_rejects_bad_mac()
     test_webhook_downloads_signed_file_on_completion()
+    test_webhook_marks_rejected_distinctly_from_pending()
     print("ok")

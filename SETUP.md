@@ -40,7 +40,10 @@ Leegality vars are set (see `.env.example` for how to get them).
 Leegality also needs your production webhook URL (`https://<your-domain>/webhooks/leegality`)
 configured on the Workflow itself in the Leegality dashboard, so it knows
 where to POST signing events back to — a purely local backend can't receive
-these without a tunnel (ngrok or similar) during development.
+these without a tunnel (ngrok or similar) during development. Set it on
+**both** the invitee's **Webhook URL** (success events) and **Error Webhook
+URL** (rejections/failures) — they're separate fields, and a rejection only
+reaches LexFlow if the second one is filled in too.
 
 OCR on scanned PDFs/images (used by `/ai/summarize` and `/ai/translate` via
 `extract_document_text()`) needs the `tesseract-ocr` and `poppler-utils`

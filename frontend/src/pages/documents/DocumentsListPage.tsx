@@ -399,8 +399,15 @@ export default function DocumentsListPage() {
                             {d.has_summary ? 'Completed' : 'Processing'}
                           </span>
                           {d.esign_status && (
-                            <span className={shellStyles.pill} style={d.esign_status === 'COMPLETED' ? { color: '#4A6B4E', background: '#E4EDE5', flexShrink: 0 } : { color: '#8A6A2F', background: '#F3EBD9', flexShrink: 0 }}>
-                              {d.esign_status === 'COMPLETED' ? 'Signed' : 'Awaiting signature'}
+                            <span
+                              className={shellStyles.pill}
+                              style={
+                                d.esign_status === 'COMPLETED' ? { color: '#4A6B4E', background: '#E4EDE5', flexShrink: 0 }
+                                : d.esign_status === 'REJECTED' ? { color: '#B3282D', background: '#F6E3E1', flexShrink: 0 }
+                                : { color: '#8A6A2F', background: '#F3EBD9', flexShrink: 0 }
+                              }
+                            >
+                              {d.esign_status === 'COMPLETED' ? 'Signed' : d.esign_status === 'REJECTED' ? 'Signature rejected' : 'Awaiting signature'}
                             </span>
                           )}
                         </div>
@@ -414,9 +421,9 @@ export default function DocumentsListPage() {
                       <div onClick={() => toggleTranslate(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: translateId === d.id ? '#E6E0CE' : '#FCFAF4' }} title="Translate the summary">
                         <Icon name="globe" size={13} color="#575145" /> Translate
                       </div>
-                      {d.mime_type === 'application/pdf' && !d.esign_status && (
-                        <div onClick={() => toggleSign(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: signId === d.id ? '#E6E0CE' : '#FCFAF4' }} title="Send for e-signature">
-                          <Icon name="edit" size={13} color="#575145" /> Sign
+                      {d.mime_type === 'application/pdf' && (!d.esign_status || d.esign_status === 'REJECTED') && (
+                        <div onClick={() => toggleSign(d.id)} className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12, background: signId === d.id ? '#E6E0CE' : '#FCFAF4' }} title={d.esign_status === 'REJECTED' ? 'Resend for e-signature' : 'Send for e-signature'}>
+                          <Icon name="edit" size={13} color="#575145" /> {d.esign_status === 'REJECTED' ? 'Resend' : 'Sign'}
                         </div>
                       )}
                     </div>
