@@ -159,8 +159,14 @@ export default function DocumentsListPage() {
   function toggleSign(id: number) {
     if (signId === id) { setSignId(null); return }
     setSignId(id)
-    setSignerName('')
-    setSignerEmail('')
+    // Pre-fill from the document's own case client -- this page lists documents across every
+    // case at once, so leaving these blank risked a lawyer typing the wrong signer's email on
+    // a list spanning many clients. Still editable, for a signer who isn't the case's client
+    // (a builder, opposing counsel, etc.).
+    const doc = documents.find((x) => x.id === id)
+    const matchedCase = doc?.case_number ? cases.find((c) => c.id === doc.case_number) : undefined
+    setSignerName(matchedCase?.client ?? '')
+    setSignerEmail(matchedCase?.client_email ?? '')
     setSignError('')
   }
 
