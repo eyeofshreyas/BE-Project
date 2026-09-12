@@ -199,7 +199,7 @@ export default function AdminConsolePage() {
           {activePage === 'cases' && <CasesView />}
           {activePage === 'documents' && <DocumentsView />}
           {activePage === 'notifications' && <NotificationsView notifications={notifications} selectedId={openNotifId} onOpen={openNotification} onClose={() => setOpenNotifId(null)} />}
-          {activePage === 'reports' && <ReportsView onGenerate={showToast} />}
+          {activePage === 'reports' && <ReportsView onToast={showToast} />}
           {activePage === 'analytics' && <AnalyticsView />}
           {activePage === 'settings' && <SettingsView profile={profile} onSave={showToast} onProfileChange={saveProfile} />}
         </div>

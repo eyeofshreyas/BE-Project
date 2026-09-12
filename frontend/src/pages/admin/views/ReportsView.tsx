@@ -1,8 +1,8 @@
 /** Admin console "Reports" tab: report-library list with search/category/date/type/status
- * filters, CSV/PDF export, on-demand report generation, and a per-report printable view.
- * No backend -- this tab has no report dataset of its own, so "generating" a report just
- * adds a row to local state and PDF export is a print-dialog window, same trick as
- * `BillingPage`'s `downloadInvoice`. */
+ * filters, CSV export, and on-demand report generation. No backend -- this tab has no report
+ * dataset of its own, so "generating" a report just adds a row to local state.
+ * PDF export/preview (Export PDF, View Report) is future scope -- ponytail: stubbed as a
+ * toast for now, wire up real PDF generation later. */
 import { useMemo, useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
@@ -38,38 +38,14 @@ function inDateRange(d: Date, range: string, now: Date) {
   return d.getFullYear() === now.getFullYear()
 }
 
-/** Opens a print-ready tab (save-as-PDF via the browser dialog) listing the given reports. */
-function printReports(title: string, rows: Report[]) {
-  const win = window.open('', '_blank')
-  if (!win) return
-  win.document.write(`<!doctype html><html><head><title>${title}</title>
-    <style>
-      body{font-family:'Spectral',serif;color:#1A1A17;padding:48px;max-width:720px;margin:0 auto}
-      .muted{color:#6E6759;font-size:12.5px}
-      table{width:100%;border-collapse:collapse;margin-top:24px}
-      th,td{padding:8px 10px;font-size:13px;border-top:1px solid #CFC6B0;text-align:left}
-    </style></head>
-    <body>
-      <div style="font-size:20px;font-weight:700">LexFlow</div>
-      <div class="muted" style="margin-top:4px">${title} &middot; Exported ${formatDate(new Date().toISOString())}</div>
-      <table>
-        <tr><th>Report</th><th>Category</th><th>Type</th><th>Status</th><th>Last Generated</th></tr>
-        ${rows.map((r) => `<tr><td>${r.label}<div class="muted">${r.desc}</div></td><td>${r.category}</td><td>${r.type}</td><td>${r.status}</td><td>${formatDate(r.generated.toISOString())}</td></tr>`).join('')}
-      </table>
-    </body></html>`)
-  win.document.close()
-  win.focus()
-  win.print()
-}
-
 const FILTER_LABEL = { fontSize: 9.5, fontWeight: 700, color: '#6E6759', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase' as const, letterSpacing: '.12em', marginBottom: 6 }
 const SELECT_STYLE = { background: '#F6F2E9', border: `1.5px solid ${C.border}`, borderRadius: 3, padding: '9px 12px', fontSize: 13, color: C.text, fontFamily: "'Public Sans',sans-serif", outline: 'none' }
 const BTN_GHOST = { fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 3, cursor: 'pointer', background: '#FCFAF4', color: C.text, border: `1px solid ${C.border}` }
 const BTN_PRIMARY = { fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 3, cursor: 'pointer', background: C.primary, color: '#FCFAF4', boxShadow: '0 4px 12px rgba(35, 48, 107,.28)' }
 
-/** `onGenerate`, if given, gets a short message to toast (e.g. "Report generated.") -- optional
- * because standalone renders of this view (tests, storybook-ish use) shouldn't need a toast host. */
-export default function ReportsView({ onGenerate }: { onGenerate?: (msg: string) => void } = {}) {
+/** `onToast`, if given, gets a short message to surface to the admin -- optional because
+ * standalone renders of this view (tests, storybook-ish use) shouldn't need a toast host. */
+export default function ReportsView({ onToast }: { onToast?: (msg: string) => void } = {}) {
   const [reports, setReports] = useState<Report[]>(seedReports)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All Reports')
@@ -109,7 +85,7 @@ export default function ReportsView({ onGenerate }: { onGenerate?: (msg: string)
       generated: new Date(),
     }
     setReports((prev) => [report, ...prev])
-    onGenerate?.('Report generated.')
+    onToast?.('Report generated.')
   }
 
   return (
@@ -127,7 +103,8 @@ export default function ReportsView({ onGenerate }: { onGenerate?: (msg: string)
             </div>
             {exportOpen && (
               <div style={{ position: 'absolute', top: '110%', right: 0, background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, boxShadow: '0 8px 24px rgba(35,48,107,.15)', zIndex: 10, minWidth: 150 }}>
-                <div style={{ padding: '10px 14px', fontSize: 13, color: '#33302A', cursor: 'pointer' }} onClick={() => { setExportOpen(false); printReports('Report Library', visible) }}>Export PDF</div>
+                {/* ponytail: PDF export is future scope, stubbed as a toast until real generation is wired up */}
+                <div style={{ padding: '10px 14px', fontSize: 13, color: '#33302A', cursor: 'pointer' }} onClick={() => { setExportOpen(false); onToast?.('PDF export is coming soon.') }}>Export PDF</div>
                 <div style={{ padding: '10px 14px', fontSize: 13, color: '#33302A', cursor: 'pointer' }} onClick={() => { setExportOpen(false); downloadCsv('lexflow-reports', ['Report', 'Description', 'Category', 'Type', 'Status', 'Last Generated'], visible.map((r) => [r.label, r.desc, r.category, r.type, r.status, formatDate(r.generated.toISOString())])) }}>Export Excel</div>
               </div>
             )}
@@ -212,7 +189,8 @@ export default function ReportsView({ onGenerate }: { onGenerate?: (msg: string)
               </div>
               <span className={styles.pill} style={pillStyle(r.status === 'Ready' ? C.success : C.warning)}>{r.status}</span>
               <div style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }}>Last generated: {formatDate(r.generated.toISOString())}</div>
-              <div style={{ ...BTN_GHOST, display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }} onClick={() => printReports(r.label, [r])}>
+              {/* ponytail: per-report PDF preview is future scope, stubbed as a toast until real generation is wired up */}
+              <div style={{ ...BTN_GHOST, display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }} onClick={() => onToast?.(`Preview for "${r.label}" is coming soon.`)}>
                 <Icon name="file-text" size={14} color={C.primaryDark} /><span>View Report</span>
               </div>
             </div>
