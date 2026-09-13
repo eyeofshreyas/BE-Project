@@ -12,10 +12,17 @@ class UserSummary(BaseModel):
     role: str | None
     is_active: bool
     created_at: str
+    suspended: bool = False
 
 
 class StatusUpdate(BaseModel):
     """Request body for activating/deactivating a user."""
+    is_active: bool
+
+
+class ClientFirmStatusUpdate(BaseModel):
+    """Request body for suspending/reactivating a client's relationship with the caller's
+    own firm -- distinct from StatusUpdate, which flips a user's global account status."""
     is_active: bool
 
 

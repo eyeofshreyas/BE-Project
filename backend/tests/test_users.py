@@ -2,15 +2,16 @@
 # refusals in front of it (your own account, the last admin) are the only thing standing
 # between a mis-click and an unadministrable platform.
 """Tests for the admin user-delete guardrails and its storage cleanup."""
+import inspect
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
 from storage3.exceptions import StorageApiError
 
-from app.controllers.users import delete_user, list_users, set_user_status
+from app.controllers.users import delete_user, list_users, set_client_firm_status, set_user_status
 from app.middleware import auth
-from app.models.users import StatusUpdate
+from app.models.users import ClientFirmStatusUpdate, StatusUpdate
 
 ADMIN_PROFILE = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
 
@@ -73,7 +74,9 @@ def test_org_admin_sees_clients_with_a_case_in_their_org():
         elif name == "cases":
             m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 3}]
         elif name == "clients":
-            m.select.return_value.in_.return_value.execute.return_value.data = [{"user_id": 9}]
+            m.select.return_value.in_.return_value.execute.return_value.data = [{"user_id": 9, "client_id": 3}]
+        elif name == "org_clients":
+            m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
         tables[name] = m
         return m
 
@@ -82,6 +85,7 @@ def test_org_admin_sees_clients_with_a_case_in_their_org():
         result = list_users(profile=ORG_ADMIN_PROFILE)
     assert [r["id"] for r in result] == [9]
     assert result[0]["role"] == "Client"
+    assert result[0]["suspended"] is False
 
 
 def test_org_admin_cannot_change_status_of_user_in_another_org():
@@ -149,3 +153,89 @@ def test_storage_failure_does_not_undo_the_delete():
     fake.storage.from_.return_value.remove.side_effect = StorageApiError("boom", "500", 500)
     with patch("app.controllers.users.supabase", fake):
         assert delete_user(2, ADMIN_PROFILE)["user_id"] == 2
+
+
+def test_set_client_firm_status_rejects_super_admin():
+    """Verifies a super-admin (no org_id to suspend a client from) is refused with 403, the
+    same reasoning admin.invite_lawyer() already uses. Calling the controller directly skips
+    FastAPI's dependency resolution (a plain `profile` arg overrides the `Depends(...)`
+    default), so -- same as test_case_history.py's `_role_gate` helper -- the gate itself is
+    pulled off the signature and exercised directly. Exercises: `PATCH /users/{id}/firm-status`
+    (`users.set_client_firm_status()`)."""
+    role_gate = inspect.signature(set_client_firm_status).parameters["profile"].default.dependency
+    profile = {"role_id": auth.SUPER_ADMIN, "user_id": 1, "org_id": None}
+    try:
+        role_gate(profile)
+        assert False, "expected HTTPException"
+    except HTTPException as e:
+        assert e.status_code == 403
+
+
+def test_set_client_firm_status_upserts_org_clients():
+    """Verifies suspending a client resolves their client_id from the given user_id and
+    upserts (not duplicate-inserts) the org_clients row for the caller's own org, stamping
+    suspended_at. Exercises: `PATCH /users/{id}/firm-status` (`users.set_client_firm_status()`)."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        elif name == "org_clients":
+            m.upsert.return_value.execute.return_value = MagicMock()
+        elif name == "users":
+            m.select.return_value.eq.return_value.execute.return_value.data = [
+                {"user_id": 5, "full_name": "A Client", "email": "c@example.com", "phone": "1",
+                 "is_active": True, "created_at": "2026-01-01", "roles": {"role_name": "Client"}}
+            ]
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    profile = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
+    # Same pattern test_case_numbering.py uses for a datetime.now() call: patch the module's
+    # `datetime` name itself so `.now(timezone.utc).isoformat()` resolves to a fixed string.
+    with patch("app.controllers.users.supabase", fake), patch("app.controllers.users.datetime") as dt:
+        dt.now.return_value.isoformat.return_value = "2026-01-01T00:00:00+00:00"
+        result = set_client_firm_status(5, ClientFirmStatusUpdate(is_active=False), profile)
+    tables["org_clients"].upsert.assert_called_once_with(
+        {"org_id": 7, "client_id": 9, "is_active": False, "suspended_at": "2026-01-01T00:00:00+00:00"},
+        on_conflict="org_id,client_id",
+    )
+    assert result["suspended"] is True
+
+
+def test_set_client_firm_status_reactivate_clears_suspended_at():
+    """Verifies reactivating writes is_active=True and suspended_at=None, without calling
+    datetime.now() at all (only a suspend stamps a timestamp). Exercises:
+    `PATCH /users/{id}/firm-status` (`users.set_client_firm_status()`)."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        elif name == "org_clients":
+            m.upsert.return_value.execute.return_value = MagicMock()
+        elif name == "users":
+            m.select.return_value.eq.return_value.execute.return_value.data = [
+                {"user_id": 5, "full_name": "A Client", "email": "c@example.com", "phone": "1",
+                 "is_active": True, "created_at": "2026-01-01", "roles": {"role_name": "Client"}}
+            ]
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    profile = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
+    with patch("app.controllers.users.supabase", fake):
+        result = set_client_firm_status(5, ClientFirmStatusUpdate(is_active=True), profile)
+    tables["org_clients"].upsert.assert_called_once_with(
+        {"org_id": 7, "client_id": 9, "is_active": True, "suspended_at": None}, on_conflict="org_id,client_id"
+    )
+    assert result["suspended"] is False

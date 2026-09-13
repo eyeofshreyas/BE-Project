@@ -4,21 +4,24 @@ require_roles-only section -- plus the self-service profile edit any signed-in u
 make to their own row."""
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException
 from storage3.exceptions import StorageApiError
 from app.controllers.documents import DOCUMENTS_BUCKET
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, SUPER_ADMIN, get_current_profile, require_roles
-from app.models.users import UserSummary, StatusUpdate, ProfileUpdate
+from app.middleware.auth import ADMIN, CLIENT, SUPER_ADMIN, get_current_profile, require_roles
+from app.models.users import UserSummary, StatusUpdate, ProfileUpdate, ClientFirmStatusUpdate
 
 logger = logging.getLogger(__name__)
 
 USERS_SELECT = "user_id,full_name,email,phone,is_active,created_at,roles(role_name)"
 
 
-def _to_user_summary(row: dict) -> dict:
-    """Shape a raw `users` row (joined with roles) into the UserSummary dict."""
+def _to_user_summary(row: dict, suspended: bool = False) -> dict:
+    """Shape a raw `users` row (joined with roles) into the UserSummary dict. `suspended`
+    reflects this caller's own org_clients row for a client (always False for every other
+    role, and for a super-admin caller, who has no single org to check against)."""
     role = row.get("roles")
     return {
         "id": row["user_id"],
@@ -28,6 +31,7 @@ def _to_user_summary(row: dict) -> dict:
         "role": role["role_name"] if role else None,
         "is_active": row["is_active"],
         "created_at": row["created_at"],
+        "suspended": suspended,
     }
 
 
@@ -39,6 +43,7 @@ def list_users(role: str | None = None, profile: dict = Depends(require_roles(AD
         query = query.eq("org_id", profile["org_id"])
     rows = query.order("created_at", desc=True).execute().data
 
+    suspended_client_ids: set[int] = set()
     if profile["role_id"] == ADMIN:
         # Clients are global (users.org_id is always NULL for them, by design -- see
         # clients.list_clients()), so the org_id filter above excludes every client. Add
@@ -46,17 +51,20 @@ def list_users(role: str | None = None, profile: dict = Depends(require_roles(AD
         case_rows = supabase.table("cases").select("client_id").eq("org_id", profile["org_id"]).execute().data
         client_ids = list({r["client_id"] for r in case_rows if r["client_id"]})
         if client_ids:
-            client_user_rows = supabase.table("clients").select("user_id").in_("client_id", client_ids).execute().data
-            client_user_ids = [r["user_id"] for r in client_user_rows]
+            client_user_rows = supabase.table("clients").select("user_id,client_id").in_("client_id", client_ids).execute().data
+            client_user_ids = {r["client_id"]: r["user_id"] for r in client_user_rows}
             if client_user_ids:
-                rows += supabase.table("users").select(USERS_SELECT).in_("user_id", client_user_ids).execute().data
+                rows += supabase.table("users").select(USERS_SELECT).in_("user_id", list(client_user_ids.values())).execute().data
+            suspended_rows = supabase.table("org_clients").select("client_id").eq("org_id", profile["org_id"]).eq("is_active", False).execute().data
+            suspended_by_client_id = {r["client_id"] for r in suspended_rows}
+            suspended_client_ids = {user_id for client_id, user_id in client_user_ids.items() if client_id in suspended_by_client_id}
         rows.sort(key=lambda r: r["created_at"], reverse=True)
 
     # ponytail: filters in Python post-fetch, fine while the users table is small;
     # switch to a PostgREST embedded filter (roles.role_name=eq.X) if the table grows large.
     if role is not None:
         rows = [r for r in rows if r.get("roles") and r["roles"]["role_name"].lower() == role.lower()]
-    return [_to_user_summary(row) for row in rows]
+    return [_to_user_summary(row, suspended=row["user_id"] in suspended_client_ids) for row in rows]
 
 
 def _assert_same_org_or_404(user_id: int, profile: dict) -> None:
@@ -79,6 +87,27 @@ def set_user_status(user_id: int, data: StatusUpdate, profile: dict = Depends(re
         raise HTTPException(status_code=404, detail="User not found")
     result = supabase.table("users").select(USERS_SELECT).eq("user_id", user_id).execute().data
     return _to_user_summary(result[0])
+
+
+def set_client_firm_status(user_id: int, data: ClientFirmStatusUpdate, profile: dict = Depends(require_roles(ADMIN))):
+    """Suspend or reactivate a client's relationship with the caller's own firm -- writes to
+    org_clients, never to the client's global users.is_active. SUPER_ADMIN is excluded: a
+    platform operator has no org_id to suspend a client *from* (same reasoning as
+    admin.invite_lawyer()). Calls: `_to_user_summary()`."""
+    client_rows = supabase.table("clients").select("client_id").eq("user_id", user_id).execute().data
+    if not client_rows:
+        raise HTTPException(status_code=404, detail="This user isn't a client")
+    client_id = client_rows[0]["client_id"]
+
+    supabase.table("org_clients").upsert({
+        "org_id": profile["org_id"],
+        "client_id": client_id,
+        "is_active": data.is_active,
+        "suspended_at": None if data.is_active else datetime.now(timezone.utc).isoformat(),
+    }, on_conflict="org_id,client_id").execute()
+
+    result = supabase.table("users").select(USERS_SELECT).eq("user_id", user_id).execute().data
+    return _to_user_summary(result[0], suspended=not data.is_active)
 
 
 def update_own_profile(data: ProfileUpdate, profile: dict = Depends(get_current_profile)):
