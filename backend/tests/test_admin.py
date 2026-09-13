@@ -84,14 +84,47 @@ def test_awaiting_summary_never_goes_negative():
     assert result["documents"]["awaiting_summary"] == 0
 
 
-def test_invite_lawyer_creates_pending_invite_for_own_org():
-    """Verifies an org admin's invite is scoped to their own org_id. Exercises: `POST /admin/lawyer-invites` (`admin.invite_lawyer()`)."""
+def _fake_supabase_for_invite(existing_user_rows: list[dict]):
     fake = MagicMock()
-    fake.table.return_value.insert.return_value.execute.return_value = MagicMock()
-    with patch("app.controllers.admin.supabase", fake):
-        result = invite_lawyer(LawyerInviteCreate(email="new@firm.example"), profile={"role_id": auth.ADMIN, "org_id": 7})
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "users":
+            m.select.return_value.eq.return_value.execute.return_value.data = existing_user_rows
+        elif name == "lawyer_invites":
+            m.insert.return_value.execute.return_value = MagicMock()
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    return fake
+
+
+def test_invite_lawyer_creates_pending_invite_for_own_org():
+    """Verifies an org admin's invite is scoped to their own org_id and emails the invitee. Exercises: `POST /admin/lawyer-invites` (`admin.invite_lawyer()`)."""
+    fake = _fake_supabase_for_invite(existing_user_rows=[])
+    with patch("app.controllers.admin.supabase", fake), patch("app.controllers.admin.send_email") as mock_send:
+        result = invite_lawyer(LawyerInviteCreate(email="new@firm.example"), profile={"role_id": auth.ADMIN, "org_id": 7, "full_name": "Test Admin"})
     assert result["message"] == "Invite sent."
-    fake.table.return_value.insert.assert_called_once_with({"org_id": 7, "email": "new@firm.example", "status": "pending"})
+    fake.table("lawyer_invites").insert.assert_called_once_with({"org_id": 7, "email": "new@firm.example", "status": "pending"})
+    mock_send.assert_called_once()
+    assert mock_send.call_args[0][0] == "new@firm.example"
+
+
+def test_invite_lawyer_rejects_an_email_with_an_existing_account():
+    """Verifies inviting an email that already has a `users` row is refused with 409 instead of
+    creating a dead invite. Exercises: `POST /admin/lawyer-invites` (`admin.invite_lawyer()`)."""
+    fake = _fake_supabase_for_invite(existing_user_rows=[{"user_id": 5}])
+    with patch("app.controllers.admin.supabase", fake), patch("app.controllers.admin.send_email") as mock_send:
+        try:
+            invite_lawyer(LawyerInviteCreate(email="already@registered.com"), profile={"role_id": auth.ADMIN, "org_id": 7, "full_name": "Test Admin"})
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 409
+    mock_send.assert_not_called()
 
 
 def test_get_settings_scoped_to_org_admins_own_org():

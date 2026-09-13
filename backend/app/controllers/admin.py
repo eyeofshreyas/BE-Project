@@ -6,7 +6,8 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException
 from postgrest.exceptions import APIError as PostgrestAPIError
-from app.core.config import STORAGE_QUOTA_BYTES
+from app.core.config import FRONTEND_URL, STORAGE_QUOTA_BYTES
+from app.core.email import send_email
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, CLIENT, LAWYER, SUPER_ADMIN, require_roles, get_scoped_case_ids
 from app.models.admin import LawyerInviteCreate, PlatformSettings
@@ -29,14 +30,30 @@ def _count(query) -> int:
 
 
 def invite_lawyer(data: LawyerInviteCreate, profile: dict = Depends(require_roles(ADMIN))):
-    """Create a pending invite for a lawyer to join the caller's organization; consumed by
-    /signup when that email signs up as a lawyer. SUPER_ADMIN is deliberately excluded --
-    that role has no org_id to invite a lawyer into."""
+    """Create a pending invite for a lawyer to join the caller's organization and email them a
+    signup link; consumed by /signup when that email signs up as a lawyer. SUPER_ADMIN is
+    deliberately excluded -- that role has no org_id to invite a lawyer into.
+
+    An email that already has a LexFlow account can't redeem this invite -- signup for an
+    existing email fails outright, and there's no way to move an existing account between
+    orgs -- so that's rejected up front rather than silently creating a dead invite."""
+    existing = supabase.table("users").select("user_id").eq("email", data.email).execute().data
+    if existing:
+        raise HTTPException(status_code=409, detail="This email already has a LexFlow account.")
+
     supabase.table("lawyer_invites").insert({
         "org_id": profile["org_id"],
         "email": data.email,
         "status": "pending",
     }).execute()
+
+    send_email(
+        data.email,
+        f"{profile['full_name']} invited you to join their firm on LexFlow",
+        f"{profile['full_name']} invited you to join their firm on LexFlow as a lawyer.\n\n"
+        f"Go to {FRONTEND_URL}/signup to create your account with this email address.",
+    )
+
     return {"message": "Invite sent."}
 
 
