@@ -8,20 +8,59 @@ import pytest
 from fastapi import HTTPException
 from storage3.exceptions import StorageApiError
 
-from app.controllers.users import delete_user
+from app.controllers.users import delete_user, list_users, set_user_status
 from app.middleware import auth
+from app.models.users import StatusUpdate
 
-ADMIN_PROFILE = {"role_id": auth.ADMIN, "user_id": 1}
+ADMIN_PROFILE = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
 
 
-def _fake_supabase(target_role: int, admin_count: int):
+def _fake_supabase(target_role: int, admin_count: int, target_org_id: int = 7):
     fake = MagicMock()
     m = MagicMock()
-    m.select.return_value.eq.return_value.execute.return_value.data = [{"role_id": target_role}]
-    m.select.return_value.eq.return_value.execute.return_value.count = admin_count
+    m.select.return_value.eq.return_value.execute.return_value.data = [{"role_id": target_role, "org_id": target_org_id}]
+    m.select.return_value.eq.return_value.eq.return_value.execute.return_value.count = admin_count
     fake.table.return_value = m
     fake.rpc.return_value.execute.return_value.data = {"user_id": 2, "storage_paths": ["case-1/a.pdf"]}
     return fake
+
+
+ORG_ADMIN_PROFILE = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
+
+
+def test_org_admin_only_lists_their_own_org_users():
+    """Verifies an org admin's user list is filtered to their own org_id. Exercises: `GET /users` (`users.list_users()`)."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value.data = []
+    with patch("app.controllers.users.supabase", fake):
+        list_users(profile=ORG_ADMIN_PROFILE)
+    fake.table.return_value.select.return_value.eq.assert_called_once_with("org_id", 7)
+
+
+def test_org_admin_cannot_change_status_of_user_in_another_org():
+    """Verifies an org admin gets a 404 (not a 200 or 403) touching a user outside their own org -- they shouldn't even learn the user exists. Exercises: `PATCH /users/{id}/status` (`users.set_user_status()`)."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"org_id": 99}]
+    with patch("app.controllers.users.supabase", fake):
+        try:
+            set_user_status(2, StatusUpdate(is_active=False), profile=ORG_ADMIN_PROFILE)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 404
+
+
+def test_last_admin_check_is_scoped_to_the_admins_own_org():
+    """Verifies deleting the last admin is blocked per-org for an org admin (not counted platform-wide). Exercises: `DELETE /users/:id`."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"role_id": auth.ADMIN, "org_id": 7}]
+    fake.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.count = 1
+    with patch("app.controllers.users.supabase", fake):
+        try:
+            delete_user(2, ORG_ADMIN_PROFILE)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 400
+    fake.table.return_value.select.return_value.eq.return_value.eq.assert_called_once_with("org_id", 7)
 
 
 def test_admin_cannot_delete_their_own_account():

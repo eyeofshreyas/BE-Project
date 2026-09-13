@@ -32,8 +32,12 @@ def _to_user_summary(row: dict) -> dict:
 
 
 def list_users(role: str | None = None, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
-    """List all users, optionally filtered by role name. Calls: `_to_user_summary()`."""
-    rows = supabase.table("users").select(USERS_SELECT).order("created_at", desc=True).execute().data
+    """List users -- platform-wide for the super-admin, scoped to the caller's own org for
+    an org admin -- optionally filtered by role name. Calls: `_to_user_summary()`."""
+    query = supabase.table("users").select(USERS_SELECT)
+    if profile["role_id"] == ADMIN:
+        query = query.eq("org_id", profile["org_id"])
+    rows = query.order("created_at", desc=True).execute().data
     # ponytail: filters in Python post-fetch, fine while the users table is small;
     # switch to a PostgREST embedded filter (roles.role_name=eq.X) if the table grows large.
     if role is not None:
@@ -41,8 +45,21 @@ def list_users(role: str | None = None, profile: dict = Depends(require_roles(AD
     return [_to_user_summary(row) for row in rows]
 
 
+def _assert_same_org_or_404(user_id: int, profile: dict) -> None:
+    """404 (not 403) if this user_id belongs to a different org than an org admin's own --
+    an org admin shouldn't be able to tell whether a user in another org exists. No-op for
+    the super-admin."""
+    if profile["role_id"] != ADMIN:
+        return
+    rows = supabase.table("users").select("org_id").eq("user_id", user_id).execute().data
+    if not rows or rows[0]["org_id"] != profile["org_id"]:
+        raise HTTPException(status_code=404, detail="User not found")
+
+
 def set_user_status(user_id: int, data: StatusUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
-    """Activate/deactivate a user; 404 if not found. Calls: `_to_user_summary()`."""
+    """Activate/deactivate a user; 404 if not found or outside the caller's org. Calls:
+    `_assert_same_org_or_404()`, `_to_user_summary()`."""
+    _assert_same_org_or_404(user_id, profile)
     rows = supabase.table("users").update({"is_active": data.is_active}).eq("user_id", user_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="User not found")
@@ -60,8 +77,10 @@ def update_own_profile(data: ProfileUpdate, profile: dict = Depends(get_current_
 
 
 def update_user(user_id: int, data: ProfileUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
-    """Admin edit of another user's name/phone; 404 if not found. Email stays out of reach
-    for the same reason as in `update_own_profile()`. Calls: `_to_user_summary()`."""
+    """Admin edit of another user's name/phone; 404 if not found or outside the caller's org.
+    Email stays out of reach for the same reason as in `update_own_profile()`. Calls:
+    `_assert_same_org_or_404()`, `_to_user_summary()`."""
+    _assert_same_org_or_404(user_id, profile)
     rows = supabase.table("users").update(data.model_dump()).eq("user_id", user_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="User not found")
@@ -77,22 +96,30 @@ def _cascade(user_id: int, dry_run: bool) -> dict:
 
 
 def _assert_deletable(user_id: int, profile: dict) -> None:
-    """Refuse the two deletes that would lock the platform's own operators out: your own
-    account, and the last remaining admin."""
+    """Refuse the two deletes that would lock an org (or the platform) out of having
+    someone able to administer it: your own account, and the last remaining admin --
+    scoped to the caller's own org for an org admin, platform-wide for the super-admin."""
     if user_id == profile["user_id"]:
         raise HTTPException(status_code=400, detail="You can't delete your own account.")
-    rows = supabase.table("users").select("role_id").eq("user_id", user_id).execute().data
+    rows = supabase.table("users").select("role_id,org_id").eq("user_id", user_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="User not found")
+    if profile["role_id"] == ADMIN and rows[0]["org_id"] != profile["org_id"]:
+        raise HTTPException(status_code=404, detail="User not found")
     if rows[0]["role_id"] == ADMIN:
-        admins = supabase.table("users").select("user_id", count="exact").eq("role_id", ADMIN).execute().count or 0
+        admins_query = supabase.table("users").select("user_id", count="exact").eq("role_id", ADMIN)
+        if profile["role_id"] == ADMIN:
+            admins_query = admins_query.eq("org_id", profile["org_id"])
+        admins = admins_query.execute().count or 0
         if admins <= 1:
-            raise HTTPException(status_code=400, detail="This is the last admin account -- deleting it would leave no one able to administer the platform.")
+            scope = "this organization" if profile["role_id"] == ADMIN else "the platform"
+            raise HTTPException(status_code=400, detail=f"This is the last admin account for {scope} -- deleting it would leave no one able to administer it.")
 
 
 def get_user_delete_impact(user_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
-    """Preview what deleting this user would destroy, without touching anything.
-    Calls: `_cascade()`."""
+    """Preview what deleting this user would destroy, without touching anything; 404 if
+    outside the caller's org. Calls: `_assert_same_org_or_404()`, `_cascade()`."""
+    _assert_same_org_or_404(user_id, profile)
     return _cascade(user_id, dry_run=True)
 
 
