@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
 from app.middleware import auth
-from app.controllers.admin import get_analytics, invite_lawyer, get_settings, update_settings
+from app.controllers.admin import get_analytics, get_stats, invite_lawyer, get_settings, update_settings
 from app.models.admin import LawyerInviteCreate, PlatformSettings
 
 
@@ -113,3 +113,63 @@ def test_get_settings_rejects_super_admin():
         assert False, "expected HTTPException"
     except HTTPException as e:
         assert e.status_code == 400
+
+
+def _fake_supabase_for_stats(case_client_rows):
+    """Enough of `get_stats()`'s query surface to run it end to end, with every count/data
+    result zeroed out except the `cases` table's client_id rows this test cares about."""
+    fake = MagicMock()
+
+    def table(name):
+        m = MagicMock()
+        if name == "documents":
+            def select(*args, **kwargs):
+                sel = MagicMock()
+                if kwargs.get("count") == "exact":
+                    sel.eq.return_value.in_.return_value.execute.return_value.count = 0
+                else:
+                    sel.in_.return_value.execute.return_value.data = []
+                return sel
+            m.select.side_effect = select
+        elif name == "invoices":
+            m.select.return_value.in_.return_value.execute.return_value.data = []
+        elif name == "users":
+            def select(*args, **kwargs):
+                sel = MagicMock()
+                sel.eq.return_value.execute.return_value.count = 0
+                sel.eq.return_value.eq.return_value.eq.return_value.execute.return_value.count = 0
+                return sel
+            m.select.side_effect = select
+        elif name == "cases":
+            def select(*args, **kwargs):
+                sel = MagicMock()
+                if kwargs.get("count") == "exact":
+                    sel.neq.return_value.in_.return_value.execute.return_value.count = 0
+                else:
+                    sel.in_.return_value.execute.return_value.data = case_client_rows
+                return sel
+            m.select.side_effect = select
+        elif name == "ai_summaries":
+            m.select.return_value.in_.return_value.execute.return_value.count = 0
+        elif name == "hearings":
+            m.select.return_value.eq.return_value.gte.return_value.in_.return_value.execute.return_value.count = 0
+        elif name == "payments":
+            m.select.return_value.eq.return_value.gte.return_value.in_.return_value.execute.return_value.data = []
+        return m
+
+    fake.table.side_effect = table
+    return fake
+
+
+def test_registered_clients_derived_from_org_case_ids_not_users_org_id():
+    """Verifies an org admin's registered_clients count comes from the distinct clients on the
+    org's own cases (case_ids), the same way list_clients() derives it -- not a users.org_id
+    filter, since clients are global (users.org_id is always NULL for them) per the tenancy
+    design, which made this count silently always zero for every org admin.
+    Exercises: `GET /admin/stats` (`admin.get_stats()`)."""
+    case_client_rows = [{"client_id": 101}, {"client_id": 102}, {"client_id": 101}, {"client_id": None}]
+    fake = _fake_supabase_for_stats(case_client_rows)
+    with patch("app.controllers.admin.supabase", fake), \
+         patch("app.controllers.admin.get_scoped_case_ids", return_value={1, 2}):
+        result = get_stats(profile={"role_id": auth.ADMIN, "org_id": 7, "user_id": 1})
+    assert result["registered_clients"] == 2

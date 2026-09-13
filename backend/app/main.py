@@ -123,9 +123,12 @@ def read_root():
     return {"message": "LexFlow backend running"}
 
 def _rollback_org(org_row: dict | None) -> None:
-    """Undo an organizations insert made earlier in signup() if a later step fails --
-    there is no transaction across REST calls, same reasoning as the users-row rollback below."""
+    """Undo an organizations insert made earlier in signup() if a later step fails. Deletes
+    platform_settings first -- it has an FK to organizations with no ON DELETE CASCADE, so
+    deleting organizations first would raise its own FK violation and mask the real error.
+    There is no transaction across REST calls, same reasoning as the users-row rollback below."""
     if org_row is not None:
+        supabase.table("platform_settings").delete().eq("org_id", org_row["org_id"]).execute()
         supabase.table("organizations").delete().eq("org_id", org_row["org_id"]).execute()
 
 

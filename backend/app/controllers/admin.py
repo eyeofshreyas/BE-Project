@@ -55,11 +55,13 @@ def get_stats(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
 
     users_query = supabase.table("users").select("user_id", count="exact")
     lawyers_query = supabase.table("users").select("user_id", count="exact").eq("role_id", LAWYER).eq("is_active", True)
+    # Clients are global (users.org_id is always NULL for them, by design -- a client can have
+    # cases with lawyers at different firms), so an org admin's registered_clients is derived
+    # below from their own org's case_ids instead, the same way clients.list_clients() does.
     clients_query = supabase.table("users").select("user_id", count="exact").eq("role_id", CLIENT)
     if profile["role_id"] == ADMIN:
         users_query = users_query.eq("org_id", profile["org_id"])
         lawyers_query = lawyers_query.eq("org_id", profile["org_id"])
-        clients_query = clients_query.eq("org_id", profile["org_id"])
 
     # "Active" means anything still being worked -- Closed is the only terminal status.
     cases_query = supabase.table("cases").select("case_id", count="exact").neq("status", "Closed")
@@ -82,10 +84,16 @@ def get_stats(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
 
     payments = payments_query.execute().data
 
+    if case_ids is not None:
+        client_rows = supabase.table("cases").select("client_id").in_("case_id", list(case_ids)).execute().data if case_ids else []
+        registered_clients = len({r["client_id"] for r in client_rows if r["client_id"]})
+    else:
+        registered_clients = _count(clients_query)
+
     return {
         "total_users": _count(users_query),
         "active_lawyers": _count(lawyers_query),
-        "registered_clients": _count(clients_query),
+        "registered_clients": registered_clients,
         "active_cases": _count(cases_query),
         "documents_uploaded": _count(documents_query),
         "ai_summaries": _count(ai_summaries_query),

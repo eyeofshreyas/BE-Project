@@ -147,6 +147,9 @@ def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMI
     assigns the creator as the case's lawyer if they are one (so it shows as Responsible Lawyer
     on the dashboard), then inserts the property and matter, and finally a `conveyancing_parties`
     row linking the client in as the Client."""
+    if profile["org_id"] is None:
+        raise HTTPException(status_code=400, detail="Conveyancing matters are created within an organization.")
+
     case_type_rows = supabase.table("case_types").select("case_type_id").eq("case_type_name", "Property").execute().data
     court_rows = supabase.table("courts").select("court_id").limit(1).execute().data
     if not case_type_rows or not court_rows:

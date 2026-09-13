@@ -19,8 +19,8 @@ class LawyerAssignment(BaseModel):
     lawyer_id: int
     name: str
     email: str
-    phone: str
-    assigned_role: str
+    phone: str | None
+    assigned_role: str | None
 
 
 class AvailableLawyer(BaseModel):

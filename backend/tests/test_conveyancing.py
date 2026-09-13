@@ -107,6 +107,19 @@ def test_create_matter_sets_org_id_from_callers_profile():
     assert inserted["org_id"] == 7
 
 
+def test_create_matter_rejects_super_admin_with_no_org():
+    """Verifies a super-admin caller (org_id None) is rejected with 400 before any DB work --
+    cases.org_id is NOT NULL, so create_matter's cases insert would otherwise hard-fail with a
+    constraint violation instead of a clean error, same pattern as admin.get_settings/
+    update_settings. Exercises: `POST /conveyancing/matters` (`conveyancing.create_matter()`)."""
+    profile = {"role_id": auth.SUPER_ADMIN, "user_id": 1, "org_id": None}
+    try:
+        create_matter(MatterCreate(matter_name="Test Matter", matter_type="Purchase", client_id=99), profile)
+        assert False, "expected HTTPException"
+    except HTTPException as e:
+        assert e.status_code == 400
+
+
 def test_next_matter_seq_skips_numbers_already_in_use():
     """Verifies the generated matter/case number clears every number already taken -- counting
     rows produced PROP2026010 while that case_number existed, breaking every create. Exercises:
@@ -125,6 +138,7 @@ if __name__ == "__main__":
     test_complete_progress_stage_rejects_matter_on_out_of_scope_case()
     test_update_matter_rejects_matter_on_out_of_scope_case()
     test_create_matter_sets_org_id_from_callers_profile()
+    test_create_matter_rejects_super_admin_with_no_org()
     test_next_matter_seq_skips_numbers_already_in_use()
     print("ok")
 

@@ -286,6 +286,51 @@ def test_signup_admin_creates_organization_and_admin_user():
     assert inserted["org_id"] == 42
 
 
+def test_signup_admin_rollback_deletes_settings_before_org_and_preserves_original_error():
+    """Verifies that when an admin signup's org+platform_settings are created but the users
+    insert then fails with a duplicate-email error, _rollback_org deletes the platform_settings
+    row before the organizations row (platform_settings has an FK to organizations with no
+    ON DELETE CASCADE, so deleting organizations first would raise its own FK violation and mask
+    the real error), and the original 409 duplicate-email response still reaches the caller.
+    Exercises: `POST /signup` (`main.signup()`, `main._rollback_org()`)."""
+    fake = MagicMock()
+    fake.auth.sign_up.return_value = None
+    call_order = []
+
+    def table(name):
+        t = MagicMock()
+        if name == "organizations":
+            t.insert.return_value.execute.return_value.data = [{"org_id": 42, "name": "Acme Law"}]
+            t.delete.return_value.eq.return_value.execute.side_effect = lambda: call_order.append("organizations")
+        elif name == "platform_settings":
+            t.insert.return_value.execute.return_value = MagicMock()
+            t.delete.return_value.eq.return_value.execute.side_effect = lambda: call_order.append("platform_settings")
+        elif name == "users":
+            t.insert.return_value.execute.side_effect = PostgrestAPIError({
+                "message": "duplicate key value violates unique constraint \"users_email_key\"",
+                "code": "23505", "hint": None, "details": None,
+            })
+        return t
+
+    tables = {}
+    fake.table.side_effect = lambda name: tables.setdefault(name, table(name))
+    payload = SignupRequest(
+        email="owner@acme.example", password="whatever123", full_name="Org Owner",
+        phone="9000000000", role="admin", org_name="Acme Law",
+    )
+    with patch("app.main.supabase", fake):
+        try:
+            signup(payload)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 409
+            assert "already exists" in e.detail.lower()
+
+    tables["platform_settings"].delete.return_value.eq.assert_called_once_with("org_id", 42)
+    tables["organizations"].delete.return_value.eq.assert_called_once_with("org_id", 42)
+    assert call_order == ["platform_settings", "organizations"]
+
+
 def test_signup_admin_requires_org_name():
     """Verifies role="admin" signup without an org_name is rejected before any Supabase call. Exercises: `POST /signup` (`main.signup()`)."""
     payload = SignupRequest(email="x@example.com", password="whatever123", full_name="X", phone="9000000000", role="admin")
@@ -418,6 +463,7 @@ if __name__ == "__main__":
     test_signup_reports_generic_profile_failure_for_other_db_errors()
     test_signup_deletes_the_users_row_when_the_profile_insert_fails()
     test_signup_admin_creates_organization_and_admin_user()
+    test_signup_admin_rollback_deletes_settings_before_org_and_preserves_original_error()
     test_signup_admin_requires_org_name()
     test_signup_lawyer_rejected_without_pending_invite()
     test_signup_lawyer_succeeds_with_pending_invite_and_marks_it_accepted()
