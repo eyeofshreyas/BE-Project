@@ -1,4 +1,4 @@
-/** Role picker at `/role-selection` shown before signup. Purely cosmetic: the chosen role is not passed on to `SignUpPage` (which asks again). */
+/** Role picker at `/role-selection` shown before signup. The chosen role is passed to `SignUpPage` via navigation state, which preselects the matching toggle. */
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
@@ -73,7 +73,7 @@ export default function RoleSelectionPage() {
     setToast(`Continuing sign-up as ${selected!.charAt(0).toUpperCase()}${selected!.slice(1)}…`)
     setTimeout(() => {
       setToast(null)
-      navigate('/signup')
+      navigate('/signup', { state: { role: selected } })
     }, 900)
   }
 

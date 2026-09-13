@@ -1,6 +1,7 @@
-/** Signup form at `/signup`. Does not auto-login -- on success it redirects to `/login`, not into the app. */
+/** Signup form at `/signup`. Does not auto-login -- on success it redirects to `/login`, not into the app.
+ * Preselects its role toggle from `location.state.role` when arriving from `RoleSelectionPage`. */
 import { useState, type CSSProperties } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
 import { signup } from '../../api/client'
 import styles from './SignUpPage.module.css'
@@ -56,7 +57,9 @@ type FocusName = 'fullName' | 'phone' | 'email' | 'password' | 'confirm' | 'bar'
 /** Renders the role-toggled signup form (extra fields for lawyer vs client); validates locally then calls `handleSubmit` -> `signup()`. */
 export default function SignUpPage() {
   const navigate = useNavigate()
-  const [role, setRole] = useState<'lawyer' | 'client' | 'admin'>('lawyer')
+  const location = useLocation()
+  const initialRole = (location.state as { role?: 'lawyer' | 'client' | 'admin' } | null)?.role
+  const [role, setRole] = useState<'lawyer' | 'client' | 'admin'>(initialRole ?? 'lawyer')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
