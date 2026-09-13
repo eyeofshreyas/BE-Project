@@ -3,11 +3,11 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   listCases, listHearings, listInvoices, listDocuments, listNotifications,
-  listClientRequests, respondClientRequest, getDocumentDownloadUrl, getOrCreateConversation,
+  listClientRequests, respondClientRequest, getDocumentDownloadUrl, getOrCreateConversation, listMySuspensions,
 } from '../../api/client'
 import type {
   CaseSummary, HearingSummary, InvoiceSummary, DocumentSummary,
-  NotificationSummary, ClientRequestSummary, UserProfile,
+  NotificationSummary, ClientRequestSummary, UserProfile, SuspendedFirm,
 } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { formatDate } from '../../utils/date'
@@ -62,14 +62,15 @@ export default function ClientDashboardPage() {
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
   const [clientRequests, setClientRequests] = useState<ClientRequestSummary[]>([])
+  const [suspensions, setSuspensions] = useState<SuspendedFirm[]>([])
   const [respondingId, setRespondingId] = useState<number | null>(null)
   const [messaging, setMessaging] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    Promise.all([listCases(), listHearings(), listInvoices(), listDocuments(), listNotifications(), listClientRequests()])
-      .then(([c, h, i, d, n, r]) => { setCases(c); setHearings(h); setInvoices(i); setDocuments(d); setNotifications(n); setClientRequests(r) })
+    Promise.all([listCases(), listHearings(), listInvoices(), listDocuments(), listNotifications(), listClientRequests(), listMySuspensions()])
+      .then(([c, h, i, d, n, r, s]) => { setCases(c); setHearings(h); setInvoices(i); setDocuments(d); setNotifications(n); setClientRequests(r); setSuspensions(s) })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load your dashboard.'))
       .finally(() => setLoading(false))
   }, [])
@@ -168,6 +169,12 @@ export default function ClientDashboardPage() {
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading your dashboard…</div>}
         {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
+
+        {suspensions.map((s) => (
+          <div key={s.firm_name} style={{ background: '#F7E4E5', border: '1px solid #E8C4C6', borderRadius: 3, padding: '12px 16px', margin: '0 0 16px', fontSize: 13.5, color: '#B3282D' }}>
+            Your access with <strong>{s.firm_name}</strong> has been suspended. Contact them directly if you believe this is a mistake.
+          </div>
+        ))}
 
         {!loading && !error && (
           <>
