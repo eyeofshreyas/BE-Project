@@ -39,10 +39,11 @@ def _rows():
         "lawyers": [{"lawyer_id": 5}],
         "case_lawyers": [{"case_id": 10}],  # assigned to 10 only
         "cases": [
-            {"case_id": 10, "case_number": "C010", "case_title": "Boundary dispute", "description": "encroachment"},
-            {"case_id": 20, "case_number": "C020", "case_title": "Someone else's matter", "description": "secret"},
+            {"case_id": 10, "case_number": "C010", "case_title": "Boundary dispute", "description": "encroachment", "org_id": 1},
+            {"case_id": 20, "case_number": "C020", "case_title": "Someone else's matter", "description": "secret", "org_id": 1},
         ],
         "case_ai_summaries": [],
+        "org_clients": [],
     }
 
 
@@ -85,7 +86,7 @@ def test_client_searches_only_their_own_cases():
     profile = {"role_id": auth.CLIENT, "user_id": 2}
     rows = _rows()
     rows["clients"] = [{"client_id": 7}]
-    rows["cases"] = [{"case_id": 20, "case_number": "C020", "case_title": "Own matter", "description": "mine"}]
+    rows["cases"] = [{"case_id": 20, "case_number": "C020", "case_title": "Own matter", "description": "mine", "org_id": 1}]
     fake = _fake_supabase(rows)
     with patch("app.middleware.auth.supabase", fake), patch("app.ml.case_search.supabase", fake), \
          patch("app.ml.case_search.run_ml_subprocess") as run_ml_subprocess:

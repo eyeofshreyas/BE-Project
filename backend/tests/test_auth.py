@@ -50,7 +50,31 @@ def test_client_with_no_profile_row_sees_nothing():
 
 def test_client_sees_only_their_own_cases():
     """Verifies a client's scope resolves to the case_ids tied to their client_id, via mocked `clients`/`cases` tables. Exercises: `auth.get_scoped_case_ids()`."""
-    with patch("app.middleware.auth.supabase", _fake_supabase({"clients": [{"client_id": 7}], "cases": [{"case_id": 10}, {"case_id": 11}]})):
+    with patch("app.middleware.auth.supabase", _fake_supabase({"clients": [{"client_id": 7}], "cases": [{"case_id": 10, "org_id": 1}, {"case_id": 11, "org_id": 1}], "org_clients": []})):
+        assert auth.get_scoped_case_ids({"role_id": auth.CLIENT, "user_id": 1}) == {10, 11}
+
+
+def test_client_does_not_see_cases_from_a_firm_that_suspended_them():
+    """Verifies a client's scope excludes cases whose org_id has an org_clients row with
+    is_active=False for them, while cases from other (non-suspended) orgs still show.
+    Exercises: `auth.get_scoped_case_ids()`."""
+    with patch("app.middleware.auth.supabase", _fake_supabase({
+        "clients": [{"client_id": 7}],
+        "cases": [{"case_id": 10, "org_id": 1}, {"case_id": 11, "org_id": 2}],
+        "org_clients": [{"org_id": 1}],
+    })):
+        assert auth.get_scoped_case_ids({"role_id": auth.CLIENT, "user_id": 1}) == {11}
+
+
+def test_client_with_no_org_clients_row_sees_everything():
+    """Verifies a client with no org_clients rows at all (the common case -- never suspended
+    by anyone) is unaffected: proves the default-active/no-backfill design holds. Exercises:
+    `auth.get_scoped_case_ids()`."""
+    with patch("app.middleware.auth.supabase", _fake_supabase({
+        "clients": [{"client_id": 7}],
+        "cases": [{"case_id": 10, "org_id": 1}, {"case_id": 11, "org_id": 2}],
+        "org_clients": [],
+    })):
         assert auth.get_scoped_case_ids({"role_id": auth.CLIENT, "user_id": 1}) == {10, 11}
 
 
@@ -445,6 +469,8 @@ if __name__ == "__main__":
     test_org_admin_sees_only_their_org_cases()
     test_client_with_no_profile_row_sees_nothing()
     test_client_sees_only_their_own_cases()
+    test_client_does_not_see_cases_from_a_firm_that_suspended_them()
+    test_client_with_no_org_clients_row_sees_everything()
     test_lawyer_with_no_profile_row_sees_nothing()
     test_lawyer_sees_only_actively_assigned_cases()
     test_require_roles_allows_matching_role()

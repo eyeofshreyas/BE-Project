@@ -81,8 +81,14 @@ def get_scoped_case_ids(profile: dict) -> set[int] | None:
         client_rows = supabase.table("clients").select("client_id").eq("user_id", profile["user_id"]).execute().data
         if not client_rows:
             return set()
-        case_rows = supabase.table("cases").select("case_id").eq("client_id", client_rows[0]["client_id"]).execute().data
-        return {row["case_id"] for row in case_rows}
+        client_id = client_rows[0]["client_id"]
+        case_rows = supabase.table("cases").select("case_id,org_id").eq("client_id", client_id).execute().data
+        # A firm can suspend its own relationship with a client without affecting that
+        # client's other firms -- see docs/superpowers/specs/2026-09-13-per-firm-client-suspension-design.md.
+        # Absence of an org_clients row means active; no backfill needed.
+        suspended_rows = supabase.table("org_clients").select("org_id").eq("client_id", client_id).eq("is_active", False).execute().data
+        suspended_org_ids = {row["org_id"] for row in suspended_rows}
+        return {row["case_id"] for row in case_rows if row["org_id"] not in suspended_org_ids}
 
     return set()
 
