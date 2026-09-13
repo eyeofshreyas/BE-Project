@@ -49,6 +49,9 @@ begin
     alter table platform_settings rename column id to org_id;
   end if;
 end $$;
+-- See the disable-RLS comment on `organizations` above -- applies here too;
+-- signup()'s admin path inserts a platform_settings row per new org.
+alter table platform_settings disable row level security;
 
 alter table platform_settings drop constraint if exists platform_settings_id_check;
 
