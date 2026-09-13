@@ -12,7 +12,6 @@ import DashboardView from './views/DashboardView'
 import UsersView from './views/UsersView'
 import CasesView from './views/CasesView'
 import DocumentsView from './views/DocumentsView'
-import ClientsView from './views/ClientsView'
 import BillingView from './views/BillingView'
 import ConflictSearchView from './views/ConflictSearchView'
 import NotificationsView from './views/NotificationsView'
@@ -23,7 +22,7 @@ import { listNotifications, markNotificationRead } from '../../api/client'
 import type { UserProfile, NotificationSummary } from '../../types/api'
 import styles from '../../components/AppShell.module.css'
 
-type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'clients' | 'billing' | 'conflicts' | 'notifications' | 'reports' | 'analytics' | 'settings'
+type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'billing' | 'conflicts' | 'notifications' | 'reports' | 'analytics' | 'settings'
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Admin', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
 
@@ -47,7 +46,6 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
   { key: 'users', label: 'Users', icon: 'users' },
   { key: 'cases', label: 'Cases', icon: 'scale' },
   { key: 'documents', label: 'Documents', icon: 'file-text' },
-  { key: 'clients', label: 'Clients', icon: 'user' },
   { key: 'billing', label: 'Billing', icon: 'receipt' },
   { key: 'conflicts', label: 'Conflict Search', icon: 'shield' },
   { key: 'reports', label: 'Reports', icon: 'bar-chart-2' },
@@ -174,7 +172,6 @@ export default function AdminConsolePage() {
           {activePage === 'users' && <UsersView />}
           {activePage === 'cases' && <CasesView />}
           {activePage === 'documents' && <DocumentsView />}
-          {activePage === 'clients' && <ClientsView />}
           {activePage === 'billing' && <BillingView />}
           {activePage === 'conflicts' && <ConflictSearchView />}
           {activePage === 'notifications' && <NotificationsView notifications={notifications} onMarkRead={markRead} />}

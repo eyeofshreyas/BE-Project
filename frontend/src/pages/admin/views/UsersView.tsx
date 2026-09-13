@@ -218,16 +218,23 @@ export default function UsersView() {
                     <td className={styles.td}><span className={styles.pill} style={pillStyle(u.is_active ? C.success : C.danger)}>{u.is_active ? 'Active' : 'Suspended'}</span></td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{formatRegistered(u.created_at)}</td>
                     <td className={styles.td}>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <span className={styles.actionBtn} title="View" onClick={() => openPanel(u, 'view')}><Icon name="eye" size={15} color="#575145" /></span>
-                        <span className={styles.actionBtn} title="Edit" onClick={() => openPanel(u, 'edit')}><Icon name="edit" size={15} color="#575145" /></span>
-                        {u.is_active ? (
-                          <span className={styles.actionBtn} title="Suspend" onClick={() => toggleStatus(u)}><Icon name="ban" size={15} color={C.warning} /></span>
-                        ) : (
-                          <span className={styles.actionBtn} title="Reactivate" onClick={() => toggleStatus(u)}><Icon name="check-circle" size={15} color={C.success} /></span>
-                        )}
-                        <span className={styles.actionBtnDanger} title="Delete permanently" onClick={() => openPanel(u, 'delete')}><Icon name="trash-2" size={15} color={C.danger} /></span>
-                      </div>
+                      {u.role === 'Client' ? (
+                        // A client is global -- the same person can have cases with other
+                        // firms too -- so this firm's admin can't edit/suspend/delete them
+                        // from here. Listed for visibility only.
+                        <span style={{ fontSize: 12, color: C.muted }}>View only</span>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <span className={styles.actionBtn} title="View" onClick={() => openPanel(u, 'view')}><Icon name="eye" size={15} color="#575145" /></span>
+                          <span className={styles.actionBtn} title="Edit" onClick={() => openPanel(u, 'edit')}><Icon name="edit" size={15} color="#575145" /></span>
+                          {u.is_active ? (
+                            <span className={styles.actionBtn} title="Suspend" onClick={() => toggleStatus(u)}><Icon name="ban" size={15} color={C.warning} /></span>
+                          ) : (
+                            <span className={styles.actionBtn} title="Reactivate" onClick={() => toggleStatus(u)}><Icon name="check-circle" size={15} color={C.success} /></span>
+                          )}
+                          <span className={styles.actionBtnDanger} title="Delete permanently" onClick={() => openPanel(u, 'delete')}><Icon name="trash-2" size={15} color={C.danger} /></span>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

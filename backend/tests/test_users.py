@@ -31,10 +31,57 @@ ORG_ADMIN_PROFILE = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
 def test_org_admin_only_lists_their_own_org_users():
     """Verifies an org admin's user list is filtered to their own org_id. Exercises: `GET /users` (`users.list_users()`)."""
     fake = MagicMock()
-    fake.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value.data = []
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "users":
+            m.select.return_value.eq.return_value.order.return_value.execute.return_value.data = []
+        elif name == "cases":
+            m.select.return_value.eq.return_value.execute.return_value.data = []
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
     with patch("app.controllers.users.supabase", fake):
         list_users(profile=ORG_ADMIN_PROFILE)
-    fake.table.return_value.select.return_value.eq.assert_called_once_with("org_id", 7)
+    fake.table("users").select.return_value.eq.assert_called_once_with("org_id", 7)
+    fake.table("cases").select.return_value.eq.assert_called_once_with("org_id", 7)
+
+
+def test_org_admin_sees_clients_with_a_case_in_their_org():
+    """Verifies clients (global, users.org_id is always NULL) still show up for an org admin
+    when they have a case in that org. Exercises: `GET /users` (`users.list_users()`)."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+    client_user_row = {"user_id": 9, "full_name": "A Client", "email": "c@example.com", "phone": "1",
+                        "is_active": True, "created_at": "2026-01-01", "roles": {"role_name": "Client"}}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "users":
+            def select(*args, **kwargs):
+                sel = MagicMock()
+                sel.eq.return_value.order.return_value.execute.return_value.data = []
+                sel.in_.return_value.execute.return_value.data = [client_user_row]
+                return sel
+            m.select.side_effect = select
+        elif name == "cases":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 3}]
+        elif name == "clients":
+            m.select.return_value.in_.return_value.execute.return_value.data = [{"user_id": 9}]
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.users.supabase", fake):
+        result = list_users(profile=ORG_ADMIN_PROFILE)
+    assert [r["id"] for r in result] == [9]
+    assert result[0]["role"] == "Client"
 
 
 def test_org_admin_cannot_change_status_of_user_in_another_org():

@@ -38,6 +38,20 @@ def list_users(role: str | None = None, profile: dict = Depends(require_roles(AD
     if profile["role_id"] == ADMIN:
         query = query.eq("org_id", profile["org_id"])
     rows = query.order("created_at", desc=True).execute().data
+
+    if profile["role_id"] == ADMIN:
+        # Clients are global (users.org_id is always NULL for them, by design -- see
+        # clients.list_clients()), so the org_id filter above excludes every client. Add
+        # back the ones with a case in this org, the same way list_clients() scopes them.
+        case_rows = supabase.table("cases").select("client_id").eq("org_id", profile["org_id"]).execute().data
+        client_ids = list({r["client_id"] for r in case_rows if r["client_id"]})
+        if client_ids:
+            client_user_rows = supabase.table("clients").select("user_id").in_("client_id", client_ids).execute().data
+            client_user_ids = [r["user_id"] for r in client_user_rows]
+            if client_user_ids:
+                rows += supabase.table("users").select(USERS_SELECT).in_("user_id", client_user_ids).execute().data
+        rows.sort(key=lambda r: r["created_at"], reverse=True)
+
     # ponytail: filters in Python post-fetch, fine while the users table is small;
     # switch to a PostgREST embedded filter (roles.role_name=eq.X) if the table grows large.
     if role is not None:
