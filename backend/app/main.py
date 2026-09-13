@@ -14,7 +14,7 @@ from supabase_auth.errors import AuthApiError
 from postgrest.exceptions import APIError as PostgrestAPIError
 from app.core.config import CORS_ORIGINS, LOG_LEVEL
 from app.db.supabase_client import supabase
-from app.middleware.auth import get_current_user
+from app.middleware.auth import get_current_user, ADMIN
 from app.middleware.rate_limit import rate_limit
 
 logging.basicConfig(
@@ -99,7 +99,8 @@ class SignupRequest(BaseModel):
     password: str
     full_name: str
     phone: str
-    role: Literal["lawyer", "client"]
+    role: Literal["lawyer", "client", "admin"]
+    org_name: str | None = None
     bar_council_number: str | None = None
     specialization: str | None = None
     experience_years: int | None = None
@@ -121,11 +122,31 @@ def read_root():
     """Health-check root endpoint."""
     return {"message": "LexFlow backend running"}
 
+def _rollback_org(org_row: dict | None) -> None:
+    """Undo an organizations insert made earlier in signup() if a later step fails --
+    there is no transaction across REST calls, same reasoning as the users-row rollback below."""
+    if org_row is not None:
+        supabase.table("organizations").delete().eq("org_id", org_row["org_id"]).execute()
+
+
 @app.post("/signup", dependencies=[Depends(rate_limit(5, 60))])
 def signup(data: SignupRequest):
     """Create a Supabase Auth account, then a LexFlow `users` row and role-specific profile
-    (lawyer/client); for a client signup, backfills any pending client_requests invites sent
-    to this email before the account existed. Calls: `supabase.auth.sign_up()`."""
+    (lawyer/client/admin); for a client signup, backfills any pending client_requests invites
+    sent to this email before the account existed; for a lawyer signup, requires a matching
+    pending lawyer_invites row and marks it accepted; for an admin signup, creates the
+    organization itself. Calls: `supabase.auth.sign_up()`, `_rollback_org()`."""
+    if data.role == "admin" and not (data.org_name or "").strip():
+        raise HTTPException(status_code=400, detail="Enter your organization's name.")
+
+    invite_row = None
+    if data.role == "lawyer":
+        invites = supabase.table("lawyer_invites").select("invite_id,org_id") \
+            .eq("email", data.email).eq("status", "pending").execute().data
+        if not invites:
+            raise HTTPException(status_code=403, detail="Ask your firm's admin for an invite.")
+        invite_row = invites[0]
+
     try:
         supabase.auth.sign_up({
             "email": data.email,
@@ -135,20 +156,30 @@ def signup(data: SignupRequest):
         logger.exception("Signup failed for %s", data.email)
         raise HTTPException(status_code=400, detail="Signup failed. Check your details and try again.")
 
+    org_row = None
+    if data.role == "admin":
+        org_row = supabase.table("organizations").insert({"name": data.org_name.strip()}).execute().data[0]
+        supabase.table("platform_settings").insert({"org_id": org_row["org_id"]}).execute()
+
+    org_id = invite_row["org_id"] if invite_row else (org_row["org_id"] if org_row else None)
+
     try:
         user_row = supabase.table("users").insert({
-            "role_id": ROLE_IDS[data.role],
+            "role_id": ADMIN if data.role == "admin" else ROLE_IDS[data.role],
             "full_name": data.full_name,
             "email": data.email,
             "password_hash": "managed_by_supabase_auth",
             "phone": data.phone,
+            "org_id": org_id,
         }).execute().data[0]
     except PostgrestAPIError as e:
+        _rollback_org(org_row)
         if e.code == "23505":
             raise HTTPException(status_code=409, detail="An account with this email already exists. Try logging in instead.")
         logger.exception("User row insert failed after auth signup for %s", data.email)
         raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
     except Exception:
+        _rollback_org(org_row)
         logger.exception("User row insert failed after auth signup for %s", data.email)
         raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
 
@@ -160,7 +191,8 @@ def signup(data: SignupRequest):
                 "specialization": data.specialization,
                 "experience_years": data.experience_years,
             }).execute()
-        else:
+            supabase.table("lawyer_invites").update({"status": "accepted"}).eq("invite_id", invite_row["invite_id"]).execute()
+        elif data.role == "client":
             client_row = supabase.table("clients").insert({
                 "user_id": user_row["user_id"],
                 "address": data.address,
@@ -179,12 +211,14 @@ def signup(data: SignupRequest):
                     "notification_type": "client_request",
                     "is_read": False,
                 }).execute()
+        # role == "admin": no lawyers/clients row -- an org admin isn't a lawyer profile.
     except Exception as e:
         # A users row without its lawyers/clients row logs in fine but 400s on every
         # role endpoint ("No lawyer profile for this account"), so undo it by hand --
         # there is no transaction across REST calls. The auth account survives; signing
         # up again reuses it.
         supabase.table("users").delete().eq("user_id", user_row["user_id"]).execute()
+        _rollback_org(org_row)
         logger.exception("Profile setup failed after auth signup for %s", data.email)
         if data.role == "lawyer" and isinstance(e, PostgrestAPIError) and e.code == "23505":
             raise HTTPException(status_code=409, detail="That bar council number is already registered.")
