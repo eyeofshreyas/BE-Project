@@ -218,6 +218,8 @@ def signup(data: SignupRequest):
         # there is no transaction across REST calls. The auth account survives; signing
         # up again reuses it.
         supabase.table("users").delete().eq("user_id", user_row["user_id"]).execute()
+        if data.role == "lawyer":
+            supabase.table("lawyers").delete().eq("user_id", user_row["user_id"]).execute()
         _rollback_org(org_row)
         logger.exception("Profile setup failed after auth signup for %s", data.email)
         if data.role == "lawyer" and isinstance(e, PostgrestAPIError) and e.code == "23505":

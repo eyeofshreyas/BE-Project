@@ -347,6 +347,41 @@ def test_signup_lawyer_succeeds_with_pending_invite_and_marks_it_accepted():
     tables["lawyer_invites"].update.assert_called_once_with({"status": "accepted"})
 
 
+def test_signup_rolls_back_lawyers_row_when_invite_accept_fails():
+    """Verifies that when the lawyers insert succeeds but marking the invite accepted then
+    throws, signup() deletes both the users row and the just-inserted lawyers row (not just
+    users), so no lawyers row is left pointing at a deleted user_id. Exercises: `POST /signup`
+    (`main.signup()`)."""
+    fake = MagicMock()
+    fake.auth.sign_up.return_value = None
+
+    def table(name):
+        t = MagicMock()
+        if name == "lawyer_invites":
+            t.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"invite_id": 9, "org_id": 42}]
+            t.update.return_value.eq.return_value.execute.side_effect = RuntimeError("db unreachable")
+        elif name == "users":
+            t.insert.return_value.execute.return_value.data = [{"user_id": 77}]
+        elif name == "lawyers":
+            t.insert.return_value.execute.return_value = MagicMock()
+        return t
+
+    tables = {}
+    fake.table.side_effect = lambda name: tables.setdefault(name, table(name))
+    payload = SignupRequest(
+        email="new@example.com", password="whatever123", full_name="New Lawyer",
+        phone="9000000000", role="lawyer", bar_council_number="MH/1/2020",
+    )
+    with patch("app.main.supabase", fake):
+        try:
+            signup(payload)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 500
+    tables["users"].delete.return_value.eq.assert_called_once_with("user_id", 77)
+    tables["lawyers"].delete.return_value.eq.assert_called_once_with("user_id", 77)
+
+
 def test_login_rejects_actually_wrong_password():
     """Verifies a wrong-password login attempt raises 401 with a generic invalid-credentials message. Exercises: `POST /login` (`main.login()`)."""
     fake = MagicMock()
@@ -386,4 +421,5 @@ if __name__ == "__main__":
     test_signup_admin_requires_org_name()
     test_signup_lawyer_rejected_without_pending_invite()
     test_signup_lawyer_succeeds_with_pending_invite_and_marks_it_accepted()
+    test_signup_rolls_back_lawyers_row_when_invite_accept_fails()
     print("ok")
