@@ -109,7 +109,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     setProfileOpen(false)
   }
 
-  const navItems = profile?.role_id === 3 ? CLIENT_NAV : profile?.role_id === 1 ? ADMIN_STAFF_NAV : LAWYER_NAV
+  const navItems = profile?.role_id === 3 ? CLIENT_NAV : profile?.role_id === 1 || profile?.role_id === 4 ? ADMIN_STAFF_NAV : LAWYER_NAV
 
   return (
     <div className={styles.page}>

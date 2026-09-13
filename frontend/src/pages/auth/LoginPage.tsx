@@ -154,7 +154,7 @@ export default function LoginPage() {
       localStorage.setItem('lexflow_token', result.access_token)
       if (result.profile) localStorage.setItem('lexflow_profile', JSON.stringify(result.profile))
       setToast('Signed in — redirecting to your dashboard…')
-      const dest = result.profile?.role_id === 1 ? '/admin' : '/dashboard'
+      const dest = result.profile?.role_id === 1 || result.profile?.role_id === 4 ? '/admin' : '/dashboard'
       setTimeout(() => navigate(dest), 900)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed.')
