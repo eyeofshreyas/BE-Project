@@ -156,6 +156,9 @@ export default function CaseDetailPage() {
   const [selectedLawyerId, setSelectedLawyerId] = useState('')
   const [addingTeammate, setAddingTeammate] = useState(false)
   const [removingLawyerId, setRemovingLawyerId] = useState<number | null>(null)
+  const [confirmRemoveLawyerId, setConfirmRemoveLawyerId] = useState<number | null>(null)
+  const [confirmDeleteNoteId, setConfirmDeleteNoteId] = useState<number | null>(null)
+  const [confirmCloseCase, setConfirmCloseCase] = useState(false)
   const [cnrEditing, setCnrEditing] = useState(false)
   const [cnrInput, setCnrInput] = useState('')
   const [cnrSaving, setCnrSaving] = useState(false)
@@ -324,10 +327,10 @@ export default function CaseDetailPage() {
   }
 
   async function removeNote(noteId: number) {
-    if (!window.confirm('Delete this note?')) return
     try {
       await deleteCaseNote(numericCaseId, noteId)
       setNotes((prev) => prev.filter((n) => n.id !== noteId))
+      setConfirmDeleteNoteId(null)
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to delete note.')
     }
@@ -374,7 +377,7 @@ export default function CaseDetailPage() {
   }
 
   function closeCase() {
-    if (!window.confirm('Close this case?')) return
+    setConfirmCloseCase(false)
     updateStatus('Closed')
   }
 
@@ -420,7 +423,7 @@ export default function CaseDetailPage() {
   }
 
   async function removeTeammate(lawyerId: number) {
-    if (!window.confirm('Remove this lawyer from the case?')) return
+    setConfirmRemoveLawyerId(null)
     setRemovingLawyerId(lawyerId)
     try {
       const updated = await removeLawyerFromCase(numericCaseId, lawyerId)
@@ -1233,8 +1236,16 @@ export default function CaseDetailPage() {
             </Card>
 
             {canManage && caseInfo.status !== 'Closed' && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <span className={cd.dangerLink} onClick={closeCase}>Close case</span>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                {confirmCloseCase ? (
+                  <>
+                    <span style={{ fontSize: 13, color: MUTED }}>Close this case?</span>
+                    <span className={cd.dangerLink} onClick={closeCase}>Close case</span>
+                    <span className={cd.linkAction} onClick={() => setConfirmCloseCase(false)}>Cancel</span>
+                  </>
+                ) : (
+                  <span className={cd.dangerLink} onClick={() => setConfirmCloseCase(true)}>Close case</span>
+                )}
               </div>
             )}
           </div>
@@ -1345,13 +1356,16 @@ export default function CaseDetailPage() {
                         </div>
                         <div className={cd.metaRow}>
                           <span>{l.email}</span>
-                          <button
-                            className={cd.linkAction}
-                            style={{ opacity: removingLawyerId === l.lawyer_id ? 0.6 : 1 }}
-                            onClick={() => removingLawyerId === null && removeTeammate(l.lawyer_id)}
-                          >
-                            {removingLawyerId === l.lawyer_id ? 'Removing…' : 'Remove'}
-                          </button>
+                          {confirmRemoveLawyerId === l.lawyer_id ? (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeTeammate(l.lawyer_id)}>
+                                {removingLawyerId === l.lawyer_id ? 'Removing…' : 'Remove'}
+                              </button>
+                              <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(null)}>Keep</button>
+                            </span>
+                          ) : (
+                            <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(l.lawyer_id)}>Remove</button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1435,9 +1449,16 @@ export default function CaseDetailPage() {
                           <button className={cd.iconBtn} onClick={() => setNoteForm({ id: n.id, title: n.title ?? '', note: n.note, checklist: n.checklist ?? [] })} title="Edit note" aria-label="Edit note">
                             <Icon name="edit" size={14} color={MUTED} />
                           </button>
-                          <button className={cd.iconBtn} onClick={() => removeNote(n.id)} title="Delete note" aria-label="Delete note">
-                            <Icon name="trash-2" size={14} color="#B3282D" />
-                          </button>
+                          {confirmDeleteNoteId === n.id ? (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                              <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeNote(n.id)}>Delete</button>
+                              <button className={cd.linkAction} onClick={() => setConfirmDeleteNoteId(null)}>Keep</button>
+                            </span>
+                          ) : (
+                            <button className={cd.iconBtn} onClick={() => setConfirmDeleteNoteId(n.id)} title="Delete note" aria-label="Delete note">
+                              <Icon name="trash-2" size={14} color="#B3282D" />
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
