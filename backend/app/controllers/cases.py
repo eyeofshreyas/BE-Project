@@ -174,13 +174,22 @@ def add_lawyer_to_case(case_id: int, data: AddLawyerRequest, profile: dict = Dep
     if target_rows[0]["users"]["org_id"] != row["org_id"]:
         raise HTTPException(status_code=403, detail="That lawyer isn't part of this case's organization.")
 
-    if any(cl["lawyer_id"] == data.lawyer_id and cl["is_active"] for cl in row["case_lawyers"]):
+    existing = next((cl for cl in row["case_lawyers"] if cl["lawyer_id"] == data.lawyer_id), None)
+    if existing and existing["is_active"]:
         raise HTTPException(status_code=409, detail="This lawyer is already on the case.")
 
-    supabase.table("case_lawyers").insert({
-        "case_id": case_id, "lawyer_id": data.lawyer_id,
-        "assigned_role": data.assigned_role, "is_active": True,
-    }).execute()
+    if existing:
+        # A previous stint left a (case_id, lawyer_id) row behind (soft-deleted via
+        # is_active=False); case_lawyers has a unique index on that pair, so rejoining
+        # the case reactivates it instead of inserting a second row, which would 500 on
+        # the constraint.
+        supabase.table("case_lawyers").update({"assigned_role": data.assigned_role, "is_active": True}) \
+            .eq("case_id", case_id).eq("lawyer_id", data.lawyer_id).execute()
+    else:
+        supabase.table("case_lawyers").insert({
+            "case_id": case_id, "lawyer_id": data.lawyer_id,
+            "assigned_role": data.assigned_role, "is_active": True,
+        }).execute()
     row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
     return _to_case_summary(row)
 

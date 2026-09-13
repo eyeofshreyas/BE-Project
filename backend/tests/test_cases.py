@@ -167,6 +167,26 @@ def test_add_lawyer_rejects_a_second_primary():
             assert e.status_code == 409
 
 
+def test_add_lawyer_reactivates_a_previously_removed_teammate():
+    """Verifies re-adding a lawyer who was previously removed from the case reactivates their
+    existing case_lawyers row instead of inserting a duplicate -- a fresh insert would violate
+    the unique (case_id, lawyer_id) index and 500. Exercises: `POST /cases/{id}/lawyers`
+    (`cases.add_lawyer_to_case()`)."""
+    case_row = {
+        **TEAM_CASE_ROW,
+        "case_lawyers": TEAM_CASE_ROW["case_lawyers"] + [
+            {"lawyer_id": 6, "assigned_role": "Associate", "is_active": False,
+             "lawyers": {"users": {"full_name": "Former Teammate", "email": "f@example.com", "phone": "2"}}},
+        ],
+    }
+    fake = _fake_supabase_for_team(assigned_case_ids={42}, case_row=case_row, target_lawyer_org_id=7, caller_lawyer_id=5)
+    with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
+        result = add_lawyer_to_case(42, AddLawyerRequest(lawyer_id=6, assigned_role="Associate"), PRIMARY_LAWYER_PROFILE)
+    assert result["case_id"] == 42
+    fake.table("case_lawyers").insert.assert_not_called()
+    fake.table("case_lawyers").update.assert_called_once_with({"assigned_role": "Associate", "is_active": True})
+
+
 def test_associate_can_remove_themselves():
     """Verifies a non-Primary teammate can remove themselves from a case. Exercises: `DELETE /cases/{id}/lawyers/{lawyer_id}` (`cases.remove_lawyer_from_case()`)."""
     fake = _fake_supabase_for_team(assigned_case_ids={42}, case_row=TEAM_CASE_ROW, target_lawyer_org_id=7, caller_lawyer_id=2)
@@ -248,6 +268,7 @@ if __name__ == "__main__":
     test_add_lawyer_rejects_a_different_org_lawyer()
     test_non_primary_lawyer_cannot_add_a_teammate()
     test_add_lawyer_rejects_a_second_primary()
+    test_add_lawyer_reactivates_a_previously_removed_teammate()
     test_associate_can_remove_themselves()
     test_associate_cannot_remove_someone_else()
     test_case_summary_lists_every_active_teammate()
