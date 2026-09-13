@@ -243,6 +243,7 @@ export interface UserSummary {
   phone: string
   role: string | null
   is_active: boolean
+  suspended: boolean
   created_at: string
 }
 
@@ -351,6 +352,10 @@ export interface ClientSummary {
   active_cases: number
   status: string
   pending_amount: number
+}
+
+export interface SuspendedFirm {
+  firm_name: string
 }
 
 export interface HearingSummary {

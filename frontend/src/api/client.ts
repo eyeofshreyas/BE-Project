@@ -51,6 +51,7 @@ import type {
   PartySummary,
   ConflictMatch,
   AvailableLawyer,
+  SuspendedFirm,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -247,6 +248,10 @@ export function listUsers(role?: string) {
 
 export function setUserStatus(userId: number, isActive: boolean) {
   return patch<UserSummary>(`/users/${userId}/status`, { is_active: isActive })
+}
+
+export function setClientFirmStatus(userId: number, isActive: boolean) {
+  return patch<UserSummary>(`/users/${userId}/firm-status`, { is_active: isActive })
 }
 
 export function adminUpdateUser(userId: number, payload: { full_name: string; phone: string }) {
@@ -450,6 +455,10 @@ export function updateHearingStatus(hearingId: number, hearing_status: string) {
 
 export function listClients() {
   return get<ClientSummary[]>('/clients')
+}
+
+export function listMySuspensions() {
+  return get<SuspendedFirm[]>('/clients/me/suspensions')
 }
 
 export function sendInvoiceReminder(invoiceId: number) {
