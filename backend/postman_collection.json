@@ -674,19 +674,52 @@
           }
         },
         {
-          "name": "Unassign Lawyer",
+          "name": "Add Lawyer",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/cases/{{case_id}}/unassign-lawyer",
+              "raw": "{{base_url}}/cases/{{case_id}}/lawyers",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "cases",
                 "{{case_id}}",
-                "unassign-lawyer"
+                "lawyers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lawyer_id\": 1,\n  \"assigned_role\": \"Associate\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Remove Lawyer",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/lawyers/{{lawyer_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "lawyers",
+                "{{lawyer_id}}"
               ]
             }
           }
