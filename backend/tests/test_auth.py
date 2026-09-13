@@ -186,7 +186,7 @@ def test_login_reports_unconfirmed_email_distinctly():
     """Verifies an unconfirmed-email login attempt raises 403 with a confirmation-specific message. Exercises: `POST /login` (`main.login()`)."""
     fake = MagicMock()
     fake.auth.sign_in_with_password.side_effect = AuthApiError("Email not confirmed", 400, "email_not_confirmed")
-    with patch("app.main.supabase", fake):
+    with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         try:
             login(LoginRequest(email="x@example.com", password="whatever"))
             assert False, "expected HTTPException"
@@ -213,7 +213,7 @@ def test_signup_reports_duplicate_email_distinctly():
 
     fake.table.side_effect = table
     payload = SignupRequest(email="dup@example.com", password="whatever123", full_name="Dup User", phone="9000000000", role="lawyer")
-    with patch("app.main.supabase", fake):
+    with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         try:
             signup(payload)
             assert False, "expected HTTPException"
@@ -237,7 +237,7 @@ def test_signup_reports_generic_profile_failure_for_other_db_errors():
 
     fake.table.side_effect = table
     payload = SignupRequest(email="new@example.com", password="whatever123", full_name="New User", phone="9000000000", role="lawyer")
-    with patch("app.main.supabase", fake):
+    with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         try:
             signup(payload)
             assert False, "expected HTTPException"
@@ -269,7 +269,7 @@ def test_signup_deletes_the_users_row_when_the_profile_insert_fails():
     tables = {}
     fake.table.side_effect = lambda name: tables.setdefault(name, table(name))
     payload = SignupRequest(email="new@example.com", password="whatever123", full_name="New User", phone="9000000000", role="lawyer", bar_council_number="MH/1/2020")
-    with patch("app.main.supabase", fake):
+    with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         try:
             signup(payload)
             assert False, "expected HTTPException"
@@ -303,7 +303,7 @@ def test_signup_admin_creates_organization_and_admin_user():
         email="owner@acme.example", password="whatever123", full_name="Org Owner",
         phone="9000000000", role="admin", org_name="Acme Law",
     )
-    with patch("app.main.supabase", fake):
+    with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         result = signup(payload)
     assert result["message"].startswith("Signup successful")
     assert inserted["role_id"] == 1  # ADMIN
@@ -342,7 +342,7 @@ def test_signup_admin_rollback_deletes_settings_before_org_and_preserves_origina
         email="owner@acme.example", password="whatever123", full_name="Org Owner",
         phone="9000000000", role="admin", org_name="Acme Law",
     )
-    with patch("app.main.supabase", fake):
+    with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         try:
             signup(payload)
             assert False, "expected HTTPException"
@@ -370,7 +370,7 @@ def test_signup_lawyer_rejected_without_pending_invite():
     fake = MagicMock()
     fake.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
     payload = SignupRequest(email="new@example.com", password="whatever123", full_name="New Lawyer", phone="9000000000", role="lawyer")
-    with patch("app.main.supabase", fake):
+    with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         try:
             signup(payload)
             assert False, "expected HTTPException"
@@ -409,7 +409,7 @@ def test_signup_lawyer_succeeds_with_pending_invite_and_marks_it_accepted():
         email="new@example.com", password="whatever123", full_name="New Lawyer",
         phone="9000000000", role="lawyer", bar_council_number="MH/1/2020",
     )
-    with patch("app.main.supabase", fake):
+    with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         result = signup(payload)
     assert result["message"].startswith("Signup successful")
     assert inserted_user["org_id"] == 42
@@ -441,7 +441,7 @@ def test_signup_rolls_back_lawyers_row_when_invite_accept_fails():
         email="new@example.com", password="whatever123", full_name="New Lawyer",
         phone="9000000000", role="lawyer", bar_council_number="MH/1/2020",
     )
-    with patch("app.main.supabase", fake):
+    with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         try:
             signup(payload)
             assert False, "expected HTTPException"
@@ -455,7 +455,7 @@ def test_login_rejects_actually_wrong_password():
     """Verifies a wrong-password login attempt raises 401 with a generic invalid-credentials message. Exercises: `POST /login` (`main.login()`)."""
     fake = MagicMock()
     fake.auth.sign_in_with_password.side_effect = AuthApiError("Invalid login credentials", 400, "invalid_credentials")
-    with patch("app.main.supabase", fake):
+    with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         try:
             login(LoginRequest(email="x@example.com", password="wrong"))
             assert False, "expected HTTPException"

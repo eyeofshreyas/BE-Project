@@ -13,7 +13,7 @@ from pydantic import BaseModel, EmailStr
 from supabase_auth.errors import AuthApiError
 from postgrest.exceptions import APIError as PostgrestAPIError
 from app.core.config import CORS_ORIGINS, LOG_LEVEL
-from app.db.supabase_client import supabase
+from app.db.supabase_client import supabase, new_auth_client
 from app.middleware.auth import get_current_user, ADMIN
 from app.middleware.rate_limit import rate_limit
 
@@ -151,7 +151,7 @@ def signup(data: SignupRequest):
         invite_row = invites[0]
 
     try:
-        supabase.auth.sign_up({
+        new_auth_client().auth.sign_up({
             "email": data.email,
             "password": data.password
         })
@@ -236,7 +236,7 @@ def login(data: LoginRequest):
     """Authenticate against Supabase Auth and return tokens plus the LexFlow profile row.
     Calls: `supabase.auth.sign_in_with_password()`."""
     try:
-        result = supabase.auth.sign_in_with_password({
+        result = new_auth_client().auth.sign_in_with_password({
             "email": data.email,
             "password": data.password
         })

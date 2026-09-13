@@ -21,3 +21,20 @@ supabase: Client = create_client(
     SUPABASE_KEY,
     options=SyncClientOptions(httpx_client=_http_client),
 )
+
+
+def new_auth_client() -> Client:
+    """A throwaway client for auth calls that establish a session (sign-up, sign-in) --
+    calling those on the shared `supabase` client above would silently switch its
+    effective database role from service_role (bypasses RLS) to that signing-in user's
+    own role for every later request in this process, since GoTrue mutates session state
+    on the client instance itself. Every table but a couple has RLS disabled, so this went
+    unnoticed until one that doesn't (org_clients) surfaced it as an inexplicable RLS
+    violation on an unrelated later request. Verifying an already-issued token
+    (auth.get_current_user's `supabase.auth.get_user()`) does not establish a session and
+    is safe on the shared client -- confirmed by testing, not touched here."""
+    return create_client(
+        SUPABASE_URL,
+        SUPABASE_KEY,
+        options=SyncClientOptions(httpx_client=httpx.Client(http2=False, timeout=httpx.Timeout(30.0))),
+    )
