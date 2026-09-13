@@ -1,9 +1,10 @@
-"""Controller for listing clients, scoped by role: all clients for admins, only clients
-on cases the lawyer is actively assigned to via case_lawyers for lawyers."""
+"""Controller for listing clients, scoped by role: every client for the super-admin, clients
+with a case in the org for an org admin, only clients on cases the lawyer is actively
+assigned to via case_lawyers for lawyers."""
 
 from fastapi import Depends
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, require_roles
+from app.middleware.auth import ADMIN, LAWYER, SUPER_ADMIN, require_roles
 
 CLIENTS_SELECT = "client_id,address,preferred_language,users(full_name,email,phone)"
 CLOSED_STATUSES = {"Completed", "Closed"}
@@ -27,10 +28,18 @@ def _to_client_summary(row: dict, active_cases: int, status: str, pending_amount
 
 
 def list_clients(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
-    """List clients visible to the caller (all for admin, case-linked for lawyer), each with
-    computed active-case count, status, and pending invoice amount. Calls: `_to_client_summary()`."""
-    if profile["role_id"] == ADMIN:
+    """List clients visible to the caller: every client for the super-admin, clients with a
+    case in the caller's own org for an org admin, case-linked clients for a lawyer -- each
+    with computed active-case count, status, and pending invoice amount. Calls:
+    `_to_client_summary()`."""
+    if profile["role_id"] == SUPER_ADMIN:
         client_rows = supabase.table("clients").select(CLIENTS_SELECT).execute().data
+    elif profile["role_id"] == ADMIN:
+        case_rows = supabase.table("cases").select("client_id").eq("org_id", profile["org_id"]).execute().data
+        client_ids = list({r["client_id"] for r in case_rows if r["client_id"]})
+        if not client_ids:
+            return []
+        client_rows = supabase.table("clients").select(CLIENTS_SELECT).in_("client_id", client_ids).execute().data
     else:
         # a lawyer's visible clients = clients on cases they're actively
         # assigned to via case_lawyers -- that assignment is only ever
