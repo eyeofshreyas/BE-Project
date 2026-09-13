@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
-import { adminUpdateUser, deleteUser, getUserDeleteImpact, inviteLawyer, listUsers, setUserStatus } from '../../../api/client'
+import { adminUpdateUser, deleteUser, getUserDeleteImpact, inviteLawyer, listUsers, setClientFirmStatus, setUserStatus } from '../../../api/client'
 import type { UserDeleteImpact, UserSummary } from '../../../types/api'
 import { downloadCsv } from '../../../utils/files'
 import styles from '../../../components/AppShell.module.css'
@@ -160,6 +160,14 @@ export default function UsersView() {
       .finally(() => setBusy(false))
   }
 
+  function toggleClientFirmStatus(user: UserSummary) {
+    setBusy(true)
+    setClientFirmStatus(user.id, user.suspended)
+      .then((updated) => setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u))))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to update this client\'s status.'))
+      .finally(() => setBusy(false))
+  }
+
   return (
     <>
       <div className={styles.pageHeadRow}>
@@ -215,14 +223,26 @@ export default function UsersView() {
                     <td className={styles.td}>{u.role && <span className={styles.pill} style={pillStyle(ROLE_COLORS[u.role] ?? C.muted)}>{u.role}</span>}</td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{u.email}</td>
                     <td className={styles.td} style={{ color: '#6E6759' }}>{u.phone}</td>
-                    <td className={styles.td}><span className={styles.pill} style={pillStyle(u.is_active ? C.success : C.danger)}>{u.is_active ? 'Active' : 'Suspended'}</span></td>
+                    <td className={styles.td}>
+                      {u.role === 'Client' ? (
+                        <span className={styles.pill} style={pillStyle(u.suspended ? C.danger : C.success)}>{u.suspended ? 'Suspended' : 'Active'}</span>
+                      ) : (
+                        <span className={styles.pill} style={pillStyle(u.is_active ? C.success : C.danger)}>{u.is_active ? 'Active' : 'Suspended'}</span>
+                      )}
+                    </td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{formatRegistered(u.created_at)}</td>
                     <td className={styles.td}>
                       {u.role === 'Client' ? (
-                        // A client is global -- the same person can have cases with other
-                        // firms too -- so this firm's admin can't edit/suspend/delete them
-                        // from here. Listed for visibility only.
-                        <span style={{ fontSize: 12, color: C.muted }}>View only</span>
+                        // A client is global -- the same person can have cases with other firms too -- so
+                        // Edit/Delete stay off-limits from here. Suspend/reactivate is per-firm (org_clients),
+                        // never touching the client's global account.
+                        <span
+                          className={styles.actionBtn}
+                          title={u.suspended ? 'Reactivate for this firm' : 'Suspend from this firm'}
+                          onClick={() => toggleClientFirmStatus(u)}
+                        >
+                          <Icon name={u.suspended ? 'check-circle' : 'ban'} size={15} color={u.suspended ? C.success : C.warning} />
+                        </span>
                       ) : (
                         <div style={{ display: 'flex', gap: 4 }}>
                           <span className={styles.actionBtn} title="View" onClick={() => openPanel(u, 'view')}><Icon name="eye" size={15} color="#575145" /></span>
