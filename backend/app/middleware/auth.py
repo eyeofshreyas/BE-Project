@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 ADMIN = 1
 LAWYER = 2
 CLIENT = 3
+SUPER_ADMIN = 4
 
 
 def get_current_user(authorization: str = Header(...)):
@@ -33,7 +34,7 @@ def get_current_user(authorization: str = Header(...)):
 def get_current_profile(current_user=Depends(get_current_user)):
     """Look up the LexFlow `users` row for the verified user's email; 401 if none, 403 if inactive.
     Calls: `get_current_user()`. The dependency almost every route uses."""
-    rows = supabase.table("users").select("user_id,role_id,full_name,email,is_active").eq("email", current_user.email).execute().data
+    rows = supabase.table("users").select("user_id,role_id,full_name,email,is_active,org_id").eq("email", current_user.email).execute().data
     if not rows:
         raise HTTPException(status_code=401, detail="No LexFlow profile for this account")
     if not rows[0]["is_active"]:
@@ -52,16 +53,20 @@ def require_roles(*allowed_role_ids: int):
 
 
 def get_scoped_case_ids(profile: dict) -> set[int] | None:
-    """Case IDs this profile may see. None means unrestricted (admin only)."""
-    if profile["role_id"] == ADMIN:
+    """Case IDs this profile may see. None means unrestricted (super-admin only)."""
+    if profile["role_id"] == SUPER_ADMIN:
         return None
+
+    if profile["role_id"] == ADMIN:
+        case_rows = supabase.table("cases").select("case_id").eq("org_id", profile["org_id"]).execute().data
+        return {row["case_id"] for row in case_rows}
 
     if profile["role_id"] == LAWYER:
         lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
         if not lawyer_rows:
             return set()
         # is_active tracks current case_lawyers assignment (see cases.py's
-        # _active_lawyer_name) -- a lawyer taken off a case loses access to it.
+        # _active_case_lawyers) -- a lawyer taken off a case loses access to it.
         case_rows = (
             supabase.table("case_lawyers")
             .select("case_id")

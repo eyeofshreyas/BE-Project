@@ -27,9 +27,19 @@ def _fake_supabase(rows_by_table):
     return fake
 
 
-def test_admin_is_unrestricted():
-    """Verifies an admin profile gets unrestricted case scope (None). Exercises: `auth.get_scoped_case_ids()`."""
-    assert auth.get_scoped_case_ids({"role_id": auth.ADMIN, "user_id": 1}) is None
+def test_super_admin_is_unrestricted():
+    """Verifies a super-admin profile (org_id None) gets unrestricted case scope (None). Exercises: `auth.get_scoped_case_ids()`."""
+    assert auth.get_scoped_case_ids({"role_id": auth.SUPER_ADMIN, "user_id": 1, "org_id": None}) is None
+
+
+def test_org_admin_sees_only_their_org_cases():
+    """Verifies an org admin's scope resolves to the case_ids belonging to their own org_id, via a mocked `cases` table. Exercises: `auth.get_scoped_case_ids()`."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"case_id": 30}, {"case_id": 31}]
+    with patch("app.middleware.auth.supabase", fake):
+        result = auth.get_scoped_case_ids({"role_id": auth.ADMIN, "user_id": 1, "org_id": 7})
+    assert result == {30, 31}
+    fake.table.return_value.select.return_value.eq.assert_called_with("org_id", 7)
 
 
 def test_client_with_no_profile_row_sees_nothing():
@@ -91,9 +101,21 @@ def test_get_current_profile_returns_active_profile():
         assert auth.get_current_profile(current_user=MagicMock(email="x@example.com")) == users[0]
 
 
-def test_ensure_case_access_allows_admin_for_any_case():
-    """Verifies an admin passes the per-record case check for any case_id, with no lookup needed. Exercises: `auth.ensure_case_access()`."""
-    auth.ensure_case_access(999, {"role_id": auth.ADMIN, "user_id": 1})
+def test_ensure_case_access_allows_super_admin_for_any_case():
+    """Verifies a super-admin passes the per-record case check for any case_id, with no lookup needed. Exercises: `auth.ensure_case_access()`."""
+    auth.ensure_case_access(999, {"role_id": auth.SUPER_ADMIN, "user_id": 1, "org_id": None})
+
+
+def test_ensure_case_access_rejects_org_admin_outside_their_org():
+    """Verifies an org admin fails the per-record case check for a case belonging to a different org, raising 403. Exercises: `auth.ensure_case_access()`."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"case_id": 30}]
+    with patch("app.middleware.auth.supabase", fake):
+        try:
+            auth.ensure_case_access(99, {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7})
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 403
 
 
 def test_ensure_case_access_allows_lawyer_in_scope():
@@ -227,7 +249,8 @@ def test_login_rejects_actually_wrong_password():
 
 
 if __name__ == "__main__":
-    test_admin_is_unrestricted()
+    test_super_admin_is_unrestricted()
+    test_org_admin_sees_only_their_org_cases()
     test_client_with_no_profile_row_sees_nothing()
     test_client_sees_only_their_own_cases()
     test_lawyer_with_no_profile_row_sees_nothing()
@@ -236,7 +259,8 @@ if __name__ == "__main__":
     test_require_roles_rejects_other_role()
     test_get_current_profile_rejects_suspended_account()
     test_get_current_profile_returns_active_profile()
-    test_ensure_case_access_allows_admin_for_any_case()
+    test_ensure_case_access_allows_super_admin_for_any_case()
+    test_ensure_case_access_rejects_org_admin_outside_their_org()
     test_ensure_case_access_allows_lawyer_in_scope()
     test_ensure_case_access_rejects_lawyer_out_of_scope()
     test_get_current_user_rejects_actually_invalid_token()
