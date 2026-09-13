@@ -4,7 +4,7 @@ assigned to via case_lawyers for lawyers."""
 
 from fastapi import Depends
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, SUPER_ADMIN, require_roles
+from app.middleware.auth import ADMIN, CLIENT, LAWYER, SUPER_ADMIN, require_roles
 
 CLIENTS_SELECT = "client_id,address,preferred_language,users(full_name,email,phone)"
 CLOSED_STATUSES = {"Completed", "Closed"}
@@ -104,3 +104,16 @@ def list_clients(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYE
         _to_client_summary(row, counts.get(row["client_id"], 0), status_for(row["client_id"]), pending.get(row["client_id"], 0))
         for row in client_rows
     ]
+
+
+def list_my_suspensions(profile: dict = Depends(require_roles(CLIENT))):
+    """List the firms that have suspended the caller's own client account, by name -- backs
+    the client dashboard's suspension banner. A client with no clients row (shouldn't
+    happen, but the same defensive check every other client-scoped function makes) sees an
+    empty list rather than an error."""
+    client_rows = supabase.table("clients").select("client_id").eq("user_id", profile["user_id"]).execute().data
+    if not client_rows:
+        return []
+    rows = supabase.table("org_clients").select("organizations(name)") \
+        .eq("client_id", client_rows[0]["client_id"]).eq("is_active", False).execute().data
+    return [{"firm_name": row["organizations"]["name"]} for row in rows if row.get("organizations")]

@@ -14,3 +14,9 @@ class ClientSummary(BaseModel):
     active_cases: int
     status: str
     pending_amount: float
+
+
+class SuspendedFirm(BaseModel):
+    """One firm that has suspended the caller's own client account, for the client-facing
+    dashboard banner."""
+    firm_name: str
