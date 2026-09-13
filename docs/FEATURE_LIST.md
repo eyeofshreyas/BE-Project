@@ -103,32 +103,62 @@ when surfacing related precedent for a case's AI summary.
 by remembering which past case they first saw it in.
 
 ### Admin console & RBAC
-**How it works:** three roles (Admin/Lawyer/Client) gate *what* an endpoint allows; a
-second, independent check (`ensure_case_access()` / `get_scoped_case_ids()`) gates *which*
-specific cases that user can touch — added after an audit found that a role check alone
-didn't stop a lawyer from writing to a case they weren't assigned to. Messaging, which has
-no case to scope to, adds a third check: a verified client-lawyer relationship plus
-per-conversation participant membership.
+**How it works:** four roles gate *what* an endpoint allows — `ADMIN`, `LAWYER`, `CLIENT`,
+and `SUPER_ADMIN` (platform operator, `org_id` is always `NULL`, sees every firm). A second,
+independent check (`ensure_case_access()` / `get_scoped_case_ids()`) gates *which* specific
+cases that user can touch — added after an audit found that a role check alone didn't stop
+a lawyer from writing to a case they weren't assigned to. `ADMIN` is scoped to their own
+`org_id` everywhere (users, clients, cases, documents, invoices, settings); `SUPER_ADMIN`
+is unrestricted. Messaging, which has no case to scope to, adds a third check: a verified
+client-lawyer relationship plus per-conversation participant membership.
 
-**Why it matters:** an admin needs oversight across the whole firm without that same
-breadth being available to a lawyer who should only see their own cases, or a client who
-should only see their own matter — and that needs to be enforced, not just assumed by the UI.
+**Why it matters:** LexFlow hosts multiple law firms on one platform, each with its own
+users, clients, and cases — one firm's admin must never see another firm's data, which is
+why `ADMIN` is org-scoped rather than platform-wide. `SUPER_ADMIN` exists separately for
+LexFlow's own operators, who legitimately need cross-firm visibility for support and
+platform administration; it's never granted through self-serve signup or an invite, only
+by directly promoting an account in the database. A firm's own admin needs oversight across
+their whole firm without that same breadth being available to a lawyer who should only see
+their own cases, or a client who should only see their own matter — and that needs to be
+enforced, not just assumed by the UI.
+
+### Multi-lawyer case teams
+**How it works:** a case's lawyer roster is `case_lawyers`, a join table between `cases`
+and `lawyers` with an `assigned_role` (`Primary` or `Associate`) and an `is_active` flag —
+removing a teammate soft-deletes their row rather than deleting it, and re-adding them
+later reactivates that same row instead of inserting a duplicate. A case always has exactly
+one `Primary` (set at case creation, never re-assignable to someone else without removing
+the case's original primary lawyer first — the endpoint that adds a teammate flatly refuses
+`assigned_role: "Primary"`). Only the case's Primary lawyer, or an admin/super-admin, can
+add or remove a teammate other than themselves; any assigned lawyer can always remove
+themselves.
+
+**Why it matters:** real cases are rarely handled by one lawyer alone — a senior partner
+brings in an associate for research, or two lawyers split a large matter. Before this, a
+case had exactly one lawyer slot, so adding help meant either working around the system
+(sharing logins, tracking it outside LexFlow) or reassigning the case away from the lawyer
+who actually owns the client relationship.
 
 ### Conflict-of-interest check
 **How it works:** `GET /conflict-check?name=...` is the one endpoint in this app that's
-deliberately *not* scoped to the caller's own cases — it searches every client and every
-`case_parties` row (the case's non-client parties: opposing party, co-party) across the
-whole firm, plain case-insensitive substring matching, and returns which case and which
-lawyer each match belongs to. Run from the "Create Case" form before a new matter is
-opened (advisory, doesn't block creation), and the case detail page's "Parties" card is
-where the opposing party gets recorded — which is what makes that name searchable for the
-*next* lawyer's check.
+deliberately *not* scoped to the caller's own cases — for an org admin or lawyer it
+searches every client and every `case_parties` row (the case's non-client parties:
+opposing party, co-party) across their *whole firm* rather than just their own cases, plain
+case-insensitive substring matching, returning which case and which lawyer each match
+belongs to. For a `SUPER_ADMIN` it searches platform-wide, across every firm. It's
+reachable two ways: inline from the "Create Case" form before a new matter is opened
+(advisory, doesn't block creation), and as its own "Conflict Search" tab in the admin
+console for running a check on demand, not just mid case-creation. The case detail page's
+"Parties" card is where the opposing party gets recorded — which is what makes that name
+searchable for the *next* lawyer's check.
 
 **Why it matters:** representing a client your firm already opposes (or once represented
 against them) can get a case thrown out, trigger discipline, and exposes the firm to a
 malpractice claim — it's a bar-ethics requirement to check *before* taking on
-representation, not something undoable after the fact. Before this, LexFlow had nowhere
-to even record who's on the other side of a case, so there was nothing to check against.
+representation, not something undoable after the fact. Firm-wide scope is the whole point:
+a conflict usually comes from a colleague's case, not your own, so a check limited to "my
+cases" would miss the exact thing it exists to catch. Before this, LexFlow had nowhere to
+even record who's on the other side of a case, so there was nothing to check against.
 
 ---
 
