@@ -2,11 +2,22 @@
 -- (organizations) and lawyer-invite-by-email, alongside the case-team feature
 -- in cases.py. See docs/superpowers/specs/2026-09-13-org-scoped-case-teams-design.md.
 
+-- users.role_id has a foreign key into roles -- seed SUPER_ADMIN (4) before
+-- anything below tries to set a user's role_id to it.
+insert into roles (role_id, role_name, description) values
+  (4, 'Super Admin', 'Platform-wide operator, unrestricted across all organizations')
+on conflict (role_id) do nothing;
+
 create table if not exists organizations (
   org_id      bigint generated always as identity primary key,
   name        text not null,
   created_at  timestamptz not null default now()
 );
+-- Supabase enables RLS by default on tables created via the SQL editor. This
+-- app has no RLS policies anywhere -- every access check happens in Python
+-- against a single service-keyed client (see app/db/supabase_client.py) --
+-- so an RLS-enabled table with no policies blocks every insert/select.
+alter table organizations disable row level security;
 
 alter table users add column if not exists org_id bigint references organizations(org_id);
 -- NULL for clients and the super-admin; set for every ADMIN (org admin) and LAWYER row.
@@ -27,6 +38,7 @@ create table if not exists lawyer_invites (
   status      text not null default 'pending', -- pending | accepted
   created_at  timestamptz not null default now()
 );
+alter table lawyer_invites disable row level security;
 
 -- platform_settings: one row per org instead of the fixed id=1 singleton.
 -- Wrap the rename in a guard to make it idempotent: only run if id exists and org_id doesn't yet.
@@ -37,6 +49,9 @@ begin
     alter table platform_settings rename column id to org_id;
   end if;
 end $$;
+-- See the disable-RLS comment on `organizations` above -- applies here too;
+-- signup()'s admin path inserts a platform_settings row per new org.
+alter table platform_settings disable row level security;
 
 alter table platform_settings drop constraint if exists platform_settings_id_check;
 

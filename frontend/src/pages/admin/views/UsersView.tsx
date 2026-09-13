@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
-import { adminUpdateUser, deleteUser, getUserDeleteImpact, listUsers, setUserStatus } from '../../../api/client'
+import { adminUpdateUser, deleteUser, getUserDeleteImpact, inviteLawyer, listUsers, setUserStatus } from '../../../api/client'
 import type { UserDeleteImpact, UserSummary } from '../../../types/api'
 import { downloadCsv } from '../../../utils/files'
 import styles from '../../../components/AppShell.module.css'
@@ -77,6 +77,11 @@ export default function UsersView() {
   const [impact, setImpact] = useState<UserDeleteImpact | null>(null)
   const [draft, setDraft] = useState({ full_name: '', phone: '' })
   const [busy, setBusy] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteBusy, setInviteBusy] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+  const [inviteSent, setInviteSent] = useState(false)
 
   useEffect(() => {
     listUsers()
@@ -125,6 +130,23 @@ export default function UsersView() {
       .finally(() => setBusy(false))
   }
 
+  function openInvite() {
+    setInviteOpen(true)
+    setInviteEmail('')
+    setInviteError('')
+    setInviteSent(false)
+  }
+
+  function sendInvite() {
+    if (!inviteEmail.trim()) { setInviteError('Enter an email address.'); return }
+    setInviteBusy(true)
+    setInviteError('')
+    inviteLawyer(inviteEmail.trim())
+      .then(() => setInviteSent(true))
+      .catch((err) => setInviteError(err instanceof Error ? err.message : 'Failed to send invite.'))
+      .finally(() => setInviteBusy(false))
+  }
+
   function toggleStatus(user: UserSummary) {
     setBusy(true)
     setUserStatus(user.id, !user.is_active)
@@ -145,6 +167,7 @@ export default function UsersView() {
           <div className={styles.pageTitle}>Users</div>
           <div className={styles.pageSubtitle}>Lawyers, clients and administrators registered on LexFlow.</div>
         </div>
+        <div style={BTN_PRIMARY} onClick={openInvite}>Invite lawyer</div>
       </div>
 
       <div className={styles.card}>
@@ -277,6 +300,42 @@ export default function UsersView() {
               )}
               {panel.mode === 'edit' && <div style={{ ...BTN_PRIMARY, opacity: busy ? 0.6 : 1 }} onClick={() => { if (!busy) saveEdit() }}>{busy ? 'Saving…' : 'Save changes'}</div>}
               {panel.mode === 'delete' && <div style={{ ...BTN_PRIMARY, background: C.danger, boxShadow: 'none', opacity: busy || !impact ? 0.6 : 1 }} onClick={() => { if (!busy && impact) confirmDelete() }}>{busy ? 'Deleting…' : 'Delete permanently'}</div>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inviteOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(35, 48, 107,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }} onClick={() => setInviteOpen(false)}>
+          <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 28, width: 'min(420px,100%)', display: 'flex', flexDirection: 'column', gap: 16 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div style={{ fontFamily: "'Spectral',serif", fontSize: 20, fontWeight: 700, color: C.text }}>Invite a lawyer</div>
+              <span className={styles.actionBtn} onClick={() => setInviteOpen(false)} title="Close"><Icon name="x" size={15} color="#6E6759" /></span>
+            </div>
+
+            {inviteSent ? (
+              <div style={{ fontSize: 13.5, color: C.text }}>Invite sent to <strong>{inviteEmail}</strong>. They can now sign up as a lawyer with this email and will join your law firm automatically.</div>
+            ) : (
+              <>
+                <div>
+                  <div style={FIELD_LABEL}>Email address</div>
+                  <input
+                    type="email"
+                    placeholder="lawyer@example.com"
+                    value={inviteEmail}
+                    onChange={(e) => { setInviteEmail(e.target.value); setInviteError('') }}
+                    style={INPUT}
+                  />
+                </div>
+                {inviteError && <div style={{ fontSize: 12.5, color: C.danger }}>{inviteError}</div>}
+              </>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={BTN_GHOST} onClick={() => setInviteOpen(false)}>{inviteSent ? 'Close' : 'Cancel'}</div>
+              {!inviteSent && (
+                <div style={{ ...BTN_PRIMARY, opacity: inviteBusy ? 0.6 : 1 }} onClick={() => { if (!inviteBusy) sendInvite() }}>{inviteBusy ? 'Sending…' : 'Send invite'}</div>
+              )}
             </div>
           </div>
         </div>

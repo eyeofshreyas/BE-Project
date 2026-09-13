@@ -20,12 +20,13 @@ export interface SignupPayload {
   password: string
   full_name: string
   phone: string
-  role: 'lawyer' | 'client'
+  role: 'lawyer' | 'client' | 'admin'
   bar_council_number?: string
   specialization?: string
   experience_years?: number
   address?: string
   preferred_language?: string
+  org_name?: string
 }
 
 export interface CaseSummary {

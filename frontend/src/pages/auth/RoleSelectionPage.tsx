@@ -1,4 +1,4 @@
-/** Role picker at `/role-selection` shown before signup. Purely cosmetic: the chosen role is not passed on to `SignUpPage` (which asks again). */
+/** Role picker at `/role-selection` shown before signup. The chosen role is passed to `SignUpPage` via navigation state, which preselects the matching toggle. */
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
@@ -59,7 +59,7 @@ type RoleKey = 'lawyer' | 'client' | 'admin'
 const ROLES: { key: RoleKey; title: string; desc: string; icon: (c: string) => React.ReactNode; bullets: string[] }[] = [
   { key: 'lawyer', title: 'Lawyer', desc: 'Manage cases, clients, documents and billing.', icon: (c) => <BriefcaseIcon color={c} />, bullets: ['Case & client management', 'AI summaries & search', 'Invoicing & scheduling'] },
   { key: 'client', title: 'Client', desc: 'Track your cases and understand your documents.', icon: (c) => <UsersIcon color={c} />, bullets: ['Case progress tracking', 'Multilingual AI summaries', 'Invoices & hearings'] },
-  { key: 'admin', title: 'Admin', desc: 'Oversee users, cases and platform health.', icon: (c) => <ShieldIcon color={c} />, bullets: ['User & lawyer management', 'Reports & analytics', 'System settings'] },
+  { key: 'admin', title: 'Law Firm', desc: "Register your firm and oversee its lawyers, cases and settings.", icon: (c) => <ShieldIcon color={c} />, bullets: ['Lawyer invites & management', 'Reports & analytics', 'Firm settings'] },
 ]
 
 export default function RoleSelectionPage() {
@@ -70,10 +70,10 @@ export default function RoleSelectionPage() {
 
   function handleContinue() {
     if (!canContinue) return
-    setToast(`Continuing sign-up as ${selected!.charAt(0).toUpperCase()}${selected!.slice(1)}…`)
+    setToast(`Continuing sign-up as ${ROLES.find((r) => r.key === selected)!.title}…`)
     setTimeout(() => {
       setToast(null)
-      navigate('/signup')
+      navigate('/signup', { state: { role: selected } })
     }, 900)
   }
 

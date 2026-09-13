@@ -256,6 +256,10 @@ export function getUserDeleteImpact(userId: number) {
   return get<UserDeleteImpact>(`/users/${userId}/impact`)
 }
 
+export function inviteLawyer(email: string) {
+  return post<{ message: string }>('/admin/lawyer-invites', { email })
+}
+
 /** Irreversible: removes the user and everything cascading off them. Show the impact first. */
 export function deleteUser(userId: number) {
   return del<UserDeleteImpact>(`/users/${userId}`)

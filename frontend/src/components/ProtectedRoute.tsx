@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children, requireAdmin }: { children: R
   const profile = loadProfile()
 
   if (!profile) return <Navigate to="/login" replace />
-  if (requireAdmin && profile.role_id !== 1) return <Navigate to="/conveyancing" replace />
+  if (requireAdmin && profile.role_id !== 1 && profile.role_id !== 4) return <Navigate to="/conveyancing" replace />
 
   return <>{children}</>
 }

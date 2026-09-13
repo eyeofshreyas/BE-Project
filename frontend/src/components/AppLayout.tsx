@@ -9,8 +9,8 @@ import { listNotifications, listConversations } from '../api/client'
 import type { UserProfile, NotificationSummary } from '../types/api'
 import styles from './AppShell.module.css'
 
-const ROLE_LABELS: Record<number, string> = { 1: 'Super Admin', 2: 'Lawyer', 3: 'Client' }
-const BRAND_SUB_LABELS: Record<number, string> = { 1: 'Admin Console', 2: 'Legal Intelligence', 3: 'Client Portal' }
+const ROLE_LABELS: Record<number, string> = { 1: 'Admin', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
+const BRAND_SUB_LABELS: Record<number, string> = { 1: 'Admin Console', 2: 'Legal Intelligence', 3: 'Client Portal', 4: 'Admin Console' }
 const UNREAD_POLL_MS = 30000
 
 type NavDef = { label: string; icon: IconName; path?: string }
@@ -109,7 +109,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     setProfileOpen(false)
   }
 
-  const navItems = profile?.role_id === 3 ? CLIENT_NAV : profile?.role_id === 1 ? ADMIN_STAFF_NAV : LAWYER_NAV
+  const navItems = profile?.role_id === 3 ? CLIENT_NAV : profile?.role_id === 1 || profile?.role_id === 4 ? ADMIN_STAFF_NAV : LAWYER_NAV
 
   return (
     <div className={styles.page}>
