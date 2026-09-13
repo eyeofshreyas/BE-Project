@@ -131,7 +131,8 @@ def respond_client_request(request_id: int, data: ClientRequestDecision, profile
         raise HTTPException(status_code=400, detail="This request has already been responded to")
 
     now = datetime.now(timezone.utc).isoformat()
-    lawyer_user_id = supabase.table("lawyers").select("user_id").eq("lawyer_id", request_row["lawyer_id"]).execute().data[0]["user_id"]
+    lawyer_row = supabase.table("lawyers").select("user_id,users(org_id)").eq("lawyer_id", request_row["lawyer_id"]).execute().data[0]
+    lawyer_user_id = lawyer_row["user_id"]
 
     if data.decision == "decline":
         supabase.table("client_requests").update({"status": "declined", "responded_at": now}).eq("request_id", request_id).execute()
@@ -151,6 +152,7 @@ def respond_client_request(request_id: int, data: ClientRequestDecision, profile
             "client_id": client_id,
             "court_id": request_row["court_id"],
             "case_type_id": request_row["case_type_id"],
+            "org_id": lawyer_row["users"]["org_id"],
             "status": "Open",
             "priority": "Medium",
         }).execute().data[0]

@@ -14,6 +14,28 @@ class CaseCreate(BaseModel):
     description: str | None = None
 
 
+class LawyerAssignment(BaseModel):
+    """One active case_lawyers row, shaped for the case-team list."""
+    lawyer_id: int
+    name: str
+    email: str
+    phone: str
+    assigned_role: str
+
+
+class AvailableLawyer(BaseModel):
+    """A lawyer in the case's own organization, offered by the add-teammate picker."""
+    lawyer_id: int
+    name: str
+    email: str
+
+
+class AddLawyerRequest(BaseModel):
+    """Request body for adding a teammate to a case."""
+    lawyer_id: int
+    assigned_role: str = "Associate"
+
+
 class CaseSummary(BaseModel):
     """Case row shaped for list/detail responses, joined with client/lawyer/court/type info."""
     id: str
@@ -29,6 +51,7 @@ class CaseSummary(BaseModel):
     lawyer: str | None
     lawyer_email: str | None
     lawyer_phone: str | None
+    lawyers: list[LawyerAssignment]
     court: str | None
     case_type: str | None
     status: str
