@@ -314,7 +314,7 @@ export default function UsersView() {
             </div>
 
             {inviteSent ? (
-              <div style={{ fontSize: 13.5, color: C.text }}>Invite sent to <strong>{inviteEmail}</strong>. They can now sign up as a lawyer with this email and will join your organization automatically.</div>
+              <div style={{ fontSize: 13.5, color: C.text }}>Invite sent to <strong>{inviteEmail}</strong>. They can now sign up as a lawyer with this email and will join your law firm automatically.</div>
             ) : (
               <>
                 <div>

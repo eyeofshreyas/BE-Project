@@ -102,7 +102,7 @@ export default function SignUpPage() {
     if (password !== confirmPassword) { setError('Passwords do not match.'); return }
     if (isLawyer && !barNumber.trim()) { setError('Enter your Bar Council registration number.'); return }
     if (role === 'client' && !address.trim()) { setError('Enter your address.'); return }
-    if (isAdmin && !orgName.trim()) { setError('Enter your organization\'s name.'); return }
+    if (isAdmin && !orgName.trim()) { setError('Enter your law firm\'s name.'); return }
     if (!canSubmit) { setError('Please accept the Terms & Conditions and Privacy Policy.'); return }
     setLoading(true)
     setError('')
@@ -152,7 +152,7 @@ export default function SignUpPage() {
                   <Icon name="users" size={15} /><span>Client</span>
                 </div>
                 <div className={styles.roleOption} style={{ background: isAdmin ? '#FCFAF4' : 'transparent', color: isAdmin ? TEXT : MUTED, boxShadow: isAdmin ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('admin')}>
-                  <Icon name="building" size={15} /><span>Organization</span>
+                  <Icon name="building" size={15} /><span>Law Firm</span>
                 </div>
               </div>
             </div>
@@ -232,9 +232,9 @@ export default function SignUpPage() {
               </div>
             ) : isAdmin ? (
               <div className={styles.section}>
-                <div className={styles.sectionTitle}>Organization Details</div>
+                <div className={styles.sectionTitle}>Law Firm Details</div>
                 <div>
-                  <div className={styles.label}>Organization Name</div>
+                  <div className={styles.label}>Law Firm Name</div>
                   <div style={wrapStyle('orgName')}><Icon name="building" size={16} color={MUTED} /><input placeholder="e.g. Kulkarni & Associates" value={orgName} onChange={(e) => setOrgName(e.target.value)} onFocus={mkFocus('orgName')} onBlur={mkFocus(null)} className={styles.input} /></div>
                 </div>
               </div>
