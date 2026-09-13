@@ -115,7 +115,7 @@ def test_sync_case_writes_status_and_timeline_event():
     fake.table.side_effect = table
 
     fake_response = MagicMock(status_code=200)
-    fake_response.json.return_value = {"data": {"caseStatus": "PENDING", "courtCode": "DLHC01"}}
+    fake_response.json.return_value = {"data": {"courtCaseData": {"caseStatus": "PENDING", "courtCode": "DLHC01"}}}
 
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
          patch("app.controllers.ecourts.supabase", fake), \
@@ -129,7 +129,7 @@ def test_sync_case_writes_status_and_timeline_event():
 
         case_writes = [p for (t, p) in writes if t == "cases"]
         assert case_writes[0]["ecourts_status"] == "PENDING"
-        assert case_writes[0]["ecourts_raw"] == {"caseStatus": "PENDING", "courtCode": "DLHC01"}
+        assert case_writes[0]["ecourts_raw"] == {"courtCaseData": {"caseStatus": "PENDING", "courtCode": "DLHC01"}}
 
         timeline_writes = [p for (t, p) in writes if t == "case_timeline"]
         assert timeline_writes[0]["event_type"] == "ecourts_synced"
