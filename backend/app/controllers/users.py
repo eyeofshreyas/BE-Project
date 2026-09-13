@@ -1,5 +1,5 @@
 """Controllers for users: the admin-only roster (list, edit, activate/deactivate, hard
-delete), gated by require_roles(ADMIN) -- see docs/BACKEND_ARCHITECTURE.md's
+delete), gated by require_roles(ADMIN, SUPER_ADMIN) -- see docs/BACKEND_ARCHITECTURE.md's
 require_roles-only section -- plus the self-service profile edit any signed-in user may
 make to their own row."""
 
@@ -9,7 +9,7 @@ from fastapi import Depends, HTTPException
 from storage3.exceptions import StorageApiError
 from app.controllers.documents import DOCUMENTS_BUCKET
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, get_current_profile, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, get_current_profile, require_roles
 from app.models.users import UserSummary, StatusUpdate, ProfileUpdate
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def _to_user_summary(row: dict) -> dict:
     }
 
 
-def list_users(role: str | None = None, profile: dict = Depends(require_roles(ADMIN))):
+def list_users(role: str | None = None, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """List all users, optionally filtered by role name. Calls: `_to_user_summary()`."""
     rows = supabase.table("users").select(USERS_SELECT).order("created_at", desc=True).execute().data
     # ponytail: filters in Python post-fetch, fine while the users table is small;
@@ -41,7 +41,7 @@ def list_users(role: str | None = None, profile: dict = Depends(require_roles(AD
     return [_to_user_summary(row) for row in rows]
 
 
-def set_user_status(user_id: int, data: StatusUpdate, profile: dict = Depends(require_roles(ADMIN))):
+def set_user_status(user_id: int, data: StatusUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """Activate/deactivate a user; 404 if not found. Calls: `_to_user_summary()`."""
     rows = supabase.table("users").update({"is_active": data.is_active}).eq("user_id", user_id).execute().data
     if not rows:
@@ -59,7 +59,7 @@ def update_own_profile(data: ProfileUpdate, profile: dict = Depends(get_current_
     return _to_user_summary(result[0])
 
 
-def update_user(user_id: int, data: ProfileUpdate, profile: dict = Depends(require_roles(ADMIN))):
+def update_user(user_id: int, data: ProfileUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """Admin edit of another user's name/phone; 404 if not found. Email stays out of reach
     for the same reason as in `update_own_profile()`. Calls: `_to_user_summary()`."""
     rows = supabase.table("users").update(data.model_dump()).eq("user_id", user_id).execute().data
@@ -90,13 +90,13 @@ def _assert_deletable(user_id: int, profile: dict) -> None:
             raise HTTPException(status_code=400, detail="This is the last admin account -- deleting it would leave no one able to administer the platform.")
 
 
-def get_user_delete_impact(user_id: int, profile: dict = Depends(require_roles(ADMIN))):
+def get_user_delete_impact(user_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """Preview what deleting this user would destroy, without touching anything.
     Calls: `_cascade()`."""
     return _cascade(user_id, dry_run=True)
 
 
-def delete_user(user_id: int, profile: dict = Depends(require_roles(ADMIN))):
+def delete_user(user_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """Permanently delete a user and everything cascading off them. Irreversible -- callers
     are expected to have shown `get_user_delete_impact()` first.
     Calls: `_assert_deletable()`, `_cascade()`."""

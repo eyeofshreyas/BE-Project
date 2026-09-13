@@ -2,7 +2,7 @@
 
 from fastapi import Depends
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
 from app.models.judgements import JudgementCreate
 
 JUDGEMENTS_SELECT = (
@@ -53,7 +53,7 @@ def list_judgements(profile: dict = Depends(get_current_profile)):
     return [_to_judgement_summary(row) for row in rows]
 
 
-def create_judgement(data: JudgementCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_judgement(data: JudgementCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Create a judgement for a case the caller has access to. Calls: `ensure_case_access()`,
     `_to_judgement_summary()`."""
     ensure_case_access(data.case_id, profile)

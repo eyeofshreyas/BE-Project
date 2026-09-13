@@ -3,7 +3,7 @@ on cases the lawyer is actively assigned to via case_lawyers for lawyers."""
 
 from fastapi import Depends
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, require_roles
 
 CLIENTS_SELECT = "client_id,address,preferred_language,users(full_name,email,phone)"
 CLOSED_STATUSES = {"Completed", "Closed"}
@@ -26,7 +26,7 @@ def _to_client_summary(row: dict, active_cases: int, status: str, pending_amount
     }
 
 
-def list_clients(profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def list_clients(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """List clients visible to the caller (all for admin, case-linked for lawyer), each with
     computed active-case count, status, and pending invoice amount. Calls: `_to_client_summary()`."""
     if profile["role_id"] == ADMIN:

@@ -11,7 +11,7 @@ from app.controllers.case_history import add_timeline_event
 from app.controllers.cases import CASES_SELECT, _to_case_summary
 from app.core.config import ECOURTS_API_BASE, ECOURTS_API_KEY
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, require_roles
 from app.models.cases import CnrUpdate
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ def _ecourts_auth() -> str:
     return ECOURTS_API_KEY
 
 
-def set_case_cnr(case_id: int, data: CnrUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def set_case_cnr(case_id: int, data: CnrUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Attach a case's 16-character eCourts CNR number so it can be synced.
     Calls: `ensure_case_access()`."""
     ensure_case_access(case_id, profile)
@@ -36,7 +36,7 @@ def set_case_cnr(case_id: int, data: CnrUpdate, profile: dict = Depends(require_
     return _to_case_summary(row)
 
 
-def sync_case_from_ecourts(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def sync_case_from_ecourts(case_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Pull the latest record for a case from eCourtsIndia by its CNR, store the raw
     response, and log a timeline event. Auto-creating hearing rows from the response's
     hearing-history is a follow-up once that field's exact shape is confirmed against a

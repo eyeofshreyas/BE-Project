@@ -4,7 +4,7 @@ also be created -- see `create_judge`."""
 
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles
 from app.models.reference import CaseType, Court, Role, Judge, JudgeCreate, DocumentType
 
 JUDGES_SELECT = "judge_id,judge_name,designation,court_id,courts(court_name)"
@@ -47,7 +47,7 @@ def list_judges(profile: dict = Depends(get_current_profile)):
     return [_to_judge(row) for row in rows]
 
 
-def create_judge(data: JudgeCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_judge(data: JudgeCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Add a judge, e.g. one an eCourts sync or hearing needs that isn't seeded yet.
     Refuses a same-name-at-same-court duplicate; a same name at a different court is a
     different judge. Calls: `_to_judge()`."""

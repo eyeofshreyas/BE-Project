@@ -1,5 +1,5 @@
 """Admin-only controllers backing the admin console's Dashboard and Analytics tabs, plus
-the platform-wide settings row. Gated by require_roles(ADMIN)."""
+the platform-wide settings row. Gated by require_roles(ADMIN, SUPER_ADMIN)."""
 
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException
 from postgrest.exceptions import APIError as PostgrestAPIError
 from app.core.config import STORAGE_QUOTA_BYTES
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, CLIENT, LAWYER, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, CLIENT, LAWYER, require_roles
 from app.models.admin import PlatformSettings
 
 TIMELINE_SELECT = (
@@ -28,7 +28,7 @@ def _count(query) -> int:
     return query.execute().count or 0
 
 
-def get_stats(profile: dict = Depends(require_roles(ADMIN))):
+def get_stats(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """Platform-wide totals for the dashboard's overview cards."""
     month_start = date.today().replace(day=1).isoformat()
     today = date.today().isoformat()
@@ -66,7 +66,7 @@ def get_stats(profile: dict = Depends(require_roles(ADMIN))):
     }
 
 
-def list_activity(limit: int = 15, profile: dict = Depends(require_roles(ADMIN))):
+def list_activity(limit: int = 15, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """The newest `case_timeline` events across every case -- the admin-wide version of
     the per-case timeline on the case page."""
     rows = (
@@ -112,7 +112,7 @@ def _week_buckets(n: int) -> list[tuple[date, str]]:
     return [(w, w.strftime("%d %b")) for w in weeks]
 
 
-def get_analytics(profile: dict = Depends(require_roles(ADMIN))):
+def get_analytics(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """Case-status distribution, monthly filing growth, AI-summary usage, document
     insights and storage usage. Calls: `_month_buckets()`, `_week_buckets()`."""
     months = _month_buckets(GROWTH_MONTHS)
@@ -172,7 +172,7 @@ def _reraise_settings_error(error: PostgrestAPIError) -> None:
     raise error
 
 
-def get_settings(profile: dict = Depends(require_roles(ADMIN))):
+def get_settings(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """Read the single pinned platform_settings row, falling back to defaults if the row
     was deleted. Calls: `_reraise_settings_error()`."""
     try:
@@ -184,7 +184,7 @@ def get_settings(profile: dict = Depends(require_roles(ADMIN))):
     return {field: rows[0][field] for field in SETTINGS_FIELDS}
 
 
-def update_settings(data: PlatformSettings, profile: dict = Depends(require_roles(ADMIN))):
+def update_settings(data: PlatformSettings, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """Upsert the pinned platform_settings row. Calls: `_reraise_settings_error()`."""
     try:
         supabase.table("platform_settings").upsert({

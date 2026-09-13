@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
 from app.models.cases import CaseCreate, CaseSummary
 
 CASES_SELECT = (
@@ -133,7 +133,7 @@ def create_case(data: CaseCreate, profile: dict = Depends(require_roles(LAWYER))
     return _to_case_summary(row)
 
 
-def unassign_lawyer(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def unassign_lawyer(case_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Deactivates the case's active case_lawyers row. A lawyer may only step
     down from a case they're actively assigned to (enforced by
     ensure_case_access); an admin can unassign any case's lawyer."""

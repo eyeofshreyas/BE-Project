@@ -8,7 +8,7 @@ import httpx
 from fastapi import Depends, HTTPException
 from app.core.config import RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.billing import (
     InvoiceSummary, InvoiceCreate, PaymentSummary, PaymentCreate, ExpenseSummary, ExpenseCreate,
     RazorpayOrder, RazorpayVerify,
@@ -102,7 +102,7 @@ def get_invoice(invoice_id: int, profile: dict = Depends(get_current_profile)):
     return _get_invoice(invoice_id, get_scoped_case_ids(profile))
 
 
-def send_invoice_reminder(invoice_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def send_invoice_reminder(invoice_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Notify the invoice's client (in-app) that payment is due. Calls: `ensure_case_access()`."""
     rows = supabase.table("invoices").select(
         "invoice_number,total_amount,case_id,cases(client_id,case_number)"
@@ -132,7 +132,7 @@ def send_invoice_reminder(invoice_id: int, profile: dict = Depends(require_roles
     return {"message": "Reminder sent."}
 
 
-def create_invoice(data: InvoiceCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_invoice(data: InvoiceCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Create an invoice for a case the caller has access to. Calls: `ensure_case_access()`, `_get_invoice()`."""
     ensure_case_access(data.case_id, profile)
     row = supabase.table("invoices").insert({
@@ -155,7 +155,7 @@ def list_invoice_payments(invoice_id: int, profile: dict = Depends(get_current_p
     return supabase.table("payments").select(PAYMENTS_SELECT).eq("invoice_id", invoice_id).order("payment_date", desc=True).execute().data
 
 
-def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Record a payment against an invoice the caller has access to, then recompute and persist
     the invoice's payment_status. Calls: `_get_invoice()`, `get_scoped_case_ids()`, `_invoice_status_for()`."""
     _get_invoice(data.invoice_id, get_scoped_case_ids(profile))
@@ -266,7 +266,7 @@ def list_expenses(matter_id: int | None = None, profile: dict = Depends(get_curr
     return [_to_expense_summary(row) for row in rows]
 
 
-def create_expense(data: ExpenseCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_expense(data: ExpenseCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Log an expense for a matter whose owning case the caller has access to.
     Calls: `ensure_case_access()`, `_to_expense_summary()`."""
     matter_rows = supabase.table("conveyancing_matters").select("case_id").eq("matter_id", data.matter_id).execute().data

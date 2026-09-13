@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 from fastapi import Depends, File, HTTPException, UploadFile
 from app.db.supabase_client import supabase
 from app.controllers.documents import DOCUMENTS_BUCKET, read_upload
-from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.conveyancing import Stats, StatusCount, MatterSummary, ConveyancingSummary, Property, DueDiligence, DueDiligenceUpdate, ProgressStage, PropertyRegistration, MatterDocument, MatterDetail, MatterCreate, MatterUpdate
 
 MATTERS_SELECT = (
@@ -140,7 +140,7 @@ def _next_matter_seq(year: int) -> int:
     return max([n for n in used if n is not None], default=0) + 1
 
 
-def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Create a conveyancing matter: `conveyancing_matters.case_id`/`properties.address` are
     NOT NULL, so this opens a lightweight `cases` row first (case_type 'Property', the first
     available court, the picked client, the form's priority) the same way `create_case()` does,
@@ -214,7 +214,7 @@ def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMI
     return {"matter_id": matter_row["matter_id"], "matter_number": matter_number}
 
 
-def update_matter(matter_id: int, data: MatterUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def update_matter(matter_id: int, data: MatterUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Edit a matter's registration status and/or its scheduled registration (date + office),
     upserting the `property_registrations` row since a matter may not have one yet. Backs both
     the dashboard's row Edit action and the Schedule Registration quick action.
@@ -364,7 +364,7 @@ def upload_matter_document(
     }
 
 
-def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Update a matter's due-diligence checklist fields. Calls: `_ensure_matter_access()`."""
     _ensure_matter_access(matter_id, profile)
 
@@ -380,7 +380,7 @@ def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict
     return {**result, "lawyer_name": lawyer["users"]["full_name"] if lawyer else None}
 
 
-def complete_progress_stage(matter_id: int, progress_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def complete_progress_stage(matter_id: int, progress_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Mark one registration-progress stage complete and recompute the matter's
     completion_percentage from all stages. Calls: `_ensure_matter_access()`."""
     _ensure_matter_access(matter_id, profile)

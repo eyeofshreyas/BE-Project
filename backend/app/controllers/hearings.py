@@ -5,7 +5,7 @@ from datetime import date
 from fastapi import Depends, HTTPException
 from app.controllers.case_history import add_timeline_event
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.hearings import HearingSummary, HearingCreate, HearingUpdate
 
 HEARINGS_SELECT = (
@@ -85,7 +85,7 @@ def get_hearing(hearing_id: int, profile: dict = Depends(get_current_profile)):
     return _get_hearing(hearing_id, get_scoped_case_ids(profile))
 
 
-def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Create a hearing for a case the caller has access to, and update the case's
     next_hearing_date. Calls: `ensure_case_access()`, `_sync_next_hearing_date()`, `_get_hearing()`."""
     ensure_case_access(data.case_id, profile)
@@ -133,7 +133,7 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
     return hearing
 
 
-def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Update a hearing's status/outcome/notes; also re-syncs the case's next_hearing_date
     since a status change can affect which hearing is now the nearest upcoming one, and records
     a timeline event when the hearing reaches a new status -- what happened at a hearing is case

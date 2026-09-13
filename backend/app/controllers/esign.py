@@ -15,7 +15,7 @@ from app.controllers.case_history import add_timeline_event
 from app.controllers.documents import DOCUMENTS_BUCKET, DOCUMENTS_SELECT, _to_document_summary
 from app.core.config import LEEGALITY_API_BASE, LEEGALITY_AUTH_TOKEN, LEEGALITY_PRIVATE_SALT, LEEGALITY_WORKFLOW_PROFILE_ID
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, require_roles
 from app.models.documents import SignatureRequestCreate
 
 
@@ -26,7 +26,7 @@ def _leegality_auth() -> str:
     return LEEGALITY_AUTH_TOKEN
 
 
-def request_signature(document_id: int, data: SignatureRequestCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def request_signature(document_id: int, data: SignatureRequestCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Send a stored PDF to Leegality for signing by the given signers -- only PDFs can be sent,
     same restriction the Document Execution API itself enforces. Calls: `ensure_case_access()`,
     `_leegality_auth()`."""

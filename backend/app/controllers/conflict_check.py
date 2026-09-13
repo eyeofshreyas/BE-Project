@@ -8,7 +8,7 @@ point, and normal RBAC scoping would hide exactly the matches that matter."""
 from fastapi import Depends, HTTPException
 from app.controllers.case_history import add_timeline_event
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, get_current_profile, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, get_current_profile, require_roles
 from app.models.conflict_check import PartyCreate
 
 CASE_PARTIES_SELECT = "party_id,case_id,name,role,created_at"
@@ -37,7 +37,7 @@ def list_case_parties(case_id: int, profile: dict = Depends(get_current_profile)
     return [_to_party_summary(r) for r in rows]
 
 
-def add_case_party(case_id: int, data: PartyCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def add_case_party(case_id: int, data: PartyCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Add a party (opposing party, co-party, etc.) to a case the caller has access to --
     this is what future conflict checks by other lawyers search against. Calls:
     `ensure_case_access()`, `add_timeline_event()`, `_to_party_summary()`."""
@@ -54,7 +54,7 @@ def add_case_party(case_id: int, data: PartyCreate, profile: dict = Depends(requ
     return _to_party_summary(row)
 
 
-def search_conflicts(name: str, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def search_conflicts(name: str, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Search every client and case party across the whole firm for a name match -- run
     before opening a new case, to catch representing someone your firm already opposes (or
     once opposed). Matching is a plain case-insensitive substring check in Python, not a
