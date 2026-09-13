@@ -29,10 +29,16 @@ create table if not exists lawyer_invites (
 );
 
 -- platform_settings: one row per org instead of the fixed id=1 singleton.
-alter table platform_settings rename column id to org_id;
+-- Wrap the rename in a guard to make it idempotent: only run if id exists and org_id doesn't yet.
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_name = 'platform_settings' and column_name = 'id')
+     and not exists (select 1 from information_schema.columns where table_name = 'platform_settings' and column_name = 'org_id') then
+    alter table platform_settings rename column id to org_id;
+  end if;
+end $$;
+
 alter table platform_settings drop constraint if exists platform_settings_id_check;
-alter table platform_settings add constraint platform_settings_org_id_fkey
-  foreign key (org_id) references organizations(org_id);
 
 -- Backfill existing single-tenant data into one "Legacy Firm" organization.
 -- Run this block once, then make cases.org_id NOT NULL.
@@ -40,13 +46,19 @@ do $$
 declare
   legacy_org_id bigint;
 begin
-  insert into organizations (name) values ('Legacy Firm') returning org_id into legacy_org_id;
+  if not exists (select 1 from organizations where name = 'Legacy Firm') then
+    insert into organizations (name) values ('Legacy Firm') returning org_id into legacy_org_id;
+  else
+    select org_id into legacy_org_id from organizations where name = 'Legacy Firm';
+  end if;
 
   update users set org_id = legacy_org_id where role_id in (1, 2) and org_id is null;
-  -- If more than one existing ADMIN row comes back from the next line, pick
-  -- the one that should be the platform super-admin and run by hand:
+  -- After this UPDATE runs, check whether more than one pre-existing user has role_id = 1 (ADMIN).
+  -- If so, pick which one should become the platform super-admin and run by hand:
   --   update users set role_id = 4, org_id = null where user_id = <that user's id>;
   -- (role_id 4 = SUPER_ADMIN, added in app/middleware/auth.py by Task 2.)
+  -- If the unique index one_admin_per_org aborts this whole block (due to conflicting pre-existing ADMINs),
+  -- resolve the conflict by hand, then re-run this file.
 
   update cases set org_id = legacy_org_id where org_id is null;
   -- No platform_settings backfill needed here: the column rename above already
@@ -55,5 +67,11 @@ begin
   -- sequence starts at 1. If that assumption doesn't hold (a prior partial run,
   -- pre-seeded organizations rows), reconcile platform_settings.org_id by hand.
 end $$;
+
+-- Add the FK constraint to platform_settings AFTER the backfill block runs (now that organizations exists).
+-- Drop and re-add to make this idempotent: safe to re-run without "constraint already exists" error.
+alter table platform_settings drop constraint if exists platform_settings_org_id_fkey;
+alter table platform_settings add constraint platform_settings_org_id_fkey
+  foreign key (org_id) references organizations(org_id);
 
 alter table cases alter column org_id set not null;
