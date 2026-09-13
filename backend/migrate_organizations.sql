@@ -13,6 +13,11 @@ create table if not exists organizations (
   name        text not null,
   created_at  timestamptz not null default now()
 );
+-- Supabase enables RLS by default on tables created via the SQL editor. This
+-- app has no RLS policies anywhere -- every access check happens in Python
+-- against a single service-keyed client (see app/db/supabase_client.py) --
+-- so an RLS-enabled table with no policies blocks every insert/select.
+alter table organizations disable row level security;
 
 alter table users add column if not exists org_id bigint references organizations(org_id);
 -- NULL for clients and the super-admin; set for every ADMIN (org admin) and LAWYER row.
@@ -33,6 +38,7 @@ create table if not exists lawyer_invites (
   status      text not null default 'pending', -- pending | accepted
   created_at  timestamptz not null default now()
 );
+alter table lawyer_invites disable row level security;
 
 -- platform_settings: one row per org instead of the fixed id=1 singleton.
 -- Wrap the rename in a guard to make it idempotent: only run if id exists and org_id doesn't yet.
