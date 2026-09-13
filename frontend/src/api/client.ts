@@ -393,6 +393,10 @@ export function listJudges() {
   return get<JudgeOption[]>('/reference/judges')
 }
 
+export function createJudge(payload: { judge_name: string; court_id: number; designation?: string }) {
+  return post<JudgeOption>('/reference/judges', payload)
+}
+
 /** `allow_duplicate` re-sends a hearing the backend refused as a possible double-submit. */
 export function createHearing(payload: {
   case_id: number

@@ -7,12 +7,12 @@ import {
   listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
   unassignLawyer, getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
-  listHearings, createHearing, listJudges, updateHearing, updateMeeting, deleteDocument,
+  listHearings, createHearing, listJudges, createJudge, listCourts, updateHearing, updateMeeting, deleteDocument,
   setCaseCnr, syncCaseEcourts, requestSignature, listCaseParties, addCaseParty,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
-  DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption, PartySummary,
+  DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption, CourtOption, PartySummary,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
 import { canRenderInline, uploadRejection, ESIGN_RESENDABLE, esignPill } from '../../utils/files'
@@ -164,7 +164,14 @@ export default function CaseDetailPage() {
   const [schedulingHearing, setSchedulingHearing] = useState(false)
   const [hearings, setHearings] = useState<HearingSummary[]>([])
   const [judges, setJudges] = useState<JudgeOption[]>([])
+  const [courts, setCourts] = useState<CourtOption[]>([])
   const [hearingJudgeId, setHearingJudgeId] = useState('')
+  const [judgeFormOpen, setJudgeFormOpen] = useState(false)
+  const [newJudgeName, setNewJudgeName] = useState('')
+  const [newJudgeCourtId, setNewJudgeCourtId] = useState('')
+  const [newJudgeDesignation, setNewJudgeDesignation] = useState('')
+  const [addingJudge, setAddingJudge] = useState(false)
+  const [judgeError, setJudgeError] = useState('')
   const [hearingDate, setHearingDate] = useState('')
   const [hearingTime, setHearingTime] = useState('')
   const [hearingCourtroom, setHearingCourtroom] = useState('')
@@ -225,6 +232,7 @@ export default function CaseDetailPage() {
       .finally(() => setLoading(false))
     if (canUploadDocs) listDocumentTypes().then(setDocumentTypes).catch(() => {})
     if (canManage) listJudges().then(setJudges).catch(() => {})
+    if (canManage) listCourts().then(setCourts).catch(() => {})
     if (canManage) getCaseAiSummary(numericCaseId).then(setAiSummary).catch(() => setAiSummary(null))
     if (canManage) listCaseParties(numericCaseId).then(setParties).catch(() => {})
   }, [numericCaseId, canUploadDocs, canManage])
@@ -510,6 +518,33 @@ export default function CaseDetailPage() {
     }
   }
 
+  /** Adds a judge not yet in the reference list (`POST /reference/judges`) -- e.g. one an
+   * eCourts sync reported that isn't seeded here -- and selects it for the hearing being
+   * scheduled. */
+  async function submitJudge() {
+    if (!newJudgeName.trim() || !newJudgeCourtId) return
+    setAddingJudge(true)
+    setJudgeError('')
+    try {
+      const created = await createJudge({
+        judge_name: newJudgeName.trim(),
+        court_id: Number(newJudgeCourtId),
+        designation: newJudgeDesignation.trim() || undefined,
+      })
+      setJudges((prev) => [...prev, created].sort((a, b) => a.judge_name.localeCompare(b.judge_name)))
+      setHearingJudgeId(String(created.judge_id))
+      setNewJudgeName('')
+      setNewJudgeCourtId('')
+      setNewJudgeDesignation('')
+      setJudgeFormOpen(false)
+    } catch (err) {
+      const status = (err as { status?: number }).status
+      setJudgeError(status === 409 ? 'This judge already exists at that court.' : err instanceof Error ? err.message : 'Failed to add judge.')
+    } finally {
+      setAddingJudge(false)
+    }
+  }
+
   function closeScheduleForm() {
     setHearingOpen(false)
     setDuplicateHearing('')
@@ -518,6 +553,8 @@ export default function CaseDetailPage() {
     setHearingTime('')
     setHearingCourtroom('')
     setHearingNotes('')
+    setJudgeFormOpen(false)
+    setJudgeError('')
     setMeetingTitle('')
     setMeetingWhen('')
     setMeetingAgenda('')
@@ -859,12 +896,38 @@ export default function CaseDetailPage() {
 
                   {scheduleKind === 'hearing' ? (
                     <>
-                      <select value={hearingJudgeId} onChange={(e) => { setHearingJudgeId(e.target.value); setDuplicateHearing('') }} style={inputStyle}>
-                        <option value="">Select a judge…</option>
-                        {judges.map((j) => (
-                          <option key={j.judge_id} value={j.judge_id}>{j.judge_name}{j.court_name ? ` — ${j.court_name}` : ''}</option>
-                        ))}
-                      </select>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <select value={hearingJudgeId} onChange={(e) => { setHearingJudgeId(e.target.value); setDuplicateHearing('') }} style={{ ...inputStyle, flex: 1 }}>
+                          <option value="">Select a judge…</option>
+                          {judges.map((j) => (
+                            <option key={j.judge_id} value={j.judge_id}>{j.judge_name}{j.court_name ? ` — ${j.court_name}` : ''}</option>
+                          ))}
+                        </select>
+                        {!judgeFormOpen && <button className={cd.linkAction} onClick={() => setJudgeFormOpen(true)}>Add judge</button>}
+                      </div>
+                      {judgeFormOpen && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', background: '#FCFAF4', borderRadius: 3 }}>
+                          <input value={newJudgeName} onChange={(e) => setNewJudgeName(e.target.value)} placeholder="Judge name" style={inputStyle} />
+                          <select value={newJudgeCourtId} onChange={(e) => setNewJudgeCourtId(e.target.value)} style={inputStyle}>
+                            <option value="">Select a court…</option>
+                            {courts.map((c) => (
+                              <option key={c.court_id} value={c.court_id}>{c.court_name}</option>
+                            ))}
+                          </select>
+                          <input value={newJudgeDesignation} onChange={(e) => setNewJudgeDesignation(e.target.value)} placeholder="Designation (optional)" style={inputStyle} />
+                          {judgeError && <div style={{ fontSize: 12, color: '#B3282D' }}>{judgeError}</div>}
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <div
+                              className={styles.primaryChip}
+                              style={{ opacity: addingJudge || !newJudgeName.trim() || !newJudgeCourtId ? 0.6 : 1 }}
+                              onClick={() => !addingJudge && submitJudge()}
+                            >
+                              {addingJudge ? 'Adding…' : 'Add judge'}
+                            </div>
+                            <div className={styles.ghostChip} onClick={() => { setJudgeFormOpen(false); setJudgeError('') }}>Cancel</div>
+                          </div>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', gap: 8 }}>
                         <input type="date" value={hearingDate} onChange={(e) => { setHearingDate(e.target.value); setDuplicateHearing('') }} style={{ ...inputStyle, flex: 1 }} />
                         <input type="time" value={hearingTime} onChange={(e) => { setHearingTime(e.target.value); setDuplicateHearing('') }} style={{ ...inputStyle, flex: 1 }} />
