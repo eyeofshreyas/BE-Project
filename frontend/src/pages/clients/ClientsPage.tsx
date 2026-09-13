@@ -2,13 +2,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { listClients, listInvoices } from '../../api/client'
-import type { ClientSummary } from '../../types/api'
+import type { ClientSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { Dropdown } from '../conveyancing/ConveyancingDashboardPage'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
 const MUTED = '#6E6759'
 const PRIMARY_DARK = '#1A2551'
+const LAWYER = 2
 const STATUSES = ['All Statuses', 'Active', 'Pending', 'Closed']
 const SORTS = ['Newest', 'Oldest', 'Name (A-Z)'] as const
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
@@ -25,10 +26,21 @@ function moneyRound(n: number) {
   return `₹${Math.round(n).toLocaleString()}`
 }
 
+function loadProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
 /** Loads all clients via `listClients()`; supports search, status filter, and sort; "Add Client" navigates to `/clients/new`. */
 export default function ClientsPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const profile = loadProfile()
+  const canInviteClient = profile?.role_id === LAWYER
   const [clients, setClients] = useState<ClientSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -141,7 +153,9 @@ export default function ClientsPage() {
           />
           <Dropdown value={statusFilter} options={STATUSES} labelFor={(s) => s} onChange={setStatusFilter} />
           <Dropdown value={sort} options={[...SORTS]} labelFor={(s) => `Sort By: ${s}`} onChange={(v) => setSort(v as (typeof SORTS)[number])} />
-          <div className={styles.primaryChip} onClick={() => navigate('/clients/new')}><Icon name="plus" size={15} color="#FCFAF4" /> Add Client</div>
+          {canInviteClient && (
+            <div className={styles.primaryChip} onClick={() => navigate('/clients/new')}><Icon name="plus" size={15} color="#FCFAF4" /> Add Client</div>
+          )}
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading clients…</div>}
