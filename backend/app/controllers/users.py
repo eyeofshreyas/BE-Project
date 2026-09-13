@@ -99,6 +99,15 @@ def set_client_firm_status(user_id: int, data: ClientFirmStatusUpdate, profile: 
         raise HTTPException(status_code=404, detail="This user isn't a client")
     client_id = client_rows[0]["client_id"]
 
+    # Same "does this client have a case in my org" check list_clients() and list_users()
+    # use to scope which clients an org admin can even see -- without it, any admin could
+    # suspend/reactivate any client platform-wide. 404 (not 403), same reasoning as
+    # _assert_same_org_or_404: an org admin shouldn't be able to tell a client outside their
+    # org exists at all.
+    case_rows = supabase.table("cases").select("client_id").eq("client_id", client_id).eq("org_id", profile["org_id"]).execute().data
+    if not case_rows:
+        raise HTTPException(status_code=404, detail="This user isn't a client")
+
     supabase.table("org_clients").upsert({
         "org_id": profile["org_id"],
         "client_id": client_id,

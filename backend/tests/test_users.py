@@ -184,6 +184,8 @@ def test_set_client_firm_status_upserts_org_clients():
         m = MagicMock()
         if name == "clients":
             m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        elif name == "cases":
+            m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
         elif name == "org_clients":
             m.upsert.return_value.execute.return_value = MagicMock()
         elif name == "users":
@@ -221,6 +223,8 @@ def test_set_client_firm_status_reactivate_clears_suspended_at():
         m = MagicMock()
         if name == "clients":
             m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        elif name == "cases":
+            m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
         elif name == "org_clients":
             m.upsert.return_value.execute.return_value = MagicMock()
         elif name == "users":
@@ -239,3 +243,34 @@ def test_set_client_firm_status_reactivate_clears_suspended_at():
         {"org_id": 7, "client_id": 9, "is_active": True, "suspended_at": None}, on_conflict="org_id,client_id"
     )
     assert result["suspended"] is False
+
+
+def test_set_client_firm_status_rejects_client_with_no_case_in_callers_org():
+    """Verifies an org admin gets a 404 (not a 200) trying to suspend/reactivate a client who
+    has never had a case with their org -- without this check any admin could suspend any
+    client platform-wide. Same "don't reveal existence" reasoning as
+    `_assert_same_org_or_404`: 404, not 403. Exercises: `PATCH /users/{id}/firm-status`
+    (`users.set_client_firm_status()`)."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        elif name == "cases":
+            m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+        elif name == "org_clients":
+            m.upsert.return_value.execute.return_value = MagicMock()
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    profile = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
+    with patch("app.controllers.users.supabase", fake):
+        with pytest.raises(HTTPException) as exc:
+            set_client_firm_status(5, ClientFirmStatusUpdate(is_active=False), profile)
+    assert exc.value.status_code == 404
+    assert "org_clients" not in tables
