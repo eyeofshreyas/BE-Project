@@ -76,7 +76,7 @@ def test_search_conflicts_finds_client_match_on_an_unscoped_case():
     """Verifies a client-name match surfaces even on a case the caller isn't scoped to --
     the whole point of the feature. Exercises: `GET /conflict-check`
     (`conflict_check.search_conflicts()`)."""
-    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    profile = {"role_id": auth.LAWYER, "user_id": 1, "org_id": 7}
     case_row = {
         "case_id": 20, "case_number": "CIV2026099",
         "clients": {"users": {"full_name": "Priya Sharma"}},
@@ -95,10 +95,10 @@ def test_search_conflicts_finds_client_match_on_an_unscoped_case():
 def test_search_conflicts_finds_party_match():
     """Verifies an opposing-party name match surfaces with its role and case context.
     Exercises: `GET /conflict-check` (`conflict_check.search_conflicts()`)."""
-    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    profile = {"role_id": auth.LAWYER, "user_id": 1, "org_id": 7}
     party_row = {
         "party_id": 1, "case_id": 20, "name": "Metro Builders", "role": "Opposing Party",
-        "cases": {"case_number": "CIV2026099", "case_lawyers": [{"is_active": True, "lawyers": {"users": {"full_name": "Rohan Mehta"}}}]},
+        "cases": {"case_number": "CIV2026099", "org_id": 7, "case_lawyers": [{"is_active": True, "lawyers": {"users": {"full_name": "Rohan Mehta"}}}]},
     }
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
          patch("app.controllers.conflict_check.supabase", _fake_supabase({"cases": [], "case_parties": [party_row]})):
@@ -108,6 +108,25 @@ def test_search_conflicts_finds_party_match():
     assert results[0]["source"] == "party"
     assert results[0]["role"] == "Opposing Party"
     assert results[0]["case_number"] == "CIV2026099"
+
+
+def test_search_conflicts_scoped_to_callers_org_for_lawyer():
+    """Verifies a lawyer's conflict search only queries their own org's cases/parties, not the whole platform. Exercises: `GET /conflicts` (`conflict_check.search_conflicts()`)."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+    with patch("app.controllers.conflict_check.supabase", fake):
+        search_conflicts("Smith", profile={"role_id": auth.LAWYER, "user_id": 1, "org_id": 7})
+    fake.table.return_value.select.return_value.eq.assert_any_call("org_id", 7)
+
+
+def test_search_conflicts_unscoped_for_super_admin():
+    """Verifies the super-admin's conflict search stays platform-wide (today's behavior). Exercises: `GET /conflicts` (`conflict_check.search_conflicts()`)."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.execute.return_value.data = []
+    with patch("app.controllers.conflict_check.supabase", fake):
+        result = search_conflicts("Smith", profile={"role_id": auth.SUPER_ADMIN, "user_id": 1, "org_id": None})
+    assert result == []
+    fake.table.return_value.select.return_value.eq.assert_not_called()
 
 
 def test_search_conflicts_blank_query_returns_nothing():
@@ -124,5 +143,7 @@ if __name__ == "__main__":
     test_list_case_parties_rejects_out_of_scope_case()
     test_search_conflicts_finds_client_match_on_an_unscoped_case()
     test_search_conflicts_finds_party_match()
+    test_search_conflicts_scoped_to_callers_org_for_lawyer()
+    test_search_conflicts_unscoped_for_super_admin()
     test_search_conflicts_blank_query_returns_nothing()
     print("ok")
