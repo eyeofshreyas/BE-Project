@@ -6,13 +6,15 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
-  unassignLawyer, getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
+  removeLawyerFromCase, addLawyerToCase, listAvailableCaseLawyers,
+  getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
   listHearings, createHearing, listJudges, createJudge, listCourts, updateHearing, updateMeeting, deleteDocument,
   setCaseCnr, syncCaseEcourts, requestSignature, listCaseParties, addCaseParty,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
   DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption, CourtOption, PartySummary,
+  AvailableLawyer,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
 import { canRenderInline, uploadRejection, ESIGN_RESENDABLE, esignPill } from '../../utils/files'
@@ -148,7 +150,12 @@ export default function CaseDetailPage() {
   const [aiLoading, setAiLoading] = useState(false)
 
   const [statusSaving, setStatusSaving] = useState(false)
-  const [unassigning, setUnassigning] = useState(false)
+  const [teamFormOpen, setTeamFormOpen] = useState(false)
+  const [availableLawyers, setAvailableLawyers] = useState<AvailableLawyer[]>([])
+  const [availableLoading, setAvailableLoading] = useState(false)
+  const [selectedLawyerId, setSelectedLawyerId] = useState('')
+  const [addingTeammate, setAddingTeammate] = useState(false)
+  const [removingLawyerId, setRemovingLawyerId] = useState<number | null>(null)
   const [cnrEditing, setCnrEditing] = useState(false)
   const [cnrInput, setCnrInput] = useState('')
   const [cnrSaving, setCnrSaving] = useState(false)
@@ -384,17 +391,45 @@ export default function CaseDetailPage() {
     }
   }
 
-  async function unassign() {
-    if (!caseInfo || !window.confirm('Remove the assigned lawyer from this case?')) return
-    setUnassigning(true)
+  async function openTeamForm() {
+    setTeamFormOpen(true)
+    setAvailableLoading(true)
     try {
-      const updated = await unassignLawyer(numericCaseId)
-      setCaseInfo(updated)
-      showToast('Lawyer unassigned.')
+      setAvailableLawyers(await listAvailableCaseLawyers(numericCaseId))
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to unassign lawyer.')
+      showToast(err instanceof Error ? err.message : 'Failed to load available lawyers.')
     } finally {
-      setUnassigning(false)
+      setAvailableLoading(false)
+    }
+  }
+
+  async function submitTeammate() {
+    if (!selectedLawyerId) return
+    setAddingTeammate(true)
+    try {
+      const updated = await addLawyerToCase(numericCaseId, Number(selectedLawyerId))
+      setCaseInfo(updated)
+      setTeamFormOpen(false)
+      setSelectedLawyerId('')
+      showToast('Teammate added to case.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to add teammate.')
+    } finally {
+      setAddingTeammate(false)
+    }
+  }
+
+  async function removeTeammate(lawyerId: number) {
+    if (!window.confirm('Remove this lawyer from the case?')) return
+    setRemovingLawyerId(lawyerId)
+    try {
+      const updated = await removeLawyerFromCase(numericCaseId, lawyerId)
+      setCaseInfo(updated)
+      showToast('Lawyer removed from case.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to remove lawyer.')
+    } finally {
+      setRemovingLawyerId(null)
     }
   }
 
@@ -735,9 +770,6 @@ export default function CaseDetailPage() {
               )}
             </Fact>
             <Fact label="Responsible lawyer" value={caseInfo.lawyer ?? 'Not assigned'}>
-              {canManage && caseInfo.lawyer && (
-                <div className={cd.factAction} onClick={() => !unassigning && unassign()}>{unassigning ? 'Removing…' : 'Unassign'}</div>
-              )}
               {!canManage && caseInfo.lawyer_id && (
                 <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => !messaging && openConversation(caseInfo.lawyer_id)}>{messaging ? 'Opening…' : 'Message'}</button>
               )}
@@ -1273,6 +1305,59 @@ export default function CaseDetailPage() {
                     No other parties recorded. Adding the opposing party here makes their name
                     searchable in future conflict checks, firm-wide.
                   </Empty>
+                )}
+              </Card>
+            )}
+
+            {canManage && (
+              <Card
+                title="Case Team"
+                count={caseInfo.lawyers.length}
+                action={!teamFormOpen ? <button className={cd.linkAction} onClick={openTeamForm}>Add</button> : undefined}
+              >
+                {teamFormOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                    {availableLoading ? (
+                      <div style={{ fontSize: 12.5, color: MUTED }}>Loading lawyers…</div>
+                    ) : (
+                      <select value={selectedLawyerId} onChange={(e) => setSelectedLawyerId(e.target.value)} style={inputStyle}>
+                        <option value="">Select a lawyer…</option>
+                        {availableLawyers.map((l) => (
+                          <option key={l.lawyer_id} value={l.lawyer_id}>{l.name} ({l.email})</option>
+                        ))}
+                      </select>
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div className={styles.primaryChip} style={{ opacity: addingTeammate || !selectedLawyerId ? 0.6 : 1 }} onClick={addingTeammate || !selectedLawyerId ? undefined : submitTeammate}>
+                        {addingTeammate ? 'Adding…' : 'Add to case'}
+                      </div>
+                      <div className={styles.ghostChip} onClick={() => { setTeamFormOpen(false); setSelectedLawyerId('') }}>Cancel</div>
+                    </div>
+                  </div>
+                )}
+                {caseInfo.lawyers.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {caseInfo.lawyers.map((l) => (
+                      <div key={l.lawyer_id} className={cd.listRow}>
+                        <div className={cd.rowTitle}>
+                          {l.name}
+                          {l.assigned_role && <span style={{ fontWeight: 400, color: MUTED, fontSize: 12 }}> · {l.assigned_role}</span>}
+                        </div>
+                        <div className={cd.metaRow}>
+                          <span>{l.email}</span>
+                          <button
+                            className={cd.linkAction}
+                            style={{ opacity: removingLawyerId === l.lawyer_id ? 0.6 : 1 }}
+                            onClick={() => removingLawyerId === null && removeTeammate(l.lawyer_id)}
+                          >
+                            {removingLawyerId === l.lawyer_id ? 'Removing…' : 'Remove'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : !teamFormOpen && (
+                  <Empty>No lawyers assigned to this case yet.</Empty>
                 )}
               </Card>
             )}

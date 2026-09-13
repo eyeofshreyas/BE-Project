@@ -50,6 +50,7 @@ import type {
   UserDeleteImpact,
   PartySummary,
   ConflictMatch,
+  AvailableLawyer,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -349,8 +350,16 @@ export function changeCaseStatus(caseId: number, newStatus: string) {
   return patch<{ current_status: string | null }>(`/cases/${caseId}/status`, { new_status: newStatus })
 }
 
-export function unassignLawyer(caseId: number) {
-  return post<CaseSummary>(`/cases/${caseId}/unassign-lawyer`, {})
+export function removeLawyerFromCase(caseId: number, lawyerId: number) {
+  return del<CaseSummary>(`/cases/${caseId}/lawyers/${lawyerId}`)
+}
+
+export function addLawyerToCase(caseId: number, lawyerId: number, assignedRole = 'Associate') {
+  return post<CaseSummary>(`/cases/${caseId}/lawyers`, { lawyer_id: lawyerId, assigned_role: assignedRole })
+}
+
+export function listAvailableCaseLawyers(caseId: number) {
+  return get<AvailableLawyer[]>(`/cases/${caseId}/available-lawyers`)
 }
 
 export function setCaseCnr(caseId: number, cnrNumber: string) {

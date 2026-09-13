@@ -29,6 +29,20 @@ export interface SignupPayload {
   org_name?: string
 }
 
+export interface LawyerAssignment {
+  lawyer_id: number
+  name: string
+  email: string
+  phone: string | null
+  assigned_role: string | null
+}
+
+export interface AvailableLawyer {
+  lawyer_id: number
+  name: string
+  email: string
+}
+
 export interface CaseSummary {
   id: string
   case_id: number
@@ -43,6 +57,7 @@ export interface CaseSummary {
   lawyer: string | null
   lawyer_email: string | null
   lawyer_phone: string | null
+  lawyers: LawyerAssignment[]
   court: string | null
   case_type: string | null
   status: string
