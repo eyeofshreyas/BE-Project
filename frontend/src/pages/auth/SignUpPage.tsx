@@ -51,12 +51,12 @@ const STRENGTH_META = [
   { label: 'Strong', color: '#4A6B4E' },
 ]
 
-type FocusName = 'fullName' | 'phone' | 'email' | 'password' | 'confirm' | 'bar' | 'practice' | 'years' | 'language' | 'address' | null
+type FocusName = 'fullName' | 'phone' | 'email' | 'password' | 'confirm' | 'bar' | 'practice' | 'years' | 'language' | 'address' | 'orgName' | null
 
 /** Renders the role-toggled signup form (extra fields for lawyer vs client); validates locally then calls `handleSubmit` -> `signup()`. */
 export default function SignUpPage() {
   const navigate = useNavigate()
-  const [role, setRole] = useState<'lawyer' | 'client'>('lawyer')
+  const [role, setRole] = useState<'lawyer' | 'client' | 'admin'>('lawyer')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -67,6 +67,7 @@ export default function SignUpPage() {
   const [yearsExp, setYearsExp] = useState('')
   const [preferredLanguage, setPreferredLanguage] = useState('English')
   const [address, setAddress] = useState('')
+  const [orgName, setOrgName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [focused, setFocused] = useState<FocusName>(null)
@@ -77,6 +78,7 @@ export default function SignUpPage() {
   const [toast, setToast] = useState<string | null>(null)
 
   const isLawyer = role === 'lawyer'
+  const isAdmin = role === 'admin'
   const score = passwordScore(password)
   const meta = STRENGTH_META[score] || STRENGTH_META[0]
   const canSubmit = agreeTerms && agreePrivacy
@@ -96,7 +98,8 @@ export default function SignUpPage() {
     if (passwordScore(password) < 2) { setError('Choose a stronger password.'); return }
     if (password !== confirmPassword) { setError('Passwords do not match.'); return }
     if (isLawyer && !barNumber.trim()) { setError('Enter your Bar Council registration number.'); return }
-    if (!isLawyer && !address.trim()) { setError('Enter your address.'); return }
+    if (role === 'client' && !address.trim()) { setError('Enter your address.'); return }
+    if (isAdmin && !orgName.trim()) { setError('Enter your organization\'s name.'); return }
     if (!canSubmit) { setError('Please accept the Terms & Conditions and Privacy Policy.'); return }
     setLoading(true)
     setError('')
@@ -109,7 +112,9 @@ export default function SignUpPage() {
         role,
         ...(isLawyer
           ? { bar_council_number: barNumber, specialization: practiceArea, experience_years: Number(yearsExp) || undefined }
-          : { address, preferred_language: preferredLanguage }),
+          : isAdmin
+            ? { org_name: orgName }
+            : { address, preferred_language: preferredLanguage }),
       })
       setToast('Account created — redirecting to sign in…')
       setTimeout(() => navigate('/login'), 1400)
@@ -137,11 +142,14 @@ export default function SignUpPage() {
             <div>
               <div className={styles.label}>I am a</div>
               <div className={styles.roleToggle}>
-                <div className={styles.roleOption} style={{ background: isLawyer ? '#FCFAF4' : 'transparent', color: isLawyer ? TEXT : MUTED, boxShadow: isLawyer ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('lawyer')}>
+                <div className={styles.roleOption} style={{ background: role === 'lawyer' ? '#FCFAF4' : 'transparent', color: role === 'lawyer' ? TEXT : MUTED, boxShadow: role === 'lawyer' ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('lawyer')}>
                   <Icon name="briefcase" size={15} /><span>Lawyer</span>
                 </div>
-                <div className={styles.roleOption} style={{ background: !isLawyer ? '#FCFAF4' : 'transparent', color: !isLawyer ? TEXT : MUTED, boxShadow: !isLawyer ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('client')}>
+                <div className={styles.roleOption} style={{ background: role === 'client' ? '#FCFAF4' : 'transparent', color: role === 'client' ? TEXT : MUTED, boxShadow: role === 'client' ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('client')}>
                   <Icon name="users" size={15} /><span>Client</span>
+                </div>
+                <div className={styles.roleOption} style={{ background: isAdmin ? '#FCFAF4' : 'transparent', color: isAdmin ? TEXT : MUTED, boxShadow: isAdmin ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('admin')}>
+                  <Icon name="building" size={15} /><span>Organization</span>
                 </div>
               </div>
             </div>
@@ -217,6 +225,14 @@ export default function SignUpPage() {
                     <div className={styles.label}>Years of Experience</div>
                     <div style={wrapStyle('years')}><ClockIcon /><input type="number" min={0} placeholder="5" value={yearsExp} onChange={(e) => setYearsExp(e.target.value)} onFocus={mkFocus('years')} onBlur={mkFocus(null)} className={styles.input} /></div>
                   </div>
+                </div>
+              </div>
+            ) : isAdmin ? (
+              <div className={styles.section}>
+                <div className={styles.sectionTitle}>Organization Details</div>
+                <div>
+                  <div className={styles.label}>Organization Name</div>
+                  <div style={wrapStyle('orgName')}><Icon name="building" size={16} color={MUTED} /><input placeholder="e.g. Kulkarni & Associates" value={orgName} onChange={(e) => setOrgName(e.target.value)} onFocus={mkFocus('orgName')} onBlur={mkFocus(null)} className={styles.input} /></div>
                 </div>
               </div>
             ) : (

@@ -121,7 +121,7 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
               <div className={styles.cardTitle}>Admin Profile</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, paddingBottom: 16, borderBottom: `1px solid ${C.border}` }}>
                 <div style={{ width: 56, height: 56, borderRadius: 3, background: 'linear-gradient(135deg,#23306B,#CFC6B0)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FCFAF4', fontFamily: "'Spectral',serif", fontWeight: 700, fontSize: 18, flexShrink: 0 }}>{adminInitials}</div>
-                <div><div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{fullName}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>Super Admin</div></div>
+                <div><div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{fullName}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{profile?.role_id === 4 ? 'Super Admin' : 'Admin'}</div></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div><div style={fieldLabel}>Full Name</div><div style={inputWrap}><Icon name="user" size={16} color={C.muted} /><input value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} /></div></div>
