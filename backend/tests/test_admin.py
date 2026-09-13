@@ -5,7 +5,10 @@
 from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
-from app.controllers.admin import get_analytics
+from fastapi import HTTPException
+from app.middleware import auth
+from app.controllers.admin import get_analytics, invite_lawyer, get_settings, update_settings
+from app.models.admin import LawyerInviteCreate, PlatformSettings
 
 
 def _fake_supabase(case_rows, summary_rows, summarized_count, live_docs, deleted_count):
@@ -57,7 +60,7 @@ def test_analytics_buckets_cases_by_month_and_summaries_by_week():
     )
 
     with patch("app.controllers.admin.supabase", fake):
-        result = get_analytics(profile={})
+        result = get_analytics(profile={"role_id": auth.SUPER_ADMIN, "org_id": None})
 
     assert result["total_cases"] == 3
     assert dict((s["label"], s["count"]) for s in result["case_status"]) == {"Open": 2, "Closed": 1}
@@ -77,5 +80,36 @@ def test_awaiting_summary_never_goes_negative():
     clamps to zero instead of showing a negative card. Exercises: `GET /admin/analytics`."""
     fake = _fake_supabase(case_rows=[], summary_rows=[], summarized_count=9, live_docs=[], deleted_count=9)
     with patch("app.controllers.admin.supabase", fake):
-        result = get_analytics(profile={})
+        result = get_analytics(profile={"role_id": auth.SUPER_ADMIN, "org_id": None})
     assert result["documents"]["awaiting_summary"] == 0
+
+
+def test_invite_lawyer_creates_pending_invite_for_own_org():
+    """Verifies an org admin's invite is scoped to their own org_id. Exercises: `POST /admin/lawyer-invites` (`admin.invite_lawyer()`)."""
+    fake = MagicMock()
+    fake.table.return_value.insert.return_value.execute.return_value = MagicMock()
+    with patch("app.controllers.admin.supabase", fake):
+        result = invite_lawyer(LawyerInviteCreate(email="new@firm.example"), profile={"role_id": auth.ADMIN, "org_id": 7})
+    assert result["message"] == "Invite sent."
+    fake.table.return_value.insert.assert_called_once_with({"org_id": 7, "email": "new@firm.example", "status": "pending"})
+
+
+def test_get_settings_scoped_to_org_admins_own_org():
+    """Verifies an org admin reads only their own org's platform_settings row. Exercises: `GET /admin/settings` (`admin.get_settings()`)."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+        {"maintenance_mode": True, "new_signup_alerts": False, "weekly_reports": True, "auto_backup": True}
+    ]
+    with patch("app.controllers.admin.supabase", fake):
+        result = get_settings(profile={"role_id": auth.ADMIN, "org_id": 7})
+    assert result["maintenance_mode"] is True
+    fake.table.return_value.select.return_value.eq.assert_called_once_with("org_id", 7)
+
+
+def test_get_settings_rejects_super_admin():
+    """Verifies the super-admin (no org) is told settings are per-organization instead of crashing. Exercises: `GET /admin/settings` (`admin.get_settings()`)."""
+    try:
+        get_settings(profile={"role_id": auth.SUPER_ADMIN, "org_id": None})
+        assert False, "expected HTTPException"
+    except HTTPException as e:
+        assert e.status_code == 400
