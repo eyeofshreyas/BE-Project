@@ -2,7 +2,7 @@
 
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.meetings import MeetingSummary, MeetingCreate, MeetingUpdate, ParticipantSummary, ParticipantCreate
 
 MEETINGS_SELECT = (
@@ -81,7 +81,7 @@ def get_meeting(meeting_id: int, profile: dict = Depends(get_current_profile)):
     return _get_meeting(meeting_id, get_scoped_case_ids(profile))
 
 
-def create_meeting(data: MeetingCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_meeting(data: MeetingCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Schedule a meeting for a case the caller has access to, conducted by the caller's own
     lawyer record unless another is named -- the client never sends a lawyer_id, it only knows
     user_ids. Calls: `ensure_case_access()`, `_get_meeting()`."""
@@ -108,7 +108,7 @@ def create_meeting(data: MeetingCreate, profile: dict = Depends(require_roles(AD
     return _get_meeting(row["meeting_id"])
 
 
-def update_meeting(meeting_id: int, data: MeetingUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def update_meeting(meeting_id: int, data: MeetingUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Record a meeting's outcome -- what was discussed, decided and agreed, and whether it
     happened. Scoped like every other meeting read, so a lawyer can only touch meetings on
     cases they're assigned to. Calls: `_get_meeting()`."""
@@ -132,7 +132,7 @@ def list_participants(meeting_id: int, profile: dict = Depends(get_current_profi
     return [_to_participant_summary(row) for row in rows]
 
 
-def add_participant(meeting_id: int, data: ParticipantCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def add_participant(meeting_id: int, data: ParticipantCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Add a participant to a meeting the caller has access to.
     Calls: `_get_meeting()`, `get_scoped_case_ids()`, `_to_participant_summary()`."""
     _get_meeting(meeting_id, get_scoped_case_ids(profile))

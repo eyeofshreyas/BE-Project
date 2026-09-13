@@ -14,6 +14,18 @@ class DocumentSummary(BaseModel):
     case_number: str | None
     uploaded_by: str | None
     has_summary: bool
+    esign_status: str | None
+
+
+class SignerInfo(BaseModel):
+    """One signer to invite for e-signature."""
+    name: str
+    email: str
+
+
+class SignatureRequestCreate(BaseModel):
+    """Request body for sending a document for e-signature."""
+    signers: list[SignerInfo]
 
 
 class DownloadUrl(BaseModel):

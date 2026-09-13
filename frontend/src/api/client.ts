@@ -48,6 +48,8 @@ import type {
   AdminAnalytics,
   PlatformSettings,
   UserDeleteImpact,
+  PartySummary,
+  ConflictMatch,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -201,6 +203,22 @@ export function summarizeDocument(documentId: number, text = '') {
   return post<{ summary: string }>('/ai/summarize', { text, document_id: documentId })
 }
 
+export function requestSignature(documentId: number, signers: { name: string; email: string }[]) {
+  return post<DocumentSummary>(`/documents/${documentId}/request-signature`, { signers })
+}
+
+export function listCaseParties(caseId: number) {
+  return get<PartySummary[]>(`/cases/${caseId}/parties`)
+}
+
+export function addCaseParty(caseId: number, name: string, role?: string) {
+  return post<PartySummary>(`/cases/${caseId}/parties`, { name, role })
+}
+
+export function searchConflicts(name: string) {
+  return get<ConflictMatch[]>(`/conflict-check?name=${encodeURIComponent(name)}`)
+}
+
 export function findSimilarCases(query: string, topK = 5) {
   return post<SimilarCaseResult[]>('/ai/similar-cases', { query, top_k: topK })
 }
@@ -331,6 +349,14 @@ export function unassignLawyer(caseId: number) {
   return post<CaseSummary>(`/cases/${caseId}/unassign-lawyer`, {})
 }
 
+export function setCaseCnr(caseId: number, cnrNumber: string) {
+  return patch<CaseSummary>(`/cases/${caseId}/cnr`, { cnr_number: cnrNumber })
+}
+
+export function syncCaseEcourts(caseId: number) {
+  return post<CaseSummary>(`/cases/${caseId}/sync-ecourts`, {})
+}
+
 export function listInvoices() {
   return get<InvoiceSummary[]>('/billing/invoices')
 }
@@ -365,6 +391,10 @@ export function listHearings() {
 
 export function listJudges() {
   return get<JudgeOption[]>('/reference/judges')
+}
+
+export function createJudge(payload: { judge_name: string; court_id: number; designation?: string }) {
+  return post<JudgeOption>('/reference/judges', payload)
 }
 
 /** `allow_duplicate` re-sends a hearing the backend refused as a possible double-submit. */

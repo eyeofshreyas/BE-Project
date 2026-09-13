@@ -7,14 +7,15 @@ import {
   listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
   unassignLawyer, getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
-  listHearings, createHearing, listJudges, updateHearing, updateMeeting, deleteDocument,
+  listHearings, createHearing, listJudges, createJudge, listCourts, updateHearing, updateMeeting, deleteDocument,
+  setCaseCnr, syncCaseEcourts, requestSignature, listCaseParties, addCaseParty,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
-  DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption,
+  DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption, CourtOption, PartySummary,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
-import { canRenderInline, uploadRejection } from '../../utils/files'
+import { canRenderInline, uploadRejection, ESIGN_RESENDABLE, esignPill } from '../../utils/files'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 import cd from './cases.module.css'
@@ -148,6 +149,10 @@ export default function CaseDetailPage() {
 
   const [statusSaving, setStatusSaving] = useState(false)
   const [unassigning, setUnassigning] = useState(false)
+  const [cnrEditing, setCnrEditing] = useState(false)
+  const [cnrInput, setCnrInput] = useState('')
+  const [cnrSaving, setCnrSaving] = useState(false)
+  const [syncingEcourts, setSyncingEcourts] = useState(false)
   const [messaging, setMessaging] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -159,7 +164,14 @@ export default function CaseDetailPage() {
   const [schedulingHearing, setSchedulingHearing] = useState(false)
   const [hearings, setHearings] = useState<HearingSummary[]>([])
   const [judges, setJudges] = useState<JudgeOption[]>([])
+  const [courts, setCourts] = useState<CourtOption[]>([])
   const [hearingJudgeId, setHearingJudgeId] = useState('')
+  const [judgeFormOpen, setJudgeFormOpen] = useState(false)
+  const [newJudgeName, setNewJudgeName] = useState('')
+  const [newJudgeCourtId, setNewJudgeCourtId] = useState('')
+  const [newJudgeDesignation, setNewJudgeDesignation] = useState('')
+  const [addingJudge, setAddingJudge] = useState(false)
+  const [judgeError, setJudgeError] = useState('')
   const [hearingDate, setHearingDate] = useState('')
   const [hearingTime, setHearingTime] = useState('')
   const [hearingCourtroom, setHearingCourtroom] = useState('')
@@ -185,6 +197,19 @@ export default function CaseDetailPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadFormOpen, setUploadFormOpen] = useState(false)
 
+  const [signId, setSignId] = useState<number | null>(null)
+  const [signerName, setSignerName] = useState('')
+  const [signerEmail, setSignerEmail] = useState('')
+  const [signing, setSigning] = useState(false)
+  const [signError, setSignError] = useState('')
+
+  const [parties, setParties] = useState<PartySummary[]>([])
+  const [partyName, setPartyName] = useState('')
+  const [partyRole, setPartyRole] = useState('Opposing Party')
+  const [partyFormOpen, setPartyFormOpen] = useState(false)
+  const [addingParty, setAddingParty] = useState(false)
+  const [partyError, setPartyError] = useState('')
+
   const numericCaseId = Number(caseId)
 
   useEffect(() => {
@@ -207,7 +232,20 @@ export default function CaseDetailPage() {
       .finally(() => setLoading(false))
     if (canUploadDocs) listDocumentTypes().then(setDocumentTypes).catch(() => {})
     if (canManage) listJudges().then(setJudges).catch(() => {})
+    // The courts table has duplicate rows for the same name under different court_ids
+    // (stale seed data) -- collapsing to one entry per name keeps a lawyer from picking
+    // two different IDs for what reads as the same court, which would let the same judge
+    // through the same-court duplicate check twice.
+    if (canManage) listCourts().then((rows) => {
+      const byName = new Map<string, CourtOption>()
+      for (const c of rows) {
+        const existing = byName.get(c.court_name)
+        if (!existing || c.court_id < existing.court_id) byName.set(c.court_name, c)
+      }
+      setCourts([...byName.values()])
+    }).catch(() => {})
     if (canManage) getCaseAiSummary(numericCaseId).then(setAiSummary).catch(() => setAiSummary(null))
+    if (canManage) listCaseParties(numericCaseId).then(setParties).catch(() => {})
   }, [numericCaseId, canUploadDocs, canManage])
 
   function showToast(msg: string) {
@@ -360,6 +398,38 @@ export default function CaseDetailPage() {
     }
   }
 
+  async function saveCnr() {
+    if (!cnrInput.trim()) return
+    setCnrSaving(true)
+    try {
+      const updated = await setCaseCnr(numericCaseId, cnrInput.trim())
+      setCaseInfo(updated)
+      setCnrEditing(false)
+      setCnrInput('')
+      showToast('CNR saved.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save CNR.')
+    } finally {
+      setCnrSaving(false)
+    }
+  }
+
+  /** Pulls the latest status for this case from eCourts by its CNR (`POST /cases/:id/sync-ecourts`)
+   * and refreshes the timeline, since a sync logs its own event there. */
+  async function syncEcourts() {
+    setSyncingEcourts(true)
+    try {
+      const updated = await syncCaseEcourts(numericCaseId)
+      setCaseInfo(updated)
+      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+      showToast('Synced with eCourts.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to sync with eCourts.')
+    } finally {
+      setSyncingEcourts(false)
+    }
+  }
+
   function openOutcomeForm(kind: 'hearing' | 'meeting', id: number, status: string, text: string) {
     setOutcomeFor({ kind, id })
     setOutcomeStatus(status)
@@ -409,6 +479,83 @@ export default function CaseDetailPage() {
     }
   }
 
+  function toggleSign(id: number) {
+    if (signId === id) { setSignId(null); return }
+    setSignId(id)
+    // Pre-fill from this case's own client -- on the case page there's only one client
+    // it could reasonably be, unlike the firm-wide Documents library. Still editable, for
+    // a signer who isn't the case's client (a builder, opposing counsel, etc.).
+    setSignerName(caseInfo.client ?? '')
+    setSignerEmail(caseInfo.client_email ?? '')
+    setSignError('')
+  }
+
+  /** Sends the document to Leegality for e-signature (`POST /documents/:id/request-signature`). */
+  async function submitSign(id: number) {
+    if (!signerName.trim() || !signerEmail.trim()) return
+    setSigning(true)
+    setSignError('')
+    try {
+      const updated = await requestSignature(id, [{ name: signerName.trim(), email: signerEmail.trim() }])
+      setDocuments((prev) => prev.map((d) => (d.id === id ? updated : d)))
+      setSignId(null)
+      showToast('Sent for e-signature.')
+      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+    } catch (err) {
+      setSignError(err instanceof Error ? err.message : 'Failed to send for e-signature.')
+    } finally {
+      setSigning(false)
+    }
+  }
+
+  /** Adds a non-client party (opposing party, co-party, etc.) to this case
+   * (`POST /cases/:id/parties`) -- this is what makes the name searchable for the next
+   * lawyer's conflict check, not just a case-detail note. */
+  async function submitParty() {
+    if (!partyName.trim()) return
+    setAddingParty(true)
+    setPartyError('')
+    try {
+      const created = await addCaseParty(numericCaseId, partyName.trim(), partyRole.trim() || 'Opposing Party')
+      setParties((prev) => [...prev, created])
+      setPartyName('')
+      setPartyRole('Opposing Party')
+      setPartyFormOpen(false)
+      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+    } catch (err) {
+      setPartyError(err instanceof Error ? err.message : 'Failed to add party.')
+    } finally {
+      setAddingParty(false)
+    }
+  }
+
+  /** Adds a judge not yet in the reference list (`POST /reference/judges`) -- e.g. one an
+   * eCourts sync reported that isn't seeded here -- and selects it for the hearing being
+   * scheduled. */
+  async function submitJudge() {
+    if (!newJudgeName.trim() || !newJudgeCourtId) return
+    setAddingJudge(true)
+    setJudgeError('')
+    try {
+      const created = await createJudge({
+        judge_name: newJudgeName.trim(),
+        court_id: Number(newJudgeCourtId),
+        designation: newJudgeDesignation.trim() || undefined,
+      })
+      setJudges((prev) => [...prev, created].sort((a, b) => a.judge_name.localeCompare(b.judge_name)))
+      setHearingJudgeId(String(created.judge_id))
+      setNewJudgeName('')
+      setNewJudgeCourtId('')
+      setNewJudgeDesignation('')
+      setJudgeFormOpen(false)
+    } catch (err) {
+      const status = (err as { status?: number }).status
+      setJudgeError(status === 409 ? 'This judge already exists at that court.' : err instanceof Error ? err.message : 'Failed to add judge.')
+    } finally {
+      setAddingJudge(false)
+    }
+  }
+
   function closeScheduleForm() {
     setHearingOpen(false)
     setDuplicateHearing('')
@@ -417,6 +564,8 @@ export default function CaseDetailPage() {
     setHearingTime('')
     setHearingCourtroom('')
     setHearingNotes('')
+    setJudgeFormOpen(false)
+    setJudgeError('')
     setMeetingTitle('')
     setMeetingWhen('')
     setMeetingAgenda('')
@@ -593,6 +742,38 @@ export default function CaseDetailPage() {
                 <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => !messaging && openConversation(caseInfo.lawyer_id)}>{messaging ? 'Opening…' : 'Message'}</button>
               )}
             </Fact>
+            {canManage && (
+              <Fact label="eCourts CNR" value={caseInfo.cnr_number ?? 'Not linked'}>
+                {cnrEditing ? (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                    <input
+                      value={cnrInput}
+                      onChange={(e) => setCnrInput(e.target.value.toUpperCase())}
+                      placeholder="16-character CNR"
+                      maxLength={16}
+                      style={{ ...inputStyle, padding: '5px 8px', fontSize: 12, width: 140 }}
+                      onKeyDown={(e) => e.key === 'Enter' && saveCnr()}
+                    />
+                    <button className={cd.linkAction} style={{ fontSize: 11.5 }} onClick={saveCnr}>{cnrSaving ? 'Saving…' : 'Save'}</button>
+                    <button className={cd.linkAction} style={{ fontSize: 11.5 }} onClick={() => { setCnrEditing(false); setCnrInput('') }}>Cancel</button>
+                  </div>
+                ) : caseInfo.cnr_number ? (
+                  <>
+                    <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => !syncingEcourts && syncEcourts()}>
+                      {syncingEcourts ? 'Syncing…' : 'Sync with eCourts'}
+                    </button>
+                    {caseInfo.ecourts_status && (
+                      <div className={cd.metaRow} style={{ marginTop: 4 }}>
+                        <span>{caseInfo.ecourts_status}</span>
+                        {caseInfo.ecourts_last_synced_at && <span>Synced {formatDate(caseInfo.ecourts_last_synced_at)}</span>}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => setCnrEditing(true)}>Add CNR</button>
+                )}
+              </Fact>
+            )}
           </div>
         </div>
 
@@ -726,12 +907,38 @@ export default function CaseDetailPage() {
 
                   {scheduleKind === 'hearing' ? (
                     <>
-                      <select value={hearingJudgeId} onChange={(e) => { setHearingJudgeId(e.target.value); setDuplicateHearing('') }} style={inputStyle}>
-                        <option value="">Select a judge…</option>
-                        {judges.map((j) => (
-                          <option key={j.judge_id} value={j.judge_id}>{j.judge_name}{j.court_name ? ` — ${j.court_name}` : ''}</option>
-                        ))}
-                      </select>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <select value={hearingJudgeId} onChange={(e) => { setHearingJudgeId(e.target.value); setDuplicateHearing('') }} style={{ ...inputStyle, flex: 1 }}>
+                          <option value="">Select a judge…</option>
+                          {judges.map((j) => (
+                            <option key={j.judge_id} value={j.judge_id}>{j.judge_name}{j.court_name ? ` — ${j.court_name}` : ''}</option>
+                          ))}
+                        </select>
+                        {!judgeFormOpen && <button className={cd.linkAction} onClick={() => setJudgeFormOpen(true)}>Add judge</button>}
+                      </div>
+                      {judgeFormOpen && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', background: '#FCFAF4', borderRadius: 3 }}>
+                          <input value={newJudgeName} onChange={(e) => setNewJudgeName(e.target.value)} placeholder="Judge name" style={inputStyle} />
+                          <Dropdown
+                            value={newJudgeCourtId}
+                            options={['', ...courts.map((c) => String(c.court_id))]}
+                            labelFor={(v) => courts.find((c) => String(c.court_id) === v)?.court_name ?? 'Select a court…'}
+                            onChange={setNewJudgeCourtId}
+                          />
+                          <input value={newJudgeDesignation} onChange={(e) => setNewJudgeDesignation(e.target.value)} placeholder="Designation (optional)" style={inputStyle} />
+                          {judgeError && <div style={{ fontSize: 12, color: '#B3282D' }}>{judgeError}</div>}
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <div
+                              className={styles.primaryChip}
+                              style={{ opacity: addingJudge || !newJudgeName.trim() || !newJudgeCourtId ? 0.6 : 1 }}
+                              onClick={() => !addingJudge && submitJudge()}
+                            >
+                              {addingJudge ? 'Adding…' : 'Add judge'}
+                            </div>
+                            <div className={styles.ghostChip} onClick={() => { setJudgeFormOpen(false); setJudgeError('') }}>Cancel</div>
+                          </div>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', gap: 8 }}>
                         <input type="date" value={hearingDate} onChange={(e) => { setHearingDate(e.target.value); setDuplicateHearing('') }} style={{ ...inputStyle, flex: 1 }} />
                         <input type="time" value={hearingTime} onChange={(e) => { setHearingTime(e.target.value); setDuplicateHearing('') }} style={{ ...inputStyle, flex: 1 }} />
@@ -916,33 +1123,73 @@ export default function CaseDetailPage() {
               {documents.length > 0 ? (
                 <div className={styles.quickActionsList}>
                   {documents.map((d) => (
-                    <div key={d.id} className={styles.quickAction} onClick={() => openDocument(d)}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                        <Icon name="file-text" size={18} color={MUTED} />
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file_name}</div>
-                          <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{formatDay(d.upload_date)}</div>
+                    <div key={d.id}>
+                      <div className={styles.quickAction} onClick={() => openDocument(d)}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                          <Icon name="file-text" size={18} color={MUTED} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file_name}</div>
+                            <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{formatDay(d.upload_date)}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                          <span className={styles.statusBadge} style={d.has_summary ? { color: '#4A6B4E', background: '#E4EDE5' } : { color: '#8A6A2F', background: '#F3EBD9' }}>
+                            {d.has_summary ? 'Summarised' : 'Not summarised'}
+                          </span>
+                          {d.esign_status && (
+                            <span className={styles.statusBadge} style={{ color: esignPill(d.esign_status).color, background: esignPill(d.esign_status).background }}>
+                              {esignPill(d.esign_status).label}
+                            </span>
+                          )}
+                          {canManage && d.mime_type === 'application/pdf' && (!d.esign_status || ESIGN_RESENDABLE.has(d.esign_status)) && (
+                            <button className={cd.iconBtn} onClick={() => toggleSign(d.id)} title={d.esign_status ? 'Resend for e-signature' : 'Send for e-signature'} aria-label={d.esign_status ? 'Resend for e-signature' : 'Send for e-signature'}>
+                              <Icon name="signature" size={14} color={MUTED} />
+                            </button>
+                          )}
+                          {canUploadDocs && (
+                            // two-step rather than a window.confirm: deleting a filing is worth a
+                            // deliberate second click, and a modal dialog here blocks the page
+                            confirmDeleteDoc === d.id ? (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeDocument(d.id)}>Delete</button>
+                                <button className={cd.linkAction} onClick={() => setConfirmDeleteDoc(null)}>Keep</button>
+                              </span>
+                            ) : (
+                              <button className={cd.iconBtn} onClick={() => setConfirmDeleteDoc(d.id)} title="Delete document" aria-label="Delete document">
+                                <Icon name="trash-2" size={14} color="#B3282D" />
+                              </button>
+                            )
+                          )}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-                        <span className={styles.statusBadge} style={d.has_summary ? { color: '#4A6B4E', background: '#E4EDE5' } : { color: '#8A6A2F', background: '#F3EBD9' }}>
-                          {d.has_summary ? 'Summarised' : 'Not summarised'}
-                        </span>
-                        {canUploadDocs && (
-                          // two-step rather than a window.confirm: deleting a filing is worth a
-                          // deliberate second click, and a modal dialog here blocks the page
-                          confirmDeleteDoc === d.id ? (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                              <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeDocument(d.id)}>Delete</button>
-                              <button className={cd.linkAction} onClick={() => setConfirmDeleteDoc(null)}>Keep</button>
-                            </span>
-                          ) : (
-                            <button className={cd.iconBtn} onClick={() => setConfirmDeleteDoc(d.id)} title="Delete document" aria-label="Delete document">
-                              <Icon name="trash-2" size={14} color="#B3282D" />
-                            </button>
-                          )
-                        )}
-                      </div>
+                      {signId === d.id && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px', background: '#FCFAF4', border: '1px solid #F1EDE0', borderTop: 'none', borderRadius: '0 0 3px 3px' }}>
+                          <input
+                            value={signerName}
+                            onChange={(e) => setSignerName(e.target.value)}
+                            placeholder="Signer's name"
+                            style={inputStyle}
+                          />
+                          <input
+                            value={signerEmail}
+                            onChange={(e) => setSignerEmail(e.target.value)}
+                            placeholder="Signer's email"
+                            type="email"
+                            style={inputStyle}
+                          />
+                          {signError && <div style={{ fontSize: 12, color: '#B3282D' }}>{signError}</div>}
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <div
+                              className={styles.primaryChip}
+                              style={{ opacity: signing || !signerName.trim() || !signerEmail.trim() ? 0.6 : 1, cursor: signing ? 'default' : 'pointer' }}
+                              onClick={signing ? undefined : () => submitSign(d.id)}
+                            >
+                              {signing ? 'Sending…' : 'Send for signature'}
+                            </div>
+                            <div className={styles.ghostChip} onClick={() => setSignId(null)}>Cancel</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -990,6 +1237,43 @@ export default function CaseDetailPage() {
                     </a>
                   )}
                 </div>
+              </Card>
+            )}
+
+            {canManage && (
+              <Card
+                title="Parties"
+                count={parties.length}
+                action={!partyFormOpen ? <button className={cd.linkAction} onClick={() => setPartyFormOpen(true)}>Add</button> : undefined}
+              >
+                {partyFormOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                    <input value={partyName} onChange={(e) => setPartyName(e.target.value)} placeholder="Name" style={inputStyle} />
+                    <input value={partyRole} onChange={(e) => setPartyRole(e.target.value)} placeholder="Role (e.g. Opposing Party)" style={inputStyle} />
+                    {partyError && <div style={{ fontSize: 12, color: '#B3282D' }}>{partyError}</div>}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div className={styles.primaryChip} style={{ opacity: addingParty || !partyName.trim() ? 0.6 : 1 }} onClick={addingParty ? undefined : submitParty}>
+                        {addingParty ? 'Adding…' : 'Add party'}
+                      </div>
+                      <div className={styles.ghostChip} onClick={() => { setPartyFormOpen(false); setPartyError('') }}>Cancel</div>
+                    </div>
+                  </div>
+                )}
+                {parties.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {parties.map((p) => (
+                      <div key={p.id} className={cd.listRow}>
+                        <div className={cd.rowTitle}>{p.name}</div>
+                        <div className={cd.metaRow}><span>{p.role}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : !partyFormOpen && (
+                  <Empty action={<div className={styles.ghostChip} onClick={() => setPartyFormOpen(true)}><Icon name="user-plus" size={15} color={MUTED} /> Add a party</div>}>
+                    No other parties recorded. Adding the opposing party here makes their name
+                    searchable in future conflict checks, firm-wide.
+                  </Empty>
+                )}
               </Card>
             )}
 

@@ -2,7 +2,7 @@
 
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, get_current_profile
+from app.middleware.auth import ADMIN, SUPER_ADMIN, get_current_profile
 from app.models.notifications import NotificationSummary
 
 NOTIFICATIONS_SELECT = "notification_id,case_id,title,message,notification_type,is_read,created_at,cases(case_number)"
@@ -38,7 +38,7 @@ def mark_read(notification_id: int, profile: dict = Depends(get_current_profile)
     rows = supabase.table("notifications").select("user_id").eq("notification_id", notification_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Notification not found")
-    if rows[0]["user_id"] != profile["user_id"] and profile["role_id"] != ADMIN:
+    if rows[0]["user_id"] != profile["user_id"] and profile["role_id"] not in (ADMIN, SUPER_ADMIN):
         raise HTTPException(status_code=403, detail="This notification doesn't belong to you")
 
     supabase.table("notifications").update({"is_read": True}).eq("notification_id", notification_id).execute()

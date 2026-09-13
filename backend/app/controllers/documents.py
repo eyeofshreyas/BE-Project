@@ -13,6 +13,7 @@ from app.models.documents import DocumentSummary, AiSummary
 
 DOCUMENTS_BUCKET = "documents"
 TEXT_MIME_PREFIX = "text/"
+IMAGE_MIME_PREFIX = "image/"
 # Same ceiling message attachments use (see messages.MAX_ATTACHMENT_BYTES).
 MAX_DOCUMENT_BYTES = 25 * 1024 * 1024
 # An hour, matching messages.ATTACHMENT_URL_TTL. It was 5 minutes, which is fine for a
@@ -20,7 +21,7 @@ MAX_DOCUMENT_BYTES = 25 * 1024 * 1024
 # ranges as it plays and seeks, so a dead URL stalls playback part-way through.
 DOCUMENT_URL_TTL = 3600
 DOCUMENTS_SELECT = (
-    "document_id,file_name,mime_type,upload_date,file_size,case_id,file_path,"
+    "document_id,file_name,mime_type,upload_date,file_size,case_id,file_path,esign_status,"
     "document_types(type_name),cases(case_number),users(full_name)"
 )
 
@@ -37,6 +38,7 @@ def _to_document_summary(row: dict, has_summary: bool = False) -> dict:
         "case_number": row["cases"]["case_number"] if row["cases"] else None,
         "uploaded_by": row["users"]["full_name"] if row["users"] else None,
         "has_summary": has_summary,
+        "esign_status": row.get("esign_status"),
     }
 
 
@@ -147,14 +149,24 @@ def get_document_download_url(document_id: int, download: bool = False, profile:
     return {"url": signed["signedURL"]}
 
 
+def _ocr_image(image) -> str:
+    """Run Tesseract OCR on one page/image. Calls: `pytesseract.image_to_string()`."""
+    import pytesseract  # local import: only the OCR path pays for it
+
+    try:
+        return pytesseract.image_to_string(image)
+    except pytesseract.TesseractNotFoundError:
+        raise HTTPException(
+            status_code=500,
+            detail="OCR is not configured on this server (tesseract-ocr isn't installed). See SETUP.md.",
+        )
+
+
 def extract_document_text(file_path: str, mime_type: str | None) -> str:
     """Download a stored document and return its text, for feeding to the summarizer.
 
-    Handles the two kinds that carry a text layer: PDFs (via pypdf) and text/* files. A scanned
-    PDF is all image, so pypdf returns nothing -- the caller reports that rather than summarizing
-    an empty string.
-    ponytail: no OCR, and no Word/image support -- pasting the text still works for those. Add
-    an OCR pass if scanned uploads turn out to be common."""
+    Handles PDFs (via pypdf, falling back to Tesseract OCR when the PDF has no text
+    layer -- a scan), text/* files, and image/* files (OCR directly)."""
     try:
         content = supabase.storage.from_(DOCUMENTS_BUCKET).download(file_path)
     except StorageApiError:
@@ -163,10 +175,19 @@ def extract_document_text(file_path: str, mime_type: str | None) -> str:
     if (mime_type or "").startswith(TEXT_MIME_PREFIX):
         return content.decode("utf-8", "replace").strip()
 
+    if (mime_type or "").startswith(IMAGE_MIME_PREFIX):
+        from PIL import Image, UnidentifiedImageError  # local import: only the OCR path pays for it
+
+        try:
+            image = Image.open(io.BytesIO(content))
+        except UnidentifiedImageError:
+            raise HTTPException(status_code=400, detail="This image could not be read.")
+        return _ocr_image(image).strip()
+
     if mime_type != "application/pdf":
         raise HTTPException(
             status_code=400,
-            detail="Text can only be read from PDF and text files. Paste the text to summarize it.",
+            detail="Text can only be read from PDF, image, and text files. Paste the text to summarize it.",
         )
 
     from pypdf import PdfReader  # local import: only the summarize path pays for it
@@ -175,7 +196,18 @@ def extract_document_text(file_path: str, mime_type: str | None) -> str:
         pages = PdfReader(io.BytesIO(content)).pages
     except Exception:
         raise HTTPException(status_code=400, detail="This PDF could not be read. Paste the text instead.")
-    return "\n".join(page.extract_text() or "" for page in pages).strip()
+    text = "\n".join(page.extract_text() or "" for page in pages).strip()
+    if text:
+        return text
+
+    # No text layer -- a scanned PDF. Render each page to an image and OCR it.
+    from pdf2image import convert_from_bytes  # local import: only the OCR path pays for it
+
+    try:
+        page_images = convert_from_bytes(content)
+    except Exception:
+        raise HTTPException(status_code=400, detail="This scanned PDF could not be read for OCR. Paste the text instead.")
+    return "\n".join(_ocr_image(img) for img in page_images).strip()
 
 
 def get_document_summary(document_id: int, profile: dict = Depends(get_current_profile)):

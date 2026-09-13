@@ -1,5 +1,5 @@
 """Admin-only controllers backing the admin console's Dashboard and Analytics tabs, plus
-the platform-wide settings row. Gated by require_roles(ADMIN)."""
+the platform-wide settings row. Gated by require_roles(ADMIN, SUPER_ADMIN)."""
 
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
@@ -8,8 +8,8 @@ from fastapi import Depends, HTTPException
 from postgrest.exceptions import APIError as PostgrestAPIError
 from app.core.config import STORAGE_QUOTA_BYTES
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, CLIENT, LAWYER, require_roles
-from app.models.admin import PlatformSettings
+from app.middleware.auth import ADMIN, CLIENT, LAWYER, SUPER_ADMIN, require_roles, get_scoped_case_ids
+from app.models.admin import LawyerInviteCreate, PlatformSettings
 
 TIMELINE_SELECT = (
     "timeline_id,event_type,event_title,event_description,created_at,"
@@ -28,55 +28,90 @@ def _count(query) -> int:
     return query.execute().count or 0
 
 
-def get_stats(profile: dict = Depends(require_roles(ADMIN))):
-    """Platform-wide totals for the dashboard's overview cards."""
+def invite_lawyer(data: LawyerInviteCreate, profile: dict = Depends(require_roles(ADMIN))):
+    """Create a pending invite for a lawyer to join the caller's organization; consumed by
+    /signup when that email signs up as a lawyer. SUPER_ADMIN is deliberately excluded --
+    that role has no org_id to invite a lawyer into."""
+    supabase.table("lawyer_invites").insert({
+        "org_id": profile["org_id"],
+        "email": data.email,
+        "status": "pending",
+    }).execute()
+    return {"message": "Invite sent."}
+
+
+def get_stats(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
+    """Totals for the dashboard's overview cards -- platform-wide for the super-admin,
+    scoped to the caller's own org for an org admin. Calls: `get_scoped_case_ids()`."""
     month_start = date.today().replace(day=1).isoformat()
     today = date.today().isoformat()
+    case_ids = get_scoped_case_ids(profile)  # None for super-admin, this org's cases for admin
 
-    payments = (
-        supabase.table("payments")
-        .select("amount")
-        .eq("payment_status", "Completed")
-        .gte("payment_date", month_start)
-        .execute()
-        .data
+    document_ids = None
+    invoice_ids = None
+    if case_ids is not None:
+        document_ids = [d["document_id"] for d in supabase.table("documents").select("document_id").in_("case_id", list(case_ids)).execute().data] if case_ids else []
+        invoice_ids = [i["invoice_id"] for i in supabase.table("invoices").select("invoice_id").in_("case_id", list(case_ids)).execute().data] if case_ids else []
+
+    users_query = supabase.table("users").select("user_id", count="exact")
+    lawyers_query = supabase.table("users").select("user_id", count="exact").eq("role_id", LAWYER).eq("is_active", True)
+    # Clients are global (users.org_id is always NULL for them, by design -- a client can have
+    # cases with lawyers at different firms), so an org admin's registered_clients is derived
+    # below from their own org's case_ids instead, the same way clients.list_clients() does.
+    clients_query = supabase.table("users").select("user_id", count="exact").eq("role_id", CLIENT)
+    if profile["role_id"] == ADMIN:
+        users_query = users_query.eq("org_id", profile["org_id"])
+        lawyers_query = lawyers_query.eq("org_id", profile["org_id"])
+
+    # "Active" means anything still being worked -- Closed is the only terminal status.
+    cases_query = supabase.table("cases").select("case_id", count="exact").neq("status", "Closed")
+    documents_query = supabase.table("documents").select("document_id", count="exact").eq("is_deleted", False)
+    ai_summaries_query = supabase.table("ai_summaries").select("document_id", count="exact")
+    hearings_query = (
+        supabase.table("hearings").select("hearing_id", count="exact")
+        .eq("hearing_status", "Scheduled").gte("hearing_date", today)
     )
+    payments_query = (
+        supabase.table("payments").select("amount")
+        .eq("payment_status", "Completed").gte("payment_date", month_start)
+    )
+    if case_ids is not None:
+        cases_query = supabase.table("cases").select("case_id", count="exact").neq("status", "Closed").in_("case_id", list(case_ids))
+        documents_query = documents_query.in_("case_id", list(case_ids))
+        ai_summaries_query = ai_summaries_query.in_("document_id", document_ids)
+        hearings_query = hearings_query.in_("case_id", list(case_ids))
+        payments_query = payments_query.in_("invoice_id", invoice_ids)
+
+    payments = payments_query.execute().data
+
+    if case_ids is not None:
+        client_rows = supabase.table("cases").select("client_id").in_("case_id", list(case_ids)).execute().data if case_ids else []
+        registered_clients = len({r["client_id"] for r in client_rows if r["client_id"]})
+    else:
+        registered_clients = _count(clients_query)
 
     return {
-        "total_users": _count(supabase.table("users").select("user_id", count="exact")),
-        "active_lawyers": _count(
-            supabase.table("users").select("user_id", count="exact").eq("role_id", LAWYER).eq("is_active", True)
-        ),
-        "registered_clients": _count(
-            supabase.table("users").select("user_id", count="exact").eq("role_id", CLIENT)
-        ),
-        # "Active" means anything still being worked -- Closed is the only terminal status.
-        "active_cases": _count(supabase.table("cases").select("case_id", count="exact").neq("status", "Closed")),
-        "documents_uploaded": _count(
-            supabase.table("documents").select("document_id", count="exact").eq("is_deleted", False)
-        ),
-        "ai_summaries": _count(supabase.table("ai_summaries").select("document_id", count="exact")),
+        "total_users": _count(users_query),
+        "active_lawyers": _count(lawyers_query),
+        "registered_clients": registered_clients,
+        "active_cases": _count(cases_query),
+        "documents_uploaded": _count(documents_query),
+        "ai_summaries": _count(ai_summaries_query),
         "revenue_this_month": sum(float(p["amount"] or 0) for p in payments),
-        "pending_hearings": _count(
-            supabase.table("hearings")
-            .select("hearing_id", count="exact")
-            .eq("hearing_status", "Scheduled")
-            .gte("hearing_date", today)
-        ),
+        "pending_hearings": _count(hearings_query),
     }
 
 
-def list_activity(limit: int = 15, profile: dict = Depends(require_roles(ADMIN))):
-    """The newest `case_timeline` events across every case -- the admin-wide version of
-    the per-case timeline on the case page."""
-    rows = (
-        supabase.table("case_timeline")
-        .select(TIMELINE_SELECT)
-        .order("created_at", desc=True)
-        .limit(min(limit, 50))
-        .execute()
-        .data
-    )
+def list_activity(limit: int = 15, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
+    """The newest `case_timeline` events -- platform-wide for the super-admin, scoped to the
+    caller's own org's cases for an org admin. Calls: `get_scoped_case_ids()`."""
+    case_ids = get_scoped_case_ids(profile)
+    if case_ids is not None and not case_ids:
+        return []
+    query = supabase.table("case_timeline").select(TIMELINE_SELECT)
+    if case_ids is not None:
+        query = query.in_("case_id", list(case_ids))
+    rows = query.order("created_at", desc=True).limit(min(limit, 50)).execute().data
     return [
         {
             "id": r["timeline_id"],
@@ -112,26 +147,42 @@ def _week_buckets(n: int) -> list[tuple[date, str]]:
     return [(w, w.strftime("%d %b")) for w in weeks]
 
 
-def get_analytics(profile: dict = Depends(require_roles(ADMIN))):
+def get_analytics(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """Case-status distribution, monthly filing growth, AI-summary usage, document
-    insights and storage usage. Calls: `_month_buckets()`, `_week_buckets()`."""
+    insights and storage usage -- platform-wide for the super-admin, scoped to the
+    caller's own org for an org admin. Calls: `_month_buckets()`, `_week_buckets()`,
+    `get_scoped_case_ids()`."""
     months = _month_buckets(GROWTH_MONTHS)
     weeks = _week_buckets(AI_USAGE_WEEKS)
+    case_ids = get_scoped_case_ids(profile)
 
-    case_rows = supabase.table("cases").select("status,filing_date,created_at").execute().data
+    cases_query = supabase.table("cases").select("status,filing_date,created_at")
+    documents_query = supabase.table("documents").select("file_size").eq("is_deleted", False)
+    summarized_query = supabase.table("ai_summaries").select("document_id", count="exact")
+    deleted_query = supabase.table("documents").select("document_id", count="exact").eq("is_deleted", True)
+    if case_ids is not None:
+        cases_query = cases_query.in_("case_id", list(case_ids))
+        documents_query = documents_query.in_("case_id", list(case_ids))
+        deleted_query = deleted_query.in_("case_id", list(case_ids))
+
+    case_rows = cases_query.execute().data
     status_counts = Counter(r["status"] or "Unknown" for r in case_rows)
 
     # filing_date is the date that matters for "cases filed", but conveyancing-style cases
     # are created without one -- fall back to the row's creation timestamp so they still count.
     filed_months = Counter((r["filing_date"] or r["created_at"] or "")[:7] for r in case_rows)
 
-    summary_rows = (
-        supabase.table("ai_summaries")
-        .select("generated_at")
-        .gte("generated_at", weeks[0][0].isoformat())
-        .execute()
-        .data
+    document_ids = None
+    if case_ids is not None:
+        document_ids = [d["document_id"] for d in supabase.table("documents").select("document_id").in_("case_id", list(case_ids)).execute().data]
+        summarized_query = summarized_query.in_("document_id", document_ids)
+
+    summary_query = (
+        supabase.table("ai_summaries").select("generated_at").gte("generated_at", weeks[0][0].isoformat())
     )
+    if document_ids is not None:
+        summary_query = summary_query.in_("document_id", document_ids)
+    summary_rows = summary_query.execute().data
     ai_counts: Counter = Counter()
     for row in summary_rows:
         if not row["generated_at"]:
@@ -139,11 +190,9 @@ def get_analytics(profile: dict = Depends(require_roles(ADMIN))):
         generated = datetime.fromisoformat(row["generated_at"].replace("Z", "+00:00")).date()
         ai_counts[generated - timedelta(days=generated.weekday())] += 1
 
-    live_docs = supabase.table("documents").select("file_size").eq("is_deleted", False).execute().data
-    summarized = _count(supabase.table("ai_summaries").select("document_id", count="exact"))
-    deleted_docs = _count(
-        supabase.table("documents").select("document_id", count="exact").eq("is_deleted", True)
-    )
+    live_docs = documents_query.execute().data
+    summarized = _count(summarized_query)
+    deleted_docs = _count(deleted_query)
 
     return {
         "total_cases": len(case_rows),
@@ -172,11 +221,13 @@ def _reraise_settings_error(error: PostgrestAPIError) -> None:
     raise error
 
 
-def get_settings(profile: dict = Depends(require_roles(ADMIN))):
-    """Read the single pinned platform_settings row, falling back to defaults if the row
-    was deleted. Calls: `_reraise_settings_error()`."""
+def get_settings(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
+    """Read the caller's own org's platform_settings row, falling back to defaults if the
+    row was deleted. Calls: `_reraise_settings_error()`."""
+    if profile["role_id"] == SUPER_ADMIN:
+        raise HTTPException(status_code=400, detail="Platform settings are managed per organization.")
     try:
-        rows = supabase.table("platform_settings").select("*").eq("id", 1).execute().data
+        rows = supabase.table("platform_settings").select("*").eq("org_id", profile["org_id"]).execute().data
     except PostgrestAPIError as e:
         _reraise_settings_error(e)
     if not rows:
@@ -184,11 +235,13 @@ def get_settings(profile: dict = Depends(require_roles(ADMIN))):
     return {field: rows[0][field] for field in SETTINGS_FIELDS}
 
 
-def update_settings(data: PlatformSettings, profile: dict = Depends(require_roles(ADMIN))):
-    """Upsert the pinned platform_settings row. Calls: `_reraise_settings_error()`."""
+def update_settings(data: PlatformSettings, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
+    """Upsert the caller's own org's platform_settings row. Calls: `_reraise_settings_error()`."""
+    if profile["role_id"] == SUPER_ADMIN:
+        raise HTTPException(status_code=400, detail="Platform settings are managed per organization.")
     try:
         supabase.table("platform_settings").upsert({
-            "id": 1,
+            "org_id": profile["org_id"],
             **data.model_dump(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).execute()

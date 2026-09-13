@@ -48,6 +48,9 @@ export interface CaseSummary {
   hearing: string | null
   priority: string
   description: string | null
+  cnr_number: string | null
+  ecourts_status: string | null
+  ecourts_last_synced_at: string | null
 }
 
 export interface CaseCreatePayload {
@@ -206,6 +209,7 @@ export interface DocumentSummary {
   case_number: string | null
   uploaded_by: string | null
   has_summary: boolean
+  esign_status: string | null
 }
 
 export interface AiSummary {
@@ -501,4 +505,21 @@ export interface PlatformSettings {
   new_signup_alerts: boolean
   weekly_reports: boolean
   auto_backup: boolean
+}
+
+export interface PartySummary {
+  id: number
+  case_id: number
+  name: string
+  role: string
+  created_at: string
+}
+
+export interface ConflictMatch {
+  source: 'client' | 'party'
+  name: string
+  case_id: number
+  case_number: string
+  lawyer: string | null
+  role: string | null
 }

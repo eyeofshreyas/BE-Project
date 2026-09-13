@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
+from app.controllers.cases import _generate_case_number
 from app.controllers.client_requests import respond_client_request, send_client_request
 from app.models.client_requests import ClientRequestCreate, ClientRequestDecision
 
@@ -96,6 +97,46 @@ def test_respond_marks_request_declined_and_creates_no_case():
         assert not any(call.args and call.args[0] == "cases" for call in fake.table.call_args_list)
 
 
+def test_respond_accept_sets_case_org_id_from_the_lawyers_own_org():
+    """Verifies accepting a request creates the case with org_id taken from the inviting lawyer's own organization, not the client's (clients have no org). Exercises: `POST /client-requests/{id}/respond` (`client_requests.respond_client_request()`)."""
+    profile = {"role_id": auth.CLIENT, "user_id": 1, "full_name": "Test Client"}
+    request_row = {
+        "request_id": 1, "client_id": 7, "lawyer_id": 3, "status": "pending",
+        "court_id": 2, "case_type_id": 4,
+        "invite_email": None, "message": None, "created_at": "now",
+        "lawyers": None, "clients": None, "courts": None, "case_types": None,
+    }
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 7}]
+        elif name == "client_requests":
+            m.select.return_value.eq.return_value.execute.return_value.data = [request_row]
+        elif name == "lawyers":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"user_id": 99, "users": {"org_id": 7}}]
+        elif name == "case_types":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"case_type_name": "Civil"}]
+        elif name == "cases":
+            m.select.return_value.like.return_value.execute.return_value.data = []
+            m.insert.return_value.execute.return_value.data = [{"case_id": 55, "case_number": "CIV2026001"}]
+        elif name == "case_lawyers":
+            m.insert.return_value.execute.return_value = MagicMock()
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.client_requests.supabase", fake), patch("app.controllers.cases.supabase", fake):
+        respond_client_request(1, ClientRequestDecision(decision="accept"), profile)
+
+    inserted = tables["cases"].insert.call_args[0][0]
+    assert inserted["org_id"] == 7
+
+
 def _fake_supabase_for_send(request_row: dict, existing_user: dict | None = None):
     fake = MagicMock()
     tables: dict[str, MagicMock] = {}
@@ -156,6 +197,7 @@ if __name__ == "__main__":
     test_respond_rejects_already_answered_request()
     test_respond_notifies_lawyer_on_decline()
     test_respond_marks_request_declined_and_creates_no_case()
+    test_respond_accept_sets_case_org_id_from_the_lawyers_own_org()
     test_send_client_request_emails_invitee_with_no_account()
     test_send_client_request_notifies_existing_client()
     print("ok")

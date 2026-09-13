@@ -5,7 +5,10 @@
 from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
-from app.controllers.admin import get_analytics
+from fastapi import HTTPException
+from app.middleware import auth
+from app.controllers.admin import get_analytics, get_stats, invite_lawyer, get_settings, update_settings
+from app.models.admin import LawyerInviteCreate, PlatformSettings
 
 
 def _fake_supabase(case_rows, summary_rows, summarized_count, live_docs, deleted_count):
@@ -57,7 +60,7 @@ def test_analytics_buckets_cases_by_month_and_summaries_by_week():
     )
 
     with patch("app.controllers.admin.supabase", fake):
-        result = get_analytics(profile={})
+        result = get_analytics(profile={"role_id": auth.SUPER_ADMIN, "org_id": None})
 
     assert result["total_cases"] == 3
     assert dict((s["label"], s["count"]) for s in result["case_status"]) == {"Open": 2, "Closed": 1}
@@ -77,5 +80,96 @@ def test_awaiting_summary_never_goes_negative():
     clamps to zero instead of showing a negative card. Exercises: `GET /admin/analytics`."""
     fake = _fake_supabase(case_rows=[], summary_rows=[], summarized_count=9, live_docs=[], deleted_count=9)
     with patch("app.controllers.admin.supabase", fake):
-        result = get_analytics(profile={})
+        result = get_analytics(profile={"role_id": auth.SUPER_ADMIN, "org_id": None})
     assert result["documents"]["awaiting_summary"] == 0
+
+
+def test_invite_lawyer_creates_pending_invite_for_own_org():
+    """Verifies an org admin's invite is scoped to their own org_id. Exercises: `POST /admin/lawyer-invites` (`admin.invite_lawyer()`)."""
+    fake = MagicMock()
+    fake.table.return_value.insert.return_value.execute.return_value = MagicMock()
+    with patch("app.controllers.admin.supabase", fake):
+        result = invite_lawyer(LawyerInviteCreate(email="new@firm.example"), profile={"role_id": auth.ADMIN, "org_id": 7})
+    assert result["message"] == "Invite sent."
+    fake.table.return_value.insert.assert_called_once_with({"org_id": 7, "email": "new@firm.example", "status": "pending"})
+
+
+def test_get_settings_scoped_to_org_admins_own_org():
+    """Verifies an org admin reads only their own org's platform_settings row. Exercises: `GET /admin/settings` (`admin.get_settings()`)."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+        {"maintenance_mode": True, "new_signup_alerts": False, "weekly_reports": True, "auto_backup": True}
+    ]
+    with patch("app.controllers.admin.supabase", fake):
+        result = get_settings(profile={"role_id": auth.ADMIN, "org_id": 7})
+    assert result["maintenance_mode"] is True
+    fake.table.return_value.select.return_value.eq.assert_called_once_with("org_id", 7)
+
+
+def test_get_settings_rejects_super_admin():
+    """Verifies the super-admin (no org) is told settings are per-organization instead of crashing. Exercises: `GET /admin/settings` (`admin.get_settings()`)."""
+    try:
+        get_settings(profile={"role_id": auth.SUPER_ADMIN, "org_id": None})
+        assert False, "expected HTTPException"
+    except HTTPException as e:
+        assert e.status_code == 400
+
+
+def _fake_supabase_for_stats(case_client_rows):
+    """Enough of `get_stats()`'s query surface to run it end to end, with every count/data
+    result zeroed out except the `cases` table's client_id rows this test cares about."""
+    fake = MagicMock()
+
+    def table(name):
+        m = MagicMock()
+        if name == "documents":
+            def select(*args, **kwargs):
+                sel = MagicMock()
+                if kwargs.get("count") == "exact":
+                    sel.eq.return_value.in_.return_value.execute.return_value.count = 0
+                else:
+                    sel.in_.return_value.execute.return_value.data = []
+                return sel
+            m.select.side_effect = select
+        elif name == "invoices":
+            m.select.return_value.in_.return_value.execute.return_value.data = []
+        elif name == "users":
+            def select(*args, **kwargs):
+                sel = MagicMock()
+                sel.eq.return_value.execute.return_value.count = 0
+                sel.eq.return_value.eq.return_value.eq.return_value.execute.return_value.count = 0
+                return sel
+            m.select.side_effect = select
+        elif name == "cases":
+            def select(*args, **kwargs):
+                sel = MagicMock()
+                if kwargs.get("count") == "exact":
+                    sel.neq.return_value.in_.return_value.execute.return_value.count = 0
+                else:
+                    sel.in_.return_value.execute.return_value.data = case_client_rows
+                return sel
+            m.select.side_effect = select
+        elif name == "ai_summaries":
+            m.select.return_value.in_.return_value.execute.return_value.count = 0
+        elif name == "hearings":
+            m.select.return_value.eq.return_value.gte.return_value.in_.return_value.execute.return_value.count = 0
+        elif name == "payments":
+            m.select.return_value.eq.return_value.gte.return_value.in_.return_value.execute.return_value.data = []
+        return m
+
+    fake.table.side_effect = table
+    return fake
+
+
+def test_registered_clients_derived_from_org_case_ids_not_users_org_id():
+    """Verifies an org admin's registered_clients count comes from the distinct clients on the
+    org's own cases (case_ids), the same way list_clients() derives it -- not a users.org_id
+    filter, since clients are global (users.org_id is always NULL for them) per the tenancy
+    design, which made this count silently always zero for every org admin.
+    Exercises: `GET /admin/stats` (`admin.get_stats()`)."""
+    case_client_rows = [{"client_id": 101}, {"client_id": 102}, {"client_id": 101}, {"client_id": None}]
+    fake = _fake_supabase_for_stats(case_client_rows)
+    with patch("app.controllers.admin.supabase", fake), \
+         patch("app.controllers.admin.get_scoped_case_ids", return_value={1, 2}):
+        result = get_stats(profile={"role_id": auth.ADMIN, "org_id": 7, "user_id": 1})
+    assert result["registered_clients"] == 2

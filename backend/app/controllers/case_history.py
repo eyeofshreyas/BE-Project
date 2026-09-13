@@ -2,7 +2,7 @@
 
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles, ensure_case_access
 from app.models.case_history import NoteSummary, NoteCreate, NoteUpdate, TimelineEvent, StatusHistoryEntry, StatusChange
 
 NOTES_SELECT = "note_id,case_id,title,note,checklist,pinned,created_at,lawyers(users(full_name))"
@@ -65,7 +65,7 @@ def _to_status_history(row: dict) -> dict:
     }
 
 
-def list_case_notes(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def list_case_notes(case_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """List notes for a case the caller has access to. Notes are the firm's internal work
     product -- only staff may read them, so this is role-gated as well as case-scoped, and
     so is the AI summary built from them (see case_ai_summary.get_case_ai_summary).
@@ -129,7 +129,7 @@ def list_status_history(case_id: int, profile: dict = Depends(get_current_profil
     return [_to_status_history(row) for row in rows]
 
 
-def change_case_status(case_id: int, data: StatusChange, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def change_case_status(case_id: int, data: StatusChange, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Update a case's status, and record both a status-history row and a timeline event.
     Calls: `ensure_case_access()`, `_to_status_history()`."""
     ensure_case_access(case_id, profile)

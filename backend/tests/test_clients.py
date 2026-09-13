@@ -92,7 +92,38 @@ def test_lawyer_sees_only_their_clients_with_active_case_counts():
         assert result[0]["pending_amount"] == 5000
 
 
+def test_org_admin_only_sees_clients_with_a_case_in_their_org():
+    """Verifies an org admin's client list is built from cases in their own org, not every client platform-wide. Exercises: `GET /clients` (`clients.list_clients()`)."""
+    profile = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
+    client_row = {
+        "client_id": 7, "address": "1 Main St", "preferred_language": "English",
+        "users": {"full_name": "Test Client", "email": "c@example.com", "phone": "123"},
+    }
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "cases":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 7}]
+        elif name == "clients":
+            m.select.return_value.in_.return_value.execute.return_value.data = [client_row]
+        elif name == "invoices":
+            m.select.return_value.in_.return_value.execute.return_value.data = []
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.clients.supabase", fake):
+        result = list_clients(profile)
+    assert [c["id"] for c in result] == [7]
+    tables["cases"].select.return_value.eq.assert_called_once_with("org_id", 7)
+
+
 if __name__ == "__main__":
     test_lawyer_with_no_cases_sees_no_clients()
     test_lawyer_sees_only_their_clients_with_active_case_counts()
+    test_org_admin_only_sees_clients_with_a_case_in_their_org()
     print("ok")

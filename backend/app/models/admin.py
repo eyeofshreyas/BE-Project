@@ -1,7 +1,7 @@
 """Pydantic response schemas for the admin console: overview stats, the platform-wide
 activity feed, analytics, and platform settings."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 class AdminStats(BaseModel):
@@ -55,6 +55,11 @@ class AdminAnalytics(BaseModel):
     ai_usage: list[LabelCount]
     documents: DocumentInsights
     storage: StorageUsage
+
+
+class LawyerInviteCreate(BaseModel):
+    """Request body for inviting a lawyer into the caller's organization."""
+    email: EmailStr
 
 
 class PlatformSettings(BaseModel):

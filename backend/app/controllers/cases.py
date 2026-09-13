@@ -1,15 +1,16 @@
-"""Controllers for cases: list (scoped), create, and unassign-lawyer."""
+"""Controllers for cases: list (scoped), create, and case-team management (add/remove/list-available lawyers)."""
 
 from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
-from app.models.cases import CaseCreate, CaseSummary
+from app.middleware.auth import ADMIN, LAWYER, SUPER_ADMIN, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
+from app.models.cases import AddLawyerRequest, CaseCreate, CaseSummary
 
 CASES_SELECT = (
     "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,description,"
-    "client_id,"
+    "cnr_number,ecourts_status,ecourts_last_synced_at,"
+    "client_id,org_id,"
     "clients(users(full_name,email,phone)),"
     "courts(court_name),"
     "case_types(case_type_name),"
@@ -17,18 +18,24 @@ CASES_SELECT = (
 )
 
 
-def _active_case_lawyer(case_lawyers: list[dict]) -> dict | None:
-    """Return the first case_lawyers entry with is_active=True and a joined lawyer, or None."""
+def _primary_case_lawyer(case_lawyers: list[dict]) -> dict | None:
+    """Return the case_lawyers entry with assigned_role="Primary" and is_active=True, or None."""
     for cl in case_lawyers:
-        if cl.get("is_active") and cl.get("lawyers"):
+        if cl.get("is_active") and cl.get("assigned_role") == "Primary" and cl.get("lawyers"):
             return cl
     return None
 
 
+def _active_case_lawyers(case_lawyers: list[dict]) -> list[dict]:
+    """Every active case_lawyers row with a joined lawyer, Primary first."""
+    active = [cl for cl in case_lawyers if cl.get("is_active") and cl.get("lawyers")]
+    return sorted(active, key=lambda cl: cl.get("assigned_role") != "Primary")
+
+
 def _to_case_summary(row: dict) -> dict:
     """Shape a raw `cases` row (joined with clients/courts/case_types/case_lawyers) into
-    the CaseSummary dict. Calls: `_active_case_lawyer()`."""
-    active_lawyer = _active_case_lawyer(row["case_lawyers"])
+    the CaseSummary dict. Calls: `_primary_case_lawyer()`, `_active_case_lawyers()`."""
+    primary = _primary_case_lawyer(row["case_lawyers"])
     return {
         "id": row["case_number"],
         "case_id": row["case_id"],
@@ -39,16 +46,29 @@ def _to_case_summary(row: dict) -> dict:
         "client_id": row["client_id"],
         "client_email": row["clients"]["users"]["email"] if row["clients"] else None,
         "client_phone": row["clients"]["users"]["phone"] if row["clients"] else None,
-        "lawyer": active_lawyer["lawyers"]["users"]["full_name"] if active_lawyer else None,
-        "lawyer_id": active_lawyer["lawyer_id"] if active_lawyer else None,
-        "lawyer_email": active_lawyer["lawyers"]["users"]["email"] if active_lawyer else None,
-        "lawyer_phone": active_lawyer["lawyers"]["users"]["phone"] if active_lawyer else None,
+        "lawyer": primary["lawyers"]["users"]["full_name"] if primary else None,
+        "lawyer_id": primary["lawyer_id"] if primary else None,
+        "lawyer_email": primary["lawyers"]["users"]["email"] if primary else None,
+        "lawyer_phone": primary["lawyers"]["users"]["phone"] if primary else None,
+        "lawyers": [
+            {
+                "lawyer_id": cl["lawyer_id"],
+                "name": cl["lawyers"]["users"]["full_name"],
+                "email": cl["lawyers"]["users"]["email"],
+                "phone": cl["lawyers"]["users"]["phone"],
+                "assigned_role": cl["assigned_role"],
+            }
+            for cl in _active_case_lawyers(row["case_lawyers"])
+        ],
         "court": row["courts"]["court_name"] if row["courts"] else None,
         "case_type": row["case_types"]["case_type_name"] if row.get("case_types") else None,
         "status": row["status"],
         "hearing": row["next_hearing_date"],
         "priority": row["priority"],
         "description": row.get("description"),
+        "cnr_number": row.get("cnr_number"),
+        "ecourts_status": row.get("ecourts_status"),
+        "ecourts_last_synced_at": row.get("ecourts_last_synced_at"),
     }
 
 
@@ -105,6 +125,7 @@ def create_case(data: CaseCreate, profile: dict = Depends(require_roles(LAWYER))
         "client_id": data.client_id,
         "court_id": data.court_id,
         "case_type_id": data.case_type_id,
+        "org_id": profile["org_id"],
         "status": "Open",
         "priority": data.priority,
         "next_hearing_date": data.next_hearing_date,
@@ -129,11 +150,76 @@ def create_case(data: CaseCreate, profile: dict = Depends(require_roles(LAWYER))
     return _to_case_summary(row)
 
 
-def unassign_lawyer(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
-    """Deactivates the case's active case_lawyers row. A lawyer may only step
-    down from a case they're actively assigned to (enforced by
-    ensure_case_access); an admin can unassign any case's lawyer."""
+def add_lawyer_to_case(case_id: int, data: AddLawyerRequest, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
+    """Add a teammate to a case's active lawyer roster. The caller must be the case's
+    current Primary lawyer, or an admin (org-scoped) / super-admin. The target lawyer must
+    belong to the same organization as the case. Calls: `ensure_case_access()`,
+    `_primary_case_lawyer()`, `_to_case_summary()`."""
+    if data.assigned_role == "Primary":
+        raise HTTPException(status_code=409, detail="A case can only have one Primary lawyer.")
+
     ensure_case_access(case_id, profile)
-    supabase.table("case_lawyers").update({"is_active": False}).eq("case_id", case_id).eq("is_active", True).execute()
+    row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
+
+    if profile["role_id"] == LAWYER:
+        lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
+        caller_lawyer_id = lawyer_rows[0]["lawyer_id"] if lawyer_rows else None
+        primary = _primary_case_lawyer(row["case_lawyers"])
+        if not primary or primary["lawyer_id"] != caller_lawyer_id:
+            raise HTTPException(status_code=403, detail="Only the case's Primary lawyer can add teammates.")
+
+    target_rows = supabase.table("lawyers").select("lawyer_id,users(org_id)").eq("lawyer_id", data.lawyer_id).execute().data
+    if not target_rows or not target_rows[0].get("users"):
+        raise HTTPException(status_code=404, detail="Lawyer not found")
+    if target_rows[0]["users"]["org_id"] != row["org_id"]:
+        raise HTTPException(status_code=403, detail="That lawyer isn't part of this case's organization.")
+
+    if any(cl["lawyer_id"] == data.lawyer_id and cl["is_active"] for cl in row["case_lawyers"]):
+        raise HTTPException(status_code=409, detail="This lawyer is already on the case.")
+
+    supabase.table("case_lawyers").insert({
+        "case_id": case_id, "lawyer_id": data.lawyer_id,
+        "assigned_role": data.assigned_role, "is_active": True,
+    }).execute()
     row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
     return _to_case_summary(row)
+
+
+def remove_lawyer_from_case(case_id: int, lawyer_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
+    """Remove a lawyer from a case's active roster. Self-removal is always allowed for an
+    actively-assigned lawyer; removing someone else requires being the case's Primary
+    lawyer or an admin/super-admin. Calls: `ensure_case_access()`, `_primary_case_lawyer()`,
+    `_to_case_summary()`."""
+    ensure_case_access(case_id, profile)
+    row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
+
+    if profile["role_id"] == LAWYER:
+        lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
+        caller_lawyer_id = lawyer_rows[0]["lawyer_id"] if lawyer_rows else None
+        if caller_lawyer_id != lawyer_id:
+            primary = _primary_case_lawyer(row["case_lawyers"])
+            if not primary or primary["lawyer_id"] != caller_lawyer_id:
+                raise HTTPException(status_code=403, detail="Only the case's Primary lawyer can remove another teammate.")
+
+    supabase.table("case_lawyers").update({"is_active": False}) \
+        .eq("case_id", case_id).eq("lawyer_id", lawyer_id).eq("is_active", True).execute()
+    row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
+    return _to_case_summary(row)
+
+
+def list_available_case_lawyers(case_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
+    """List lawyers in the case's own organization who could be added to its team --
+    backs the "Add lawyer" picker. Calls: `ensure_case_access()`."""
+    ensure_case_access(case_id, profile)
+    case_row = supabase.table("cases").select("org_id").eq("case_id", case_id).execute().data[0]
+    org_lawyer_users = supabase.table("users").select("user_id,full_name,email") \
+        .eq("role_id", LAWYER).eq("org_id", case_row["org_id"]).execute().data
+    user_ids = [u["user_id"] for u in org_lawyer_users]
+    if not user_ids:
+        return []
+    lawyer_rows = supabase.table("lawyers").select("lawyer_id,user_id").in_("user_id", user_ids).execute().data
+    lawyer_id_by_user = {r["user_id"]: r["lawyer_id"] for r in lawyer_rows}
+    return [
+        {"lawyer_id": lawyer_id_by_user[u["user_id"]], "name": u["full_name"], "email": u["email"]}
+        for u in org_lawyer_users if u["user_id"] in lawyer_id_by_user
+    ]

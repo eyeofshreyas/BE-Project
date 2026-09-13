@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, require_roles
 from app.ml.case_search import search_own_cases
 from app.ml.similar_cases import FINETUNE_VENV_PYTHON, SEARCH_RUNNER
 from app.ml.subprocess_utils import run_ml_subprocess
@@ -118,7 +118,7 @@ def _build_case_text(case_id: int) -> str:
     return "\n".join(lines).strip()
 
 
-def get_case_ai_summary(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def get_case_ai_summary(case_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Fetch the stored AI summary for a case, if one has been generated. Staff-only: the
     summary is written from the case's notes (see `_build_case_text()`), which are private to
     the firm, so it inherits their audience. Calls: `ensure_case_access()`."""
@@ -129,7 +129,7 @@ def get_case_ai_summary(case_id: int, profile: dict = Depends(require_roles(ADMI
     return _to_case_ai_summary(rows[0])
 
 
-def generate_case_ai_summary(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def generate_case_ai_summary(case_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Generate (or regenerate) the case's AI summary from the whole case file, and look up
     related precedent cases via the similar-cases search. Calls: `ensure_case_access()`,
     `_build_case_text()`, `run_ml_subprocess()`."""
@@ -160,7 +160,7 @@ def generate_case_ai_summary(case_id: int, profile: dict = Depends(require_roles
     return _to_case_ai_summary(row)
 
 
-def list_similar_own_cases(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def list_similar_own_cases(case_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Rank the caller's *other* cases against this one -- "have we handled something like this
     before" over the firm's own files, not the public reference corpus. The query is the same
     case file the summary is written from, and `search_own_cases()` applies the caller's normal

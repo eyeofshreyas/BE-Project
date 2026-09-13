@@ -1,8 +1,8 @@
 /** `/cases/new` route: multi-field new-case form (type, client search, court, description, drag-drop file upload). */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listCourts, listCaseTypes, listClients, listDocumentTypes, createCase, uploadDocument } from '../../api/client'
-import type { CourtOption, CaseTypeOption, ClientSummary, DocumentTypeOption } from '../../types/api'
+import { listCourts, listCaseTypes, listClients, listDocumentTypes, createCase, uploadDocument, searchConflicts } from '../../api/client'
+import type { CourtOption, CaseTypeOption, ClientSummary, DocumentTypeOption, ConflictMatch } from '../../types/api'
 import { Icon, type IconName } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
@@ -66,6 +66,10 @@ export default function CreateCasePage() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const [conflictQuery, setConflictQuery] = useState('')
+  const [conflictResults, setConflictResults] = useState<ConflictMatch[] | null>(null)
+  const [conflictSearching, setConflictSearching] = useState(false)
+
   useEffect(() => {
     listCourts().then(setCourts).catch(() => {})
     listCaseTypes().then((types) => { setCaseTypes(types); if (types[0]) setCaseTypeId(String(types[0].case_type_id)) }).catch(() => {})
@@ -94,6 +98,24 @@ export default function CreateCasePage() {
     setEmail(c.email)
     setPhone(c.phone)
     setClientDropdownOpen(false)
+  }
+
+  /** Searches every client and case party firm-wide for a name match (`GET /conflict-check`)
+   * -- advisory only, doesn't block creating the case. Run this for the new client's name and
+   * for the other side's name (there's no opposing-party field on this form yet; add the
+   * opposing party to the case afterward from the case detail page, which also makes that
+   * name searchable for the next lawyer's conflict check). */
+  async function runConflictCheck() {
+    const q = conflictQuery.trim()
+    if (!q) return
+    setConflictSearching(true)
+    try {
+      setConflictResults(await searchConflicts(q))
+    } catch {
+      setConflictResults(null)
+    } finally {
+      setConflictSearching(false)
+    }
   }
 
   async function submit() {
@@ -231,6 +253,38 @@ export default function CreateCasePage() {
               <option value="">Select a court…</option>
               {courts.map((c) => <option key={c.court_id} value={c.court_id}>{c.court_name}</option>)}
             </select>
+          </Field>
+
+          <Field label="Conflict Check">
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                placeholder="Search a name (the new client, or the other side)…"
+                value={conflictQuery}
+                onChange={(e) => { setConflictQuery(e.target.value); setConflictResults(null) }}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), runConflictCheck())}
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <div
+                className={styles.ghostChip}
+                style={{ opacity: conflictSearching || !conflictQuery.trim() ? 0.6 : 1, cursor: conflictSearching ? 'default' : 'pointer' }}
+                onClick={conflictSearching ? undefined : runConflictCheck}
+              >
+                <Icon name="search" size={14} color="#575145" /> {conflictSearching ? 'Checking…' : 'Check'}
+              </div>
+            </div>
+            {conflictResults !== null && (
+              conflictResults.length === 0 ? (
+                <div style={{ marginTop: 8, fontSize: 12.5, color: '#4A6B4E' }}>No matches found across the firm's existing clients and cases.</div>
+              ) : (
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {conflictResults.map((m, i) => (
+                    <div key={i} style={{ fontSize: 12.5, background: '#F6E3E1', border: '1px solid #E8B8B3', borderRadius: 3, padding: '8px 10px' }}>
+                      <b>{m.name}</b> — {m.source === 'client' ? 'existing client' : m.role} on <b>{m.case_number}</b>{m.lawyer ? ` (${m.lawyer})` : ''}
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
           </Field>
 
           <Field label="Short Case Description">

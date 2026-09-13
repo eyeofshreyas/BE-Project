@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.db.supabase_client import supabase
 from app.controllers.documents import extract_document_text
-from app.middleware.auth import ADMIN, LAWYER, require_roles, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, require_roles, ensure_case_access
 from app.ml.subprocess_utils import run_ml_subprocess
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -33,7 +33,7 @@ class SummarizeResponse(BaseModel):
 
 
 @router.post("/summarize", response_model=SummarizeResponse)
-def summarize_text(data: SummarizeRequest, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def summarize_text(data: SummarizeRequest, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Summarize text via the LoRA model subprocess. With a document_id, checks case access,
     falls back to the stored file's own text when none was posted, and upserts the result into
     ai_summaries. Calls: `ensure_case_access()`, `extract_document_text()`, `run_ml_subprocess()`,
