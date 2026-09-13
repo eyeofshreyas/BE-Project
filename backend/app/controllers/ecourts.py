@@ -2,6 +2,7 @@
 by CNR number. No official government API exists for this -- services.ecourts.gov.in is a
 CAPTCHA-gated portal -- so this goes through eCourtsIndia's third-party partner API instead."""
 
+import logging
 from datetime import datetime, timezone
 
 import httpx
@@ -12,6 +13,8 @@ from app.core.config import ECOURTS_API_BASE, ECOURTS_API_KEY
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, require_roles
 from app.models.cases import CnrUpdate
+
+logger = logging.getLogger(__name__)
 
 
 def _ecourts_auth() -> str:
@@ -59,6 +62,10 @@ def sync_case_from_ecourts(case_id: int, profile: dict = Depends(require_roles(A
     if resp.status_code >= 400:
         raise HTTPException(status_code=502, detail="eCourts sync failed.")
     record = resp.json()["data"]
+    # ponytail: log the raw payload until we've seen a real response and know the
+    # hearing-history field's shape well enough to auto-create hearings from it (see
+    # sync_case_from_ecourts's docstring); drop this once that mapping is written.
+    logger.info("eCourts raw response for CNR %s: %s", cnr, record)
 
     supabase.table("cases").update({
         "ecourts_status": record.get("caseStatus"),
