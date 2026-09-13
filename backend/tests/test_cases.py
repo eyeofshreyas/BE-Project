@@ -2,6 +2,7 @@
 # to add/remove teammates on cases where they're the Primary, and only from
 # their own org; anyone assigned can remove themselves.
 """Tests for the cases domain: case creation's consent gate and case-team management."""
+import inspect
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -9,6 +10,12 @@ from fastapi import HTTPException
 from app.middleware import auth
 from app.controllers.cases import _to_case_summary, add_lawyer_to_case, create_case, list_available_case_lawyers, remove_lawyer_from_case
 from app.models.cases import AddLawyerRequest, CaseCreate
+
+
+def _role_gate(fn):
+    """The dependency FastAPI resolves for `fn`'s profile parameter. Calling the controller
+    directly skips it, so a role gate has to be exercised through this to be tested at all."""
+    return inspect.signature(fn).parameters["profile"].default.dependency
 
 
 # ponytail self-check for create_case's consent gate -- a lawyer may only
@@ -147,12 +154,29 @@ def test_non_primary_lawyer_cannot_add_a_teammate():
             assert e.status_code == 403
 
 
+def test_add_lawyer_rejects_a_second_primary():
+    """Verifies a case's Primary cannot add another lawyer as Primary; raises 409 -- a case may
+    have only one Primary, set once at creation. Exercises: `POST /cases/{id}/lawyers`
+    (`cases.add_lawyer_to_case()`)."""
+    fake = _fake_supabase_for_team(assigned_case_ids={42}, case_row=TEAM_CASE_ROW, target_lawyer_org_id=7, caller_lawyer_id=5)
+    with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
+        try:
+            add_lawyer_to_case(42, AddLawyerRequest(lawyer_id=6, assigned_role="Primary"), PRIMARY_LAWYER_PROFILE)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 409
+
+
 def test_associate_can_remove_themselves():
     """Verifies a non-Primary teammate can remove themselves from a case. Exercises: `DELETE /cases/{id}/lawyers/{lawyer_id}` (`cases.remove_lawyer_from_case()`)."""
     fake = _fake_supabase_for_team(assigned_case_ids={42}, case_row=TEAM_CASE_ROW, target_lawyer_org_id=7, caller_lawyer_id=2)
     with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
         result = remove_lawyer_from_case(42, 2, ASSOCIATE_LAWYER_PROFILE)
     assert result["case_id"] == 42
+    update = fake.table("case_lawyers").update
+    assert update.call_args[0][0] == {"is_active": False}
+    assert update.return_value.eq.call_args[0] == ("case_id", 42)
+    assert update.return_value.eq.return_value.eq.call_args[0] == ("lawyer_id", 2)
 
 
 def test_associate_cannot_remove_someone_else():
@@ -206,14 +230,27 @@ def test_available_case_lawyers_are_scoped_to_the_cases_org():
     assert result == [{"lawyer_id": 6, "name": "Org Lawyer", "email": "o@example.com"}]
 
 
+def test_client_cannot_list_available_case_lawyers():
+    """Verifies a CLIENT profile is rejected by list_available_case_lawyers's role gate; raises
+    403 -- this endpoint backs an internal add-teammate picker, not a client-facing view.
+    Exercises: `GET /cases/{id}/available-lawyers` (`cases.list_available_case_lawyers()`)."""
+    try:
+        _role_gate(list_available_case_lawyers)({"role_id": auth.CLIENT, "user_id": 1})
+        assert False, "expected HTTPException"
+    except HTTPException as e:
+        assert e.status_code == 403
+
+
 if __name__ == "__main__":
     test_create_case_denied_without_accepted_request()
     test_create_case_allowed_with_accepted_request()
     test_primary_lawyer_can_add_a_same_org_teammate()
     test_add_lawyer_rejects_a_different_org_lawyer()
     test_non_primary_lawyer_cannot_add_a_teammate()
+    test_add_lawyer_rejects_a_second_primary()
     test_associate_can_remove_themselves()
     test_associate_cannot_remove_someone_else()
     test_case_summary_lists_every_active_teammate()
     test_available_case_lawyers_are_scoped_to_the_cases_org()
+    test_client_cannot_list_available_case_lawyers()
     print("ok")

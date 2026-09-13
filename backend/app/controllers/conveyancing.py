@@ -162,6 +162,7 @@ def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMI
         "client_id": data.client_id,
         "court_id": court_rows[0]["court_id"],
         "case_type_id": case_type_rows[0]["case_type_id"],
+        "org_id": profile["org_id"],
         "status": "Open",
         "priority": data.priority,
     }).execute().data[0]

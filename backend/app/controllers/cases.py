@@ -155,6 +155,9 @@ def add_lawyer_to_case(case_id: int, data: AddLawyerRequest, profile: dict = Dep
     current Primary lawyer, or an admin (org-scoped) / super-admin. The target lawyer must
     belong to the same organization as the case. Calls: `ensure_case_access()`,
     `_primary_case_lawyer()`, `_to_case_summary()`."""
+    if data.assigned_role == "Primary":
+        raise HTTPException(status_code=409, detail="A case can only have one Primary lawyer.")
+
     ensure_case_access(case_id, profile)
     row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
 
@@ -204,7 +207,7 @@ def remove_lawyer_from_case(case_id: int, lawyer_id: int, profile: dict = Depend
     return _to_case_summary(row)
 
 
-def list_available_case_lawyers(case_id: int, profile: dict = Depends(get_current_profile)):
+def list_available_case_lawyers(case_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """List lawyers in the case's own organization who could be added to its team --
     backs the "Add lawyer" picker. Calls: `ensure_case_access()`."""
     ensure_case_access(case_id, profile)

@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.conveyancing import update_due_diligence, complete_progress_stage, update_matter, _next_matter_seq
-from app.models.conveyancing import DueDiligenceUpdate, MatterUpdate
+from app.controllers.conveyancing import update_due_diligence, complete_progress_stage, update_matter, create_matter, _next_matter_seq
+from app.models.conveyancing import DueDiligenceUpdate, MatterUpdate, MatterCreate
 
 
 def _fake_supabase(rows_by_table):
@@ -65,6 +65,48 @@ def test_update_matter_rejects_matter_on_out_of_scope_case():
             assert e.status_code == 403
 
 
+def test_create_matter_sets_org_id_from_callers_profile():
+    """Verifies create_matter's underlying `cases` insert carries org_id from the caller's own
+    profile -- cases.org_id is NOT NULL, and this is a third case-creation path (besides
+    create_case and respond_client_request) that needed the same fix. Exercises:
+    `POST /conveyancing/matters` (`conveyancing.create_matter()`)."""
+    profile = {"role_id": auth.LAWYER, "user_id": 1, "org_id": 7}
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "case_types":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"case_type_id": 1, "case_type_name": "Property"}]
+        elif name == "courts":
+            m.select.return_value.limit.return_value.execute.return_value.data = [{"court_id": 1}]
+        elif name == "cases":
+            m.select.return_value.execute.return_value.data = []
+            m.insert.return_value.execute.return_value.data = [{"case_id": 42, "case_number": "PROP2026001"}]
+        elif name == "lawyers":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"lawyer_id": 5}]
+        elif name == "properties":
+            m.insert.return_value.execute.return_value.data = [{"property_id": 1}]
+        elif name == "conveyancing_matters":
+            m.select.return_value.execute.return_value.data = []
+            m.insert.return_value.execute.return_value.data = [{"matter_id": 9}]
+        elif name in ("registration_progress", "due_diligence"):
+            m.insert.return_value.execute.return_value = MagicMock()
+        elif name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = []
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.conveyancing.supabase", fake):
+        create_matter(MatterCreate(matter_name="Test Matter", matter_type="Purchase", client_id=99), profile)
+
+    inserted = tables["cases"].insert.call_args[0][0]
+    assert inserted["org_id"] == 7
+
+
 def test_next_matter_seq_skips_numbers_already_in_use():
     """Verifies the generated matter/case number clears every number already taken -- counting
     rows produced PROP2026010 while that case_number existed, breaking every create. Exercises:
@@ -82,6 +124,7 @@ if __name__ == "__main__":
     test_update_due_diligence_rejects_matter_on_out_of_scope_case()
     test_complete_progress_stage_rejects_matter_on_out_of_scope_case()
     test_update_matter_rejects_matter_on_out_of_scope_case()
+    test_create_matter_sets_org_id_from_callers_profile()
     test_next_matter_seq_skips_numbers_already_in_use()
     print("ok")
 
