@@ -232,7 +232,18 @@ export default function CaseDetailPage() {
       .finally(() => setLoading(false))
     if (canUploadDocs) listDocumentTypes().then(setDocumentTypes).catch(() => {})
     if (canManage) listJudges().then(setJudges).catch(() => {})
-    if (canManage) listCourts().then(setCourts).catch(() => {})
+    // The courts table has duplicate rows for the same name under different court_ids
+    // (stale seed data) -- collapsing to one entry per name keeps a lawyer from picking
+    // two different IDs for what reads as the same court, which would let the same judge
+    // through the same-court duplicate check twice.
+    if (canManage) listCourts().then((rows) => {
+      const byName = new Map<string, CourtOption>()
+      for (const c of rows) {
+        const existing = byName.get(c.court_name)
+        if (!existing || c.court_id < existing.court_id) byName.set(c.court_name, c)
+      }
+      setCourts([...byName.values()])
+    }).catch(() => {})
     if (canManage) getCaseAiSummary(numericCaseId).then(setAiSummary).catch(() => setAiSummary(null))
     if (canManage) listCaseParties(numericCaseId).then(setParties).catch(() => {})
   }, [numericCaseId, canUploadDocs, canManage])
@@ -908,12 +919,12 @@ export default function CaseDetailPage() {
                       {judgeFormOpen && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', background: '#FCFAF4', borderRadius: 3 }}>
                           <input value={newJudgeName} onChange={(e) => setNewJudgeName(e.target.value)} placeholder="Judge name" style={inputStyle} />
-                          <select value={newJudgeCourtId} onChange={(e) => setNewJudgeCourtId(e.target.value)} style={inputStyle}>
-                            <option value="">Select a court…</option>
-                            {courts.map((c) => (
-                              <option key={c.court_id} value={c.court_id}>{c.court_name}</option>
-                            ))}
-                          </select>
+                          <Dropdown
+                            value={newJudgeCourtId}
+                            options={['', ...courts.map((c) => String(c.court_id))]}
+                            labelFor={(v) => courts.find((c) => String(c.court_id) === v)?.court_name ?? 'Select a court…'}
+                            onChange={setNewJudgeCourtId}
+                          />
                           <input value={newJudgeDesignation} onChange={(e) => setNewJudgeDesignation(e.target.value)} placeholder="Designation (optional)" style={inputStyle} />
                           {judgeError && <div style={{ fontSize: 12, color: '#B3282D' }}>{judgeError}</div>}
                           <div style={{ display: 'flex', gap: 8 }}>
