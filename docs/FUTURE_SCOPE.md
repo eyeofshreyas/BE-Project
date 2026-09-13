@@ -14,18 +14,31 @@ in `cases.ecourts_raw` for future use. Two things were deliberately left out of 
 
 ### 1.1 Auto-creating hearing rows from eCourts data
 
-The eCourtsIndia single-CNR response is documented to include "per-case process,
-interim-application, transfer, and hearing-history arrays" on the district-court side,
-but the exact field names and shape weren't confirmed against a live response at
-implementation time — no API key was available yet. Guessing at a field name in a
-correctness-sensitive domain (a wrong date silently written to `hearings`) was worse
-than shipping without it.
+Field shape confirmed from the official docs (`https://ecourtsindia.com/api/docs`, v4.0)
+without needing a live API key — no account is provisioned yet. `GET /api/partner/case/{cnr}`
+returns `data.courtCaseData.historyOfCaseHearings`, an array of
+`{ judge, businessOnDate, hearingDate, purposeOfListing }` (district-court cases; shape may
+vary for High Court/Supreme Court CNRs, unconfirmed). Example from the docs:
 
-**Unblocked by:** getting `ECOURTS_API_KEY` configured and making one real
-`GET /api/partner/case/{cnr}` call to see the actual `hearingHistory` (or equivalently
-named) field. Once confirmed, extend `sync_case_from_ecourts()` to diff that array
-against existing `hearings` rows for the case and insert any hearing eCourts knows
-about that LexFlow doesn't, following the same insert + `add_timeline_event()` pattern
+```json
+{ "judge": "Chief Metropolitan Magistrate", "businessOnDate": "2016-04-07",
+  "hearingDate": "2016-05-19", "purposeOfListing": "Misc./ Appearance" }
+```
+
+Note this whole object sits under `data.courtCaseData`, not directly under `data` —
+`sync_case_from_ecourts()` originally read `caseStatus`/`courtCode` off the wrong level
+(always `null`/`n/a`); fixed once this was confirmed.
+
+`judge` is a free-text name string, not this app's `judges.judge_id` — there's no lookup
+or create endpoint for `judges` today (it's seed-only, see `app/controllers/reference.py`),
+so an unmatched name needs either a name-match against existing judges or a way to create
+one on the fly.
+
+**Unblocked by:** an eCourtsIndia API key (real account, not just docs) to confirm this
+holds for a live response and to see whether High Court/Supreme Court CNRs use the same
+field. Once confirmed, extend `sync_case_from_ecourts()` to diff `historyOfCaseHearings`
+against existing `hearings` rows for the case and insert any hearing eCourts knows about
+that LexFlow doesn't, following the same insert + `add_timeline_event()` pattern
 `create_hearing()` already uses in `app/controllers/hearings.py`.
 
 ### 1.2 Scheduled bulk sync (no manual click needed)

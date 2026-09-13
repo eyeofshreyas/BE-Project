@@ -62,21 +62,23 @@ def sync_case_from_ecourts(case_id: int, profile: dict = Depends(require_roles(A
     if resp.status_code >= 400:
         raise HTTPException(status_code=502, detail="eCourts sync failed.")
     record = resp.json()["data"]
-    # ponytail: log the raw payload until we've seen a real response and know the
-    # hearing-history field's shape well enough to auto-create hearings from it (see
-    # sync_case_from_ecourts's docstring); drop this once that mapping is written.
+    # ponytail: log the raw payload until hearing-history auto-import is written (see
+    # docs/FUTURE_SCOPE.md §1.1); drop this once that mapping is in place.
     logger.info("eCourts raw response for CNR %s: %s", cnr, record)
+    # caseStatus/courtCode live under courtCaseData, not at the top level of `data`
+    # -- see docs/FUTURE_SCOPE.md §1.1 for the confirmed response shape.
+    case_data = record.get("courtCaseData", {})
 
     supabase.table("cases").update({
-        "ecourts_status": record.get("caseStatus"),
+        "ecourts_status": case_data.get("caseStatus"),
         "ecourts_raw": record,
         "ecourts_last_synced_at": datetime.now(timezone.utc).isoformat(),
     }).eq("case_id", case_id).execute()
 
     add_timeline_event(
         case_id, "ecourts_synced",
-        f"Synced with eCourts — status: {record.get('caseStatus', 'unknown')}",
-        f"CNR {cnr}, court {record.get('courtCode', 'n/a')}.",
+        f"Synced with eCourts — status: {case_data.get('caseStatus', 'unknown')}",
+        f"CNR {cnr}, court {case_data.get('courtCode', 'n/a')}.",
         profile["user_id"],
     )
 
