@@ -2,6 +2,12 @@
 -- (organizations) and lawyer-invite-by-email, alongside the case-team feature
 -- in cases.py. See docs/superpowers/specs/2026-09-13-org-scoped-case-teams-design.md.
 
+-- users.role_id has a foreign key into roles -- seed SUPER_ADMIN (4) before
+-- anything below tries to set a user's role_id to it.
+insert into roles (role_id, role_name, description) values
+  (4, 'Super Admin', 'Platform-wide operator, unrestricted across all organizations')
+on conflict (role_id) do nothing;
+
 create table if not exists organizations (
   org_id      bigint generated always as identity primary key,
   name        text not null,
