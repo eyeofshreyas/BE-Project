@@ -18,10 +18,12 @@ logger = logging.getLogger(__name__)
 USERS_SELECT = "user_id,full_name,email,phone,is_active,created_at,roles(role_name)"
 
 
-def _to_user_summary(row: dict, suspended: bool = False) -> dict:
+def _to_user_summary(row: dict, suspended: bool = False, specialization: str | None = None) -> dict:
     """Shape a raw `users` row (joined with roles) into the UserSummary dict. `suspended`
     reflects this caller's own org_clients row for a client (always False for every other
-    role, and for a super-admin caller, who has no single org to check against)."""
+    role, and for a super-admin caller, who has no single org to check against).
+    `specialization` is the lawyer's practice area (lawyers.specialization), None for
+    every other role."""
     role = row.get("roles")
     return {
         "id": row["user_id"],
@@ -32,7 +34,17 @@ def _to_user_summary(row: dict, suspended: bool = False) -> dict:
         "is_active": row["is_active"],
         "created_at": row["created_at"],
         "suspended": suspended,
+        "specialization": specialization,
     }
+
+
+def _lawyer_specialization(user_id: int, role_name: str | None) -> str | None:
+    """The lawyer's practice area (lawyers.specialization, e.g. 'Family Law', 'Criminal
+    Law') for a single-user response; None for any non-lawyer role."""
+    if role_name != "Lawyer":
+        return None
+    rows = supabase.table("lawyers").select("specialization").eq("user_id", user_id).execute().data
+    return rows[0]["specialization"] if rows else None
 
 
 def list_users(role: str | None = None, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
@@ -64,18 +76,45 @@ def list_users(role: str | None = None, profile: dict = Depends(require_roles(AD
     # switch to a PostgREST embedded filter (roles.role_name=eq.X) if the table grows large.
     if role is not None:
         rows = [r for r in rows if r.get("roles") and r["roles"]["role_name"].lower() == role.lower()]
-    return [_to_user_summary(row, suspended=row["user_id"] in suspended_client_ids) for row in rows]
+
+    lawyer_ids = [r["user_id"] for r in rows if r.get("roles") and r["roles"]["role_name"] == "Lawyer"]
+    specializations: dict[int, str] = {}
+    if lawyer_ids:
+        lawyer_rows = supabase.table("lawyers").select("user_id,specialization").in_("user_id", lawyer_ids).execute().data
+        specializations = {r["user_id"]: r["specialization"] for r in lawyer_rows if r["specialization"]}
+
+    return [
+        _to_user_summary(row, suspended=row["user_id"] in suspended_client_ids, specialization=specializations.get(row["user_id"]))
+        for row in rows
+    ]
+
+
+def _client_has_case_in_org(user_id: int, org_id: int) -> bool:
+    """Same "does this client have a case in my org" check list_users()/list_clients() use
+    to decide which clients an org admin can even see."""
+    client_rows = supabase.table("clients").select("client_id").eq("user_id", user_id).execute().data
+    if not client_rows:
+        return False
+    case_rows = supabase.table("cases").select("client_id").eq("client_id", client_rows[0]["client_id"]).eq("org_id", org_id).execute().data
+    return bool(case_rows)
 
 
 def _assert_same_org_or_404(user_id: int, profile: dict) -> None:
     """404 (not 403) if this user_id belongs to a different org than an org admin's own --
-    an org admin shouldn't be able to tell whether a user in another org exists. No-op for
-    the super-admin."""
+    an org admin shouldn't be able to tell whether a user in another org exists. A client's
+    users.org_id is always NULL (clients are global, by design), so a client instead passes
+    when they have a case in the caller's org -- same reasoning and scoping as
+    set_client_firm_status(). No-op for the super-admin."""
     if profile["role_id"] != ADMIN:
         return
     rows = supabase.table("users").select("org_id").eq("user_id", user_id).execute().data
-    if not rows or rows[0]["org_id"] != profile["org_id"]:
+    if not rows:
         raise HTTPException(status_code=404, detail="User not found")
+    if rows[0]["org_id"] == profile["org_id"]:
+        return
+    if rows[0]["org_id"] is None and _client_has_case_in_org(user_id, profile["org_id"]):
+        return
+    raise HTTPException(status_code=404, detail="User not found")
 
 
 def set_user_status(user_id: int, data: StatusUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
@@ -85,8 +124,9 @@ def set_user_status(user_id: int, data: StatusUpdate, profile: dict = Depends(re
     rows = supabase.table("users").update({"is_active": data.is_active}).eq("user_id", user_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="User not found")
-    result = supabase.table("users").select(USERS_SELECT).eq("user_id", user_id).execute().data
-    return _to_user_summary(result[0])
+    result = supabase.table("users").select(USERS_SELECT).eq("user_id", user_id).execute().data[0]
+    role_name = result["roles"]["role_name"] if result.get("roles") else None
+    return _to_user_summary(result, specialization=_lawyer_specialization(user_id, role_name))
 
 
 def set_client_firm_status(user_id: int, data: ClientFirmStatusUpdate, profile: dict = Depends(require_roles(ADMIN))):
@@ -124,8 +164,9 @@ def update_own_profile(data: ProfileUpdate, profile: dict = Depends(get_current_
     only link between a `users` row and its Supabase Auth account (see auth.get_current_profile),
     so changing it on one side alone locks the account out. Calls: `_to_user_summary()`."""
     supabase.table("users").update(data.model_dump()).eq("user_id", profile["user_id"]).execute()
-    result = supabase.table("users").select(USERS_SELECT).eq("user_id", profile["user_id"]).execute().data
-    return _to_user_summary(result[0])
+    result = supabase.table("users").select(USERS_SELECT).eq("user_id", profile["user_id"]).execute().data[0]
+    role_name = result["roles"]["role_name"] if result.get("roles") else None
+    return _to_user_summary(result, specialization=_lawyer_specialization(profile["user_id"], role_name))
 
 
 def update_user(user_id: int, data: ProfileUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
@@ -136,8 +177,9 @@ def update_user(user_id: int, data: ProfileUpdate, profile: dict = Depends(requi
     rows = supabase.table("users").update(data.model_dump()).eq("user_id", user_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="User not found")
-    result = supabase.table("users").select(USERS_SELECT).eq("user_id", user_id).execute().data
-    return _to_user_summary(result[0])
+    result = supabase.table("users").select(USERS_SELECT).eq("user_id", user_id).execute().data[0]
+    role_name = result["roles"]["role_name"] if result.get("roles") else None
+    return _to_user_summary(result, specialization=_lawyer_specialization(user_id, role_name))
 
 
 def _cascade(user_id: int, dry_run: bool) -> dict:

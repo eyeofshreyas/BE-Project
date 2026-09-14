@@ -9,9 +9,9 @@ import pytest
 from fastapi import HTTPException
 from storage3.exceptions import StorageApiError
 
-from app.controllers.users import delete_user, list_users, set_client_firm_status, set_user_status
+from app.controllers.users import delete_user, list_users, set_client_firm_status, set_user_status, update_user
 from app.middleware import auth
-from app.models.users import ClientFirmStatusUpdate, StatusUpdate
+from app.models.users import ClientFirmStatusUpdate, ProfileUpdate, StatusUpdate
 
 ADMIN_PROFILE = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
 
@@ -98,6 +98,97 @@ def test_org_admin_cannot_change_status_of_user_in_another_org():
             assert False, "expected HTTPException"
         except HTTPException as e:
             assert e.status_code == 404
+
+
+def test_org_admin_can_edit_a_client_with_a_case_in_their_org():
+    """Verifies the client.org_id-is-always-NULL carve-out in `_assert_same_org_or_404` lets
+    an org admin edit a client who has a case with them, mirroring set_client_firm_status()'s
+    scoping. Exercises: `PUT /users/{id}` (`users.update_user()`)."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+    client_row = {"user_id": 9, "full_name": "New Name", "email": "c@example.com", "phone": "1",
+                  "is_active": True, "created_at": "2026-01-01", "roles": {"role_name": "Client"}}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "users":
+            # update_user() issues two different `.select()` queries against "users" -- the
+            # org_id-only check in _assert_same_org_or_404, then the full row for the
+            # response -- so the stub has to tell them apart by their columns argument.
+            def select(cols):
+                sel = MagicMock()
+                sel.eq.return_value.execute.return_value.data = [{"org_id": None}] if cols == "org_id" else [client_row]
+                return sel
+            m.select.side_effect = select
+            m.update.return_value.eq.return_value.execute.return_value.data = [client_row]
+        elif name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        elif name == "cases":
+            m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.users.supabase", fake):
+        result = update_user(9, ProfileUpdate(full_name="New Name", phone="1"), profile=ORG_ADMIN_PROFILE)
+    assert result["id"] == 9
+    assert result["specialization"] is None
+
+
+def test_org_admin_cannot_edit_a_client_with_no_case_in_their_org():
+    """Verifies the client carve-out doesn't turn into a platform-wide bypass -- a client with
+    no case in the caller's org still 404s. Exercises: `PUT /users/{id}` (`users.update_user()`)."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "users":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"org_id": None}]
+        elif name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        elif name == "cases":
+            m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.users.supabase", fake):
+        with pytest.raises(HTTPException) as exc:
+            update_user(9, ProfileUpdate(full_name="New Name", phone="1"), profile=ORG_ADMIN_PROFILE)
+    assert exc.value.status_code == 404
+
+
+def test_list_users_includes_lawyer_specialization():
+    """Verifies a lawyer's practice area (lawyers.specialization) rides along in the list
+    response -- the Users admin page surfaces it as the lawyer's case-type category.
+    Exercises: `GET /users` (`users.list_users()`)."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+    lawyer_row = {"user_id": 4, "full_name": "A Lawyer", "email": "l@example.com", "phone": "1",
+                  "is_active": True, "created_at": "2026-01-01", "roles": {"role_name": "Lawyer"}}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "users":
+            m.select.return_value.eq.return_value.order.return_value.execute.return_value.data = [lawyer_row]
+        elif name == "cases":
+            m.select.return_value.eq.return_value.execute.return_value.data = []
+        elif name == "lawyers":
+            m.select.return_value.in_.return_value.execute.return_value.data = [{"user_id": 4, "specialization": "Family Law"}]
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.users.supabase", fake):
+        result = list_users(profile=ORG_ADMIN_PROFILE)
+    assert result[0]["specialization"] == "Family Law"
 
 
 def test_last_admin_check_is_scoped_to_the_admins_own_org():

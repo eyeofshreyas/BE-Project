@@ -163,7 +163,10 @@ export default function UsersView() {
   function toggleClientFirmStatus(user: UserSummary) {
     setBusy(true)
     setClientFirmStatus(user.id, user.suspended)
-      .then((updated) => setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u))))
+      .then((updated) => {
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
+        setPanel((prev) => (prev && prev.user.id === updated.id ? { ...prev, user: updated } : prev))
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to update this client\'s status.'))
       .finally(() => setBusy(false))
   }
@@ -220,7 +223,10 @@ export default function UsersView() {
                         <span style={{ fontWeight: 600, color: '#1A1A17' }}>{u.full_name}</span>
                       </div>
                     </td>
-                    <td className={styles.td}>{u.role && <span className={styles.pill} style={pillStyle(ROLE_COLORS[u.role] ?? C.muted)}>{u.role}</span>}</td>
+                    <td className={styles.td}>
+                      {u.role && <span className={styles.pill} style={pillStyle(ROLE_COLORS[u.role] ?? C.muted)}>{u.role}</span>}
+                      {u.specialization && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{u.specialization}</div>}
+                    </td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{u.email}</td>
                     <td className={styles.td} style={{ color: '#6E6759' }}>{u.phone}</td>
                     <td className={styles.td}>
@@ -234,15 +240,20 @@ export default function UsersView() {
                     <td className={styles.td}>
                       {u.role === 'Client' ? (
                         // A client is global -- the same person can have cases with other firms too -- so
-                        // Edit/Delete stay off-limits from here. Suspend/reactivate is per-firm (org_clients),
-                        // never touching the client's global account.
-                        <span
-                          className={styles.actionBtn}
-                          title={u.suspended ? 'Reactivate for this firm' : 'Suspend from this firm'}
-                          onClick={() => toggleClientFirmStatus(u)}
-                        >
-                          <Icon name={u.suspended ? 'check-circle' : 'ban'} size={15} color={u.suspended ? C.success : C.warning} />
-                        </span>
+                        // Delete stays off-limits from here (it would destroy their account and cases with
+                        // every other firm). View/Edit only touch shared contact info. Suspend/reactivate is
+                        // per-firm (org_clients), never touching the client's global account.
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <span className={styles.actionBtn} title="View" onClick={() => openPanel(u, 'view')}><Icon name="eye" size={15} color="#575145" /></span>
+                          <span className={styles.actionBtn} title="Edit" onClick={() => openPanel(u, 'edit')}><Icon name="edit" size={15} color="#575145" /></span>
+                          <span
+                            className={styles.actionBtn}
+                            title={u.suspended ? 'Reactivate for this firm' : 'Suspend from this firm'}
+                            onClick={() => toggleClientFirmStatus(u)}
+                          >
+                            <Icon name={u.suspended ? 'check-circle' : 'ban'} size={15} color={u.suspended ? C.success : C.warning} />
+                          </span>
+                        </div>
                       ) : (
                         <div style={{ display: 'flex', gap: 4 }}>
                           <span className={styles.actionBtn} title="View" onClick={() => openPanel(u, 'view')}><Icon name="eye" size={15} color="#575145" /></span>
@@ -293,7 +304,17 @@ export default function UsersView() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div><div style={FIELD_LABEL}>Email</div><div style={{ fontSize: 13.5, color: C.text, wordBreak: 'break-all' }}>{panel.user.email}</div></div>
                   <div><div style={FIELD_LABEL}>Phone</div><div style={{ fontSize: 13.5, color: C.text }}>{panel.user.phone}</div></div>
-                  <div><div style={FIELD_LABEL}>Status</div><span className={styles.pill} style={pillStyle(panel.user.is_active ? C.success : C.danger)}>{panel.user.is_active ? 'Active' : 'Suspended'}</span></div>
+                  <div>
+                    <div style={FIELD_LABEL}>Status</div>
+                    {panel.user.role === 'Client' ? (
+                      <span className={styles.pill} style={pillStyle(panel.user.suspended ? C.danger : C.success)}>{panel.user.suspended ? 'Suspended (this firm)' : 'Active'}</span>
+                    ) : (
+                      <span className={styles.pill} style={pillStyle(panel.user.is_active ? C.success : C.danger)}>{panel.user.is_active ? 'Active' : 'Suspended'}</span>
+                    )}
+                  </div>
+                  {panel.user.specialization && (
+                    <div><div style={FIELD_LABEL}>Specialization</div><div style={{ fontSize: 13.5, color: C.text }}>{panel.user.specialization}</div></div>
+                  )}
                 </div>
 
                 <div>
@@ -317,12 +338,20 @@ export default function UsersView() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <div style={BTN_GHOST} onClick={closePanel}>{panel.mode === 'view' ? 'Close' : 'Cancel'}</div>
-              {panel.mode !== 'edit' && (
+              {panel.mode !== 'edit' && panel.user.role !== 'Client' && (
                 <div
                   style={{ ...BTN_GHOST, color: panel.user.is_active ? C.warning : C.success, borderColor: panel.user.is_active ? C.warning : C.success, opacity: busy ? 0.6 : 1 }}
                   onClick={() => { if (!busy) toggleStatus(panel.user) }}
                 >
                   {panel.user.is_active ? 'Suspend account' : 'Reactivate account'}
+                </div>
+              )}
+              {panel.mode !== 'edit' && panel.user.role === 'Client' && (
+                <div
+                  style={{ ...BTN_GHOST, color: panel.user.suspended ? C.success : C.warning, borderColor: panel.user.suspended ? C.success : C.warning, opacity: busy ? 0.6 : 1 }}
+                  onClick={() => { if (!busy) toggleClientFirmStatus(panel.user) }}
+                >
+                  {panel.user.suspended ? 'Reactivate for this firm' : 'Suspend from this firm'}
                 </div>
               )}
               {panel.mode === 'edit' && <div style={{ ...BTN_PRIMARY, opacity: busy ? 0.6 : 1 }} onClick={() => { if (!busy) saveEdit() }}>{busy ? 'Saving…' : 'Save changes'}</div>}

@@ -13,6 +13,7 @@ class UserSummary(BaseModel):
     is_active: bool
     created_at: str
     suspended: bool = False
+    specialization: str | None = None
 
 
 class StatusUpdate(BaseModel):

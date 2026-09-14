@@ -245,6 +245,7 @@ export interface UserSummary {
   is_active: boolean
   suspended: boolean
   created_at: string
+  specialization: string | null
 }
 
 export interface NotificationSummary {
