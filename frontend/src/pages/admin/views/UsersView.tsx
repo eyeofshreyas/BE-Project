@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
-import { adminUpdateUser, deleteUser, getUserDeleteImpact, inviteLawyer, listUsers, setClientFirmStatus, setUserStatus } from '../../../api/client'
+import { adminUpdateUser, deleteUser, getUserDeleteImpact, inviteLawyer, listLawyerSpecializations, listUsers, setClientFirmStatus, setUserStatus } from '../../../api/client'
 import type { UserDeleteImpact, UserSummary } from '../../../types/api'
 import { downloadCsv } from '../../../utils/files'
 import styles from '../../../components/AppShell.module.css'
@@ -75,7 +75,8 @@ export default function UsersView() {
   const [role, setRole] = useState<string | null>(null)
   const [panel, setPanel] = useState<{ user: UserSummary; mode: PanelMode } | null>(null)
   const [impact, setImpact] = useState<UserDeleteImpact | null>(null)
-  const [draft, setDraft] = useState({ full_name: '', phone: '' })
+  const [draft, setDraft] = useState({ full_name: '', phone: '', specialization: '' })
+  const [specializations, setSpecializations] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
@@ -88,13 +89,14 @@ export default function UsersView() {
       .then(setUsers)
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load users.'))
       .finally(() => setLoading(false))
+    listLawyerSpecializations().then(setSpecializations).catch(() => {})
   }, [])
 
   const visible = useMemo(() => (role ? users.filter((u) => u.role === role) : users), [users, role])
 
   function openPanel(user: UserSummary, mode: PanelMode) {
     setPanel({ user, mode })
-    setDraft({ full_name: user.full_name, phone: user.phone })
+    setDraft({ full_name: user.full_name, phone: user.phone, specialization: user.specialization ?? '' })
     if (mode === 'edit') return
     // View and delete both want the same answer: what is attached to this person?
     setImpact(null)
@@ -109,7 +111,9 @@ export default function UsersView() {
   function saveEdit() {
     if (!panel) return
     setBusy(true)
-    adminUpdateUser(panel.user.id, { full_name: draft.full_name.trim(), phone: draft.phone.trim() })
+    // ponytail: "Not set" just leaves the existing specialization alone -- no clear flow, add if that's ever needed.
+    const payload = { full_name: draft.full_name.trim(), phone: draft.phone.trim(), ...(panel.user.role === 'Lawyer' && draft.specialization ? { specialization: draft.specialization } : {}) }
+    adminUpdateUser(panel.user.id, payload)
       .then((updated) => {
         setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
         closePanel()
@@ -297,6 +301,15 @@ export default function UsersView() {
                   <div style={FIELD_LABEL}>Phone Number</div>
                   <input value={draft.phone} onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))} style={INPUT} />
                 </div>
+                {panel.user.role === 'Lawyer' && (
+                  <div>
+                    <div style={FIELD_LABEL}>Specialization</div>
+                    <select value={draft.specialization} onChange={(e) => setDraft((d) => ({ ...d, specialization: e.target.value }))} style={INPUT}>
+                      <option value="">Not set</option>
+                      {specializations.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div style={{ fontSize: 12, color: C.muted }}>Email can't be changed here — it's the only link between this row and the account's login.</div>
               </>
             ) : (

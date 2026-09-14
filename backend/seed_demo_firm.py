@@ -55,10 +55,10 @@ def main():
 
     lawyer_specs = [
         ("Arjun Rao", "Civil Litigation", 12, "MH/1234/2013"),
-        ("Divya Nair", "Family Law", 8, "MH/2345/2017"),
-        ("Kabir Malhotra", "Corporate Law", 15, "MH/3456/2010"),
-        ("Ritu Desai", "Criminal Defense", 6, "MH/4567/2019"),
-        ("Sameer Iyer", "Property Law", 10, "MH/5678/2015"),
+        ("Divya Nair", "Family & Matrimonial Law", 8, "MH/2345/2017"),
+        ("Kabir Malhotra", "Corporate & Commercial Law", 15, "MH/3456/2010"),
+        ("Ritu Desai", "Criminal Law", 6, "MH/4567/2019"),
+        ("Sameer Iyer", "Property & Real Estate Law", 10, "MH/5678/2015"),
     ]
     lawyer_ids: list[int] = []
     for i, (name, spec, years, bar_no) in enumerate(lawyer_specs, start=1):

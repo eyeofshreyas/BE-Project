@@ -254,8 +254,12 @@ export function setClientFirmStatus(userId: number, isActive: boolean) {
   return patch<UserSummary>(`/users/${userId}/firm-status`, { is_active: isActive })
 }
 
-export function adminUpdateUser(userId: number, payload: { full_name: string; phone: string }) {
+export function adminUpdateUser(userId: number, payload: { full_name: string; phone: string; specialization?: string }) {
   return patch<UserSummary>(`/users/${userId}`, payload)
+}
+
+export function listLawyerSpecializations() {
+  return get<string[]>('/reference/lawyer-specializations')
 }
 
 export function getUserDeleteImpact(userId: number) {

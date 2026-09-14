@@ -28,9 +28,12 @@ class ClientFirmStatusUpdate(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
-    """Request body for a user editing their own profile."""
+    """Request body for a user editing their own profile, or an admin editing someone else's.
+    `specialization` only applies when the target is a Lawyer (see users.update_user()) --
+    ignored everywhere else, including a lawyer editing their own profile."""
     full_name: str
     phone: str
+    specialization: str | None = None
 
 
 class UserDeleteImpact(BaseModel):

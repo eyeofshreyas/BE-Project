@@ -191,6 +191,71 @@ def test_list_users_includes_lawyer_specialization():
     assert result[0]["specialization"] == "Family Law"
 
 
+def test_update_user_writes_a_recognized_specialization_to_lawyers():
+    """Verifies editing a lawyer's specialization writes to the `lawyers` table (not `users`,
+    which has no such column) and only when it's one of reference.LAWYER_SPECIALIZATIONS.
+    Exercises: `PUT /users/{id}` (`users.update_user()`)."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+    lawyer_row = {"user_id": 4, "full_name": "A Lawyer", "email": "l@example.com", "phone": "1",
+                  "is_active": True, "created_at": "2026-01-01", "roles": {"role_name": "Lawyer"}}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "users":
+            def select(cols):
+                sel = MagicMock()
+                sel.eq.return_value.execute.return_value.data = [{"org_id": 7}] if cols == "org_id" else [lawyer_row]
+                return sel
+            m.select.side_effect = select
+            m.update.return_value.eq.return_value.execute.return_value.data = [lawyer_row]
+        elif name == "lawyers":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"specialization": "Civil Litigation"}]
+            m.update.return_value.eq.return_value.execute.return_value = MagicMock()
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.users.supabase", fake):
+        result = update_user(4, ProfileUpdate(full_name="A Lawyer", phone="1", specialization="Tax Law"), profile=ORG_ADMIN_PROFILE)
+    tables["lawyers"].update.assert_called_once_with({"specialization": "Tax Law"})
+    assert result["specialization"] == "Tax Law"
+
+
+def test_update_user_rejects_an_unrecognized_specialization():
+    """Verifies a specialization outside the fixed reference list is refused with 400, rather
+    than being written as free text. Exercises: `PUT /users/{id}` (`users.update_user()`)."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+    lawyer_row = {"user_id": 4, "full_name": "A Lawyer", "email": "l@example.com", "phone": "1",
+                  "is_active": True, "created_at": "2026-01-01", "roles": {"role_name": "Lawyer"}}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "users":
+            def select(cols):
+                sel = MagicMock()
+                sel.eq.return_value.execute.return_value.data = [{"org_id": 7}] if cols == "org_id" else [lawyer_row]
+                return sel
+            m.select.side_effect = select
+            m.update.return_value.eq.return_value.execute.return_value.data = [lawyer_row]
+        elif name == "lawyers":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"specialization": "Civil Litigation"}]
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.users.supabase", fake):
+        with pytest.raises(HTTPException) as exc:
+            update_user(4, ProfileUpdate(full_name="A Lawyer", phone="1", specialization="Made Up Law"), profile=ORG_ADMIN_PROFILE)
+    assert exc.value.status_code == 400
+    assert not tables["lawyers"].update.called
+
+
 def test_last_admin_check_is_scoped_to_the_admins_own_org():
     """Verifies deleting the last admin is blocked per-org for an org admin (not counted platform-wide). Exercises: `DELETE /users/:id`."""
     fake = MagicMock()

@@ -9,6 +9,35 @@ from app.models.reference import CaseType, Court, Role, Judge, JudgeCreate, Docu
 
 JUDGES_SELECT = "judge_id,judge_name,designation,court_id,courts(court_name)"
 
+# Practice-area categories for a lawyer's specialization (users.update_user()'s dropdown).
+# Fixed, not a DB table -- sourced from how Indian legal directories/career guides group
+# practice areas (e.g. careers360's "20 Types of Lawyers in India", Vakilsearch, UPES), and
+# named to line up with this app's own case_types (Civil/Criminal/Family/Corporate/Property)
+# where they cover the same ground.
+LAWYER_SPECIALIZATIONS = [
+    "Civil Litigation",
+    "Criminal Law",
+    "Family & Matrimonial Law",
+    "Corporate & Commercial Law",
+    "Property & Real Estate Law",
+    "Constitutional Law",
+    "Labour & Employment Law",
+    "Intellectual Property Law",
+    "Tax Law",
+    "Banking & Finance Law",
+    "Cyber & IT Law",
+    "Consumer Protection Law",
+    "Immigration Law",
+    "Environmental Law",
+    "Arbitration & ADR",
+]
+
+
+def list_lawyer_specializations(profile: dict = Depends(get_current_profile)):
+    """Return the fixed list of lawyer practice-area specializations offered in the admin
+    Edit-lawyer dropdown. Changing the list is a code change, not an admin action."""
+    return LAWYER_SPECIALIZATIONS
+
 
 def list_roles(profile: dict = Depends(get_current_profile)):
     """Return all roles. Calls: `supabase.table("roles")`."""

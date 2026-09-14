@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from fastapi import Depends, HTTPException
 from storage3.exceptions import StorageApiError
 from app.controllers.documents import DOCUMENTS_BUCKET
+from app.controllers.reference import LAWYER_SPECIALIZATIONS
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, CLIENT, SUPER_ADMIN, get_current_profile, require_roles
 from app.models.users import UserSummary, StatusUpdate, ProfileUpdate, ClientFirmStatusUpdate
@@ -162,24 +163,35 @@ def set_client_firm_status(user_id: int, data: ClientFirmStatusUpdate, profile: 
 def update_own_profile(data: ProfileUpdate, profile: dict = Depends(get_current_profile)):
     """Update the caller's own name/phone. Email is deliberately not editable here: it's the
     only link between a `users` row and its Supabase Auth account (see auth.get_current_profile),
-    so changing it on one side alone locks the account out. Calls: `_to_user_summary()`."""
-    supabase.table("users").update(data.model_dump()).eq("user_id", profile["user_id"]).execute()
+    so changing it on one side alone locks the account out. `specialization` is ignored here --
+    a lawyer doesn't self-certify their own practice area, an admin sets it (see `update_user()`).
+    Calls: `_to_user_summary()`."""
+    supabase.table("users").update({"full_name": data.full_name, "phone": data.phone}).eq("user_id", profile["user_id"]).execute()
     result = supabase.table("users").select(USERS_SELECT).eq("user_id", profile["user_id"]).execute().data[0]
     role_name = result["roles"]["role_name"] if result.get("roles") else None
     return _to_user_summary(result, specialization=_lawyer_specialization(profile["user_id"], role_name))
 
 
 def update_user(user_id: int, data: ProfileUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
-    """Admin edit of another user's name/phone; 404 if not found or outside the caller's org.
-    Email stays out of reach for the same reason as in `update_own_profile()`. Calls:
-    `_assert_same_org_or_404()`, `_to_user_summary()`."""
+    """Admin edit of another user's name/phone, plus specialization when the target is a
+    Lawyer (must be one of reference.LAWYER_SPECIALIZATIONS); 404 if not found or outside the
+    caller's org. Email stays out of reach for the same reason as in `update_own_profile()`.
+    Calls: `_assert_same_org_or_404()`, `_to_user_summary()`."""
     _assert_same_org_or_404(user_id, profile)
-    rows = supabase.table("users").update(data.model_dump()).eq("user_id", user_id).execute().data
+    rows = supabase.table("users").update({"full_name": data.full_name, "phone": data.phone}).eq("user_id", user_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="User not found")
     result = supabase.table("users").select(USERS_SELECT).eq("user_id", user_id).execute().data[0]
     role_name = result["roles"]["role_name"] if result.get("roles") else None
-    return _to_user_summary(result, specialization=_lawyer_specialization(user_id, role_name))
+
+    specialization = _lawyer_specialization(user_id, role_name)
+    if role_name == "Lawyer" and data.specialization is not None and data.specialization != specialization:
+        if data.specialization not in LAWYER_SPECIALIZATIONS:
+            raise HTTPException(status_code=400, detail="Not a recognized specialization.")
+        supabase.table("lawyers").update({"specialization": data.specialization}).eq("user_id", user_id).execute()
+        specialization = data.specialization
+
+    return _to_user_summary(result, specialization=specialization)
 
 
 def _cascade(user_id: int, dry_run: bool) -> dict:
