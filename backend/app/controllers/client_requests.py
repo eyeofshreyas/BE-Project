@@ -133,6 +133,11 @@ def respond_client_request(request_id: int, data: ClientRequestDecision, profile
     now = datetime.now(timezone.utc).isoformat()
     lawyer_row = supabase.table("lawyers").select("user_id,users(org_id)").eq("lawyer_id", request_row["lawyer_id"]).execute().data[0]
     lawyer_user_id = lawyer_row["user_id"]
+    # cases.org_id is NOT NULL -- a lawyer whose account isn't linked to a firm (shouldn't
+    # happen via /signup, which always requires an org-scoped invite, but data can drift)
+    # would otherwise crash the insert below with a raw DB constraint error.
+    if data.decision == "accept" and lawyer_row["users"]["org_id"] is None:
+        raise HTTPException(status_code=500, detail="This lawyer's account isn't linked to a firm. Contact support.")
 
     if data.decision == "decline":
         supabase.table("client_requests").update({"status": "declined", "responded_at": now}).eq("request_id", request_id).execute()

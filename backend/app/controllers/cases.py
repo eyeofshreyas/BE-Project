@@ -119,6 +119,10 @@ def create_case(data: CaseCreate, profile: dict = Depends(require_roles(LAWYER))
     if not case_type_rows:
         raise HTTPException(status_code=400, detail="Unknown case type")
 
+    # cases.org_id is NOT NULL -- see respond_client_request's matching guard.
+    if profile.get("org_id") is None:
+        raise HTTPException(status_code=500, detail="This lawyer's account isn't linked to a firm. Contact support.")
+
     case_row = supabase.table("cases").insert({
         "case_number": _generate_case_number(case_type_rows[0]["case_type_name"]),
         "case_title": data.case_title,
