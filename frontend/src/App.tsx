@@ -57,9 +57,9 @@ export default function App() {
         <Route path="/billing/invoices/generate" element={<ProtectedRoute><AppLayout><GenerateInvoicePage /></AppLayout></ProtectedRoute>} />
         <Route path="/billing/invoices/:invoiceId/record-payment" element={<ProtectedRoute><AppLayout><RecordPaymentPage /></AppLayout></ProtectedRoute>} />
         <Route path="/hearings" element={<ProtectedRoute><AppLayout><HearingsPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/clients/new" element={<ProtectedRoute><AppLayout><CreateClientPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/clients/:clientId" element={<ProtectedRoute><AppLayout><ClientDetailPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/clients" element={<ProtectedRoute><AppLayout><ClientsPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/clients/new" element={<ProtectedRoute requireStaff><AppLayout><CreateClientPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/clients/:clientId" element={<ProtectedRoute requireStaff><AppLayout><ClientDetailPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/clients" element={<ProtectedRoute requireStaff><AppLayout><ClientsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/judgements/reference/:docId" element={<ProtectedRoute><AppLayout><ReferenceJudgementPage /></AppLayout></ProtectedRoute>} />
         <Route path="/judgements/:judgementId" element={<ProtectedRoute><AppLayout><JudgementDetailPage /></AppLayout></ProtectedRoute>} />
         <Route path="/judgements" element={<ProtectedRoute><AppLayout><JudgementsPage /></AppLayout></ProtectedRoute>} />

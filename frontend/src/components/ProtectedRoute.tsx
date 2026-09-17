@@ -19,11 +19,14 @@ function loadProfile(): UserProfile | null {
 
 // Client-side gate only -- real enforcement is the backend rejecting the
 // request; this just avoids flashing a protected page before that 401 lands.
-export default function ProtectedRoute({ children, requireAdmin }: { children: ReactNode; requireAdmin?: boolean }) {
+export default function ProtectedRoute({ children, requireAdmin, requireStaff }: { children: ReactNode; requireAdmin?: boolean; requireStaff?: boolean }) {
   const profile = loadProfile()
 
   if (!profile) return <Navigate to="/login" replace />
   if (requireAdmin && profile.role_id !== 1 && profile.role_id !== 4) return <Navigate to="/conveyancing" replace />
+  // A client has no Clients link in their nav, but the URL was still reachable and rendered
+  // the firm-facing page's empty shell with the backend's 403 printed under it.
+  if (requireStaff && profile.role_id === 3) return <Navigate to="/dashboard" replace />
 
   return <>{children}</>
 }
