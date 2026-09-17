@@ -69,12 +69,15 @@ def send_client_request(data: ClientRequestCreate, profile: dict = Depends(requi
     row = supabase.table("client_requests").insert(insert).execute().data[0]
     result = supabase.table("client_requests").select(CLIENT_REQUESTS_SELECT).eq("request_id", row["request_id"]).execute().data[0]
 
+    org_rows = supabase.table("organizations").select("name").eq("org_id", profile["org_id"]).execute().data if profile.get("org_id") else []
+    firm_name = org_rows[0]["name"] if org_rows else "their firm"
+
     if user_rows:
         supabase.table("notifications").insert({
             "user_id": user_rows[0]["user_id"],
             "case_id": None,
             "title": "New client request",
-            "message": f"{profile['full_name']} would like to connect with you on LexFlow.",
+            "message": f"{profile['full_name']} of {firm_name} would like to connect with you on LexFlow.",
             "notification_type": "client_request",
             "is_read": False,
         }).execute()
@@ -82,8 +85,8 @@ def send_client_request(data: ClientRequestCreate, profile: dict = Depends(requi
     destination = "/signup" if "invite_email" in insert else "/login"
     send_email(
         data.email,
-        f"{profile['full_name']} invited you to LexFlow",
-        f"{profile['full_name']} would like to connect with you on LexFlow.\n\n"
+        f"{profile['full_name']} of {firm_name} invited you to LexFlow",
+        f"{profile['full_name']} of {firm_name} would like to connect with you on LexFlow.\n\n"
         f"Go to {FRONTEND_URL}{destination} to view and respond to this request.",
     )
 
