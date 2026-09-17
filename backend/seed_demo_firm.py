@@ -10,7 +10,7 @@ All seeded accounts share the password below. Safe to re-run: emails are unique 
 import random
 import string
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 sys.path.insert(0, ".")
 from app.db.supabase_client import supabase
@@ -115,6 +115,21 @@ def main():
             "case_id": case_id, "lawyer_id": primary_lawyer_id,
             "assigned_role": "Primary", "is_active": True,
         }).execute()
+        # In the app a case only ever exists because the client accepted the lawyer's invite,
+        # and create_case re-checks that. Seeding the case row alone left the seeded lawyers
+        # unable to open a second case for their own clients ("You don't have an accepted
+        # client relationship with this client"), so record the consent the case implies.
+        already_engaged = (
+            supabase.table("client_requests").select("request_id")
+            .eq("lawyer_id", primary_lawyer_id).eq("client_id", client_id).execute().data
+        )
+        if not already_engaged:
+            supabase.table("client_requests").insert({
+                "lawyer_id": primary_lawyer_id, "client_id": client_id,
+                "court_id": COURT_ID, "case_type_id": case_type_id,
+                "message": "Seeded engagement -- the client accepted this lawyer's invite.",
+                "status": "accepted", "responded_at": datetime.now(timezone.utc).isoformat(),
+            }).execute()
         if i % 3 == 0:  # every 3rd case also gets an associate teammate
             associate_lawyer_id = lawyer_ids[(i + 1) % len(lawyer_ids)]
             supabase.table("case_lawyers").insert({
