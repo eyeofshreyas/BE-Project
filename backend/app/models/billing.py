@@ -82,7 +82,7 @@ class ExpenseCreate(BaseModel):
     matter_id: int
     expense_type: str
     description: str | None = None
-    amount: float
+    amount: float = Field(gt=0)
     expense_date: str
     receipt_document_id: int | None = None
     # ignored server-side (set from the authenticated profile) -- kept

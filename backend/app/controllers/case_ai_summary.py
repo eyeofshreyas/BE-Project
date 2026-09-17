@@ -79,7 +79,7 @@ def _hearing_lines(case_id: int) -> list[str]:
 def _document_summaries(case_id: int) -> list[str]:
     """The AI summaries of the case's documents -- the closest thing to the filings' own text
     that's stored, since document files live in Storage and are never read back here."""
-    docs = supabase.table("documents").select("document_id").eq("case_id", case_id).execute().data
+    docs = supabase.table("documents").select("document_id").eq("case_id", case_id).eq("is_deleted", False).execute().data
     if not docs:
         return []
     rows = (

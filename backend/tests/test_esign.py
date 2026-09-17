@@ -94,10 +94,10 @@ def test_request_signature_writes_status_and_timeline_event():
 
     fake = MagicMock()
     docs_mock = MagicMock()
-    docs_mock.select.return_value.eq.return_value.execute.side_effect = [
-        MagicMock(data=[doc_first]),
-        MagicMock(data=[doc_summary_row]),
-    ]
+    # request_signature filters out soft-deleted rows (.eq(document_id).eq(is_deleted)); the
+    # re-read for the response shape still matches on document_id alone.
+    docs_mock.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[doc_first])
+    docs_mock.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[doc_summary_row])
 
     def docs_update(payload):
         writes.append(("documents", payload))
@@ -345,3 +345,23 @@ if __name__ == "__main__":
     test_webhook_marks_expired_distinctly_from_pending()
     test_unconfigured_webhook_gives_clean_error_not_a_crash()
     print("ok")
+
+
+def test_a_deleted_document_cannot_be_sent_for_signature():
+    """Soft-deleted documents stayed reachable by id -- e-signing one would have pulled a file
+    the firm had already removed from the case."""
+    profile = {"role_id": 2, "user_id": 1}
+    fake = MagicMock()
+    docs_mock = MagicMock()
+    docs_mock.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+    fake.table.side_effect = lambda name: docs_mock if name == "documents" else MagicMock()
+
+    with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
+         patch("app.controllers.esign.supabase", fake), \
+         patch("app.controllers.esign.LEEGALITY_AUTH_TOKEN", "test"), \
+         patch("app.controllers.esign.LEEGALITY_WORKFLOW_PROFILE_ID", "wf1"):
+        try:
+            request_signature(1, SIGNERS, profile)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 404

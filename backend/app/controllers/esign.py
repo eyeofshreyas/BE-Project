@@ -32,7 +32,7 @@ def request_signature(document_id: int, data: SignatureRequestCreate, profile: d
     `_leegality_auth()`."""
     token = _leegality_auth()
 
-    rows = supabase.table("documents").select("case_id,file_path,mime_type,file_name").eq("document_id", document_id).execute().data
+    rows = supabase.table("documents").select("case_id,file_path,mime_type,file_name").eq("document_id", document_id).eq("is_deleted", False).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Document not found")
     doc = rows[0]
