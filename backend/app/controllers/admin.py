@@ -47,11 +47,14 @@ def invite_lawyer(data: LawyerInviteCreate, profile: dict = Depends(require_role
         "status": "pending",
     }).execute()
 
+    org_rows = supabase.table("organizations").select("name").eq("org_id", profile["org_id"]).execute().data
+    firm_name = org_rows[0]["name"] if org_rows else "a firm"
+
     send_email(
         data.email,
-        f"{profile['full_name']} invited you to join their firm on LexFlow",
-        f"{profile['full_name']} invited you to join their firm on LexFlow as a lawyer.\n\n"
-        f"Go to {FRONTEND_URL}/signup to create your account with this email address.",
+        f"You're invited to join {firm_name} on LexFlow",
+        f"{profile['full_name']} has invited you to join {firm_name} as a lawyer on LexFlow.\n\n"
+        f"Go to {FRONTEND_URL}/signup and sign up with this email address ({data.email}) to accept the invite.",
     )
 
     return {"message": "Invite sent."}
