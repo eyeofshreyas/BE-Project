@@ -65,7 +65,7 @@ def main():
         email = f"seed-lawyer{i}-{TAG}@example.com"
         user_id = make_account(email, name, f"98000000{10 + i}", LAWYER, org_id)
         lawyer_row = supabase.table("lawyers").insert({
-            "user_id": user_id, "bar_council_number": bar_no,
+            "user_id": user_id, "bar_council_number": f"{bar_no}-{TAG}",
             "specialization": spec, "experience_years": years,
         }).execute().data[0]
         lawyer_ids.append(lawyer_row["lawyer_id"])

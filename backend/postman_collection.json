@@ -22,6 +22,10 @@
       "value": ""
     },
     {
+      "key": "doc_id",
+      "value": ""
+    },
+    {
       "key": "document_id",
       "value": ""
     },
@@ -31,6 +35,10 @@
     },
     {
       "key": "invoice_id",
+      "value": ""
+    },
+    {
+      "key": "lawyer_id",
       "value": ""
     },
     {
@@ -73,6 +81,148 @@
     ]
   },
   "item": [
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/stats",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "stats"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Activity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/activity",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "activity"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "15",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/analytics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "analytics"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "settings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "settings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"maintenance_mode\": true,\n  \"new_signup_alerts\": true,\n  \"weekly_reports\": true,\n  \"auto_backup\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Invite Lawyer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/lawyer-invites",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "lawyer-invites"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
     {
       "name": "Ai",
       "item": [
@@ -139,6 +289,24 @@
           }
         },
         {
+          "name": "Similar Case Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/ai/similar-cases/{{doc_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai",
+                "similar-cases",
+                "{{doc_id}}"
+              ]
+            }
+          }
+        },
+        {
           "name": "Summarize Text",
           "request": {
             "method": "POST",
@@ -160,7 +328,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"text\": \"string\",\n  \"document_id\": 1\n}",
+              "raw": "{\n  \"text\": \"\",\n  \"document_id\": 1\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -674,7 +842,7 @@
           }
         },
         {
-          "name": "Add Lawyer",
+          "name": "Add Lawyer To Case",
           "request": {
             "method": "POST",
             "header": [
@@ -706,7 +874,7 @@
           }
         },
         {
-          "name": "Remove Lawyer",
+          "name": "Remove Lawyer From Case",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -720,6 +888,74 @@
                 "{{case_id}}",
                 "lawyers",
                 "{{lawyer_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Available Case Lawyers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/available-lawyers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "available-lawyers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Set Case Cnr",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/cnr",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "cnr"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cnr_number\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sync Case From Ecourts",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/sync-ecourts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "sync-ecourts"
               ]
             }
           }
@@ -756,6 +992,24 @@
                 "cases",
                 "{{case_id}}",
                 "ai-summary"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Similar Own Cases",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/similar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "similar"
               ]
             }
           }
@@ -863,6 +1117,102 @@
               ]
             }
           }
+        },
+        {
+          "name": "List My Suspensions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/clients/me/suspensions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "clients",
+                "me",
+                "suspensions"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Conflict Check",
+      "item": [
+        {
+          "name": "List Case Parties",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/parties",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "parties"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Case Party",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cases/{{case_id}}/parties",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cases",
+                "{{case_id}}",
+                "parties"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"role\": \"Opposing Party\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Search Conflicts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/conflict-check?name=string",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conflict-check"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "string",
+                  "disabled": false
+                }
+              ]
+            }
+          }
         }
       ]
     },
@@ -932,6 +1282,38 @@
                 "matters",
                 "{{matter_id}}"
               ]
+            }
+          }
+        },
+        {
+          "name": "Update Matter",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/conveyancing/matters/{{matter_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conveyancing",
+                "matters",
+                "{{matter_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"registration_status\": \"string\",\n  \"registration_date\": \"string\",\n  \"office_name\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -1134,6 +1516,74 @@
       ]
     },
     {
+      "name": "Esign",
+      "item": [
+        {
+          "name": "Request Signature",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/documents/{{document_id}}/request-signature",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "documents",
+                "{{document_id}}",
+                "request-signature"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"signers\": [\n    {\n      \"name\": null,\n      \"email\": null\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Handle Esign Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/webhooks/leegality",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "webhooks",
+                "leegality"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "General",
       "item": [
         {
@@ -1177,7 +1627,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"string\",\n  \"full_name\": \"string\",\n  \"phone\": \"string\",\n  \"role\": \"lawyer\",\n  \"bar_council_number\": \"string\",\n  \"specialization\": \"string\",\n  \"experience_years\": 1,\n  \"address\": \"string\",\n  \"preferred_language\": \"string\"\n}",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"string\",\n  \"full_name\": \"string\",\n  \"phone\": \"string\",\n  \"role\": \"lawyer\",\n  \"org_name\": \"string\",\n  \"bar_council_number\": \"string\",\n  \"specialization\": \"string\",\n  \"experience_years\": 1,\n  \"address\": \"string\",\n  \"preferred_language\": \"string\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1329,7 +1779,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"case_id\": 1,\n  \"judge_id\": 1,\n  \"hearing_date\": \"string\",\n  \"hearing_time\": \"string\",\n  \"courtroom\": \"string\",\n  \"notes\": \"string\"\n}",
+              "raw": "{\n  \"case_id\": 1,\n  \"judge_id\": 1,\n  \"hearing_date\": \"string\",\n  \"hearing_time\": \"string\",\n  \"courtroom\": \"string\",\n  \"notes\": \"string\",\n  \"allow_duplicate\": false\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1509,6 +1959,37 @@
                 "meetings",
                 "{{meeting_id}}"
               ]
+            }
+          }
+        },
+        {
+          "name": "Update Meeting",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/meetings/{{meeting_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings",
+                "{{meeting_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"meeting_status\": \"string\",\n  \"discussion_summary\": \"string\",\n  \"decisions\": \"string\",\n  \"action_items\": \"string\",\n  \"next_meeting_date\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -1804,6 +2285,37 @@
           }
         },
         {
+          "name": "Create Judge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reference/judges",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reference",
+                "judges"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"judge_name\": \"string\",\n  \"court_id\": 1,\n  \"designation\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "List Document Types",
           "request": {
             "method": "GET",
@@ -1816,6 +2328,23 @@
               "path": [
                 "reference",
                 "document-types"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Lawyer Specializations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reference/lawyer-specializations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reference",
+                "lawyer-specializations"
               ]
             }
           }
@@ -1849,6 +2378,37 @@
           }
         },
         {
+          "name": "Update Own Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"string\",\n  \"phone\": \"string\",\n  \"specialization\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "Set User Status",
           "request": {
             "method": "PATCH",
@@ -1877,6 +2437,104 @@
                   "language": "json"
                 }
               }
+            }
+          }
+        },
+        {
+          "name": "Set Client Firm Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}/firm-status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}",
+                "firm-status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"string\",\n  \"phone\": \"string\",\n  \"specialization\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User Delete Impact",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}/impact",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}",
+                "impact"
+              ]
             }
           }
         }
