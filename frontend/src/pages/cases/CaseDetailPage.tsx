@@ -523,8 +523,8 @@ export default function CaseDetailPage() {
     // Pre-fill from this case's own client -- on the case page there's only one client
     // it could reasonably be, unlike the firm-wide Documents library. Still editable, for
     // a signer who isn't the case's client (a builder, opposing counsel, etc.).
-    setSignerName(caseInfo.client ?? '')
-    setSignerEmail(caseInfo.client_email ?? '')
+    setSignerName(caseInfo?.client ?? '')
+    setSignerEmail(caseInfo?.client_email ?? '')
     setSignError('')
   }
 

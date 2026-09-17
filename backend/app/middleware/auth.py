@@ -15,9 +15,13 @@ CLIENT = 3
 SUPER_ADMIN = 4
 
 
-def get_current_user(authorization: str = Header(...)):
-    """Verify the Bearer token against Supabase Auth. 401 if rejected, 503 if Supabase Auth is
-    unreachable. Calls: `supabase.auth.get_user()`. Used directly only by main.py's /protected route."""
+def get_current_user(authorization: str | None = Header(None)):
+    """Verify the Bearer token against Supabase Auth. 401 if missing or rejected, 503 if Supabase
+    Auth is unreachable. Calls: `supabase.auth.get_user()`. Used directly only by main.py's
+    /protected route. Header is optional so a missing one 401s like a bad one, rather than
+    falling through to FastAPI's 422 for a missing required header."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     token = authorization.replace("Bearer ", "")
     try:
         user = supabase.auth.get_user(token)
