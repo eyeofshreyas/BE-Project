@@ -1,6 +1,6 @@
 /** Signup form at `/signup`. Does not auto-login -- on success it redirects to `/login`, not into the app.
  * Preselects its role toggle from `location.state.role` when arriving from `RoleSelectionPage`. */
-import { useState, type CSSProperties } from 'react'
+import { useState, type CSSProperties, type FormEvent } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
 import { signup } from '../../api/client'
@@ -93,8 +93,9 @@ export default function SignUpPage() {
   })
   const mkFocus = (name: FocusName) => () => setFocused(name)
 
-  /** Validates all fields (role-dependent), then calls `signup()` and redirects to `/login` on success. */
-  async function handleSubmit() {
+  /** Validates all fields (role-dependent), then calls `signup()` and redirects to `/login` on success. Bound to the form's submit, so Enter in any field gets here too. */
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
     if (!fullName.trim()) { setError('Enter your full name.'); return }
     if (!isValidEmail(email)) { setError('Enter a valid email address.'); return }
     if (!phone.trim()) { setError('Enter your phone number.'); return }
@@ -141,53 +142,55 @@ export default function SignUpPage() {
             <div className={styles.subtitle}>Join LexFlow to manage cases with AI-powered intelligence</div>
           </div>
 
-          <div className={styles.fields}>
+          {/* noValidate: handleSubmit checks every field and reports through the styled
+              error row -- the browser's own bubbles would fire first and say it twice. */}
+          <form className={styles.fields} onSubmit={handleSubmit} noValidate>
             <div>
-              <div className={styles.label}>I am a</div>
-              <div className={styles.roleToggle}>
-                <div className={styles.roleOption} style={{ background: role === 'lawyer' ? '#FCFAF4' : 'transparent', color: role === 'lawyer' ? TEXT : MUTED, boxShadow: role === 'lawyer' ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('lawyer')}>
+              <div className={styles.label} id="signup-role-label">I am a</div>
+              <div className={styles.roleToggle} role="group" aria-labelledby="signup-role-label">
+                <button type="button" aria-pressed={role === 'lawyer'} className={styles.roleOption} style={{ background: role === 'lawyer' ? '#FCFAF4' : 'transparent', color: role === 'lawyer' ? TEXT : MUTED, boxShadow: role === 'lawyer' ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('lawyer')}>
                   <Icon name="briefcase" size={15} /><span>Lawyer</span>
-                </div>
-                <div className={styles.roleOption} style={{ background: role === 'client' ? '#FCFAF4' : 'transparent', color: role === 'client' ? TEXT : MUTED, boxShadow: role === 'client' ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('client')}>
+                </button>
+                <button type="button" aria-pressed={role === 'client'} className={styles.roleOption} style={{ background: role === 'client' ? '#FCFAF4' : 'transparent', color: role === 'client' ? TEXT : MUTED, boxShadow: role === 'client' ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('client')}>
                   <Icon name="users" size={15} /><span>Client</span>
-                </div>
-                <div className={styles.roleOption} style={{ background: isAdmin ? '#FCFAF4' : 'transparent', color: isAdmin ? TEXT : MUTED, boxShadow: isAdmin ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('admin')}>
+                </button>
+                <button type="button" aria-pressed={isAdmin} className={styles.roleOption} style={{ background: isAdmin ? '#FCFAF4' : 'transparent', color: isAdmin ? TEXT : MUTED, boxShadow: isAdmin ? '0 1px 2px rgba(35, 48, 107,.08)' : 'none' }} onClick={() => setRole('admin')}>
                   <Icon name="building" size={15} /><span>Law Firm</span>
-                </div>
+                </button>
               </div>
             </div>
 
             <div className={styles.row2}>
               <div>
-                <div className={styles.label}>Full Name</div>
-                <div style={wrapStyle('fullName')}><Icon name="user" size={16} color={MUTED} /><input placeholder="Adv. Meera Kulkarni" value={fullName} onChange={(e) => setFullName(e.target.value)} onFocus={mkFocus('fullName')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                <label className={styles.label} htmlFor="signup-name">Full Name</label>
+                <div style={wrapStyle('fullName')}><Icon name="user" size={16} color={MUTED} /><input id="signup-name" name="name" autoComplete="name" placeholder="Adv. Meera Kulkarni" value={fullName} onChange={(e) => setFullName(e.target.value)} onFocus={mkFocus('fullName')} onBlur={mkFocus(null)} className={styles.input} /></div>
               </div>
               <div>
-                <div className={styles.label}>Phone Number</div>
-                <div style={wrapStyle('phone')}><Icon name="phone" size={16} color={MUTED} /><input placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} onFocus={mkFocus('phone')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                <label className={styles.label} htmlFor="signup-phone">Phone Number</label>
+                <div style={wrapStyle('phone')}><Icon name="phone" size={16} color={MUTED} /><input id="signup-phone" name="tel" type="tel" autoComplete="tel" placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} onFocus={mkFocus('phone')} onBlur={mkFocus(null)} className={styles.input} /></div>
               </div>
             </div>
 
             <div>
-              <div className={styles.label}>Email Address</div>
-              <div style={wrapStyle('email')}><Icon name="mail" size={16} color={MUTED} /><input type="email" placeholder="you@lawfirm.com" value={email} onChange={(e) => { setEmail(e.target.value); setError('') }} onFocus={mkFocus('email')} onBlur={mkFocus(null)} className={styles.input} /></div>
+              <label className={styles.label} htmlFor="signup-email">Email Address</label>
+              <div style={wrapStyle('email')}><Icon name="mail" size={16} color={MUTED} /><input id="signup-email" name="email" type="email" autoComplete="email" placeholder="you@lawfirm.com" value={email} onChange={(e) => { setEmail(e.target.value); setError('') }} onFocus={mkFocus('email')} onBlur={mkFocus(null)} className={styles.input} /></div>
             </div>
 
             <div className={styles.row2}>
               <div>
-                <div className={styles.label}>Password</div>
+                <label className={styles.label} htmlFor="signup-password">Password</label>
                 <div style={wrapStyle('password')}>
                   <LockIcon />
-                  <input type={showPassword ? 'text' : 'password'} placeholder="Create a password" value={password} onChange={(e) => { setPassword(e.target.value); setError('') }} onFocus={mkFocus('password')} onBlur={mkFocus(null)} className={styles.input} />
-                  <span className={styles.eyeBtn} onClick={() => setShowPassword((s) => !s)}><EyeIcon off={showPassword} /></span>
+                  <input id="signup-password" name="new-password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" placeholder="Create a password" value={password} onChange={(e) => { setPassword(e.target.value); setError('') }} onFocus={mkFocus('password')} onBlur={mkFocus(null)} className={styles.input} />
+                  <button type="button" className={styles.eyeBtn} onClick={() => setShowPassword((s) => !s)} aria-label={showPassword ? 'Hide password' : 'Show password'}><EyeIcon off={showPassword} /></button>
                 </div>
               </div>
               <div>
-                <div className={styles.label}>Confirm Password</div>
+                <label className={styles.label} htmlFor="signup-confirm">Confirm Password</label>
                 <div style={wrapStyle('confirm')}>
                   <LockIcon />
-                  <input type={showConfirm ? 'text' : 'password'} placeholder="Re-enter password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setError('') }} onFocus={mkFocus('confirm')} onBlur={mkFocus(null)} className={styles.input} />
-                  <span className={styles.eyeBtn} onClick={() => setShowConfirm((s) => !s)}><EyeIcon off={showConfirm} /></span>
+                  <input id="signup-confirm" name="confirm-password" type={showConfirm ? 'text' : 'password'} autoComplete="new-password" placeholder="Re-enter password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setError('') }} onFocus={mkFocus('confirm')} onBlur={mkFocus(null)} className={styles.input} />
+                  <button type="button" className={styles.eyeBtn} onClick={() => setShowConfirm((s) => !s)} aria-label={showConfirm ? 'Hide password' : 'Show password'}><EyeIcon off={showConfirm} /></button>
                 </div>
               </div>
             </div>
@@ -210,23 +213,23 @@ export default function SignUpPage() {
               <div className={styles.section}>
                 <div className={styles.sectionTitle}>Lawyer Details</div>
                 <div>
-                  <div className={styles.label}>Bar Council Registration Number</div>
-                  <div style={wrapStyle('bar')}><Icon name="shield" size={16} color={MUTED} /><input placeholder="e.g. D/1234/2015" value={barNumber} onChange={(e) => setBarNumber(e.target.value)} onFocus={mkFocus('bar')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                  <label className={styles.label} htmlFor="signup-bar">Bar Council Registration Number</label>
+                  <div style={wrapStyle('bar')}><Icon name="shield" size={16} color={MUTED} /><input id="signup-bar" placeholder="e.g. D/1234/2015" value={barNumber} onChange={(e) => setBarNumber(e.target.value)} onFocus={mkFocus('bar')} onBlur={mkFocus(null)} className={styles.input} /></div>
                 </div>
                 <div className={styles.row2}>
                   <div>
-                    <div className={styles.label}>Practice Area</div>
+                    <label className={styles.label} htmlFor="signup-practice">Practice Area</label>
                     <div style={wrapStyle('practice')}>
                       <Icon name="scale" size={16} color={MUTED} />
-                      <select value={practiceArea} onChange={(e) => setPracticeArea(e.target.value)} className={styles.select}>
+                      <select id="signup-practice" value={practiceArea} onChange={(e) => setPracticeArea(e.target.value)} className={styles.select}>
                         {PRACTICE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                       <Icon name="chevron-down" size={14} color={MUTED} />
                     </div>
                   </div>
                   <div>
-                    <div className={styles.label}>Years of Experience</div>
-                    <div style={wrapStyle('years')}><ClockIcon /><input type="number" min={0} placeholder="5" value={yearsExp} onChange={(e) => setYearsExp(e.target.value)} onFocus={mkFocus('years')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                    <label className={styles.label} htmlFor="signup-years">Years of Experience</label>
+                    <div style={wrapStyle('years')}><ClockIcon /><input id="signup-years" type="number" min={0} placeholder="5" value={yearsExp} onChange={(e) => setYearsExp(e.target.value)} onFocus={mkFocus('years')} onBlur={mkFocus(null)} className={styles.input} /></div>
                   </div>
                 </div>
               </div>
@@ -234,47 +237,51 @@ export default function SignUpPage() {
               <div className={styles.section}>
                 <div className={styles.sectionTitle}>Law Firm Details</div>
                 <div>
-                  <div className={styles.label}>Law Firm Name</div>
-                  <div style={wrapStyle('orgName')}><Icon name="building" size={16} color={MUTED} /><input placeholder="e.g. Kulkarni & Associates" value={orgName} onChange={(e) => setOrgName(e.target.value)} onFocus={mkFocus('orgName')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                  <label className={styles.label} htmlFor="signup-org">Law Firm Name</label>
+                  <div style={wrapStyle('orgName')}><Icon name="building" size={16} color={MUTED} /><input id="signup-org" name="organization" autoComplete="organization" placeholder="e.g. Kulkarni & Associates" value={orgName} onChange={(e) => setOrgName(e.target.value)} onFocus={mkFocus('orgName')} onBlur={mkFocus(null)} className={styles.input} /></div>
                 </div>
               </div>
             ) : (
               <div className={styles.section}>
                 <div className={styles.sectionTitle}>Client Details</div>
                 <div>
-                  <div className={styles.label}>Preferred Language</div>
+                  <label className={styles.label} htmlFor="signup-language">Preferred Language</label>
                   <div style={wrapStyle('language')}>
                     <LanguagesIcon />
-                    <select value={preferredLanguage} onChange={(e) => setPreferredLanguage(e.target.value)} className={styles.select}>
+                    <select id="signup-language" value={preferredLanguage} onChange={(e) => setPreferredLanguage(e.target.value)} className={styles.select}>
                       {LANGUAGE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                     </select>
                     <Icon name="chevron-down" size={14} color={MUTED} />
                   </div>
                 </div>
                 <div>
-                  <div className={styles.label}>Address</div>
-                  <div style={wrapStyle('address')}><MapPinIcon /><input placeholder="House no., street, city, state" value={address} onChange={(e) => setAddress(e.target.value)} onFocus={mkFocus('address')} onBlur={mkFocus(null)} className={styles.input} /></div>
+                  <label className={styles.label} htmlFor="signup-address">Address</label>
+                  <div style={wrapStyle('address')}><MapPinIcon /><input id="signup-address" name="street-address" autoComplete="street-address" placeholder="House no., street, city, state" value={address} onChange={(e) => setAddress(e.target.value)} onFocus={mkFocus('address')} onBlur={mkFocus(null)} className={styles.input} /></div>
                 </div>
               </div>
             )}
 
+            {/* Real checkboxes behind the squares: consent to terms is exactly the control
+                a keyboard or screen-reader user must be able to operate and have read back. */}
             <div className={styles.agreements}>
-              <div className={styles.agreeRow} onClick={() => setAgreeTerms((v) => !v)}>
+              <label className={styles.agreeRow}>
+                <input type="checkbox" className={styles.checkboxInput} checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} />
                 <div className={styles.checkbox} style={{ background: agreeTerms ? PRIMARY : 'transparent', border: agreeTerms ? 'none' : `1.5px solid ${BORDER}` }}>{agreeTerms && <CheckIcon />}</div>
-                <div className={styles.agreeLabel}>I agree to the <a href="#" onClick={(e) => e.preventDefault()}>Terms &amp; Conditions</a></div>
-              </div>
-              <div className={styles.agreeRow} onClick={() => setAgreePrivacy((v) => !v)}>
+                <div className={styles.agreeLabel}>I agree to the Terms &amp; Conditions</div>
+              </label>
+              <label className={styles.agreeRow}>
+                <input type="checkbox" className={styles.checkboxInput} checked={agreePrivacy} onChange={(e) => setAgreePrivacy(e.target.checked)} />
                 <div className={styles.checkbox} style={{ background: agreePrivacy ? PRIMARY : 'transparent', border: agreePrivacy ? 'none' : `1.5px solid ${BORDER}` }}>{agreePrivacy && <CheckIcon />}</div>
-                <div className={styles.agreeLabel}>I agree to the <a href="#" onClick={(e) => e.preventDefault()}>Privacy Policy</a></div>
-              </div>
+                <div className={styles.agreeLabel}>I agree to the Privacy Policy</div>
+              </label>
             </div>
 
-            {error && <div className={styles.errorRow}><AlertIcon />{error}</div>}
+            {error && <div className={styles.errorRow} role="alert"><AlertIcon />{error}</div>}
 
-            <div className={styles.submitBtn} style={{ opacity: loading ? 0.85 : 1 }} onClick={handleSubmit}>
+            <button type="submit" className={styles.submitBtn} disabled={loading}>
               {loading ? <span className={styles.spinner} /> : (<><span>Create Account</span><ArrowIcon /></>)}
-            </div>
-          </div>
+            </button>
+          </form>
         </div>
 
         <div className={styles.footerLine}>Already have an account? <Link to="/login">Sign In</Link></div>

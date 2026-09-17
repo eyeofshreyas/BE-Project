@@ -73,6 +73,31 @@ class Tab:
         await self.send("Page.navigate", url=url)
         await asyncio.sleep(2.0)
 
+    async def key(self, key, code, vk, text=None):
+        """One real key press, dispatched at the browser rather than at an element --
+        so what it exercises is what a person with only a keyboard can reach."""
+        for kind in ("keyDown", "keyUp"):
+            params = {"type": kind, "key": key, "code": code,
+                      "windowsVirtualKeyCode": vk, "nativeVirtualKeyCode": vk}
+            if text and kind == "keyDown":
+                params["text"] = text
+            await self.send("Input.dispatchKeyEvent", **params)
+            await asyncio.sleep(0.02)
+
+    async def type_text(self, s):
+        for ch in s:
+            await self.send("Input.insertText", text=ch)
+            await asyncio.sleep(0.01)
+
+    async def tab_to(self, selector, limit=15):
+        """Press Tab until the focused element matches, returning how many it took
+        (None if it never gets there -- i.e. the control isn't keyboard-reachable)."""
+        for i in range(1, limit + 1):
+            await self.key("Tab", "Tab", 9)
+            if await self.eval(f"!!document.activeElement && document.activeElement.matches({json.dumps(selector)})"):
+                return i
+        return None
+
 
 async def wait_for(tab, expr, timeout=12.0):
     deadline = time.time() + timeout
@@ -97,27 +122,22 @@ async def run_role(tab, role, email, password):
         print("FAIL login form never rendered")
         return
 
-    # fill and submit the real form the way a person would (native setter so React sees it)
-    await tab.eval(f"""
-    (() => {{
-      const set = (el, v) => {{
-        const proto = Object.getPrototypeOf(el);
-        Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, v);
-        el.dispatchEvent(new Event('input', {{bubbles: true}}));
-      }};
-      const email = document.querySelector('input[type=email], input[name=email]');
-      const pw = document.querySelector('input[type=password]');
-      set(email, {json.dumps(email)});
-      set(pw, {json.dumps(password)});
-      // the submit control is a div with an onClick handler, not a button or a form
-      const clickable = [...document.querySelectorAll('div, button, a')]
-        .filter(el => /^(log ?in|sign ?in)$/i.test((el.innerText || '').trim()));
-      const target = clickable[clickable.length - 1];
-      if (!target) return 'no login control found';
-      target.click();
-      return true;
-    }})()
-    """)
+    # Sign in with the keyboard alone -- Tab to each field, type, Enter to submit. No
+    # click anywhere. The form used to be unsubmittable this way (the control was a
+    # <div onClick>), so if anyone takes the <form>/<button type=submit> back out,
+    # every role fails here rather than the regression reaching a screen reader.
+    await tab.eval("document.activeElement && document.activeElement.blur()")
+    if await tab.tab_to("#login-email") is None:
+        PROBLEMS.append((role, "/login", "email field is not reachable by Tab"))
+        print("FAIL login  email field not reachable by keyboard")
+        return
+    await tab.type_text(email)
+    if await tab.tab_to("#login-password", limit=4) is None:
+        PROBLEMS.append((role, "/login", "password field is not reachable by Tab"))
+        print("FAIL login  password field not reachable by keyboard")
+        return
+    await tab.type_text(password)
+    await tab.key("Enter", "Enter", 13, text="\r")
 
     logged_in = await wait_for(tab, "!!localStorage.getItem('lexflow_token')", timeout=20)
     who = await tab.eval("(JSON.parse(localStorage.getItem('lexflow_profile') || '{}') || {}).email")

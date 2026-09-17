@@ -1,5 +1,5 @@
 /** Login form at `/login`. The only place session keys (`lexflow_token`/`lexflow_profile`) get written -- see `handleSubmit`. */
-import { useState, type CSSProperties } from 'react'
+import { useState, type CSSProperties, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import logoWhite from '../../assets/logo-white.svg'
 import { login, forgotPassword } from '../../api/client'
@@ -141,8 +141,9 @@ export default function LoginPage() {
     }
   }
 
-  /** Validates fields, calls `login()`, writes the session to `localStorage`, then navigates to `/admin` (role 1) or `/dashboard`. */
-  async function handleSubmit() {
+  /** Validates fields, calls `login()`, writes the session to `localStorage`, then navigates to `/admin` (role 1) or `/dashboard`. Bound to the form's submit, so Enter in either field gets here too. */
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
     if (!email || !isValidEmail(email)) { setError('Enter a valid email address.'); return }
     if (!password || password.length < 6) { setError('Password must be at least 6 characters.'); return }
     setLoading(true)
@@ -196,13 +197,18 @@ export default function LoginPage() {
             <div className={styles.welcomeSub}>Log in to your LexFlow account to pick up where you left off.</div>
           </div>
 
-          <div className={styles.fields}>
+          {/* noValidate: the fields are checked by handleSubmit, which reports through the
+              styled error row -- the browser's own bubbles would fire first and say it twice. */}
+          <form className={styles.fields} onSubmit={handleSubmit} noValidate>
             <div>
-              <div className={styles.label}>Email address</div>
+              <label className={styles.label} htmlFor="login-email">Email address</label>
               <div style={wrapStyle('email')}>
                 <MailIcon />
                 <input
+                  id="login-email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
                   placeholder="you@lawfirm.com"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError('') }}
@@ -215,13 +221,16 @@ export default function LoginPage() {
 
             <div>
               <div className={styles.labelRow}>
-                <div className={styles.label}>Password</div>
-                <a href="#" onClick={(e) => { e.preventDefault(); handleForgotPassword() }} className={styles.forgotLink}>Forgot password?</a>
+                <label className={styles.label} htmlFor="login-password">Password</label>
+                <button type="button" onClick={handleForgotPassword} className={styles.forgotLink}>Forgot password?</button>
               </div>
               <div style={wrapStyle('password')}>
                 <LockIcon />
                 <input
+                  id="login-password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError('') }}
@@ -229,16 +238,28 @@ export default function LoginPage() {
                   onBlur={() => setFocused(null)}
                   className={styles.input}
                 />
-                <span className={styles.eyeBtn} onClick={() => setShowPassword((s) => !s)}>
+                <button
+                  type="button"
+                  className={styles.eyeBtn}
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
                   <EyeIcon off={showPassword} />
-                </span>
+                </button>
               </div>
               {error && (
-                <div className={styles.errorRow}><AlertIcon />{error}</div>
+                <div className={styles.errorRow} role="alert"><AlertIcon />{error}</div>
               )}
             </div>
 
-            <div className={styles.rememberRow} onClick={() => setRemember((r) => !r)}>
+            {/* A real checkbox behind the square, so the row is tabbable and Space toggles it. */}
+            <label className={styles.rememberRow}>
+              <input
+                type="checkbox"
+                className={styles.checkboxInput}
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
               <div className={styles.checkbox} style={{ background: remember ? PRIMARY : '#FCFAF4', border: remember ? 'none' : `1.5px solid ${BORDER}` }}>
                 {remember && (
                   <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
@@ -247,12 +268,12 @@ export default function LoginPage() {
                 )}
               </div>
               <div className={styles.rememberLabel}>Remember me for 30 days</div>
-            </div>
+            </label>
 
-            <div className={styles.submitBtn} onClick={handleSubmit}>
+            <button type="submit" className={styles.submitBtn} disabled={loading}>
               {loading ? <span className={styles.spinner} /> : (<><span>Log In</span><ArrowIcon /></>)}
-            </div>
-          </div>
+            </button>
+          </form>
 
           <div className={styles.orRow}>
             <div className={styles.orLine} />
