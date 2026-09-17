@@ -95,12 +95,16 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
     # The repeat is only refused until the caller says it's deliberate, since a case genuinely
     # can be listed twice at one slot.
     if not data.allow_duplicate:
-        clash = (
+        query = (
             supabase.table("hearings").select("hearing_id")
             .eq("case_id", data.case_id).eq("hearing_date", data.hearing_date)
-            .eq("hearing_time", data.hearing_time).eq("judge_id", data.judge_id)
-            .execute().data
+            .eq("judge_id", data.judge_id)
         )
+        # hearing_time is optional (a listing with no time set yet). .eq() would send the
+        # literal string "None" to Postgres and error out on the time column, so a hearing
+        # with no time needs an IS NULL comparison instead.
+        query = query.is_("hearing_time", "null") if data.hearing_time is None else query.eq("hearing_time", data.hearing_time)
+        clash = query.execute().data
         if clash:
             raise HTTPException(
                 status_code=409,

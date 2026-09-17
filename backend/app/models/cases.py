@@ -1,12 +1,15 @@
 """Pydantic request/response schemas for cases."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CaseCreate(BaseModel):
-    """Request body for creating a case."""
+    """Request body for creating a case. Strings are stripped first, so a title of only
+    spaces fails min_length rather than creating an untitled case."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     case_type_id: int
-    case_title: str
+    case_title: str = Field(min_length=1)
     client_id: int
     court_id: int
     priority: str = "Medium"

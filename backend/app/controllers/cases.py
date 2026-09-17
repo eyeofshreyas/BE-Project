@@ -232,7 +232,14 @@ def list_available_case_lawyers(case_id: int, profile: dict = Depends(require_ro
         return []
     lawyer_rows = supabase.table("lawyers").select("lawyer_id,user_id").in_("user_id", user_ids).execute().data
     lawyer_id_by_user = {r["user_id"]: r["lawyer_id"] for r in lawyer_rows}
+    # Whoever is already on the team isn't available to be added again -- offering them
+    # put names in the "Add lawyer" picker that could only ever come back as a 409.
+    already_on_case = {
+        row["lawyer_id"]
+        for row in supabase.table("case_lawyers").select("lawyer_id").eq("case_id", case_id).eq("is_active", True).execute().data
+    }
     return [
         {"lawyer_id": lawyer_id_by_user[u["user_id"]], "name": u["full_name"], "email": u["email"]}
-        for u in org_lawyer_users if u["user_id"] in lawyer_id_by_user
+        for u in org_lawyer_users
+        if u["user_id"] in lawyer_id_by_user and lawyer_id_by_user[u["user_id"]] not in already_on_case
     ]

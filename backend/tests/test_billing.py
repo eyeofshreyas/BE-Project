@@ -156,3 +156,38 @@ if __name__ == "__main__":
     test_full_payment_is_paid()
     test_overpayment_is_paid()
     print("ok")
+
+
+def test_payment_beyond_the_outstanding_balance_is_rejected():
+    """Verifies a payment larger than what the invoice still owes raises 400 rather than being
+    recorded -- an overpayment silently flipped the invoice to Paid and overstated collections.
+    Exercises: `POST /payments` (`billing.create_payment()`)."""
+    profile = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
+    invoice_row = {
+        "invoice_id": 7, "case_id": 10, "invoice_number": "INV-7", "amount": 1000, "tax": 0,
+        "total_amount": 1000, "issue_date": "2026-01-01", "due_date": None,
+        "payment_status": "Partially Paid", "cases": None,
+    }
+    billing_fake = _fake_supabase({"invoices": [invoice_row], "payments": [{"amount": 400}]})
+    with patch("app.middleware.auth.supabase", _fake_supabase({"cases": [{"case_id": 10}]})), \
+         patch("app.controllers.billing.supabase", billing_fake):
+        try:
+            create_payment(PaymentCreate(invoice_id=7, amount=601, payment_date="2026-01-01"), profile)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 400
+        # the rest of the balance is still payable
+        create_payment(PaymentCreate(invoice_id=7, amount=600, payment_date="2026-01-01"), profile)
+
+
+def test_money_amounts_must_be_positive():
+    """Verifies the request models reject non-positive money, so a negative payment can never
+    reach the payments table. Exercises: `PaymentCreate` / `InvoiceCreate` validation."""
+    import pytest
+    from pydantic import ValidationError
+
+    for amount in (0, -100):
+        with pytest.raises(ValidationError):
+            PaymentCreate(invoice_id=7, amount=amount, payment_date="2026-01-01")
+        with pytest.raises(ValidationError):
+            InvoiceCreate(case_id=1, invoice_number="INV-2", amount=amount, total_amount=100, issue_date="2026-01-01")

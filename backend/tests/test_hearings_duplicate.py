@@ -69,3 +69,26 @@ def test_a_new_slot_still_inserts():
     assert (case_id, event_type) == (1, "hearing_scheduled")
     assert title == "Hearing scheduled for 2026-08-15 at 11:00"
     assert description == "Listed before Justice S. Kulkarni, Court Room 3."
+
+
+def test_a_hearing_with_no_time_uses_an_is_null_clash_check():
+    """hearing_time is optional, and .eq() would send the string "None" to a time column --
+    Postgres rejected it and every timeless hearing came back as a 500."""
+    fake = MagicMock()
+    table = MagicMock()
+    is_null_chain = table.select.return_value.eq.return_value.eq.return_value.eq.return_value.is_.return_value
+    is_null_chain.execute.return_value.data = []
+    table.insert.return_value.execute.return_value.data = [{"hearing_id": 43}]
+    fake.table.return_value = table
+
+    payload = PAYLOAD.model_copy(update={"hearing_time": None})
+    with patch("app.controllers.hearings.supabase", fake), \
+         patch("app.controllers.hearings.ensure_case_access"), \
+         patch("app.controllers.hearings._sync_next_hearing_date"), \
+         patch("app.controllers.hearings.add_timeline_event"), \
+         patch("app.controllers.hearings._get_hearing") as get_hearing:
+        get_hearing.return_value = {**HEARING, "hearing_time": None}
+        create_hearing(payload, PROFILE)
+
+    table.select.return_value.eq.return_value.eq.return_value.eq.return_value.is_.assert_called_once_with("hearing_time", "null")
+    table.insert.assert_called_once()

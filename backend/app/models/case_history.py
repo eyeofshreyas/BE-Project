@@ -1,5 +1,7 @@
 """Pydantic request/response schemas for case notes, timeline events, and status history."""
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -58,5 +60,6 @@ class StatusHistoryEntry(BaseModel):
 
 
 class StatusChange(BaseModel):
-    """Request body for changing a case's status."""
-    new_status: str
+    """Request body for changing a case's status. The literal mirrors STATUS_OPTIONS in the
+    frontend's CaseDetailPage -- any other string used to be written straight to the column."""
+    new_status: Literal["Open", "In Progress", "Pending", "Completed", "Closed"]

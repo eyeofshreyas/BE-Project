@@ -222,8 +222,9 @@ def test_case_summary_lists_every_active_teammate():
     assert {la["lawyer_id"] for la in summary["lawyers"]} == {5, 6}
 
 
-def test_available_case_lawyers_are_scoped_to_the_cases_org():
-    """Verifies the add-teammate picker only lists lawyers in the case's own organization. Exercises: `GET /cases/{id}/available-lawyers` (`cases.list_available_case_lawyers()`)."""
+def _available_lawyers_fake(roster: list[dict]):
+    """supabase double for list_available_case_lawyers: one org lawyer (lawyer_id 6, user 20)
+    and `roster` as the case's active case_lawyers rows."""
     fake = MagicMock()
     tables: dict[str, MagicMock] = {}
 
@@ -240,14 +241,29 @@ def test_available_case_lawyers_are_scoped_to_the_cases_org():
         elif name == "lawyers":
             m.select.return_value.in_.return_value.execute.return_value.data = [{"lawyer_id": 6, "user_id": 20}]
         elif name == "case_lawyers":
-            m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"case_id": 42}]
+            m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = roster
         tables[name] = m
         return m
 
     fake.table.side_effect = table
+    return fake
+
+
+def test_available_case_lawyers_are_scoped_to_the_cases_org():
+    """Verifies the add-teammate picker only lists lawyers in the case's own organization. Exercises: `GET /cases/{id}/available-lawyers` (`cases.list_available_case_lawyers()`)."""
+    fake = _available_lawyers_fake([{"case_id": 42, "lawyer_id": 99}])
     with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
         result = list_available_case_lawyers(42, PRIMARY_LAWYER_PROFILE)
     assert result == [{"lawyer_id": 6, "name": "Org Lawyer", "email": "o@example.com"}]
+
+
+def test_available_case_lawyers_excludes_the_current_team():
+    """Verifies a lawyer already on the case isn't offered again -- adding them could only ever
+    come back as a 409. Exercises: `GET /cases/{id}/available-lawyers`."""
+    fake = _available_lawyers_fake([{"case_id": 42, "lawyer_id": 6}])
+    with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
+        result = list_available_case_lawyers(42, PRIMARY_LAWYER_PROFILE)
+    assert result == []
 
 
 def test_client_cannot_list_available_case_lawyers():

@@ -158,7 +158,16 @@ def list_invoice_payments(invoice_id: int, profile: dict = Depends(get_current_p
 def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Record a payment against an invoice the caller has access to, then recompute and persist
     the invoice's payment_status. Calls: `_get_invoice()`, `get_scoped_case_ids()`, `_invoice_status_for()`."""
-    _get_invoice(data.invoice_id, get_scoped_case_ids(profile))
+    invoice = _get_invoice(data.invoice_id, get_scoped_case_ids(profile))
+    # A payment can't exceed what's still outstanding -- without this the invoice silently
+    # goes to Paid on any amount, and the books show more collected than was ever billed.
+    paid = supabase.table("payments").select("amount").eq("invoice_id", data.invoice_id).eq("payment_status", "Completed").execute().data
+    due = invoice["total_amount"] - sum(p["amount"] for p in paid)
+    if data.payment_status == "Completed" and data.amount > due:
+        raise HTTPException(
+            status_code=400,
+            detail=f"That is more than this invoice has outstanding ({due:.2f}).",
+        )
     payment = supabase.table("payments").insert(data.model_dump()).execute().data[0]
     _recompute_invoice_status(data.invoice_id)
     return payment

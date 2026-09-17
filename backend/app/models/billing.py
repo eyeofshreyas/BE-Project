@@ -1,6 +1,6 @@
 """Pydantic request/response schemas for billing: invoices, payments, and matter expenses."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class InvoiceSummary(BaseModel):
@@ -21,9 +21,9 @@ class InvoiceCreate(BaseModel):
     """Request body for creating an invoice."""
     case_id: int
     invoice_number: str
-    amount: float
-    tax: float = 0
-    total_amount: float
+    amount: float = Field(gt=0)
+    tax: float = Field(default=0, ge=0)
+    total_amount: float = Field(gt=0)
     issue_date: str
     due_date: str | None = None
     remarks: str | None = None
@@ -43,7 +43,7 @@ class PaymentSummary(BaseModel):
 class PaymentCreate(BaseModel):
     """Request body for recording a payment against an invoice."""
     invoice_id: int
-    amount: float
+    amount: float = Field(gt=0)
     payment_method: str | None = None
     transaction_reference: str | None = None
     payment_date: str

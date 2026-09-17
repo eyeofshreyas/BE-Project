@@ -56,6 +56,15 @@ async def unhandled_errors_as_json(request, call_next):
     Registered before CORSMiddleware so it runs *inside* it and the 500 keeps its CORS headers."""
     try:
         return await call_next(request)
+    except PostgrestAPIError as e:
+        # A unique-constraint violation is the caller re-sending something that already
+        # exists (an invoice number, a bar council number), not a server fault -- answer
+        # 409 rather than burying it in a generic 500.
+        if e.code == "23505":
+            logger.info("Duplicate rejected on %s %s: %s", request.method, request.url.path, e.details)
+            return JSONResponse(status_code=409, content={"detail": "That record already exists."})
+        logger.exception("Unhandled database error on %s %s", request.method, request.url.path)
+        return JSONResponse(status_code=500, content={"detail": "Something went wrong on our side. Please try again."})
     except Exception:
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
         return JSONResponse(status_code=500, content={"detail": "Something went wrong on our side. Please try again."})
