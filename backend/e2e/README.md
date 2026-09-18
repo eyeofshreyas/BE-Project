@@ -23,6 +23,11 @@ Start the stack first (`./start.sh` from the repo root), then, from `backend/`:
 talks to Chrome over the DevTools protocol using `websockets`, which the backend
 already depends on. Nothing else to install.
 
+Leave a minute between scripts. Login is rate limited to 10 requests a minute
+per IP, and `test_documents_and_admin.py` ends by deliberately burning that
+budget to prove the 429 works -- so a script started straight after it reports
+logins failing that are fine on their own.
+
 ## Accounts
 
 They sign in as a seeded demo firm (`backend/seed_demo_firm.py`). After a fresh

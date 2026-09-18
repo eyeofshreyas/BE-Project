@@ -781,7 +781,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"new_status\": \"string\"\n}",
+              "raw": "{\n  \"new_status\": \"Open\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
