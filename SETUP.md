@@ -27,6 +27,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env      # then fill in SUPABASE_URL and SUPABASE_KEY
+cp frontend/.env.example frontend/.env
 ```
 
 `SUPABASE_URL` / `SUPABASE_KEY` are required — the server refuses to start
