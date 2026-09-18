@@ -45,8 +45,58 @@ def test_tracks_ips_and_routes_independently():
     dependency(_fake_request(path="/signup", ip="1.1.1.1"))
 
 
+def test_the_store_does_not_grow_once_per_visiting_ip_forever():
+    """Verifies entries whose hits have aged out are swept once the store grows past its
+    threshold. Every IP that touched an auth route used to keep a key for the life of the
+    process: a key's timestamps are pruned only on that key's next request, so a one-off
+    visitor was never revisited and never removed. Exercises: `rate_limit.rate_limit()`."""
+    import app.middleware.rate_limit as rl
+
+    _hits.clear()
+    dependency = rate_limit(10, 60)
+    for i in range(rl._SWEEP_OVER_KEYS + 1):
+        dependency(_fake_request(ip=f"10.{i // 65536}.{i // 256 % 256}.{i % 256}"))
+    assert len(_hits) > rl._SWEEP_OVER_KEYS
+
+    # Roll past the window so every one of those hits is stale, then make one more
+    # request -- which should trigger the sweep and collect the lot.
+    real_monotonic = rl.time.monotonic
+    rl.time.monotonic = lambda: real_monotonic() + 3600
+    try:
+        dependency(_fake_request(ip="9.9.9.9"))
+    finally:
+        rl.time.monotonic = real_monotonic
+    assert len(_hits) == 1, f"expected the stale keys swept, {len(_hits)} left"
+
+
+def test_the_sweep_never_clears_someone_still_inside_their_window():
+    """Verifies a sweep triggered by a short-window route leaves a long-window route's live
+    entries alone -- collecting those would reset a caller's count and hand them a second
+    allowance, turning a memory fix into a way past the limit.
+    Exercises: `rate_limit.rate_limit()`."""
+    import app.middleware.rate_limit as rl
+
+    _hits.clear()
+    slow = rate_limit(1, 3600)      # long window: one request an hour
+    fast = rate_limit(10, 1)        # short window, and what triggers the sweep
+
+    slow(_fake_request(path="/slow", ip="1.1.1.1"))   # uses up the hourly allowance
+
+    # Fill the store past the threshold so the next call sweeps.
+    for i in range(rl._SWEEP_OVER_KEYS + 1):
+        fast(_fake_request(path="/fast", ip=f"10.{i // 65536}.{i // 256 % 256}.{i % 256}"))
+
+    try:
+        slow(_fake_request(path="/slow", ip="1.1.1.1"))
+        assert False, "expected HTTPException -- the hourly allowance was already spent"
+    except HTTPException as e:
+        assert e.status_code == 429
+
+
 if __name__ == "__main__":
     test_allows_requests_under_the_limit()
     test_blocks_requests_over_the_limit()
     test_tracks_ips_and_routes_independently()
+    test_the_store_does_not_grow_once_per_visiting_ip_forever()
+    test_the_sweep_never_clears_someone_still_inside_their_window()
     print("ok")
