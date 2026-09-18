@@ -168,3 +168,155 @@ Technical groundwork already in place: layered RBAC + per-object case ownership 
 syncs (`case_timeline`, `add_timeline_event()`). Still open: documented encryption-at-rest
 posture and a data-retention/deletion policy — engineering-led, but should be reviewed
 against the standard above, not just DPDP minimums.
+
+---
+
+## 4. Audit findings (2026-09-18) — queued fixes
+
+A read of the backend and frontend against the open issue list turned up eighteen things
+none of the existing issues covered. Unlike everything above, **these are defects, not
+deferred features** — they're recorded here because the fix is scheduled for a later
+cycle, not because something external unblocks them. The trigger for §4.1–§4.5 is simply
+the next fix cycle. Only §4.6 has a real external trigger.
+
+Six are filed: [#20](https://github.com/eyeofshreyas/BE-Project/issues/20)–[#25](https://github.com/eyeofshreyas/BE-Project/issues/25). The rest are recorded here and
+not yet filed — §4.1 and §4.2 describe exploitable paths, and this repo is public, so they
+should be reported through private vulnerability reporting (§4.5) rather than opened as
+public issues.
+
+Step-by-step fixes, with test code, are in
+`docs/superpowers/plans/2026-09-18-audit-findings-remediation.md` (gitignored, local only).
+
+### 4.1 Money paths
+
+- **Razorpay verify never binds the order to the invoice** —
+  `app/controllers/billing.py:219`. The HMAC proves the `order_id|payment_id` pair is
+  Razorpay's, and the payment is re-fetched so the amount isn't taken from the caller, but
+  nothing checks the order was raised *for this invoice*. A client can pay their smallest
+  invoice and POST the result against their largest; the `transaction_reference`
+  idempotency check then makes it impossible to ever apply it to the right one.
+  **Fix:** `create_razorpay_order()` already puts the invoice number in the order's
+  `receipt` (`billing.py:210`) — fetch the order and read it back.
+
+- **Invoice `total_amount` is whatever the client sends** — `app/models/billing.py:26`.
+  Each field is validated alone; nothing checks `total_amount == amount + tax`. That
+  number decides the outstanding balance, the Paid/Partially Paid status, and what the
+  card is actually charged. **Fix:** a Pydantic `@model_validator(mode="after")` on
+  `InvoiceCreate`.
+
+### 4.2 Correctness
+
+- **The e-sign webhook isn't idempotent** — `app/controllers/esign.py:134`. The signed PDF
+  goes to a fixed `signed-{document_id}.pdf`, Supabase Storage's `upload` rejects an
+  existing path, and the call isn't wrapped the way `messages.py:284` is. A redelivery
+  500s, and because `esign_status` is written *after* the upload (`esign.py:138`) the
+  document is stuck at SENT while Leegality retries a callback that can never succeed.
+  **Fix:** `{"upsert": "true"}`, and write the status even when storing the file fails.
+
+- **Org admins can preview a client delete but the delete 404s** —
+  `app/controllers/users.py:213`. `get_user_delete_impact()` uses
+  `_assert_same_org_or_404()`, which handles a client's `NULL` `org_id` explicitly;
+  `_assert_deletable()` compares raw, so `None != org_id` → 404 for a user the impact
+  dialog just described. An org admin can never delete a client at all.
+  **Fix:** have `_assert_deletable()` delegate scoping to `_assert_same_org_or_404()`.
+
+- **Deleting a user leaves their Supabase Auth account** — `app/controllers/users.py:231`.
+  The cascade clears the `users` row and storage; nothing calls the Auth admin API
+  (`grep -rn "auth.admin" backend/` finds nothing, and `migrate_delete_user_cascade.sql`
+  doesn't touch `auth.users`). The person still authenticates and gets `profile: null`,
+  which reads as a broken app rather than a closed account, and their email can't be
+  signed up again. **Fix:** `supabase.auth.admin.delete_user()` after the cascade, logged
+  but not fatal — same stance as the storage cleanup beside it. Matching is by email;
+  there's no UUID column linking the two (see the note at the top of `seed.sql`).
+
+- **Signup rollback deletes the parent first, and skips `clients`** — `app/main.py:232`.
+  `_rollback_org()` (`main.py:127`) documents exactly why children go first; the rollback
+  below it deletes `users` before `lawyers`, so an FK violation escapes the `except` block
+  and masks the real error. The client branch has no `clients` delete at all, stranding
+  that row. **Fix:** delete `lawyers`/`clients` first, then `users`, then `_rollback_org()`.
+
+- **`/ai/summarize` reads soft-deleted documents** — `app/ml/summarize.py:46`. Download
+  and summary-fetch both filter `is_deleted=False`; this query doesn't, so a deleted
+  document is still pulled out of storage and summarized during the reaper's grace window.
+  **Fix:** add the filter the other two call sites have.
+
+### 4.3 Resources
+
+- **Message attachments are buffered in full before the size check** —
+  `app/controllers/messages.py:279`. `file.file.read()` with no argument reads to EOF;
+  the 25 MB check happens after. `documents.read_upload()` reads `MAX + 1` and documents
+  why. A 2 GB attachment is rejected — after 2 GB is allocated to decide that.
+  **Fix:** `file.file.read(MAX_ATTACHMENT_BYTES + 1)`.
+
+- **Every login and signup leaks an httpx connection pool** —
+  `app/db/supabase_client.py:26`, filed as
+  [#25](https://github.com/eyeofshreyas/BE-Project/issues/25). `new_auth_client()` builds a
+  fresh `httpx.Client` per call and nothing closes it. The reason it exists is sound (see
+  its docstring — don't "fix" this by going back to the shared client); only the lifetime
+  is wrong. **Fix:** make it a `@contextmanager`. Note this renames the patch target in
+  ~6 places in `tests/test_auth.py`.
+
+- **A failed `documents` insert orphans the uploaded file** —
+  `app/controllers/documents.py:131`. The object is already in the bucket, and
+  `reap_storage.py` only walks rows, so nothing will ever find it. Same shape in
+  `messages.py:303`. **Fix:** delete the object if the insert raises. A bucket-side sweep
+  would catch what's already orphaned — only worth building if a check shows orphans have
+  actually accumulated.
+
+### 4.4 Frontend
+
+- **The refresh token is returned, typed, and never used** — `frontend/src/api/client.ts:88`.
+  `/login` hands back `refresh_token` and `types/api.ts:13` declares it, but nothing stores
+  it and there's no `/refresh` endpoint. When the access token expires (an hour, by
+  Supabase's default) the 401 handler does `window.location.href = '/login'` — a full page
+  navigation — so every user is logged out roughly hourly, mid-task, losing whatever was in
+  the form they were filling in. The 401 handler is right; treating a routine expiry as the
+  end of a session isn't. **Fix:** a `/refresh` route plus single-flight refresh-and-replay
+  in `request()`, so six parallel dashboard 401s trigger one refresh, not six. No frontend
+  test framework exists yet (#16), so this half is verified by clicking through.
+
+### 4.5 Repo hygiene — all filed
+
+- [#20](https://github.com/eyeofshreyas/BE-Project/issues/20) **No `LICENSE`.** Public repo,
+  `licenseInfo: null`. No license means nobody has permission to use the code, and
+  contributors have no stated terms — public visibility changes neither.
+- [#21](https://github.com/eyeofshreyas/BE-Project/issues/21) **No `SECURITY.md`.** Nowhere
+  to report §4.1/§4.2-shaped findings except a public issue. Do this one first: it's what
+  makes the rest fileable.
+- [#22](https://github.com/eyeofshreyas/BE-Project/issues/22) **No issue or PR templates.**
+  `CONTRIBUTING.md` §1 and §6 specify what each must contain; nothing puts that in front of
+  the person filling the form in, so `Closes #N` gets forgotten and issues outlive their fix.
+- [#23](https://github.com/eyeofshreyas/BE-Project/issues/23) **No `CODE_OF_CONDUCT.md`.**
+  A file you adopt, not one you write — the Contributor Covenant, with a genuinely
+  monitored enforcement contact.
+- [#24](https://github.com/eyeofshreyas/BE-Project/issues/24) **No `frontend/.env.example`.**
+  `VITE_API_URL` (`client.ts:57`) is discoverable only by grepping, and its
+  `?? 'http://localhost:8000'` fallback keeps it quiet until the first build for somewhere
+  that isn't a laptop. Vite inlines `VITE_*` at **build** time, so a wrong value can't be
+  corrected on the server afterwards.
+
+### 4.6 Genuinely deferred — these have real triggers
+
+Unlike the rest of §4, these two are correct as written and shouldn't be touched
+speculatively. Both rewrites are wide and land on hot paths.
+
+- **Case scoping expands to an unbounded `IN` list.** `get_scoped_case_ids()`
+  (`app/middleware/auth.py:58`) materialises every visible case id, and callers pass the
+  whole set to `.in_()` (`documents.py:56`, `billing.py:94`, ~6 others). PostgREST puts
+  those ids in the query string, so this hits a URL-length limit — as a 414 on every list
+  page at once, not a gradual slowdown. The fix is to push scoping into the query: an
+  `org_id` filter for admins, a view or RPC for the lawyer/client joins
+  (`migrate_delete_user_cascade.sql` is the precedent for that kind of SQL function).
+  **Unblocked by:** a firm's case count passing roughly a thousand, or a 414 / oversized-URL
+  error actually appearing in logs.
+
+- **Every request costs a Supabase Auth round trip.** `supabase.auth.get_user(token)`
+  (`app/middleware/auth.py:26`) validates a *signed* JWT over the network, then a `users`
+  select loads the profile. A dashboard mount fires ~6 parallel requests, so that's 12
+  extra calls per page load, and it's the reason the 503 branch in that function has to
+  exist at all. Verifying locally against the project's JWKS removes them. Keep the profile
+  select regardless — `is_active` and `role_id` are LexFlow's own state, and a suspended
+  user must stop working immediately. **Unblocked by:** latency actually being complained
+  about, or Auth flakiness showing up as 503s in logs. `CONTRIBUTING.md` §3 lists
+  `middleware/auth.py` under "don't relax these" — this needs the full suite green and a
+  careful review, not a quick patch.
