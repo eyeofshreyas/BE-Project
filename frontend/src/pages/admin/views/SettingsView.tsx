@@ -1,6 +1,6 @@
 /** Admin console "Settings" tab: profile (`updateOwnProfile()`), security (password reset
  * via `forgotPassword()`), platform toggles (`getPlatformSettings()`/`updatePlatformSettings()`),
- * appearance (stored per-browser), and a static about panel. */
+ * and a static about panel. */
 import { useEffect, useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C } from '../../../components/theme'
@@ -12,12 +12,8 @@ const MENU: { key: string; label: string; icon: IconName }[] = [
   { key: 'profile', label: 'Profile', icon: 'user' },
   { key: 'security', label: 'Security', icon: 'shield' },
   { key: 'platform', label: 'Platform', icon: 'settings' },
-  { key: 'appearance', label: 'Appearance', icon: 'palette' },
   { key: 'about', label: 'About', icon: 'info' },
 ]
-
-const THEME_KEY = 'lexflow_theme'
-type Theme = 'Light' | 'Dark' | 'System'
 
 /** Small controlled on/off switch (sliding dot) used throughout this view's toggle rows. */
 function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
@@ -39,9 +35,6 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
   const [phone, setPhone] = useState(profile?.phone ?? '')
   const [settings, setSettings] = useState<PlatformSettings | null>(null)
   const [saving, setSaving] = useState(false)
-  // ponytail: the theme picker is per-browser only -- nothing renders a dark palette yet,
-  // so there's no point round-tripping it to the server until there is.
-  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem(THEME_KEY) as Theme | null) ?? 'Light')
 
   useEffect(() => {
     getPlatformSettings().then(setSettings).catch((e: Error) => onSave(e.message))
@@ -54,7 +47,6 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
   function reset() {
     setFullName(profile?.full_name ?? '')
     setPhone(profile?.phone ?? '')
-    setTheme((localStorage.getItem(THEME_KEY) as Theme | null) ?? 'Light')
     getPlatformSettings().then(setSettings).catch((e: Error) => onSave(e.message))
   }
 
@@ -64,7 +56,6 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
       const updated = await updateOwnProfile({ full_name: fullName.trim(), phone: phone.trim() })
       if (profile) onProfileChange({ ...profile, full_name: updated.full_name, phone: updated.phone })
       if (settings) await updatePlatformSettings(settings)
-      localStorage.setItem(THEME_KEY, theme)
       onSave('Settings saved.')
     } catch (e) {
       onSave((e as Error).message)
@@ -159,21 +150,6 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
             </div>
           )}
 
-          {tab === 'appearance' && (
-            <div style={cardStyle}>
-              <div className={styles.cardTitle}>Appearance</div>
-              <div>
-                <div style={fieldLabel}>Theme</div>
-                <div style={{ display: 'flex', gap: 6, background: '#F6F2E9', border: `1px solid ${C.border}`, borderRadius: 3, padding: 4 }}>
-                  {(['Light', 'Dark', 'System'] as const).map((t) => (
-                    <div key={t} style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 600, padding: 11, borderRadius: 3, cursor: 'pointer', background: theme === t ? C.primary : 'transparent', color: theme === t ? '#FCFAF4' : C.text }} onClick={() => setTheme(t)}>{t}</div>
-                  ))}
-                </div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Saved in this browser only.</div>
-              </div>
-            </div>
-          )}
-
           {tab === 'about' && (
             <div style={cardStyle}>
               <div className={styles.cardTitle}>About LexFlow</div>
@@ -190,3 +166,5 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
     </>
   )
 }
+
+
