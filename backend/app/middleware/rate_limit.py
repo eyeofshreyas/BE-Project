@@ -41,6 +41,8 @@ def rate_limit(max_requests: int, window_seconds: float):
                 for stale in [k for k, v in _hits.items() if not v or now - v[-1] >= _max_window]:
                     del _hits[stale]
             hits = [t for t in _hits.get(key, []) if now - t < window_seconds]
+            if not hits:
+                _hits.pop(key, None)
             if len(hits) >= max_requests:
                 raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
             hits.append(now)
