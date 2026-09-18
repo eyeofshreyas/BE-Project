@@ -33,8 +33,10 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env   # fill in SUPABASE_URL / SUPABASE_KEY
 
+
 # frontend
 cd frontend
+cp .env.example .env
 npm install
 
 # run both
