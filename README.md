@@ -56,3 +56,8 @@ Setting those up is a separate step in `SETUP.md`.
 | `finetune-summarizer/` | Offline ML pipeline (fine-tuning, indexing) and the venvs the backend shells out to for AI endpoints |
 | `docs/` | Architecture docs (HLD, LLD) |
 | `design-concepts/` | UI design explorations |
+
+## License
+
+This project is licensed under the MIT License.
+See the [LICENSE](LICENSE) file for details.
