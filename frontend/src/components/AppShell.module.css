@@ -61,13 +61,32 @@
   overflow-y: auto;
 }
 
+/* Strips default <button> chrome so a real <button> can drop in wherever a clickable
+   div used to be, with no visual change -- see AppLayout.tsx's nav/logout/bell/profile
+   controls. resetBtnBlock also fills the row's width, for a button meant to stretch
+   the way a block-level div did (sidebar/dropdown rows); resetBtn alone stays
+   content-sized, for an icon/pill-shaped button. */
+.resetBtn {
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.resetBtnBlock {
+  composes: resetBtn;
+  width: 100%;
+  text-align: left;
+}
+
 .navRow {
+  composes: resetBtnBlock;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 11px 14px;
   border-radius: 3px;
-  cursor: pointer;
   margin-bottom: 2px;
   transition: background .15s;
 }
@@ -126,12 +145,12 @@
 }
 
 .logoutRow {
+  composes: resetBtnBlock;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 11px 14px;
   border-radius: 3px;
-  cursor: pointer;
   transition: background .18s ease-out;
 }
 
@@ -197,6 +216,7 @@
 }
 
 .bellBtn {
+  composes: resetBtn;
   position: relative;
   width: 38px;
   height: 38px;
@@ -204,7 +224,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
 }
 
 .bellDot {
@@ -225,10 +244,10 @@
 }
 
 .profileBtn {
+  composes: resetBtn;
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
   padding: 4px 6px;
   border-radius: 3px;
 }
@@ -266,11 +285,12 @@
 }
 
 .profileDropdownItem {
+  composes: resetBtnBlock;
+  display: block;
   padding: 9px 12px;
   font-size: 13px;
   color: #1A1A17;
   border-radius: 3px;
-  cursor: pointer;
 }
 
 .profileDropdownItem:hover {

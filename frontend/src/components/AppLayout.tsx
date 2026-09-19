@@ -134,25 +134,25 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               )
             }
             return (
-              <div key={item.label} className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => navigate(item.path!)} title={item.label}>
+              <button key={item.label} type="button" className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => navigate(item.path!)} title={item.label} aria-current={active ? 'page' : undefined}>
                 <span className={styles.navIcon}><Icon name={item.icon} size={18} color={active ? C.primaryDark : '#8C857A'} /></span>
                 <span className={styles.navLabel} style={{ fontWeight: active ? 600 : 500, color: active ? C.text : '#575145' }}>{item.label}</span>
                 {item.path === '/messages' && unreadMessages > 0 && (
                   <span className={styles.navBadge}>{unreadMessages > 99 ? '99+' : unreadMessages}</span>
                 )}
-              </div>
+              </button>
             )
           })}
         </div>
         <div className={styles.sidebarFooter}>
-          <div className={styles.navRow} style={{ background: location.pathname === '/settings' ? '#E6E0CE' : 'transparent' }} onClick={() => navigate('/settings')} title="Settings">
+          <button type="button" className={styles.navRow} style={{ background: location.pathname === '/settings' ? '#E6E0CE' : 'transparent' }} onClick={() => navigate('/settings')} title="Settings">
             <span className={styles.navIcon}><Icon name="settings" size={18} color={location.pathname === '/settings' ? C.primaryDark : '#8C857A'} /></span>
             <span className={styles.navLabel} style={{ fontWeight: location.pathname === '/settings' ? 600 : 500, color: location.pathname === '/settings' ? C.text : '#575145' }}>Settings</span>
-          </div>
-          <div className={styles.logoutRow} onClick={logout} title="Logout">
+          </button>
+          <button type="button" className={styles.logoutRow} onClick={logout} title="Logout">
             <span className={styles.navIcon}><Icon name="log-out" size={18} color="#8C857A" /></span>
             <span style={{ fontSize: 13.5, fontWeight: 500, color: '#575145' }}>Logout</span>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -164,20 +164,20 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </div>
           <div className={styles.topbarRight}>
             <div className={styles.todayLabel}>{new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
-            <div className={styles.bellBtn} onClick={() => navigate('/notifications')}>
+            <button type="button" className={styles.bellBtn} onClick={() => navigate('/notifications')} aria-label="Notifications">
               <Icon name="bell" size={19} color="#575145" />
               {notifications.some((n) => !n.is_read) && <span className={styles.bellDot} />}
-            </div>
+            </button>
             <div className={styles.vDivider} />
             <div style={{ position: 'relative' }}>
-              <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v) }}>
+              <button type="button" className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v) }} aria-haspopup="true" aria-expanded={profileOpen}>
                 <div className={styles.avatarCircle}>{profile ? initialsOf(profile.full_name) : '—'}</div>
                 <div style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{profile?.full_name ?? 'Unknown user'}</div><div style={{ fontSize: 11, color: '#8C857A' }}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'User') : ''}</div></div>
                 <span style={{ color: '#8C857A', display: 'flex' }}><Icon name="chevron-down" size={15} color="#8C857A" /></span>
-              </div>
+              </button>
               {profileOpen && (
                 <div className={styles.profileDropdown}>
-                  <div className={styles.profileDropdownItem} onClick={() => navigate('/settings')}>My Profile</div>
+                  <button type="button" className={styles.profileDropdownItem} onClick={() => navigate('/settings')}>My Profile</button>
                 </div>
               )}
             </div>
