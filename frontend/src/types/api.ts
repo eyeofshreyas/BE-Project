@@ -545,3 +545,38 @@ export interface ConflictMatch {
   lawyer: string | null
   role: string | null
 }
+
+export interface TrustTransaction {
+  id: number
+  client_id: number
+  case_id: number | null
+  type: 'deposit' | 'disbursement' | 'invoice_payment'
+  amount: number
+  transaction_date: string
+  description: string | null
+  created_at: string
+}
+
+export interface TrustLedger {
+  client_id: number
+  org_id: number
+  transactions: TrustTransaction[]
+}
+
+export interface TrustBalance {
+  client_id: number
+  org_id: number
+  balance: number
+}
+
+/** The three totals that must agree -- see backend/app/controllers/trust.py. */
+export interface TrustReconciliation {
+  as_of: string
+  org_id: number
+  bank_balance: number | null
+  bank_statement_date: string | null
+  ledger_total: number
+  client_total: number
+  reconciled: boolean
+  client_balances: { client_id: number; balance: number }[]
+}

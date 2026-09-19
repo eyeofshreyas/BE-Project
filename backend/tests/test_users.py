@@ -16,11 +16,20 @@ from app.models.users import ClientFirmStatusUpdate, ProfileUpdate, StatusUpdate
 ADMIN_PROFILE = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
 
 
-def _fake_supabase(target_role: int, admin_count: int, target_org_id: int = 7):
+def _fake_supabase(target_role: int, admin_count: int, target_org_id: int = 7, trust_rows: list | None = None):
+    """`trust_rows` stands in for the target's trust ledger -- empty by default, so the
+    held-money check in `_assert_deletable()` passes and the other rules get exercised."""
     fake = MagicMock()
     m = MagicMock()
     m.select.return_value.eq.return_value.execute.return_value.data = [{"role_id": target_role, "org_id": target_org_id}]
     m.select.return_value.eq.return_value.eq.return_value.execute.return_value.count = admin_count
+
+    trust = MagicMock()
+    trust.select.return_value.eq.return_value.execute.return_value.data = trust_rows or []
+    clients = MagicMock()
+    clients.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 4}]
+
+    fake.table.side_effect = lambda name: {"trust_transactions": trust, "clients": clients}.get(name, m)
     fake.table.return_value = m
     fake.rpc.return_value.execute.return_value.data = {"user_id": 2, "storage_paths": ["case-1/a.pdf"]}
     return fake
@@ -288,6 +297,29 @@ def test_last_admin_cannot_be_deleted():
             delete_user(2, ADMIN_PROFILE)
     assert exc.value.status_code == 400
     fake.rpc.assert_not_called()
+
+
+def test_client_holding_trust_money_cannot_be_deleted():
+    """Verifies a client whose money the firm is still holding is refused -- deleting them
+    would destroy the record of funds that aren't the firm's. Exercises: `DELETE /users/:id`."""
+    fake = _fake_supabase(auth.CLIENT, 2, trust_rows=[{"type": "deposit", "amount": 5000.00}])
+    with patch("app.controllers.users.supabase", fake):
+        with pytest.raises(HTTPException) as exc:
+            delete_user(2, ADMIN_PROFILE)
+    assert exc.value.status_code == 400
+    assert "trust account" in exc.value.detail
+    fake.rpc.assert_not_called()
+
+
+def test_client_with_a_drawn_down_trust_balance_can_be_deleted():
+    """Verifies a zero balance is no obstacle -- the ledger has entries but the money is gone.
+    Exercises: `DELETE /users/:id`."""
+    fake = _fake_supabase(auth.CLIENT, 2, trust_rows=[
+        {"type": "deposit", "amount": 5000.00},
+        {"type": "invoice_payment", "amount": 5000.00},
+    ])
+    with patch("app.controllers.users.supabase", fake):
+        assert delete_user(2, ADMIN_PROFILE)["user_id"] == 2
 
 
 def test_delete_runs_the_cascade_and_clears_storage():

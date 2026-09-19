@@ -14,6 +14,7 @@ import CasesView from './views/CasesView'
 import DocumentsView from './views/DocumentsView'
 import BillingView from './views/BillingView'
 import ConflictSearchView from './views/ConflictSearchView'
+import TrustReconciliationView from './views/TrustReconciliationView'
 import NotificationsView from './views/NotificationsView'
 import ReportsView from './views/ReportsView'
 import AnalyticsView from './views/AnalyticsView'
@@ -22,7 +23,7 @@ import { listNotifications, markNotificationRead } from '../../api/client'
 import type { UserProfile, NotificationSummary } from '../../types/api'
 import styles from '../../components/AppShell.module.css'
 
-type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'billing' | 'conflicts' | 'notifications' | 'reports' | 'analytics' | 'settings'
+type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'billing' | 'trust' | 'conflicts' | 'notifications' | 'reports' | 'analytics' | 'settings'
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Admin', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
 
@@ -47,6 +48,7 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
   { key: 'cases', label: 'Cases', icon: 'scale' },
   { key: 'documents', label: 'Documents', icon: 'file-text' },
   { key: 'billing', label: 'Billing', icon: 'receipt' },
+  { key: 'trust', label: 'Trust', icon: 'shield' },
   { key: 'conflicts', label: 'Conflict Search', icon: 'shield' },
   { key: 'reports', label: 'Reports', icon: 'bar-chart-2' },
   { key: 'analytics', label: 'Analytics', icon: 'pie-chart' },
@@ -54,7 +56,8 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
 
 /**
  * Renders admin sidebar nav + topbar, and swaps in `DashboardView`, `UsersView`,
- * `CasesView`, `DocumentsView`, `ReportsView`, `AnalyticsView`, or `SettingsView`
+ * `CasesView`, `DocumentsView`, `TrustReconciliationView`, `ReportsView`, `AnalyticsView`,
+ * or `SettingsView`
  * based on `activePage`. Handles notification read/logout, and shows a toast
  * (e.g. after `SettingsView` saves).
  */
@@ -173,6 +176,7 @@ export default function AdminConsolePage() {
           {activePage === 'cases' && <CasesView />}
           {activePage === 'documents' && <DocumentsView />}
           {activePage === 'billing' && <BillingView />}
+          {activePage === 'trust' && <TrustReconciliationView />}
           {activePage === 'conflicts' && <ConflictSearchView />}
           {activePage === 'notifications' && <NotificationsView notifications={notifications} onMarkRead={markRead} />}
           {activePage === 'reports' && <ReportsView onToast={showToast} />}

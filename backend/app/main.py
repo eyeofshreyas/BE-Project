@@ -101,6 +101,7 @@ app.include_router(esign_router)
 app.include_router(conflict_check_router)
 app.include_router(trust_router)
 app.include_router(invoice_trust_router)
+
 ROLE_IDS = {"lawyer": 2, "client": 3}
 
 # --- Schemas ---
