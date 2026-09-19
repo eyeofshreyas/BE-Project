@@ -53,7 +53,7 @@ def test_the_store_does_not_grow_once_per_visiting_ip_forever():
     import app.middleware.rate_limit as rl
 
     _hits.clear()
-    rl._last_sweep = 0.0
+    rl._last_sweep = float("-inf")
     dependency = rate_limit(10, 60)
     for i in range(rl._SWEEP_OVER_KEYS + 1):
         dependency(_fake_request(ip=f"10.{i // 65536}.{i // 256 % 256}.{i % 256}"))
@@ -78,7 +78,7 @@ def test_the_sweep_never_clears_someone_still_inside_their_window():
     import app.middleware.rate_limit as rl
 
     _hits.clear()
-    rl._last_sweep = 0.0
+    rl._last_sweep = float("-inf")
     slow = rate_limit(1, 3600)      # long window: one request an hour
     fast = rate_limit(10, 1)        # short window, and what triggers the sweep
 
@@ -105,7 +105,7 @@ def test_the_sweep_does_not_rescan_on_every_request():
     import app.middleware.rate_limit as rl
 
     _hits.clear()
-    rl._last_sweep = 0.0
+    rl._last_sweep = float("-inf")
     dependency = rate_limit(5, 3600)        # long window, so nothing ever goes stale
     for i in range(rl._SWEEP_OVER_KEYS + 100):
         dependency(_fake_request(ip=f"10.{i // 65536}.{i // 256 % 256}.{i % 256}"))

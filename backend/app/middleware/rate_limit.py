@@ -23,7 +23,11 @@ _SWEEP_OVER_KEYS = 10_000
 # collectable. Rate-limiting the sweep makes it O(n) per minute instead of O(n) per
 # request; stale keys linger up to a minute longer, which costs nothing.
 _SWEEP_EVERY_SECONDS = 60.0
-_last_sweep = 0.0
+# -inf, not 0.0: time.monotonic()'s origin is arbitrary (on Linux it's host uptime), so
+# a zero start makes "has the interval elapsed" depend on how long the machine has been
+# up -- on a freshly booted one the first sweep is silently deferred until uptime passes
+# the interval. -inf says "never swept" independently of where the clock starts.
+_last_sweep = float("-inf")
 
 # The longest window any route registered. The sweep has to measure staleness
 # against that rather than the window of whichever route happened to trigger it,
