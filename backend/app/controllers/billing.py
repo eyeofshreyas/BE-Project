@@ -19,6 +19,9 @@ from app.models.billing import (
 RAZORPAY_API = "https://api.razorpay.com/v1"
 RAZORPAY_METHOD_LABELS = {"card": "Credit/Debit Card", "netbanking": "Net Banking", "upi": "UPI", "wallet": "Wallet", "emi": "EMI"}
 
+# ponytail: hard cap, not real pagination -- same reasoning as cases.MAX_CASES.
+MAX_INVOICES = 1000
+
 INVOICES_SELECT = (
     "invoice_id,invoice_number,amount,tax,total_amount,issue_date,due_date,payment_status,remarks,case_id,"
     "cases(case_number,clients(users(full_name)))"
@@ -111,7 +114,7 @@ def list_invoices(profile: dict = Depends(get_current_profile)):
     query = supabase.table("invoices").select(INVOICES_SELECT)
     if case_ids is not None:
         query = query.in_("case_id", list(case_ids))
-    rows = query.order("invoice_id", desc=True).execute().data
+    rows = query.order("invoice_id", desc=True).limit(MAX_INVOICES).execute().data
     return [_to_invoice_summary(row) for row in rows]
 
 

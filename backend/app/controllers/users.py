@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 USERS_SELECT = "user_id,full_name,email,phone,is_active,created_at,roles(role_name)"
 
+# ponytail: hard cap, not real pagination -- same reasoning as cases.MAX_CASES. Matters
+# most for the super-admin's platform-wide branch below; an org admin's is already
+# scoped to their own org.
+MAX_USERS = 1000
+
 
 def _to_user_summary(row: dict, suspended: bool = False, specialization: str | None = None) -> dict:
     """Shape a raw `users` row (joined with roles) into the UserSummary dict. `suspended`
@@ -54,7 +59,7 @@ def list_users(role: str | None = None, profile: dict = Depends(require_roles(AD
     query = supabase.table("users").select(USERS_SELECT)
     if profile["role_id"] == ADMIN:
         query = query.eq("org_id", profile["org_id"])
-    rows = query.order("created_at", desc=True).execute().data
+    rows = query.order("created_at", desc=True).limit(MAX_USERS).execute().data
 
     suspended_client_ids: set[int] = set()
     if profile["role_id"] == ADMIN:

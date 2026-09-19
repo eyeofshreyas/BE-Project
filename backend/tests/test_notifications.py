@@ -37,7 +37,7 @@ def _fake(owner_row, list_rows=(), filters_sink=None, updated_sink=None):
                 inner = MagicMock()
                 inner.eq.side_effect = eq
                 inner.execute.return_value.data = [owner_row] if owner_row else []
-                inner.order.return_value.execute.return_value.data = list(list_rows)
+                inner.order.return_value.limit.return_value.execute.return_value.data = list(list_rows)
                 return inner
             sel.eq.side_effect = eq
             return sel

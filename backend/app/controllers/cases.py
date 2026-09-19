@@ -7,6 +7,11 @@ from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, SUPER_ADMIN, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
 from app.models.cases import AddLawyerRequest, CaseCreate, CaseSummary
 
+# ponytail: hard cap, not real pagination -- an org/lawyer/client's own scope is naturally
+# bounded, but the super-admin's unrestricted view (case_ids=None) is a full-platform scan
+# with no limit otherwise. Add cursor pagination if the case list ever needs "load more".
+MAX_CASES = 1000
+
 CASES_SELECT = (
     "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,description,"
     "cnr_number,ecourts_status,ecourts_last_synced_at,"
@@ -81,7 +86,7 @@ def list_cases(profile: dict = Depends(get_current_profile)):
     query = supabase.table("cases").select(CASES_SELECT)
     if case_ids is not None:
         query = query.in_("case_id", list(case_ids))
-    rows = query.order("case_id").execute().data
+    rows = query.order("case_id").limit(MAX_CASES).execute().data
     return [_to_case_summary(row) for row in rows]
 
 

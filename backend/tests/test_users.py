@@ -76,7 +76,7 @@ def test_org_admin_sees_clients_with_a_case_in_their_org():
         if name == "users":
             def select(*args, **kwargs):
                 sel = MagicMock()
-                sel.eq.return_value.order.return_value.execute.return_value.data = []
+                sel.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = []
                 sel.in_.return_value.execute.return_value.data = [client_user_row]
                 return sel
             m.select.side_effect = select
@@ -186,7 +186,7 @@ def test_list_users_includes_lawyer_specialization():
             return tables[name]
         m = MagicMock()
         if name == "users":
-            m.select.return_value.eq.return_value.order.return_value.execute.return_value.data = [lawyer_row]
+            m.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = [lawyer_row]
         elif name == "cases":
             m.select.return_value.eq.return_value.execute.return_value.data = []
         elif name == "lawyers":

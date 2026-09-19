@@ -7,6 +7,11 @@ from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, CLIENT, LAWYER, SUPER_ADMIN, require_roles
 
 CLIENTS_SELECT = "client_id,address,preferred_language,users(full_name,email,phone)"
+
+# ponytail: hard cap, not real pagination -- same reasoning as cases.MAX_CASES. Matters
+# most for the super-admin's platform-wide branch below; the org/lawyer branches are
+# already bounded by their own client_id list.
+MAX_CLIENTS = 1000
 CLOSED_STATUSES = {"Completed", "Closed"}
 ACTIVE_STATUSES = {"Open", "In Progress"}
 
@@ -33,7 +38,7 @@ def list_clients(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYE
     with computed active-case count, status, and pending invoice amount. Calls:
     `_to_client_summary()`."""
     if profile["role_id"] == SUPER_ADMIN:
-        client_rows = supabase.table("clients").select(CLIENTS_SELECT).execute().data
+        client_rows = supabase.table("clients").select(CLIENTS_SELECT).limit(MAX_CLIENTS).execute().data
     elif profile["role_id"] == ADMIN:
         case_rows = supabase.table("cases").select("client_id").eq("org_id", profile["org_id"]).execute().data
         client_ids = list({r["client_id"] for r in case_rows if r["client_id"]})

@@ -7,6 +7,11 @@ from app.models.notifications import NotificationSummary
 
 NOTIFICATIONS_SELECT = "notification_id,case_id,title,message,notification_type,is_read,created_at,cases(case_number)"
 
+# ponytail: hard cap, not real pagination -- this is a recent-activity feed, not a
+# searchable archive, and nothing prunes old rows. Without a cap this grows forever
+# per user. Add cursor pagination if a "view older" UI ever gets built.
+MAX_NOTIFICATIONS = 200
+
 
 def _to_notification(row: dict) -> dict:
     """Shape a raw `notifications` row (joined with cases) into the NotificationSummary dict."""
@@ -28,7 +33,7 @@ def list_notifications(unread_only: bool = False, profile: dict = Depends(get_cu
     query = supabase.table("notifications").select(NOTIFICATIONS_SELECT).eq("user_id", profile["user_id"])
     if unread_only:
         query = query.eq("is_read", False)
-    rows = query.order("created_at", desc=True).execute().data
+    rows = query.order("created_at", desc=True).limit(MAX_NOTIFICATIONS).execute().data
     return [_to_notification(row) for row in rows]
 
 
