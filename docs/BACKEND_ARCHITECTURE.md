@@ -191,6 +191,7 @@ into `case_ai_summaries`.
 | Conveyancing matters | `routes/conveyancing.py` | `controllers/conveyancing.py` | `models/conveyancing.py` |
 | Documents | `routes/documents.py` | `controllers/documents.py` | `models/documents.py` |
 | Billing (invoices/payments/expenses) | `routes/billing.py` | `controllers/billing.py` | `models/billing.py` |
+| Trust accounting (client money/reconciliation) | `routes/trust.py` | `controllers/trust.py` | `models/trust.py` |
 | Meetings | `routes/meetings.py` | `controllers/meetings.py` | `models/meetings.py` |
 | Hearings | `routes/hearings.py` | `controllers/hearings.py` | `models/hearings.py` |
 | Judgements | `routes/judgements.py` | `controllers/judgements.py` | `models/judgements.py` |

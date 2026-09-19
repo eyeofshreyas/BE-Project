@@ -8,14 +8,22 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.controllers.trust import (
-    BankStatementCreate,
-    TrustTransactionCreate,
     create_bank_statement,
     create_trust_transaction,
     get_client_balance,
     get_client_ledger,
     get_reconciliation,
     pay_invoice_from_trust,
+)
+from app.models.trust import (
+    BankStatementCreate,
+    BankStatementSummary,
+    TrustBalance,
+    TrustLedger,
+    TrustPayment,
+    TrustReconciliation,
+    TrustTransactionCreate,
+    TrustTransactionSummary,
 )
 
 LAWYER_PROFILE = {"user_id": 7, "role_id": 2, "full_name": "Test Lawyer", "org_id": 10}
@@ -41,9 +49,11 @@ class TestCreateTrustTransaction:
     def test_deposit_succeeds_and_is_stamped_with_the_callers_firm(self, mock_supabase, _access):
         inserted = {}
         mock_supabase.table.return_value.insert.side_effect = lambda row: (
-            inserted.update(row) or MagicMock(execute=lambda: MagicMock(data=[{"id": 42, **row}]))
+            inserted.update(row)
+            or MagicMock(execute=lambda: MagicMock(data=[{"id": 42, "created_at": "2026-09-18T12:00:00Z", **row}]))
         )
         result = create_trust_transaction(deposit(), LAWYER_PROFILE)
+        TrustTransactionSummary(**result)     # the shape routes/trust.py declares
         assert result["type"] == "deposit"
         assert inserted["org_id"] == 10
         assert inserted["created_by"] == 7
@@ -105,9 +115,10 @@ class TestOverdraftGuard:
     @patch("app.controllers.trust.supabase")
     def test_disbursement_exactly_equal_to_balance_succeeds(self, mock_supabase, _access, _balance):
         """Edge case: spending the last rupee is allowed."""
-        mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [
-            {"id": 1, "type": "disbursement", "amount": 300.00}
-        ]
+        mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [{
+            "id": 1, "client_id": 1, "case_id": None, "type": "disbursement", "amount": 300.00,
+            "transaction_date": "2026-09-18", "description": None, "created_at": "2026-09-18T12:00:00Z",
+        }]
         result = create_trust_transaction(deposit(type="disbursement", amount=300.00), LAWYER_PROFILE)
         assert result["type"] == "disbursement"
 
@@ -135,6 +146,7 @@ class TestClientBalance:
     @patch("app.controllers.trust._ensure_client_access")
     def test_balance_returned_for_the_callers_firm(self, _access, _balance):
         result = get_client_balance(1, None, LAWYER_PROFILE)
+        TrustBalance(**result)
         assert result == {"client_id": 1, "org_id": 10, "balance": 2750.50}
 
     @patch("app.controllers.trust.get_scoped_case_ids", return_value=set())
@@ -148,7 +160,7 @@ class TestClientBalance:
     def test_ledger_is_filtered_to_the_callers_firm(self, mock_supabase, _access):
         chain = mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value
         chain.order.return_value.order.return_value.execute.return_value.data = []
-        get_client_ledger(1, None, LAWYER_PROFILE)
+        TrustLedger(**get_client_ledger(1, None, LAWYER_PROFILE))
         # client_id then org_id
         eq_calls = mock_supabase.table.return_value.select.return_value.eq.call_args_list
         assert eq_calls[0].args == ("client_id", 1)
@@ -189,6 +201,7 @@ class TestPayInvoiceFromTrust:
         """An invoice part-paid by Razorpay must not be charged in full again from trust."""
         tables = _invoice_table(mock_supabase, total_amount=1000.00, payment_status="Partially Paid")
         result = pay_invoice_from_trust(99, LAWYER_PROFILE)
+        TrustPayment(**result)
         assert result["amount_paid"] == 400.00
         assert tables["trust_transactions"].insert.call_args.args[0]["amount"] == 400.00
 
@@ -268,6 +281,7 @@ class TestReconciliation:
             {"id": 2, "type": "deposit", "amount": 1000.00, "client_id": 2, "running_balance": 3000.00, "transaction_date": "2026-09-03"},
         ])
         result = get_reconciliation(date(2026, 9, 18), None, ADMIN_PROFILE)
+        TrustReconciliation(**result)
         assert result["bank_balance"] == 3000.00
         assert result["ledger_total"] == 3000.00
         assert result["client_total"] == 3000.00
@@ -320,12 +334,13 @@ class TestBankStatement:
     def test_statement_is_stamped_with_the_callers_firm(self, mock_supabase):
         inserted = {}
         mock_supabase.table.return_value.insert.side_effect = lambda row: (
-            inserted.update(row) or MagicMock(execute=lambda: MagicMock(data=[row]))
+            inserted.update(row) or MagicMock(execute=lambda: MagicMock(data=[{"id": 9, **row}]))
         )
-        create_bank_statement(
+        result = create_bank_statement(
             BankStatementCreate(statement_date=date(2026, 9, 1), bank_balance=3000.00),
             ADMIN_PROFILE,
         )
+        BankStatementSummary(**result)
         assert inserted["org_id"] == 10
         assert inserted["recorded_by"] == 3
 

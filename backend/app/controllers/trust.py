@@ -8,50 +8,48 @@ here is org-scoped -- a client's "balance" is always their balance *with this fi
 from datetime import date
 
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel, Field
-
 from app.controllers.billing import _amount_due, _recompute_invoice_status
 from app.db.supabase_client import supabase
-from app.middleware.auth import (
-    ADMIN,
-    SUPER_ADMIN,
-    LAWYER,
-    ensure_case_access,
-    get_scoped_case_ids,
-    require_roles,
-)
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, get_scoped_case_ids, require_roles
+from app.models.trust import TrustTransactionCreate, BankStatementCreate
 
-# ─────────────────────────────────────────────────────────────
-# Pydantic schemas
-# ─────────────────────────────────────────────────────────────
+TRUST_SELECT = "id,client_id,case_id,type,amount,transaction_date,description,created_at"
 
-class TrustTransactionCreate(BaseModel):
-    client_id: int
-    case_id: int | None = None
-    type: str                   # "deposit" or "disbursement"
-    amount: float = Field(gt=0)
-    transaction_date: date
-    description: str | None = None
-    org_id: int | None = None   # super-admin only; everyone else posts to their own firm
-
-
-class BankStatementCreate(BaseModel):
-    statement_date: date
-    bank_balance: float = Field(ge=0)
-    notes: str | None = None
-    org_id: int | None = None
-
-
-# ─────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────
-
+# `invoice_payment` is not here on purpose: those rows only ever come from
+# pay_invoice_from_trust(), so the ledger can't claim an invoice was settled when it wasn't.
 WRITE_TYPES = {"deposit", "disbursement"}
 
 # Postgres raises this from the trust_guard_and_stamp trigger when an insert would take a
 # client's balance below zero -- the backstop for the controller's own check, which is
 # read-then-write and so can be raced by a concurrent disbursement.
 _NEGATIVE_BALANCE_SQLSTATE = "23514"
+
+
+def _to_trust_transaction_summary(row: dict) -> dict:
+    """Shape a raw `trust_transactions` row into the TrustTransactionSummary dict. The
+    stamped `running_balance` is deliberately not exposed -- it's a control figure for
+    `get_reconciliation()`, not a per-entry fact anyone should be reading off the ledger."""
+    return {
+        "id": row["id"],
+        "client_id": row["client_id"],
+        "case_id": row["case_id"],
+        "type": row["type"],
+        "amount": row["amount"],
+        "transaction_date": row["transaction_date"],
+        "description": row["description"],
+        "created_at": row["created_at"],
+    }
+
+
+def _to_bank_statement_summary(row: dict) -> dict:
+    """Shape a raw `trust_bank_statements` row into the BankStatementSummary dict."""
+    return {
+        "id": row["id"],
+        "org_id": row["org_id"],
+        "statement_date": row["statement_date"],
+        "bank_balance": row["bank_balance"],
+        "notes": row["notes"],
+    }
 
 
 def _scope_org(profile: dict, org_id: int | None) -> int:
@@ -134,9 +132,8 @@ def create_trust_transaction(
     profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER)),
 ):
     """Record a deposit or disbursement against a client's trust account at the caller's
-    firm. `invoice_payment` entries are not accepted here -- those only ever come from
-    `pay_invoice_from_trust()`, so the ledger can't claim an invoice was settled when it
-    wasn't. Calls: `_scope_org()`, `_ensure_client_access()`, `_get_balance()`."""
+    firm. Calls: `_scope_org()`, `_ensure_client_access()`, `_get_balance()`,
+    `_insert_transaction()`, `_to_trust_transaction_summary()`."""
 
     if data.type not in WRITE_TYPES:
         raise HTTPException(status_code=400, detail=f"type must be one of: {', '.join(sorted(WRITE_TYPES))}")
@@ -163,7 +160,7 @@ def create_trust_transaction(
                 },
             )
 
-    return _insert_transaction({
+    return _to_trust_transaction_summary(_insert_transaction({
         "org_id": org_id,
         "client_id": data.client_id,
         "case_id": data.case_id,
@@ -172,7 +169,7 @@ def create_trust_transaction(
         "transaction_date": data.transaction_date.isoformat(),
         "description": data.description,
         "created_by": profile["user_id"],
-    })
+    }))
 
 
 # ─────────────────────────────────────────────────────────────
@@ -185,13 +182,13 @@ def get_client_ledger(
     profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER)),
 ):
     """This client's trust ledger at the caller's firm, newest first. Calls: `_scope_org()`,
-    `_ensure_client_access()`."""
+    `_ensure_client_access()`, `_to_trust_transaction_summary()`."""
     org = _scope_org(profile, org_id)
     _ensure_client_access(client_id, org, profile)
 
     rows = (
         supabase.table("trust_transactions")
-        .select("*")
+        .select(TRUST_SELECT)
         .eq("client_id", client_id)
         .eq("org_id", org)
         .order("transaction_date", desc=True)
@@ -199,7 +196,11 @@ def get_client_ledger(
         .execute()
         .data
     )
-    return {"client_id": client_id, "org_id": org, "transactions": rows}
+    return {
+        "client_id": client_id,
+        "org_id": org,
+        "transactions": [_to_trust_transaction_summary(r) for r in rows],
+    }
 
 
 # ─────────────────────────────────────────────────────────────
@@ -388,12 +389,14 @@ def create_bank_statement(
     profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN)),
 ):
     """Record what the bank says the firm's trust account held on a date -- leg 1 of the
-    reconciliation, entered by hand until there's a bank feed. Calls: `_scope_org()`."""
+    reconciliation, entered by hand until there's a bank feed. Calls: `_scope_org()`,
+    `_to_bank_statement_summary()`."""
     org = _scope_org(profile, data.org_id)
-    return supabase.table("trust_bank_statements").insert({
+    row = supabase.table("trust_bank_statements").insert({
         "org_id": org,
         "statement_date": data.statement_date.isoformat(),
         "bank_balance": data.bank_balance,
         "notes": data.notes,
         "recorded_by": profile["user_id"],
     }).execute().data[0]
+    return _to_bank_statement_summary(row)
