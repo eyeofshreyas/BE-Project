@@ -53,6 +53,7 @@ def test_the_store_does_not_grow_once_per_visiting_ip_forever():
     import app.middleware.rate_limit as rl
 
     _hits.clear()
+    rl._last_sweep = float("-inf")
     dependency = rate_limit(10, 60)
     for i in range(rl._SWEEP_OVER_KEYS + 1):
         dependency(_fake_request(ip=f"10.{i // 65536}.{i // 256 % 256}.{i % 256}"))
@@ -77,6 +78,7 @@ def test_the_sweep_never_clears_someone_still_inside_their_window():
     import app.middleware.rate_limit as rl
 
     _hits.clear()
+    rl._last_sweep = float("-inf")
     slow = rate_limit(1, 3600)      # long window: one request an hour
     fast = rate_limit(10, 1)        # short window, and what triggers the sweep
 
@@ -93,10 +95,36 @@ def test_the_sweep_never_clears_someone_still_inside_their_window():
         assert e.status_code == 429
 
 
+def test_the_sweep_does_not_rescan_on_every_request():
+    """Verifies the full scan is rate-limited by a clock, not just by the store's size.
+    The trigger is a size, so without one the scan repeats on every single request for as
+    long as the store stays large -- and the store is large precisely when a flood from
+    many IPs is in progress, so the limiter does its most expensive work, under a global
+    lock, at its worst moment, reclaiming nothing because live keys aren't collectable.
+    Exercises: `rate_limit.rate_limit()`."""
+    import app.middleware.rate_limit as rl
+
+    _hits.clear()
+    rl._last_sweep = float("-inf")
+    dependency = rate_limit(5, 3600)        # long window, so nothing ever goes stale
+    for i in range(rl._SWEEP_OVER_KEYS + 100):
+        dependency(_fake_request(ip=f"10.{i // 65536}.{i // 256 % 256}.{i % 256}"))
+
+    assert len(_hits) > rl._SWEEP_OVER_KEYS, "live keys are not collectable, nothing should be reclaimed"
+    swept_at = rl._last_sweep
+    assert swept_at > 0, "expected one sweep once the store passed the threshold"
+
+    for i in range(200):
+        j = rl._SWEEP_OVER_KEYS + 1_000 + i
+        dependency(_fake_request(ip=f"20.{j // 65536}.{j // 256 % 256}.{j % 256}"))
+    assert rl._last_sweep == swept_at, "the sweep re-ran while the store was still large"
+
+
 if __name__ == "__main__":
     test_allows_requests_under_the_limit()
     test_blocks_requests_over_the_limit()
     test_tracks_ips_and_routes_independently()
     test_the_store_does_not_grow_once_per_visiting_ip_forever()
     test_the_sweep_never_clears_someone_still_inside_their_window()
+    test_the_sweep_does_not_rescan_on_every_request()
     print("ok")
