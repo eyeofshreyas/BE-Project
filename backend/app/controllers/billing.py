@@ -3,10 +3,12 @@
 import hashlib
 import hmac
 from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
 
 import httpx
 from fastapi import Depends, HTTPException
 from app.core.config import RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
+from app.core.money import money, to_float
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.billing import (
@@ -46,22 +48,24 @@ def _to_expense_summary(row: dict) -> dict:
     }
 
 
-def _total_paid(invoice_id: int) -> float:
-    """Sum of an invoice's Completed payments."""
+def _total_paid(invoice_id: int) -> Decimal:
+    """Sum of an invoice's Completed payments, as an exact Decimal -- summing the raw floats
+    Supabase returns would drift after enough rows."""
     paid = supabase.table("payments").select("amount").eq("invoice_id", invoice_id).eq("payment_status", "Completed").execute().data
-    return sum(p["amount"] for p in paid)
+    return sum((money(p["amount"]) for p in paid), Decimal("0"))
 
 
-def _amount_due(invoice_id: int, total_amount: float) -> float:
+def _amount_due(invoice_id: int, total_amount) -> Decimal:
     """What's still outstanding on an invoice. Every path that collects money goes through
     this -- `create_payment()`, `create_razorpay_order()`, and trust's
     `pay_invoice_from_trust()` -- so none of them can charge against the full total when
     part of it has already been paid. Calls: `_total_paid()`."""
-    return total_amount - _total_paid(invoice_id)
+    return money(total_amount) - _total_paid(invoice_id)
 
 
-def _invoice_status_for(total_paid: float, total_amount: float) -> str:
+def _invoice_status_for(total_paid: Decimal, total_amount) -> str:
     """Derive payment_status ("Paid"/"Partially Paid"/"Pending") from amount paid vs. owed."""
+    total_amount = money(total_amount)
     if total_paid >= total_amount:
         return "Paid"
     if total_paid > 0:
@@ -176,7 +180,7 @@ def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(AD
     # A payment can't exceed what's still outstanding -- without this the invoice silently
     # goes to Paid on any amount, and the books show more collected than was ever billed.
     due = _amount_due(data.invoice_id, invoice["total_amount"])
-    if data.payment_status == "Completed" and data.amount > due:
+    if data.payment_status == "Completed" and money(data.amount) > due:
         raise HTTPException(
             status_code=400,
             detail=f"That is more than this invoice has outstanding ({due:.2f}).",
@@ -214,10 +218,11 @@ def create_razorpay_order(invoice_id: int, profile: dict = Depends(get_current_p
     if due <= 0:
         raise HTTPException(status_code=400, detail="This invoice is already paid.")
 
+    paise = int((due * 100).to_integral_value(rounding=ROUND_HALF_UP))
     resp = httpx.post(
         f"{RAZORPAY_API}/orders",
         auth=(key_id, key_secret),
-        json={"amount": round(due * 100), "currency": "INR", "receipt": invoice["invoice_number"]},
+        json={"amount": paise, "currency": "INR", "receipt": invoice["invoice_number"]},
         timeout=15,
     )
     if resp.status_code >= 400:
@@ -257,7 +262,7 @@ def verify_razorpay_payment(invoice_id: int, data: RazorpayVerify, profile: dict
 
     row = supabase.table("payments").insert({
         "invoice_id": invoice_id,
-        "amount": payment["amount"] / 100,
+        "amount": to_float(money(payment["amount"]) / 100),
         "payment_method": RAZORPAY_METHOD_LABELS.get(payment.get("method"), payment.get("method")),
         "transaction_reference": data.razorpay_payment_id,
         "payment_date": datetime.now(timezone.utc).date().isoformat(),

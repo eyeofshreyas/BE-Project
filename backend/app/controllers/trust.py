@@ -6,9 +6,11 @@ Trust money is held per firm. A client can retain several firms (see `org_client
 here is org-scoped -- a client's "balance" is always their balance *with this firm*."""
 
 from datetime import date
+from decimal import Decimal
 
 from fastapi import Depends, HTTPException
 from app.controllers.billing import _amount_due, _recompute_invoice_status
+from app.core.money import money, to_float
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, get_scoped_case_ids, require_roles
 from app.models.trust import TrustTransactionCreate, BankStatementCreate
@@ -85,14 +87,16 @@ def _ensure_client_access(client_id: int, org_id: int, profile: dict) -> None:
         raise HTTPException(status_code=403, detail="You don't have access to this client")
 
 
-def _balance_of(rows: list[dict]) -> float:
-    """Deposits minus everything that left the account, over the rows given."""
-    return round(
-        sum(r["amount"] if r["type"] == "deposit" else -r["amount"] for r in rows), 2
+def _balance_of(rows: list[dict]) -> Decimal:
+    """Deposits minus everything that left the account, over the rows given. Exact Decimal --
+    summing the raw floats Supabase returns would drift after enough transactions."""
+    return sum(
+        (money(r["amount"]) if r["type"] == "deposit" else -money(r["amount"]) for r in rows),
+        Decimal("0"),
     )
 
 
-def _get_balance(client_id: int, org_id: int) -> float:
+def _get_balance(client_id: int, org_id: int) -> Decimal:
     """Current trust balance for a client at one firm. Derived from the ledger every time --
     never stored -- so it can't drift out of sync with the transactions behind it."""
     rows = (
@@ -148,12 +152,12 @@ def create_trust_transaction(
     # is the one that holds under concurrency).
     if data.type == "disbursement":
         balance = _get_balance(data.client_id, org_id)
-        if data.amount > balance:
+        if money(data.amount) > balance:
             raise HTTPException(
                 status_code=422,
                 detail={
                     "error": "Insufficient trust funds",
-                    "available": balance,
+                    "available": to_float(balance),
                     "requested": data.amount,
                 },
             )
@@ -214,7 +218,7 @@ def get_client_balance(
     `_ensure_client_access()`, `_get_balance()`."""
     org = _scope_org(profile, org_id)
     _ensure_client_access(client_id, org, profile)
-    return {"client_id": client_id, "org_id": org, "balance": _get_balance(client_id, org)}
+    return {"client_id": client_id, "org_id": org, "balance": to_float(_get_balance(client_id, org))}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -257,10 +261,12 @@ def pay_invoice_from_trust(
             status_code=422,
             detail={
                 "error": "Insufficient trust funds to pay this invoice",
-                "available": balance,
-                "amount_due": due,
+                "available": to_float(balance),
+                "amount_due": to_float(due),
             },
         )
+
+    due_amount = to_float(due)
 
     # Debit trust first: if the payments insert below fails, the client is left holding
     # money the firm hasn't taken, which is the safe side of the error to be on.
@@ -269,7 +275,7 @@ def pay_invoice_from_trust(
         "client_id": client_id,
         "case_id": invoice["case_id"],
         "type": "invoice_payment",
-        "amount": due,
+        "amount": due_amount,
         "transaction_date": date.today().isoformat(),
         "description": f"Payment for invoice #{invoice_id}",
         "reference_id": invoice_id,
@@ -281,7 +287,7 @@ def pay_invoice_from_trust(
     # no payment row reverts to Pending the next time anything recomputes it.
     supabase.table("payments").insert({
         "invoice_id": invoice_id,
-        "amount": due,
+        "amount": due_amount,
         "payment_method": "Trust Account",
         "transaction_reference": f"trust:{trust_row['id']}",
         "payment_date": date.today().isoformat(),
@@ -292,8 +298,8 @@ def pay_invoice_from_trust(
     return {
         "invoice_id": invoice_id,
         "client_id": client_id,
-        "amount_paid": due,
-        "remaining_trust_balance": _get_balance(client_id, org_id),
+        "amount_paid": due_amount,
+        "remaining_trust_balance": to_float(_get_balance(client_id, org_id)),
     }
 
 
@@ -346,7 +352,7 @@ def get_reconciliation(
         .execute()
         .data
     )
-    ledger_total = round(sum(r["total"] for r in control_rows), 2)
+    ledger_total = sum((money(r["total"]) for r in control_rows), Decimal("0"))
 
     # ── Leg 3: sum of the client subledgers, recomputed from the amounts ──
     tx_rows = (
@@ -361,11 +367,11 @@ def get_reconciliation(
     for r in tx_rows:
         by_client.setdefault(r["client_id"], []).append(r)
     client_balances = {cid: _balance_of(rows) for cid, rows in by_client.items()}
-    client_total = round(sum(client_balances.values()), 2)
+    client_total = sum(client_balances.values(), Decimal("0"))
 
     reconciled = (
         bank_balance is not None
-        and round(bank_balance, 2) == ledger_total
+        and money(bank_balance) == ledger_total
         and client_total == ledger_total
     )
 
@@ -374,11 +380,11 @@ def get_reconciliation(
         "org_id": org,
         "bank_balance": bank_balance,
         "bank_statement_date": bank_statement_date,
-        "ledger_total": ledger_total,
-        "client_total": client_total,
+        "ledger_total": to_float(ledger_total),
+        "client_total": to_float(client_total),
         "reconciled": reconciled,
         "client_balances": [
-            {"client_id": cid, "balance": bal} for cid, bal in sorted(client_balances.items())
+            {"client_id": cid, "balance": to_float(bal)} for cid, bal in sorted(client_balances.items())
         ],
     }
 
