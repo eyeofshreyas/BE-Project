@@ -4,8 +4,7 @@
  * rest of the app (and looked broken once its fake sections were removed, since its
  * min-height:100vh shell assumed a lot more content than four small cards).
  * Profile (name/phone via `updateOwnProfile()`) and password-reset (`forgotPassword()`)
- * are real, mirroring the admin console's own Settings tab (`admin/views/SettingsView.tsx`).
- * Appearance is a per-browser preference only -- there's no dark palette rendered yet. */
+ * are real, mirroring the admin console's own Settings tab (`admin/views/SettingsView.tsx`). */
 import { useState } from 'react'
 import { Icon, type IconName } from '../../components/icons'
 import { C } from '../../components/theme'
@@ -13,15 +12,11 @@ import { forgotPassword, updateOwnProfile } from '../../api/client'
 import type { UserProfile } from '../../types/api'
 import styles from '../../components/AppShell.module.css'
 
-const THEME_KEY = 'lexflow_theme'
 const ROLE_LABELS: Record<number, string> = { 2: 'Lawyer', 3: 'Client' }
-
-type Theme = 'Light' | 'Dark' | 'System'
 
 const MENU: { key: string; label: string; icon: IconName }[] = [
   { key: 'profile', label: 'Profile', icon: 'user' },
   { key: 'security', label: 'Security', icon: 'shield' },
-  { key: 'appearance', label: 'Appearance', icon: 'palette' },
   { key: 'about', label: 'About', icon: 'info' },
 ]
 
@@ -43,7 +38,7 @@ function initialsOf(name: string) {
 /**
  * Left-nav-switched settings panels, structurally identical to the admin console's own
  * Settings tab. Profile fields seed from the cached `lexflow_profile`; "Save Changes"
- * writes name/phone back via `updateOwnProfile()` and the theme choice to `localStorage`.
+ * writes name/phone back via `updateOwnProfile()`.
  */
 export default function SettingsPage() {
   const [profile, setProfile] = useState<UserProfile | null>(loadProfile)
@@ -52,7 +47,6 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState(profile?.phone ?? '')
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem(THEME_KEY) as Theme | null) ?? 'Light')
 
   function showToast(msg: string) {
     setToast(msg)
@@ -62,7 +56,6 @@ export default function SettingsPage() {
   function reset() {
     setFullName(profile?.full_name ?? '')
     setPhone(profile?.phone ?? '')
-    setTheme((localStorage.getItem(THEME_KEY) as Theme | null) ?? 'Light')
     showToast('Changes discarded.')
   }
 
@@ -75,7 +68,6 @@ export default function SettingsPage() {
         setProfile(merged)
         localStorage.setItem('lexflow_profile', JSON.stringify(merged))
       }
-      localStorage.setItem(THEME_KEY, theme)
       showToast('Settings saved.')
     } catch (e) {
       showToast((e as Error).message)
@@ -153,21 +145,6 @@ export default function SettingsPage() {
               <div style={rowLastStyle}>
                 <div><div style={rowTitle}>Password</div><div style={rowDesc}>Email a reset link to {profile?.email ?? 'your account'}.</div></div>
                 <div style={btnGhost} onClick={sendPasswordReset}>Send reset link</div>
-              </div>
-            </div>
-          )}
-
-          {tab === 'appearance' && (
-            <div style={cardStyle}>
-              <div className={styles.cardTitle}>Appearance</div>
-              <div>
-                <div style={fieldLabel}>Theme</div>
-                <div style={{ display: 'flex', gap: 6, background: '#F6F2E9', border: `1px solid ${C.border}`, borderRadius: 3, padding: 4 }}>
-                  {(['Light', 'Dark', 'System'] as const).map((t) => (
-                    <div key={t} style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 600, padding: 11, borderRadius: 3, cursor: 'pointer', background: theme === t ? C.primary : 'transparent', color: theme === t ? '#FCFAF4' : C.text }} onClick={() => setTheme(t)}>{t}</div>
-                  ))}
-                </div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Saved in this browser only.</div>
               </div>
             </div>
           )}
