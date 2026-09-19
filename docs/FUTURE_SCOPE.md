@@ -263,12 +263,6 @@ Step-by-step fixes, with test code, are in
   but not fatal — same stance as the storage cleanup beside it. Matching is by email;
   there's no UUID column linking the two (see the note at the top of `seed.sql`).
 
-- **Signup rollback deletes the parent first, and skips `clients`** — `app/main.py:232`.
-  `_rollback_org()` (`main.py:127`) documents exactly why children go first; the rollback
-  below it deletes `users` before `lawyers`, so an FK violation escapes the `except` block
-  and masks the real error. The client branch has no `clients` delete at all, stranding
-  that row. **Fix:** delete `lawyers`/`clients` first, then `users`, then `_rollback_org()`.
-
 - **`/ai/summarize` reads soft-deleted documents** — `app/ml/summarize.py:46`. Download
   and summary-fetch both filter `is_deleted=False`; this query doesn't, so a deleted
   document is still pulled out of storage and summarized during the reaper's grace window.

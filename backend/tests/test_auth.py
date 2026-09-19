@@ -195,24 +195,30 @@ def test_login_reports_unconfirmed_email_distinctly():
             assert "confirm" in e.detail.lower()
 
 
-def test_signup_reports_duplicate_email_distinctly():
-    """Verifies a duplicate-email signup raises 409 with an "already exists" message, via a mocked unique-constraint Postgrest error. Exercises: `POST /signup` (`main.signup()`)."""
+def _fake_signup_supabase(lawyer_invite_rows=None, rpc_side_effect=None, rpc_return_value=None):
+    """A fake supabase client for signup(): auth.sign_up() succeeds, lawyer_invites (the
+    pre-check) returns lawyer_invite_rows, and rpc("complete_signup", ...) either raises
+    rpc_side_effect or returns rpc_return_value. Since the whole profile-creation sequence
+    is now one RPC call (see migrate_signup_transaction.sql), that's the only thing left to
+    mock here -- there's no per-table insert/rollback sequence in Python anymore."""
     fake = MagicMock()
     fake.auth.sign_up.return_value = None
+    fake.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = lawyer_invite_rows or []
+    if rpc_side_effect is not None:
+        fake.rpc.return_value.execute.side_effect = rpc_side_effect
+    else:
+        fake.rpc.return_value.execute.return_value = MagicMock(data=rpc_return_value)
+    return fake
 
-    def table(name):
-        t = MagicMock()
-        if name == "lawyer_invites":
-            t.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"invite_id": 1, "org_id": 1}]
-        else:
-            t.insert.return_value.execute.side_effect = PostgrestAPIError({
-                "message": "duplicate key value violates unique constraint \"users_email_key\"",
-                "code": "23505", "hint": None, "details": None,
-            })
-        return t
 
-    fake.table.side_effect = table
-    payload = SignupRequest(email="dup@example.com", password="whatever123", full_name="Dup User", phone="9000000000", role="lawyer")
+def test_signup_reports_duplicate_email_distinctly():
+    """Verifies a duplicate-email signup raises 409 with an "already exists" message, when
+    complete_signup() raises its 'duplicate_email' error. Exercises: `POST /signup`
+    (`main.signup()`)."""
+    fake = _fake_signup_supabase(rpc_side_effect=PostgrestAPIError({
+        "message": "duplicate_email", "code": "P0001", "hint": None, "details": None,
+    }))
+    payload = SignupRequest(email="dup@example.com", password="whatever123", full_name="Dup User", phone="9000000000", role="client")
     with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         try:
             signup(payload)
@@ -223,20 +229,10 @@ def test_signup_reports_duplicate_email_distinctly():
 
 
 def test_signup_reports_generic_profile_failure_for_other_db_errors():
-    """Verifies a non-duplicate DB error during signup raises a generic 500, via a mocked RuntimeError insert failure. Exercises: `POST /signup` (`main.signup()`)."""
-    fake = MagicMock()
-    fake.auth.sign_up.return_value = None
-
-    def table(name):
-        t = MagicMock()
-        if name == "lawyer_invites":
-            t.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"invite_id": 1, "org_id": 1}]
-        else:
-            t.insert.return_value.execute.side_effect = RuntimeError("db unreachable")
-        return t
-
-    fake.table.side_effect = table
-    payload = SignupRequest(email="new@example.com", password="whatever123", full_name="New User", phone="9000000000", role="lawyer")
+    """Verifies a non-mapped DB error during signup raises a generic 500. Exercises:
+    `POST /signup` (`main.signup()`)."""
+    fake = _fake_signup_supabase(rpc_side_effect=RuntimeError("db unreachable"))
+    payload = SignupRequest(email="new@example.com", password="whatever123", full_name="New User", phone="9000000000", role="client")
     with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         try:
             signup(payload)
@@ -246,28 +242,16 @@ def test_signup_reports_generic_profile_failure_for_other_db_errors():
             assert "contact support" in e.detail.lower()
 
 
-def test_signup_deletes_the_users_row_when_the_profile_insert_fails():
-    """Verifies a failed lawyers-row insert removes the just-created users row, so the account
-    can't log in with no profile (the "No lawyer profile for this account" 400). Exercises:
+def test_signup_reports_duplicate_bar_council_number_distinctly():
+    """Verifies a lawyer signup with an already-registered bar council number raises 409,
+    when complete_signup() raises its 'duplicate_bar_council_number' error. Exercises:
     `POST /signup` (`main.signup()`)."""
-    fake = MagicMock()
-    fake.auth.sign_up.return_value = None
-
-    def table(name):
-        t = MagicMock()
-        if name == "lawyer_invites":
-            t.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"invite_id": 1, "org_id": 1}]
-        elif name == "users":
-            t.insert.return_value.execute.return_value.data = [{"user_id": 77}]
-        else:
-            t.insert.return_value.execute.side_effect = PostgrestAPIError({
-                "message": "duplicate key value violates unique constraint \"lawyers_bar_council_number_key\"",
-                "code": "23505", "hint": None, "details": None,
-            })
-        return t
-
-    tables = {}
-    fake.table.side_effect = lambda name: tables.setdefault(name, table(name))
+    fake = _fake_signup_supabase(
+        lawyer_invite_rows=[{"invite_id": 1, "org_id": 1}],
+        rpc_side_effect=PostgrestAPIError({
+            "message": "duplicate_bar_council_number", "code": "P0001", "hint": None, "details": None,
+        }),
+    )
     payload = SignupRequest(email="new@example.com", password="whatever123", full_name="New User", phone="9000000000", role="lawyer", bar_council_number="MH/1/2020")
     with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         try:
@@ -276,29 +260,14 @@ def test_signup_deletes_the_users_row_when_the_profile_insert_fails():
         except HTTPException as e:
             assert e.status_code == 409
             assert "bar council" in e.detail.lower()
-    tables["users"].delete.return_value.eq.assert_called_once_with("user_id", 77)
 
 
-def test_signup_admin_creates_organization_and_admin_user():
-    """Verifies role="admin" signup creates an organizations row, a platform_settings row for it, and a users row with role_id=ADMIN and that org_id. Exercises: `POST /signup` (`main.signup()`)."""
-    fake = MagicMock()
-    fake.auth.sign_up.return_value = None
-    inserted = {}
-
-    def table(name):
-        t = MagicMock()
-        if name == "organizations":
-            t.insert.return_value.execute.return_value.data = [{"org_id": 42, "name": "Acme Law"}]
-        elif name == "platform_settings":
-            t.insert.return_value.execute.return_value = MagicMock()
-        elif name == "users":
-            def insert(payload):
-                inserted.update(payload)
-                return MagicMock(execute=MagicMock(return_value=MagicMock(data=[{"user_id": 5, **payload}])))
-            t.insert.side_effect = insert
-        return t
-
-    fake.table.side_effect = table
+def test_signup_admin_passes_org_name_and_role_to_the_transaction():
+    """Verifies role="admin" signup calls complete_signup() with p_role="admin" and the
+    trimmed org name -- the organization/platform_settings/users rows are all created
+    inside that one transaction now (see migrate_signup_transaction.sql), not from Python.
+    Exercises: `POST /signup` (`main.signup()`)."""
+    fake = _fake_signup_supabase(rpc_return_value=5)
     payload = SignupRequest(
         email="owner@acme.example", password="whatever123", full_name="Org Owner",
         phone="9000000000", role="admin", org_name="Acme Law",
@@ -306,53 +275,12 @@ def test_signup_admin_creates_organization_and_admin_user():
     with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         result = signup(payload)
     assert result["message"].startswith("Signup successful")
-    assert inserted["role_id"] == 1  # ADMIN
-    assert inserted["org_id"] == 42
-
-
-def test_signup_admin_rollback_deletes_settings_before_org_and_preserves_original_error():
-    """Verifies that when an admin signup's org+platform_settings are created but the users
-    insert then fails with a duplicate-email error, _rollback_org deletes the platform_settings
-    row before the organizations row (platform_settings has an FK to organizations with no
-    ON DELETE CASCADE, so deleting organizations first would raise its own FK violation and mask
-    the real error), and the original 409 duplicate-email response still reaches the caller.
-    Exercises: `POST /signup` (`main.signup()`, `main._rollback_org()`)."""
-    fake = MagicMock()
-    fake.auth.sign_up.return_value = None
-    call_order = []
-
-    def table(name):
-        t = MagicMock()
-        if name == "organizations":
-            t.insert.return_value.execute.return_value.data = [{"org_id": 42, "name": "Acme Law"}]
-            t.delete.return_value.eq.return_value.execute.side_effect = lambda: call_order.append("organizations")
-        elif name == "platform_settings":
-            t.insert.return_value.execute.return_value = MagicMock()
-            t.delete.return_value.eq.return_value.execute.side_effect = lambda: call_order.append("platform_settings")
-        elif name == "users":
-            t.insert.return_value.execute.side_effect = PostgrestAPIError({
-                "message": "duplicate key value violates unique constraint \"users_email_key\"",
-                "code": "23505", "hint": None, "details": None,
-            })
-        return t
-
-    tables = {}
-    fake.table.side_effect = lambda name: tables.setdefault(name, table(name))
-    payload = SignupRequest(
-        email="owner@acme.example", password="whatever123", full_name="Org Owner",
-        phone="9000000000", role="admin", org_name="Acme Law",
-    )
-    with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
-        try:
-            signup(payload)
-            assert False, "expected HTTPException"
-        except HTTPException as e:
-            assert e.status_code == 409
-            assert "already exists" in e.detail.lower()
-
-    tables["platform_settings"].delete.return_value.eq.assert_called_once_with("org_id", 42)
-    tables["organizations"].delete.return_value.eq.assert_called_once_with("org_id", 42)
-    assert call_order == ["platform_settings", "organizations"]
+    fake.rpc.assert_called_once()
+    rpc_name, rpc_args = fake.rpc.call_args[0]
+    assert rpc_name == "complete_signup"
+    assert rpc_args["p_role"] == "admin"
+    assert rpc_args["p_org_name"] == "Acme Law"
+    assert rpc_args["p_invite_id"] is None
 
 
 def test_signup_admin_requires_org_name():
@@ -379,32 +307,12 @@ def test_signup_lawyer_rejected_without_pending_invite():
     fake.auth.sign_up.assert_not_called()
 
 
-def test_signup_lawyer_succeeds_with_pending_invite_and_marks_it_accepted():
-    """Verifies a lawyer signup with a pending invite inherits that invite's org_id and marks the invite accepted. Exercises: `POST /signup` (`main.signup()`)."""
-    fake = MagicMock()
-    fake.auth.sign_up.return_value = None
-    inserted_user = {}
-
-    def table(name):
-        t = MagicMock()
-        if name == "lawyer_invites":
-            t.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"invite_id": 9, "org_id": 42}]
-            t.update.return_value.eq.return_value.execute.return_value = MagicMock()
-        elif name == "users":
-            def insert(payload):
-                inserted_user.update(payload)
-                return MagicMock(execute=MagicMock(return_value=MagicMock(data=[{"user_id": 5, **payload}])))
-            t.insert.side_effect = insert
-        elif name == "lawyers":
-            t.insert.return_value.execute.return_value = MagicMock()
-        return t
-
-    # ponytail: cache mocks per table name -- signup() calls supabase.table("lawyer_invites")
-    # twice (select for the gate, update to accept it), and a bare side_effect=table would hand
-    # back a fresh, uncalled MagicMock each time, including to the assertion below. Same pattern
-    # as test_signup_deletes_the_users_row_when_the_profile_insert_fails.
-    tables = {}
-    fake.table.side_effect = lambda name: tables.setdefault(name, table(name))
+def test_signup_lawyer_passes_invite_id_to_the_transaction():
+    """Verifies a lawyer signup with a pending invite passes that invite's invite_id to
+    complete_signup() -- the function itself resolves org_id and marks the invite accepted
+    inside its transaction now (see migrate_signup_transaction.sql). Exercises:
+    `POST /signup` (`main.signup()`)."""
+    fake = _fake_signup_supabase(lawyer_invite_rows=[{"invite_id": 9, "org_id": 42}], rpc_return_value=5)
     payload = SignupRequest(
         email="new@example.com", password="whatever123", full_name="New Lawyer",
         phone="9000000000", role="lawyer", bar_council_number="MH/1/2020",
@@ -412,31 +320,24 @@ def test_signup_lawyer_succeeds_with_pending_invite_and_marks_it_accepted():
     with patch("app.main.supabase", fake), patch("app.main.new_auth_client", return_value=fake):
         result = signup(payload)
     assert result["message"].startswith("Signup successful")
-    assert inserted_user["org_id"] == 42
-    tables["lawyer_invites"].update.assert_called_once_with({"status": "accepted"})
+    rpc_name, rpc_args = fake.rpc.call_args[0]
+    assert rpc_name == "complete_signup"
+    assert rpc_args["p_role"] == "lawyer"
+    assert rpc_args["p_invite_id"] == 9
+    assert rpc_args["p_bar_council_number"] == "MH/1/2020"
 
 
-def test_signup_rolls_back_lawyers_row_when_invite_accept_fails():
-    """Verifies that when the lawyers insert succeeds but marking the invite accepted then
-    throws, signup() deletes both the users row and the just-inserted lawyers row (not just
-    users), so no lawyers row is left pointing at a deleted user_id. Exercises: `POST /signup`
+def test_signup_reports_invite_consumed_between_check_and_transaction():
+    """Verifies that if the pending invite is consumed between signup()'s own pre-check and
+    complete_signup()'s re-check (a race -- see the function's 'invite_not_pending' raise),
+    signup() still answers with the same 403 as the up-front check. Exercises: `POST /signup`
     (`main.signup()`)."""
-    fake = MagicMock()
-    fake.auth.sign_up.return_value = None
-
-    def table(name):
-        t = MagicMock()
-        if name == "lawyer_invites":
-            t.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"invite_id": 9, "org_id": 42}]
-            t.update.return_value.eq.return_value.execute.side_effect = RuntimeError("db unreachable")
-        elif name == "users":
-            t.insert.return_value.execute.return_value.data = [{"user_id": 77}]
-        elif name == "lawyers":
-            t.insert.return_value.execute.return_value = MagicMock()
-        return t
-
-    tables = {}
-    fake.table.side_effect = lambda name: tables.setdefault(name, table(name))
+    fake = _fake_signup_supabase(
+        lawyer_invite_rows=[{"invite_id": 9, "org_id": 42}],
+        rpc_side_effect=PostgrestAPIError({
+            "message": "invite_not_pending", "code": "P0001", "hint": None, "details": None,
+        }),
+    )
     payload = SignupRequest(
         email="new@example.com", password="whatever123", full_name="New Lawyer",
         phone="9000000000", role="lawyer", bar_council_number="MH/1/2020",
@@ -446,9 +347,7 @@ def test_signup_rolls_back_lawyers_row_when_invite_accept_fails():
             signup(payload)
             assert False, "expected HTTPException"
         except HTTPException as e:
-            assert e.status_code == 500
-    tables["users"].delete.return_value.eq.assert_called_once_with("user_id", 77)
-    tables["lawyers"].delete.return_value.eq.assert_called_once_with("user_id", 77)
+            assert e.status_code == 403
 
 
 def test_login_rejects_actually_wrong_password():
@@ -487,11 +386,10 @@ if __name__ == "__main__":
     test_login_rejects_actually_wrong_password()
     test_signup_reports_duplicate_email_distinctly()
     test_signup_reports_generic_profile_failure_for_other_db_errors()
-    test_signup_deletes_the_users_row_when_the_profile_insert_fails()
-    test_signup_admin_creates_organization_and_admin_user()
-    test_signup_admin_rollback_deletes_settings_before_org_and_preserves_original_error()
+    test_signup_reports_duplicate_bar_council_number_distinctly()
+    test_signup_admin_passes_org_name_and_role_to_the_transaction()
     test_signup_admin_requires_org_name()
     test_signup_lawyer_rejected_without_pending_invite()
-    test_signup_lawyer_succeeds_with_pending_invite_and_marks_it_accepted()
-    test_signup_rolls_back_lawyers_row_when_invite_accept_fails()
+    test_signup_lawyer_passes_invite_id_to_the_transaction()
+    test_signup_reports_invite_consumed_between_check_and_transaction()
     print("ok")

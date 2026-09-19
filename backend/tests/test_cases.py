@@ -36,14 +36,12 @@ def _fake_supabase_for_create(accepted_request_rows: list[dict], case_row: dict)
             m.select.return_value.eq.return_value.execute.return_value.data = [{"case_type_name": "Civil"}]
         elif name == "cases":
             m.select.return_value.like.return_value.execute.return_value.data = []
-            m.insert.return_value.execute.return_value.data = [case_row]
             m.select.return_value.eq.return_value.execute.return_value.data = [case_row]
-        elif name == "case_lawyers":
-            m.insert.return_value.execute.return_value = MagicMock()
         tables[name] = m
         return m
 
     fake.table.side_effect = table
+    fake.rpc.return_value.execute.return_value.data = case_row.get("case_id")
     return fake
 
 

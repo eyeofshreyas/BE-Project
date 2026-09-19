@@ -128,34 +128,23 @@ def create_case(data: CaseCreate, profile: dict = Depends(require_roles(LAWYER))
     if profile.get("org_id") is None:
         raise HTTPException(status_code=500, detail="This lawyer's account isn't linked to a firm. Contact support.")
 
-    case_row = supabase.table("cases").insert({
-        "case_number": _generate_case_number(case_type_rows[0]["case_type_name"]),
-        "case_title": data.case_title,
-        "client_id": data.client_id,
-        "court_id": data.court_id,
-        "case_type_id": data.case_type_id,
-        "org_id": profile["org_id"],
-        "status": "Open",
-        "priority": data.priority,
-        "next_hearing_date": data.next_hearing_date,
-        "description": data.description,
-    }).execute().data[0]
+    # One DB transaction (see migrate_create_case_transaction.sql) for all three inserts --
+    # three separate REST calls here used to leave a case with no Primary lawyer (or no
+    # opening note) behind if the process died between them, with nothing to roll it back.
+    case_id = supabase.rpc("create_case_with_lawyer", {
+        "p_case_number": _generate_case_number(case_type_rows[0]["case_type_name"]),
+        "p_case_title": data.case_title,
+        "p_client_id": data.client_id,
+        "p_court_id": data.court_id,
+        "p_case_type_id": data.case_type_id,
+        "p_org_id": profile["org_id"],
+        "p_priority": data.priority,
+        "p_next_hearing_date": data.next_hearing_date,
+        "p_description": data.description,
+        "p_lawyer_id": lawyer_rows[0]["lawyer_id"],
+    }).execute().data
 
-    supabase.table("case_lawyers").insert({
-        "case_id": case_row["case_id"],
-        "lawyer_id": lawyer_rows[0]["lawyer_id"],
-        "assigned_role": "Primary",
-        "is_active": True,
-    }).execute()
-
-    if data.description:
-        supabase.table("case_notes").insert({
-            "case_id": case_row["case_id"],
-            "lawyer_id": lawyer_rows[0]["lawyer_id"],
-            "note": data.description,
-        }).execute()
-
-    row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_row["case_id"]).execute().data[0]
+    row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
     return _to_case_summary(row)
 
 
