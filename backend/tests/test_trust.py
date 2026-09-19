@@ -257,19 +257,35 @@ class TestPayInvoiceFromTrust:
 # Reconciliation
 # ─────────────────────────────────────────────────────────────
 
-def _recon_tables(mock_supabase, *, bank, transactions):
+def _recon_tables(mock_supabase, *, bank, transactions, control=None):
+    """Wire the three tables reconciliation reads. `control` is the firm's control account
+    (leg 2) as a list of per-date totals; left out, it's derived from `transactions` the way
+    the trigger would have posted it, which is the reconciled case."""
+    if control is None:
+        by_date: dict[str, float] = {}
+        for t in transactions:
+            delta = t["amount"] if t["type"] == "deposit" else -t["amount"]
+            by_date[t["transaction_date"]] = by_date.get(t["transaction_date"], 0.0) + delta
+        control = [{"total": v} for v in by_date.values()]
+
+    tables = {}
+
     def table(name):
-        m = MagicMock()
+        if name in tables:
+            return tables[name]
+        m = tables.setdefault(name, MagicMock())
         if name == "trust_bank_statements":
             m.select.return_value.eq.return_value.lte.return_value.order.return_value\
                 .limit.return_value.execute.return_value.data = (
                     [{"bank_balance": bank, "statement_date": "2026-09-01"}] if bank is not None else []
                 )
+        elif name == "trust_control_totals":
+            m.select.return_value.eq.return_value.lte.return_value.execute.return_value.data = control
         else:
-            m.select.return_value.eq.return_value.lte.return_value.order.return_value\
-                .order.return_value.execute.return_value.data = transactions
+            m.select.return_value.eq.return_value.lte.return_value.execute.return_value.data = transactions
         return m
     mock_supabase.table.side_effect = table
+    return tables
 
 
 class TestReconciliation:
@@ -277,8 +293,8 @@ class TestReconciliation:
     @patch("app.controllers.trust.supabase")
     def test_clean_dataset_reports_all_three_totals_agreeing(self, mock_supabase):
         _recon_tables(mock_supabase, bank=3000.00, transactions=[
-            {"id": 1, "type": "deposit", "amount": 2000.00, "client_id": 1, "running_balance": 2000.00, "transaction_date": "2026-09-02"},
-            {"id": 2, "type": "deposit", "amount": 1000.00, "client_id": 2, "running_balance": 3000.00, "transaction_date": "2026-09-03"},
+            {"id": 1, "type": "deposit", "amount": 2000.00, "client_id": 1, "transaction_date": "2026-09-02"},
+            {"id": 2, "type": "deposit", "amount": 1000.00, "client_id": 2, "transaction_date": "2026-09-03"},
         ])
         result = get_reconciliation(date(2026, 9, 18), None, ADMIN_PROFILE)
         TrustReconciliation(**result)
@@ -295,20 +311,52 @@ class TestReconciliation:
         """The point of a *three*-way check: someone edits an amount in the database, the
         recomputed client balances move and the control total stamped at posting time does
         not. A two-way bank-vs-ledger check would not see this at all."""
-        _recon_tables(mock_supabase, bank=3000.00, transactions=[
-            {"id": 1, "type": "deposit", "amount": 2000.00, "client_id": 1, "running_balance": 2000.00, "transaction_date": "2026-09-02"},
-            # amount edited by hand from 1000 to 500; running_balance left behind
-            {"id": 2, "type": "deposit", "amount": 500.00, "client_id": 2, "running_balance": 3000.00, "transaction_date": "2026-09-03"},
-        ])
+        _recon_tables(
+            mock_supabase, bank=3000.00,
+            transactions=[
+                {"id": 1, "type": "deposit", "amount": 2000.00, "client_id": 1, "transaction_date": "2026-09-02"},
+                # amount edited by hand from 1000 to 500 -- the control account still has 1000
+                {"id": 2, "type": "deposit", "amount": 500.00, "client_id": 2, "transaction_date": "2026-09-03"},
+            ],
+            control=[{"total": 2000.00}, {"total": 1000.00}],
+        )
         result = get_reconciliation(date(2026, 9, 18), None, ADMIN_PROFILE)
         assert result["ledger_total"] == 3000.00
         assert result["client_total"] == 2500.00
         assert result["reconciled"] is False
 
     @patch("app.controllers.trust.supabase")
+    def test_a_late_recorded_entry_does_not_raise_a_false_alarm(self, mock_supabase):
+        """A deposit that cleared on the 5th but was keyed in on the 12th. Both legs file it
+        under its transaction_date, so the books reconcile. Reading leg 2 off the last row
+        in *insert* order -- as this did before -- reported a gap of the whole deposit."""
+        _recon_tables(mock_supabase, bank=3000.00, transactions=[
+            {"id": 2, "type": "deposit", "amount": 1000.00, "client_id": 2, "transaction_date": "2026-09-05"},
+            {"id": 1, "type": "deposit", "amount": 2000.00, "client_id": 1, "transaction_date": "2026-09-10"},
+        ])
+        result = get_reconciliation(date(2026, 9, 18), None, ADMIN_PROFILE)
+        assert result["ledger_total"] == 3000.00
+        assert result["client_total"] == 3000.00
+        assert result["reconciled"] is True
+
+    @patch("app.controllers.trust.supabase")
+    def test_as_of_excludes_later_dates_from_both_legs(self, mock_supabase):
+        """Reconciling a closed month must not pull in money that arrived after it. The
+        mock returns what the `lte` filters would; this pins that both legs apply one."""
+        tables = _recon_tables(mock_supabase, bank=2000.00, transactions=[
+            {"id": 1, "type": "deposit", "amount": 2000.00, "client_id": 1, "transaction_date": "2026-08-20"},
+        ])
+        result = get_reconciliation(date(2026, 8, 31), None, ADMIN_PROFILE)
+        assert result["ledger_total"] == result["client_total"] == 2000.00
+        assert result["reconciled"] is True
+        for name in ("trust_transactions", "trust_control_totals"):
+            lte = tables[name].select.return_value.eq.return_value.lte
+            assert lte.call_args.args[1] == "2026-08-31"
+
+    @patch("app.controllers.trust.supabase")
     def test_bank_balance_disagreeing_is_not_reconciled(self, mock_supabase):
         _recon_tables(mock_supabase, bank=3000.00, transactions=[
-            {"id": 1, "type": "deposit", "amount": 2500.00, "client_id": 1, "running_balance": 2500.00, "transaction_date": "2026-09-02"},
+            {"id": 1, "type": "deposit", "amount": 2500.00, "client_id": 1, "transaction_date": "2026-09-02"},
         ])
         assert get_reconciliation(date(2026, 9, 18), None, ADMIN_PROFILE)["reconciled"] is False
 

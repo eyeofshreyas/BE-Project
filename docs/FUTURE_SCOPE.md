@@ -162,11 +162,19 @@ Two things worth knowing if you touch this:
 and has to name one via `?org_id=`.
 
 **The three legs have to come from different places or the check is theatre.** Leg 1 is
-the hand-entered bank statement. Leg 3 is recomputed from the transaction amounts. Leg 2
-is `running_balance` — the firm's control total stamped onto each row by the
-`trust_guard_and_stamp()` trigger when it was posted. Editing an amount in the database
-moves leg 3 and not leg 2, which is the entire point; derive both from the same amounts
-and they agree by construction no matter what has been tampered with.
+the hand-entered bank statement. Leg 3 is recomputed from `trust_transactions.amount`.
+Leg 2 is the `trust_control_totals` table — the firm's control account, one row per date,
+posted to by the `trust_guard_and_post()` trigger and never recomputed afterwards.
+Editing an amount in the database, or deleting a row, moves leg 3 and not leg 2, which is
+the entire point; derive both from the same amounts and they agree by construction no
+matter what has been tampered with.
+
+Both legs are filed under `transaction_date`, never insert order. An earlier revision
+stamped the control total onto each ledger row instead, and read leg 2 off the last row
+by date — so a deposit that cleared on the 5th but was keyed in on the 12th reported a
+gap the size of the deposit against books that were perfectly correct. Anything that
+removes ledger rows outside the API (the user-delete cascade is the only one) has to post
+a reversing entry to the control account or it reintroduces exactly that false alarm.
 
 That same trigger is where the no-negative-balance rule actually holds: the controller
 checks it too, for a clear error message, but a controller check is read-then-write and

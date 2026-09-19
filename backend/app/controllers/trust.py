@@ -19,16 +19,14 @@ TRUST_SELECT = "id,client_id,case_id,type,amount,transaction_date,description,cr
 # pay_invoice_from_trust(), so the ledger can't claim an invoice was settled when it wasn't.
 WRITE_TYPES = {"deposit", "disbursement"}
 
-# Postgres raises this from the trust_guard_and_stamp trigger when an insert would take a
+# Postgres raises this from the trust_guard_and_post trigger when an insert would take a
 # client's balance below zero -- the backstop for the controller's own check, which is
 # read-then-write and so can be raced by a concurrent disbursement.
 _NEGATIVE_BALANCE_SQLSTATE = "23514"
 
 
 def _to_trust_transaction_summary(row: dict) -> dict:
-    """Shape a raw `trust_transactions` row into the TrustTransactionSummary dict. The
-    stamped `running_balance` is deliberately not exposed -- it's a control figure for
-    `get_reconciliation()`, not a per-entry fact anyone should be reading off the ledger."""
+    """Shape a raw `trust_transactions` row into the TrustTransactionSummary dict."""
     return {
         "id": row["id"],
         "client_id": row["client_id"],
@@ -110,7 +108,7 @@ def _get_balance(client_id: int, org_id: int) -> float:
 
 def _insert_transaction(row: dict) -> dict:
     """Insert a ledger entry, turning the DB's negative-balance guard into the same 422 the
-    controller's own check raises. See `trust_guard_and_stamp()` in
+    controller's own check raises. See `trust_guard_and_post()` in
     migrate_trust_accounting.sql."""
     try:
         return supabase.table("trust_transactions").insert(row).execute().data[0]
@@ -311,15 +309,15 @@ def get_reconciliation(
     """The monthly check that three numbers agree, for one firm as of one date:
 
     1. `bank_balance`  -- the trust account per the bank, hand-entered via POST /trust/bank-statements
-    2. `ledger_total`  -- the firm's control total, read back from the `running_balance`
-       stamped on the last entry posted
+    2. `ledger_total`  -- the firm's control account (`trust_control_totals`), posted to
+       when money moved and never recomputed since
     3. `client_total`  -- the sum of every client's balance, recomputed from the amounts
 
-    Legs 2 and 3 come from different places on purpose: 3 is derived from the transaction
-    amounts, 2 is the figure recorded when each entry was posted. Editing an amount in the
-    database moves one and not the other, which is the whole point of the exercise. They
-    also diverge if an entry is backdated into an already-reconciled period -- also worth
-    seeing.
+    Legs 2 and 3 come from different tables on purpose: 3 is summed from the transaction
+    amounts, 2 from the control account written alongside them. Editing an amount by hand,
+    or deleting a row, moves one and not the other -- which is the whole point of a *three*-way
+    check. Both are filed under `transaction_date`, so a late-recorded entry lands in the
+    same period for both and doesn't raise a false alarm.
 
     Calls: `_scope_org()`, `_balance_of()`."""
     as_of = as_of or date.today()
@@ -339,21 +337,26 @@ def get_reconciliation(
     bank_balance = bank_rows[0]["bank_balance"] if bank_rows else None
     bank_statement_date = bank_rows[0]["statement_date"] if bank_rows else None
 
-    tx_rows = (
-        supabase.table("trust_transactions")
-        .select("id,type,amount,client_id,running_balance,transaction_date")
+    # ── Leg 2: the firm's control account, summed over every date up to as_of ──
+    control_rows = (
+        supabase.table("trust_control_totals")
+        .select("total")
         .eq("org_id", org)
-        .lte("transaction_date", as_of.isoformat())
-        .order("transaction_date")
-        .order("id")
+        .lte("entry_date", as_of.isoformat())
         .execute()
         .data
     )
-
-    # ── Leg 2: control total as recorded when the last entry was posted ──
-    ledger_total = round(tx_rows[-1]["running_balance"], 2) if tx_rows else 0.0
+    ledger_total = round(sum(r["total"] for r in control_rows), 2)
 
     # ── Leg 3: sum of the client subledgers, recomputed from the amounts ──
+    tx_rows = (
+        supabase.table("trust_transactions")
+        .select("type,amount,client_id")
+        .eq("org_id", org)
+        .lte("transaction_date", as_of.isoformat())
+        .execute()
+        .data
+    )
     by_client: dict[int, list[dict]] = {}
     for r in tx_rows:
         by_client.setdefault(r["client_id"], []).append(r)

@@ -116,6 +116,20 @@ begin
   delete from invoices where case_id = any(v_case_ids);
   -- Trust rows reference clients with ON DELETE RESTRICT, so they go here explicitly
   -- rather than by cascade -- client money is not something to delete by accident.
+  -- The firm's control account is a separate book (see migrate_trust_accounting.sql), so
+  -- removing the subledger rows has to be matched by a reversing entry or every
+  -- reconciliation covering those dates reports a gap that isn't there. users.py already
+  -- refuses the delete while the client's balance is above zero, but the per-date
+  -- movements still have to come back out.
+  insert into trust_control_totals (org_id, entry_date, total)
+  select org_id, transaction_date,
+         -sum(case when type = 'deposit' then amount else -amount end)
+    from trust_transactions
+   where v_client_id is not null and client_id = v_client_id
+   group by org_id, transaction_date
+  on conflict (org_id, entry_date)
+    do update set total = trust_control_totals.total + excluded.total;
+
   delete from trust_transactions where v_client_id is not null and client_id = v_client_id;
 
   delete from meeting_participants where meeting_id in (select meeting_id from meetings where case_id = any(v_case_ids));
