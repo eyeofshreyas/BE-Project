@@ -2,7 +2,7 @@
 /** Admin console "Reports" tab: report-library list with search/category/date/type/status
  * filters, CSV export, on-demand report generation, and browser-based PDF printing.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
 import { formatDate } from '../../../utils/date'
@@ -248,6 +248,14 @@ export default function ReportsView({
     setReports((prev) => [report, ...prev])
     onToast?.('Report generated.')
   }
+
+  // Drop the selection once the dialog closes (afterprint fires on cancel too), so a
+  // later Ctrl+P prints the library rather than whichever report was last viewed.
+  useEffect(() => {
+    const clear = () => setSelectedReport(null)
+    window.addEventListener('afterprint', clear)
+    return () => window.removeEventListener('afterprint', clear)
+  }, [])
 
   function printReport(report: Report) {
     setSelectedReport(report)
@@ -951,36 +959,6 @@ export default function ReportsView({
               <h1>{selectedReport.label}</h1>
 
               <p>{selectedReport.desc}</p>
-
-              <div className="lexflow-print-meta">
-                <div>
-                  <strong>Category:</strong>{' '}
-                  {selectedReport.category}
-                </div>
-
-                <div>
-                  <strong>Type:</strong>{' '}
-                  {selectedReport.type}
-                </div>
-
-                <div>
-                  <strong>Status:</strong>{' '}
-                  {selectedReport.status}
-                </div>
-
-                <div>
-                  <strong>Generated:</strong>{' '}
-                  {formatDate(
-                    selectedReport.generated.toISOString(),
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="lexflow-print-section">
-              <h2>Report Summary</h2>
-
-              <p>{selectedReport.desc}</p>
             </div>
 
             <div className="lexflow-print-section">
@@ -988,16 +966,6 @@ export default function ReportsView({
 
               <table>
                 <tbody>
-                  <tr>
-                    <th>Report</th>
-                    <td>{selectedReport.label}</td>
-                  </tr>
-
-                  <tr>
-                    <th>Description</th>
-                    <td>{selectedReport.desc}</td>
-                  </tr>
-
                   <tr>
                     <th>Category</th>
                     <td>{selectedReport.category}</td>
