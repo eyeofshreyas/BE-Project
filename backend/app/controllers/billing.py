@@ -46,6 +46,20 @@ def _to_expense_summary(row: dict) -> dict:
     }
 
 
+def _total_paid(invoice_id: int) -> float:
+    """Sum of an invoice's Completed payments."""
+    paid = supabase.table("payments").select("amount").eq("invoice_id", invoice_id).eq("payment_status", "Completed").execute().data
+    return sum(p["amount"] for p in paid)
+
+
+def _amount_due(invoice_id: int, total_amount: float) -> float:
+    """What's still outstanding on an invoice. Every path that collects money goes through
+    this -- `create_payment()`, `create_razorpay_order()`, and trust's
+    `pay_invoice_from_trust()` -- so none of them can charge against the full total when
+    part of it has already been paid. Calls: `_total_paid()`."""
+    return total_amount - _total_paid(invoice_id)
+
+
 def _invoice_status_for(total_paid: float, total_amount: float) -> str:
     """Derive payment_status ("Paid"/"Partially Paid"/"Pending") from amount paid vs. owed."""
     if total_paid >= total_amount:
@@ -161,8 +175,7 @@ def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(AD
     invoice = _get_invoice(data.invoice_id, get_scoped_case_ids(profile))
     # A payment can't exceed what's still outstanding -- without this the invoice silently
     # goes to Paid on any amount, and the books show more collected than was ever billed.
-    paid = supabase.table("payments").select("amount").eq("invoice_id", data.invoice_id).eq("payment_status", "Completed").execute().data
-    due = invoice["total_amount"] - sum(p["amount"] for p in paid)
+    due = _amount_due(data.invoice_id, invoice["total_amount"])
     if data.payment_status == "Completed" and data.amount > due:
         raise HTTPException(
             status_code=400,
@@ -175,13 +188,11 @@ def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(AD
 
 def _recompute_invoice_status(invoice_id: int) -> None:
     """Recompute and persist an invoice's payment_status from its Completed payments.
-    Calls: `_invoice_status_for()`."""
+    Calls: `_total_paid()`, `_invoice_status_for()`."""
     invoice = supabase.table("invoices").select("total_amount").eq("invoice_id", invoice_id).execute().data
     if not invoice:
         return
-    paid = supabase.table("payments").select("amount").eq("invoice_id", invoice_id).eq("payment_status", "Completed").execute().data
-    total_paid = sum(p["amount"] for p in paid)
-    new_status = _invoice_status_for(total_paid, invoice[0]["total_amount"])
+    new_status = _invoice_status_for(_total_paid(invoice_id), invoice[0]["total_amount"])
     supabase.table("invoices").update({"payment_status": new_status}).eq("invoice_id", invoice_id).execute()
 
 
@@ -199,8 +210,7 @@ def create_razorpay_order(invoice_id: int, profile: dict = Depends(get_current_p
     `_razorpay_auth()`."""
     key_id, key_secret = _razorpay_auth()
     invoice = _get_invoice(invoice_id, get_scoped_case_ids(profile))
-    paid = supabase.table("payments").select("amount").eq("invoice_id", invoice_id).eq("payment_status", "Completed").execute().data
-    due = invoice["total_amount"] - sum(p["amount"] for p in paid)
+    due = _amount_due(invoice_id, invoice["total_amount"])
     if due <= 0:
         raise HTTPException(status_code=400, detail="This invoice is already paid.")
 

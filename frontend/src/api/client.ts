@@ -38,6 +38,10 @@ import type {
   MatterProgressStage,
   ConversationSummary,
   ConversationDetail,
+  TrustBalance,
+  TrustLedger,
+  TrustTransaction,
+  TrustReconciliation,
   MessageSummary,
   SimilarCaseResult,
   SimilarCaseDetail,
@@ -528,3 +532,27 @@ export function sendMessage(conversationId: number, body: string, file?: File | 
   return postForm<MessageSummary>(`/messages/conversations/${conversationId}/messages`, formData)
 }
 
+
+export function getTrustBalance(clientId: number) {
+  return get<TrustBalance>(`/trust/clients/${clientId}/balance`)
+}
+
+export function getTrustLedger(clientId: number) {
+  return get<TrustLedger>(`/trust/clients/${clientId}/transactions`)
+}
+
+export function createTrustTransaction(payload: { client_id: number; case_id?: number | null; type: 'deposit' | 'disbursement'; amount: number; transaction_date: string; description?: string }) {
+  return post<TrustTransaction>('/trust/transactions', payload)
+}
+
+export function payInvoiceFromTrust(invoiceId: number) {
+  return post<{ invoice_id: number; client_id: number; amount_paid: number; remaining_trust_balance: number }>(`/invoices/${invoiceId}/pay-from-trust`, {})
+}
+
+export function getTrustReconciliation(asOf?: string) {
+  return get<TrustReconciliation>(`/trust/reconciliation${asOf ? `?as_of=${asOf}` : ''}`)
+}
+
+export function createTrustBankStatement(payload: { statement_date: string; bank_balance: number; notes?: string }) {
+  return post('/trust/bank-statements', payload)
+}

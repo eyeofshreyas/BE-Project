@@ -66,7 +66,7 @@ Not started. Ordered by the priority set in the market brief.
 | 2 | ~~Document OCR~~ | Done (§1.1 below) | Scanned PDFs and image uploads now feed the existing summarize/translate pipeline |
 | 3 | ~~E-signatures~~ | Done (§4 below) | Leegality, PDF documents only |
 | 4 | ~~Conflict-of-interest check~~ | Done (§5 below) | Firm-wide name search, MyCase-style — not Clio's full report/status workflow |
-| 5 | Basic trust accounting / reconciliation | Table stakes at every competitor; MyCase's automated 3-way reconciliation is the bar | Next up |
+| 5 | ~~Basic trust accounting / reconciliation~~ | Done (below) | Per-firm client ledger and 3-way reconciliation; bank balance entered by hand |
 
 ### Document OCR — how it landed
 
@@ -148,6 +148,40 @@ card for recording the opposing party, which is what makes that name searchable 
 - Fuzzy/phonetic name matching — a real search index (`pg_trgm`, `similarity()`) is the
   upgrade path if plain substring matching starts missing real matches, or the firm's data
   grows large enough that fetching every case/party per search gets slow.
+
+### Trust accounting — how it landed
+
+Ledger in `trust_transactions`, endpoints in `app/controllers/trust.py`, a Trust account
+card on the client detail page and a Trust tab in the admin console.
+
+Two things worth knowing if you touch this:
+
+**Trust money is per firm, not per client.** A client can retain several firms (see
+`org_clients`), and each firm has its own trust bank account, so every row carries an
+`org_id` and a "balance" always means *with this firm*. The super-admin belongs to no firm
+and has to name one via `?org_id=`.
+
+**The three legs have to come from different places or the check is theatre.** Leg 1 is
+the hand-entered bank statement. Leg 3 is recomputed from `trust_transactions.amount`.
+Leg 2 is the `trust_control_totals` table — the firm's control account, one row per date,
+posted to by the `trust_guard_and_post()` trigger and never recomputed afterwards.
+Editing an amount in the database, or deleting a row, moves leg 3 and not leg 2, which is
+the entire point; derive both from the same amounts and they agree by construction no
+matter what has been tampered with.
+
+Both legs are filed under `transaction_date`, never insert order. An earlier revision
+stamped the control total onto each ledger row instead, and read leg 2 off the last row
+by date — so a deposit that cleared on the 5th but was keyed in on the 12th reported a
+gap the size of the deposit against books that were perfectly correct. Anything that
+removes ledger rows outside the API (the user-delete cascade is the only one) has to post
+a reversing entry to the control account or it reintroduces exactly that false alarm.
+
+That same trigger is where the no-negative-balance rule actually holds: the controller
+checks it too, for a clear error message, but a controller check is read-then-write and
+two concurrent disbursements both pass it.
+
+Not built: bank-feed import, multi-currency, interest on held funds, and per-client
+statements as a downloadable document.
 
 ---
 

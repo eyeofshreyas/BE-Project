@@ -11,7 +11,9 @@
 --
 -- What "cascade" means here, exactly:
 --   * A CLIENT owns cases, so their cases go, and with them every hearing, meeting,
---     invoice, payment, document, note, timeline entry and conveyancing matter attached.
+--     invoice, payment, document, note, timeline entry, conveyancing matter and trust
+--     ledger entry attached. users.py refuses the delete outright while any of that
+--     client's money is still held -- see `_assert_deletable()`.
 --   * A LAWYER does not own cases -- their client does. Deleting a lawyer removes their
 --     assignments, notes, client requests and conversations, and leaves other people's
 --     cases standing.
@@ -35,6 +37,10 @@ alter table meetings              alter column conducted_by drop not null;
 alter table matter_documents      alter column verified_by  drop not null;
 alter table miscellaneous_expenses alter column created_by  drop not null;
 alter table due_diligence         alter column lawyer_id    drop not null;
+-- Trust tables are created without NOT NULL on these; the alters are here for a schema
+-- that predates that. See migrate_trust_accounting.sql.
+alter table trust_transactions    alter column created_by   drop not null;
+alter table trust_bank_statements alter column recorded_by  drop not null;
 
 create or replace function delete_user_cascade(p_user_id bigint, p_dry_run boolean default true)
 returns jsonb
@@ -88,6 +94,7 @@ begin
     'documents', coalesce(array_length(v_doc_ids, 1), 0),
     'conversations', coalesce(array_length(v_conv_ids, 1), 0),
     'invoices', (select count(*) from invoices where case_id = any(v_case_ids)),
+    'trust_transactions', (select count(*) from trust_transactions where v_client_id is not null and client_id = v_client_id),
     'hearings', (select count(*) from hearings where case_id = any(v_case_ids)),
     'meetings', (select count(*) from meetings where case_id = any(v_case_ids)),
     'notifications', (select count(*) from notifications where user_id = p_user_id or case_id = any(v_case_ids)),
@@ -107,6 +114,23 @@ begin
 
   delete from payments where invoice_id in (select invoice_id from invoices where case_id = any(v_case_ids));
   delete from invoices where case_id = any(v_case_ids);
+  -- Trust rows reference clients with ON DELETE RESTRICT, so they go here explicitly
+  -- rather than by cascade -- client money is not something to delete by accident.
+  -- The firm's control account is a separate book (see migrate_trust_accounting.sql), so
+  -- removing the subledger rows has to be matched by a reversing entry or every
+  -- reconciliation covering those dates reports a gap that isn't there. users.py already
+  -- refuses the delete while the client's balance is above zero, but the per-date
+  -- movements still have to come back out.
+  insert into trust_control_totals (org_id, entry_date, total)
+  select org_id, transaction_date,
+         -sum(case when type = 'deposit' then amount else -amount end)
+    from trust_transactions
+   where v_client_id is not null and client_id = v_client_id
+   group by org_id, transaction_date
+  on conflict (org_id, entry_date)
+    do update set total = trust_control_totals.total + excluded.total;
+
+  delete from trust_transactions where v_client_id is not null and client_id = v_client_id;
 
   delete from meeting_participants where meeting_id in (select meeting_id from meetings where case_id = any(v_case_ids));
   delete from meetings where case_id = any(v_case_ids);
@@ -155,6 +179,8 @@ begin
   update matter_documents       set verified_by  = null where verified_by  = p_user_id;
   update miscellaneous_expenses set created_by   = null where created_by   = p_user_id;
   update judgements             set created_by   = null where created_by   = p_user_id;
+  update trust_transactions     set created_by   = null where created_by   = p_user_id;
+  update trust_bank_statements  set recorded_by  = null where recorded_by  = p_user_id;
 
   delete from users where user_id = p_user_id;
 

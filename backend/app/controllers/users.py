@@ -201,10 +201,21 @@ def _cascade(user_id: int, dry_run: bool) -> dict:
     return supabase.rpc("delete_user_cascade", {"p_user_id": user_id, "p_dry_run": dry_run}).execute().data
 
 
+def _trust_balance_held(user_id: int) -> float:
+    """Client money this user still has sitting in a trust account, across every firm.
+    Deleting them would destroy the record of money the firm is holding on their behalf,
+    so `_assert_deletable()` refuses while this is above zero."""
+    client_rows = supabase.table("clients").select("client_id").eq("user_id", user_id).execute().data
+    if not client_rows:
+        return 0.0
+    rows = supabase.table("trust_transactions").select("type,amount").eq("client_id", client_rows[0]["client_id"]).execute().data
+    return round(sum(r["amount"] if r["type"] == "deposit" else -r["amount"] for r in rows), 2)
+
+
 def _assert_deletable(user_id: int, profile: dict) -> None:
-    """Refuse the two deletes that would lock an org (or the platform) out of having
-    someone able to administer it: your own account, and the last remaining admin --
-    scoped to the caller's own org for an org admin, platform-wide for the super-admin."""
+    """Refuse the deletes that shouldn't happen: your own account, the last remaining admin
+    (scoped to the caller's own org for an org admin, platform-wide for the super-admin),
+    and a client whose money the firm is still holding. Calls: `_trust_balance_held()`."""
     if user_id == profile["user_id"]:
         raise HTTPException(status_code=400, detail="You can't delete your own account.")
     rows = supabase.table("users").select("role_id,org_id").eq("user_id", user_id).execute().data
@@ -220,6 +231,13 @@ def _assert_deletable(user_id: int, profile: dict) -> None:
         if admins <= 1:
             scope = "this organization" if profile["role_id"] == ADMIN else "the platform"
             raise HTTPException(status_code=400, detail=f"This is the last admin account for {scope} -- deleting it would leave no one able to administer it.")
+
+    held = _trust_balance_held(user_id)
+    if held > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"This client still has {held:.2f} held in the trust account. Return or disburse it before deleting them.",
+        )
 
 
 def get_user_delete_impact(user_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
