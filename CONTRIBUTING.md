@@ -8,6 +8,8 @@ what the system does and why is in [`docs/`](docs/).
 Issues are assigned, not first-come. Work the ones assigned to you; if you want
 one that isn't, ask rather than pushing to it.
 
+Use the issue templates under `.github/ISSUE_TEMPLATE/`; they mirror the repo’s expected issue shape and deferred-trigger wording.
+
 **Comment on the issue before you write code.** One line saying you've started
 and how you plan to fix it. That's where a wrong approach gets caught cheaply —
 after the PR is open it costs a rewrite.
@@ -96,6 +98,7 @@ behaviour — not "update documents.py". Keep unrelated changes in separate
 commits.
 
 ## 6. Open the PR
+The PR template pre-fills these required sections; fill them in rather than deleting them.
 
 Target `develop`, not `main`:
 
