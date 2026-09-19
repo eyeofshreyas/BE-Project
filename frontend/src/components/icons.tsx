@@ -6,7 +6,7 @@ export type IconName =
   | 'calendar' | 'bar-chart-2' | 'pie-chart' | 'bell' | 'settings' | 'log-out' | 'search'
   | 'chevron-down' | 'plus' | 'download' | 'receipt' | 'banknote' | 'alert-triangle'
   | 'check-circle' | 'database' | 'server' | 'hard-drive' | 'eye' | 'edit' | 'ban'
-  | 'trash-2' | 'mail' | 'phone' | 'shield' | 'palette' | 'info' | 'x' | 'gavel' | 'clock' | 'filter'
+  | 'trash-2' | 'mail' | 'phone' | 'shield' | 'info' | 'x' | 'gavel' | 'clock' | 'filter'
   | 'home' | 'more-horizontal' | 'star' | 'upload-cloud' | 'globe' | 'message-circle' | 'send'
   | 'paperclip' | 'play-circle' | 'signature' | 'building'
 
@@ -46,7 +46,6 @@ export function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 1.
     case 'mail': return <svg {...common}><rect x={3} y={5} width={18} height={14} rx={2} /><path d="M3 6l9 7 9-7" /></svg>
     case 'phone': return <svg {...common}><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C9.5 19 5 14.5 5 8a2 2 0 0 1 1-2z" /></svg>
     case 'shield': return <svg {...common}><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /><path d="M9 12l2 2 4-4" /></svg>
-    case 'palette': return <svg {...common}><path d="M12 3a9 9 0 1 0 .3 18c1.2 0 1.9-.9 1.9-1.9 0-.5-.2-1-.5-1.4-.3-.4-.5-.9-.5-1.4 0-1.1.9-1.9 1.9-1.9H17a4 4 0 0 0 4-4c0-4.6-4-7.4-9-7.4z" /><circle cx={7.5} cy={10.5} r={1.2} /><circle cx={11} cy={7.5} r={1.2} /><circle cx={15} cy={8.5} r={1.2} /></svg>
     case 'info': return <svg {...common}><circle cx={12} cy={12} r={9} /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
     case 'x': return <svg {...common}><path d="M18 6L6 18" /><path d="M6 6l12 12" /></svg>
     case 'gavel': return <svg {...common}><path d="M14 4l6 6" /><path d="M4 14l6 6" /><path d="M9.5 8.5l-6 6" /><path d="M15.5 2.5l6 6" /><path d="M10.5 13.5L18 6" /><path d="M2 22h10" /></svg>
