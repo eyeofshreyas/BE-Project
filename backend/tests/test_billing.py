@@ -191,3 +191,19 @@ def test_money_amounts_must_be_positive():
             PaymentCreate(invoice_id=7, amount=amount, payment_date="2026-01-01")
         with pytest.raises(ValidationError):
             InvoiceCreate(case_id=1, invoice_number="INV-2", amount=amount, total_amount=100, issue_date="2026-01-01")
+
+
+def test_invoice_total_amount_must_equal_amount_plus_tax():
+    """Verifies total_amount can't be an independent, caller-supplied figure -- it decides the
+    outstanding balance, the Paid/Partially Paid status, and what Razorpay actually charges, so
+    it must be derived from amount + tax rather than trusted on its own.
+    Exercises: `InvoiceCreate` validation."""
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        InvoiceCreate(case_id=1, invoice_number="INV-3", amount=100, tax=10, total_amount=999, issue_date="2026-01-01")
+
+    # a correct total (with or without tax) still succeeds
+    InvoiceCreate(case_id=1, invoice_number="INV-3", amount=100, tax=10, total_amount=110, issue_date="2026-01-01")
+    InvoiceCreate(case_id=1, invoice_number="INV-3", amount=100, total_amount=100, issue_date="2026-01-01")

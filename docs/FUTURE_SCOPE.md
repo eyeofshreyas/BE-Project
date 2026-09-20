@@ -223,20 +223,13 @@ Step-by-step fixes, with test code, are in
 
 ### 4.1 Money paths
 
-- **Razorpay verify never binds the order to the invoice** —
-  `app/controllers/billing.py:219`. The HMAC proves the `order_id|payment_id` pair is
-  Razorpay's, and the payment is re-fetched so the amount isn't taken from the caller, but
-  nothing checks the order was raised *for this invoice*. A client can pay their smallest
-  invoice and POST the result against their largest; the `transaction_reference`
-  idempotency check then makes it impossible to ever apply it to the right one.
-  **Fix:** `create_razorpay_order()` already puts the invoice number in the order's
-  `receipt` (`billing.py:210`) — fetch the order and read it back.
+- ~~**Razorpay verify never binds the order to the invoice**~~ — Done. `verify_razorpay_payment()`
+  now fetches the order back and rejects the payment unless its `receipt` matches the
+  invoice's `invoice_number`, closing the gap where a captured payment for one invoice
+  could be POSTed against a different one.
 
-- **Invoice `total_amount` is whatever the client sends** — `app/models/billing.py:26`.
-  Each field is validated alone; nothing checks `total_amount == amount + tax`. That
-  number decides the outstanding balance, the Paid/Partially Paid status, and what the
-  card is actually charged. **Fix:** a Pydantic `@model_validator(mode="after")` on
-  `InvoiceCreate`.
+- ~~**Invoice `total_amount` is whatever the client sends**~~ — Done. `InvoiceCreate` now has
+  a `@model_validator(mode="after")` rejecting any `total_amount != amount + tax`.
 
 ### 4.2 Correctness
 

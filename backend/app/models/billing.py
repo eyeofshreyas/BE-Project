@@ -1,6 +1,8 @@
 """Pydantic request/response schemas for billing: invoices, payments, and matter expenses."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from app.core.money import money
 
 
 class InvoiceSummary(BaseModel):
@@ -27,6 +29,14 @@ class InvoiceCreate(BaseModel):
     issue_date: str
     due_date: str | None = None
     remarks: str | None = None
+
+    @model_validator(mode="after")
+    def _total_matches_amount_plus_tax(self) -> "InvoiceCreate":
+        # total_amount decides the outstanding balance, the Paid/Partially Paid status, and
+        # what Razorpay actually charges -- it can't be an independent, caller-supplied figure.
+        if money(self.total_amount) != money(self.amount) + money(self.tax):
+            raise ValueError("total_amount must equal amount + tax")
+        return self
 
 
 class PaymentSummary(BaseModel):
