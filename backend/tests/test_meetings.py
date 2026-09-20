@@ -1,14 +1,53 @@
 # ponytail self-check for the case-scoping fix on meetings writes -- a lawyer
 # scoped to case 10 must not be able to create a meeting, or add a
-# participant to a meeting, on case 20.
-"""Tests for the meetings domain: case-scoping on meeting creation and participant addition."""
+# participant to a meeting, on case 20 -- and for meetings being staff-only,
+# same as case notes: a client must never read them, even on their own case.
+"""Tests for the meetings domain: case-scoping on meeting creation and participant addition,
+and that meetings are internal to the firm."""
+import inspect
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.meetings import create_meeting, add_participant
+from app.controllers.meetings import create_meeting, add_participant, list_meetings, get_meeting, list_participants
 from app.models.meetings import MeetingCreate, ParticipantCreate
+
+
+def _role_gate(fn):
+    """The dependency FastAPI resolves for `fn`'s profile parameter. Calling the controller
+    directly skips it, so a role gate has to be exercised through this to be tested at all."""
+    return inspect.signature(fn).parameters["profile"].default.dependency
+
+
+def _assert_staff_only(fn, name):
+    """Assert `fn` 403s a client and admits a lawyer and an admin."""
+    try:
+        _role_gate(fn)({"role_id": auth.CLIENT, "user_id": 1})
+    except HTTPException as e:
+        assert e.status_code == 403
+    except Exception as e:
+        assert False, f"{name} is not role-gated -- its dependency raised {e!r} on a client profile"
+    else:
+        assert False, f"expected {name} to reject clients"
+    for role in (auth.LAWYER, auth.ADMIN):
+        assert _role_gate(fn)({"role_id": role, "user_id": 1})["role_id"] == role
+
+
+def test_list_meetings_is_staff_only():
+    """Verifies a client cannot list meetings even on their own case; raises 403 -- meetings are
+    internal to the firm, same as case notes. Exercises: `GET /meetings` (`meetings.list_meetings()`)."""
+    _assert_staff_only(list_meetings, "list_meetings")
+
+
+def test_get_meeting_is_staff_only():
+    """Verifies a client cannot read a single meeting; raises 403. Exercises: `GET /meetings/{id}` (`meetings.get_meeting()`)."""
+    _assert_staff_only(get_meeting, "get_meeting")
+
+
+def test_list_participants_is_staff_only():
+    """Verifies a client cannot list a meeting's participants; raises 403. Exercises: `GET /meetings/{id}/participants` (`meetings.list_participants()`)."""
+    _assert_staff_only(list_participants, "list_participants")
 
 
 def _fake_supabase(rows_by_table):

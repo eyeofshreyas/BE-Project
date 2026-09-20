@@ -2,7 +2,7 @@
 
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.meetings import MeetingSummary, MeetingCreate, MeetingUpdate, ParticipantSummary, ParticipantCreate
 
 MEETINGS_SELECT = (
@@ -60,8 +60,9 @@ def _get_meeting(meeting_id: int, case_ids: set[int] | None = None) -> dict:
     return _to_meeting_summary(rows[0])
 
 
-def list_meetings(case_id: int | None = None, profile: dict = Depends(get_current_profile)):
+def list_meetings(case_id: int | None = None, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """List meetings, optionally filtered by case_id, restricted to the caller's scope.
+    Internal to the firm -- a client never sees these, same as case notes.
     Calls: `get_scoped_case_ids()`, `_to_meeting_summary()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None and not case_ids:
@@ -76,8 +77,9 @@ def list_meetings(case_id: int | None = None, profile: dict = Depends(get_curren
     return [_to_meeting_summary(row) for row in rows]
 
 
-def get_meeting(meeting_id: int, profile: dict = Depends(get_current_profile)):
-    """Fetch one meeting, scoped to the caller. Calls: `_get_meeting()`, `get_scoped_case_ids()`."""
+def get_meeting(meeting_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
+    """Fetch one meeting, scoped to the caller. Internal to the firm, same as case notes.
+    Calls: `_get_meeting()`, `get_scoped_case_ids()`."""
     return _get_meeting(meeting_id, get_scoped_case_ids(profile))
 
 
@@ -124,9 +126,9 @@ def update_meeting(meeting_id: int, data: MeetingUpdate, profile: dict = Depends
     return _get_meeting(meeting_id)
 
 
-def list_participants(meeting_id: int, profile: dict = Depends(get_current_profile)):
-    """List participants of a meeting the caller has access to.
-    Calls: `_get_meeting()`, `get_scoped_case_ids()`, `_to_participant_summary()`."""
+def list_participants(meeting_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
+    """List participants of a meeting the caller has access to. Internal to the firm, same as
+    the meeting itself. Calls: `_get_meeting()`, `get_scoped_case_ids()`, `_to_participant_summary()`."""
     _get_meeting(meeting_id, get_scoped_case_ids(profile))
     rows = supabase.table("meeting_participants").select(PARTICIPANTS_SELECT).eq("meeting_id", meeting_id).execute().data
     return [_to_participant_summary(row) for row in rows]
