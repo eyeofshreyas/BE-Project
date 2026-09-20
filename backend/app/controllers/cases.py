@@ -151,18 +151,20 @@ def create_case(data: CaseCreate, profile: dict = Depends(require_roles(LAWYER))
 def add_lawyer_to_case(case_id: int, data: AddLawyerRequest, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Add a teammate to a case's active lawyer roster. The caller must be the case's
     current Primary lawyer, or an admin (org-scoped) / super-admin. The target lawyer must
-    belong to the same organization as the case. Calls: `ensure_case_access()`,
-    `_primary_case_lawyer()`, `_to_case_summary()`."""
-    if data.assigned_role == "Primary":
-        raise HTTPException(status_code=409, detail="A case can only have one Primary lawyer.")
-
+    belong to the same organization as the case. A case with no active Primary (its original
+    one self-removed, or was removed by an admin) can have a new one assigned -- but only by
+    an admin/super-admin, never by a lawyer, since no lawyer is "the Primary" to authorize it.
+    Calls: `ensure_case_access()`, `_primary_case_lawyer()`, `_to_case_summary()`."""
     ensure_case_access(case_id, profile)
     row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
+    primary = _primary_case_lawyer(row["case_lawyers"])
+
+    if data.assigned_role == "Primary" and primary is not None:
+        raise HTTPException(status_code=409, detail="A case can only have one Primary lawyer.")
 
     if profile["role_id"] == LAWYER:
         lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
         caller_lawyer_id = lawyer_rows[0]["lawyer_id"] if lawyer_rows else None
-        primary = _primary_case_lawyer(row["case_lawyers"])
         if not primary or primary["lawyer_id"] != caller_lawyer_id:
             raise HTTPException(status_code=403, detail="Only the case's Primary lawyer can add teammates.")
 

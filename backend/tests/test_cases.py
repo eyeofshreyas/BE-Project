@@ -165,6 +165,35 @@ def test_add_lawyer_rejects_a_second_primary():
             assert e.status_code == 409
 
 
+ADMIN_PROFILE = {"role_id": auth.ADMIN, "user_id": 3, "org_id": 7}
+
+NO_PRIMARY_CASE_ROW = {**TEAM_CASE_ROW, "case_lawyers": []}
+
+
+def test_admin_can_assign_a_new_primary_when_case_has_none():
+    """Verifies an org admin can assign a new Primary to a case whose original one self-removed
+    (or was removed), so the case isn't permanently stuck with no Primary and no way to get one.
+    Exercises: `POST /cases/{id}/lawyers` (`cases.add_lawyer_to_case()`)."""
+    fake = _fake_supabase_for_team(assigned_case_ids={42}, case_row=NO_PRIMARY_CASE_ROW, target_lawyer_org_id=7, caller_lawyer_id=5)
+    with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
+        result = add_lawyer_to_case(42, AddLawyerRequest(lawyer_id=6, assigned_role="Primary"), ADMIN_PROFILE)
+    assert result["case_id"] == 42
+    fake.table("case_lawyers").insert.assert_called_once_with({"case_id": 42, "lawyer_id": 6, "assigned_role": "Primary", "is_active": True})
+
+
+def test_lawyer_cannot_self_promote_to_primary_when_case_has_none():
+    """Verifies a lawyer already on a Primary-less case still can't add themselves (or anyone)
+    as Primary -- only an admin/super-admin can, since no lawyer is "the Primary" to authorize
+    it. Exercises: `POST /cases/{id}/lawyers` (`cases.add_lawyer_to_case()`)."""
+    fake = _fake_supabase_for_team(assigned_case_ids={42}, case_row=NO_PRIMARY_CASE_ROW, target_lawyer_org_id=7, caller_lawyer_id=2)
+    with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
+        try:
+            add_lawyer_to_case(42, AddLawyerRequest(lawyer_id=6, assigned_role="Primary"), ASSOCIATE_LAWYER_PROFILE)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 403
+
+
 def test_add_lawyer_reactivates_a_previously_removed_teammate():
     """Verifies re-adding a lawyer who was previously removed from the case reactivates their
     existing case_lawyers row instead of inserting a duplicate -- a fresh insert would violate
