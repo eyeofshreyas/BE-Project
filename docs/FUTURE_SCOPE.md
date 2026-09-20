@@ -250,10 +250,52 @@ syncs (`case_timeline`, `add_timeline_event()`).
   specific field (a bank account number, a national ID) needs to stay unreadable even to
   someone with raw database access — nothing currently stored needs that.
 
+### Data retention & deletion policy
+
+- **Active data has no automatic expiry.** Cases, documents, messages, invoices, hearings,
+  and everything else persist indefinitely once created — nothing in the app deletes them
+  by age on its own. Note: bar associations typically set a minimum retention period for
+  closed matters (often several years, varying by matter type), and nothing here encodes
+  that yet. That minimum has to come from the legal review below, not an engineering guess.
+
+- **A single document's deletion is soft, then permanent after a grace period.**
+  `delete_document()` (`app/controllers/documents.py`) sets `is_deleted`/`deleted_at`; the
+  storage object itself is only physically removed by `reap_storage.py`, run manually, after
+  a 30-day default grace period (`--days` overridable, dry-run by default). The `documents`
+  row is kept forever afterward as a tombstone — what was deleted, by whom, when — even once
+  the underlying file is gone. `reap_storage.py` isn't scheduled yet ([#17](https://github.com/eyeofshreyas/BE-Project/issues/17)), so in
+  practice the grace period only actually expires when someone runs it by hand.
+
+- **Account deletion — the mechanism behind DPDP's "right to erasure" — is a hard,
+  irreversible cascade, not a soft delete.** `delete_user_cascade()`
+  (`migrate_delete_user_cascade.sql`), reached through `DELETE /users/{id}` and gated by
+  `_assert_deletable()`:
+  - Deleting a **client** deletes their entire case tree outright — cases, hearings,
+    meetings, invoices, payments, documents (rows and storage objects), notes, timeline,
+    AI summaries, conveyancing matters, judgement references, notifications. No grace
+    period, no undo. Refused up front while the client's trust balance is above zero.
+  - Deleting a **lawyer** leaves cases alone (the client owns them, not the lawyer) — only
+    their own case assignments, notes, client-request invites, and conversations are
+    removed. Their attribution on records that survive (a case-timeline entry, a document
+    upload, a conducted meeting) is anonymized — `created_by`/`uploaded_by`/etc. set to
+    null — rather than the record itself being deleted, since it isn't this person's data
+    to take with them.
+  - A deleted client's trust-ledger detail is removed, but a reversing entry is posted to
+    `trust_control_totals` first, so the firm's aggregate books stay correct even though
+    that individual's transaction history is gone.
+  - **Gap:** the person's Supabase Auth login is *not* removed by this cascade (see the
+    correctness backlog, §4.2) — a "deleted" account can still authenticate until someone
+    removes it from the Auth dashboard by hand.
+
+- **Not covered here, and not an app-code decision:** Supabase's own backup retention (a
+  project setting, not something this codebase configures) doesn't have a stated policy
+  either. Worth a line in the same legal review once a production Supabase plan/region is
+  chosen.
+
 Still open: confirming the production backend host actually terminates TLS once one is
-chosen (a hosting-config item, not an app-code one), and the data-retention/deletion policy
-below — both engineering-adjacent, but should be reviewed against the standard above, not
-just DPDP minimums.
+chosen (a hosting-config item, not an app-code one), and setting the actual minimum
+retention period for closed matters — that number has to come from the legal review, not
+from this document.
 
 ---
 
