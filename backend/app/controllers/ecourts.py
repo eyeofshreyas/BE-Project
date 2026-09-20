@@ -69,11 +69,14 @@ def sync_case_from_ecourts(case_id: int, profile: dict = Depends(require_roles(A
     # -- see docs/FUTURE_SCOPE.md §1.1 for the confirmed response shape.
     case_data = record.get("courtCaseData", {})
 
-    supabase.table("cases").update({
-        "ecourts_status": case_data.get("caseStatus"),
-        "ecourts_raw": record,
-        "ecourts_last_synced_at": datetime.now(timezone.utc).isoformat(),
-    }).eq("case_id", case_id).execute()
+    # Additive: only overwrite ecourts_status if this response actually carried one. A
+    # response shape eCourts changes on us (a renamed field, a court type that nests it
+    # differently -- courtCaseData itself was one such surprise, see docs/FUTURE_SCOPE.md
+    # §1.1) must not silently blank out a status a previous, working sync already set.
+    updates = {"ecourts_raw": record, "ecourts_last_synced_at": datetime.now(timezone.utc).isoformat()}
+    if case_data.get("caseStatus") is not None:
+        updates["ecourts_status"] = case_data["caseStatus"]
+    supabase.table("cases").update(updates).eq("case_id", case_id).execute()
 
     add_timeline_event(
         case_id, "ecourts_synced",
