@@ -272,7 +272,7 @@ def send_message(
         "sender_user_id": profile["user_id"],
         "body": body,
     }
-
+    uploaded_attachment_path = None
     if file is not None:
         if not _is_allowed_attachment(file.content_type):
             raise HTTPException(status_code=400, detail="Only images, video, and documents can be attached")
@@ -293,6 +293,7 @@ def send_message(
             # so the composer can show it instead of a bare "failed to send".
             logger.warning("Attachment upload failed for conversation %s: %s", conversation_id, err)
             raise HTTPException(status_code=400, detail=f"Couldn't upload that file: {err}")
+        uploaded_attachment_path = storage_path
         record |= {
             "attachment_path": storage_path,
             "attachment_name": file.filename or storage_path,
@@ -300,7 +301,12 @@ def send_message(
             "attachment_size": len(content),
         }
 
-    supabase.table("messages").insert(record).execute()
+    try:
+        supabase.table("messages").insert(record).execute()
+    except Exception:
+        if uploaded_attachment_path is not None:
+            supabase.storage.from_(ATTACHMENTS_BUCKET).remove([uploaded_attachment_path])
+        raise
 
     inserted = supabase.table("messages").select(MESSAGES_SELECT) \
         .eq("conversation_id", conversation_id).order("created_at", desc=True).limit(1).execute().data[0]

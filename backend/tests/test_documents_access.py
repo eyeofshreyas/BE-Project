@@ -172,3 +172,26 @@ def test_upload_is_refused_for_a_case_outside_the_callers_scope():
     assert err.value.status_code == 403
     file.file.read.assert_not_called()
     docs_fake.storage.from_.return_value.upload.assert_not_called()
+
+
+def test_upload_removes_storage_object_when_document_insert_fails():
+    """Verifies a storage upload is undone if the documents row cannot be inserted, so
+    a partial write does not leave an orphaned object in the bucket. Exercises:
+    `POST /cases/{case_id}/documents` (`documents.upload_document()`)."""
+    file = MagicMock()
+    file.filename = "brief.pdf"
+    file.content_type = "application/pdf"
+    file.file.read.return_value = b"%PDF-1.4 test"
+
+    docs_fake = MagicMock()
+    docs_fake.table.return_value.insert.return_value.execute.side_effect = RuntimeError("db insert failed")
+    storage = docs_fake.storage.from_.return_value
+
+    with patch("app.middleware.auth.supabase", _auth_supabase(LAWYER_SCOPED_TO_CASE_10)), \
+         patch("app.controllers.documents.supabase", docs_fake):
+        with pytest.raises(RuntimeError):
+            upload_document(10, 1, file, LAWYER_PROFILE)
+
+    uploaded_path = storage.upload.call_args.args[0]
+    assert uploaded_path.startswith("case-10/")
+    storage.remove.assert_called_once_with([uploaded_path])

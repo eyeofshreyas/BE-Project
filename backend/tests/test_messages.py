@@ -6,6 +6,7 @@
 on reading/sending within a conversation."""
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi import HTTPException
 
 from app.middleware import auth
@@ -116,6 +117,45 @@ def test_send_message_rejects_non_participant():
             assert False, "expected HTTPException"
         except HTTPException as e:
             assert e.status_code == 403
+
+
+def test_send_message_removes_attachment_when_message_insert_fails():
+    """Verifies an uploaded attachment is removed if inserting the message row fails, so
+    message send cannot leave an unreferenced storage object behind. Exercises:
+    `POST /messages/conversations/{id}/messages` (`messages.send_message()`)."""
+    profile = {"role_id": auth.LAWYER, "user_id": 2}
+    row = {"id": 42, "client_id": 7, "lawyer_id": 3, "clients": None, "lawyers": None}
+    file = MagicMock()
+    file.filename = "reply.pdf"
+    file.content_type = "application/pdf"
+    file.file.read.return_value = b"%PDF-1.4 test"
+
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "conversations":
+            m.select.return_value.eq.return_value.execute.return_value.data = [row]
+        elif name == "lawyers":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"lawyer_id": 3}]
+        elif name == "messages":
+            m.insert.return_value.execute.side_effect = RuntimeError("db insert failed")
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    storage = fake.storage.from_.return_value
+
+    with patch("app.controllers.messages.supabase", fake):
+        with pytest.raises(RuntimeError):
+            send_message(42, body="", file=file, profile=profile)
+
+    uploaded_path = storage.upload.call_args.args[0]
+    assert uploaded_path.startswith("conversation-42/")
+    storage.remove.assert_called_once_with([uploaded_path])
 
 
 def _fake_supabase_for_get_or_create_lawyer(lawyer_id=3, cases=None, case_lawyers=None, conversations=None):

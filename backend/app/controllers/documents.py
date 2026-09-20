@@ -131,15 +131,19 @@ def upload_document(
         storage_path, content, {"content-type": file.content_type or "application/octet-stream"}
     )
 
-    row = supabase.table("documents").insert({
-        "case_id": case_id,
-        "document_type_id": document_type_id,
-        "uploaded_by": profile["user_id"],
-        "file_name": file.filename or storage_path,
-        "file_path": storage_path,
-        "file_size": len(content),
-        "mime_type": file.content_type,
-    }).execute().data[0]
+    try:
+        row = supabase.table("documents").insert({
+            "case_id": case_id,
+            "document_type_id": document_type_id,
+            "uploaded_by": profile["user_id"],
+            "file_name": file.filename or storage_path,
+            "file_path": storage_path,
+            "file_size": len(content),
+            "mime_type": file.content_type,
+        }).execute().data[0]
+    except Exception:
+        supabase.storage.from_(DOCUMENTS_BUCKET).remove([storage_path])
+        raise
 
     result = supabase.table("documents").select(DOCUMENTS_SELECT).eq("document_id", row["document_id"]).execute().data[0]
     return _to_document_summary(result)
