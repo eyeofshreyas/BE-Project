@@ -199,9 +199,35 @@ blocking continued feature work, per the [market brief](https://claude.ai/code/a
 
 Technical groundwork already in place: layered RBAC + per-object case ownership checks
 (`app/middleware/auth.py`), and an audit trail on case status changes and now eCourts
-syncs (`case_timeline`, `add_timeline_event()`). Still open: documented encryption-at-rest
-posture and a data-retention/deletion policy — engineering-led, but should be reviewed
-against the standard above, not just DPDP minimums.
+syncs (`case_timeline`, `add_timeline_event()`).
+
+### Encryption posture
+
+- **In transit** — Supabase's REST, Auth, and Storage APIs are TLS-only; this is Supabase's
+  platform guarantee, not app config. The FastAPI backend itself must be served over HTTPS in
+  production, but this repo doesn't pin a production host yet (see `SETUP.md`), so that's a
+  deployment-time requirement to confirm when one is chosen, not something the app code
+  enforces or could enforce on its own.
+- **At rest** — Supabase's underlying Postgres database and Storage buckets are encrypted at
+  rest by default (AWS-managed keys), as part of the Supabase platform. Not something this
+  app configures, and not something it could opt out of.
+- **File access control** — documents and message attachments live in private Storage
+  buckets, never a public one; every read goes through a short-lived signed URL
+  (`documents.py`'s document preview/download, `messages.py`'s `_attachment_url()`) rather
+  than a permanent link. Encryption at rest is paired with per-request, time-limited access,
+  not a bucket anyone with the URL can read forever.
+- **No application-level (field-level) encryption, deliberately.** Supabase's at-rest
+  encryption already covers the "disk or backup stolen" threat model, which is what DPDP and
+  the confidentiality standard above are actually concerned with. Encrypting specific columns
+  ourselves would need key management this app doesn't have, and would break the `ilike`/
+  full-text matching the conflict-check and judgment search rely on. Revisit only if a
+  specific field (a bank account number, a national ID) needs to stay unreadable even to
+  someone with raw database access — nothing currently stored needs that.
+
+Still open: confirming the production backend host actually terminates TLS once one is
+chosen (a hosting-config item, not an app-code one), and the data-retention/deletion policy
+below — both engineering-adjacent, but should be reviewed against the standard above, not
+just DPDP minimums.
 
 ---
 
