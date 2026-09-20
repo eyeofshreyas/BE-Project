@@ -7,10 +7,10 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.conveyancing import update_due_diligence, complete_progress_stage, update_matter, create_matter, _next_matter_seq
+from app.controllers.conveyancing import update_due_diligence, complete_progress_stage, update_matter, create_matter, _next_matter_seq, upload_matter_document
 from app.models.conveyancing import DueDiligenceUpdate, MatterUpdate, MatterCreate
 
-
+import pytest
 def _fake_supabase(rows_by_table):
     fake = MagicMock()
 
@@ -196,3 +196,76 @@ def test_no_meetings_and_no_slots_is_zero():
 
 def test_a_client_with_no_matters_queries_nothing():
     assert _summary([], meetings=[], registrations=[])["stats"]["upcoming_appointments"] == 0
+
+
+def test_upload_matter_document_removes_storage_object_when_document_insert_fails():
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    file = MagicMock()
+    file.filename = "contract.pdf"
+    file.content_type = "application/pdf"
+    file.file.read.return_value = b"%PDF-1.4 test"
+
+    fake = MagicMock()
+    tables = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "conveyancing_matters":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"matter_id": 5, "case_id": 10}]
+        elif name == "document_types":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"document_type_id": 2}]
+        elif name == "documents":
+            m.insert.return_value.execute.side_effect = RuntimeError("document insert failed")
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    storage = fake.storage.from_.return_value
+
+    with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
+         patch("app.controllers.conveyancing.supabase", fake):
+        with pytest.raises(RuntimeError):
+            upload_matter_document(5, file, profile)
+
+    uploaded_path = storage.upload.call_args.args[0]
+    storage.remove.assert_called_once_with([uploaded_path])
+
+
+def test_upload_matter_document_cleans_document_row_when_link_insert_fails():
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    file = MagicMock()
+    file.filename = "contract.pdf"
+    file.content_type = "application/pdf"
+    file.file.read.return_value = b"%PDF-1.4 test"
+
+    fake = MagicMock()
+    tables = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "conveyancing_matters":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"matter_id": 5, "case_id": 10}]
+        elif name == "document_types":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"document_type_id": 2}]
+        elif name == "documents":
+            m.insert.return_value.execute.return_value.data = [{"document_id": 99, "file_name": "contract.pdf", "mime_type": "application/pdf"}]
+        elif name == "matter_documents":
+            m.insert.return_value.execute.side_effect = RuntimeError("link insert failed")
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    storage = fake.storage.from_.return_value
+
+    with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
+         patch("app.controllers.conveyancing.supabase", fake):
+        with pytest.raises(RuntimeError):
+            upload_matter_document(5, file, profile)
+
+    uploaded_path = storage.upload.call_args.args[0]
+    storage.remove.assert_called_once_with([uploaded_path])
+    tables["documents"].delete.return_value.eq.assert_called_once_with("document_id", 99)

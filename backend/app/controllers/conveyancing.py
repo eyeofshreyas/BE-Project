@@ -340,22 +340,30 @@ def upload_matter_document(
     )
 
     doc_type_rows = supabase.table("document_types").select("document_type_id").eq("type_name", "Contract").execute().data
-    doc_row = supabase.table("documents").insert({
-        "case_id": case_id,
-        "document_type_id": doc_type_rows[0]["document_type_id"] if doc_type_rows else None,
-        "uploaded_by": profile["user_id"],
-        "file_name": file.filename or storage_path,
-        "file_path": storage_path,
-        "file_size": len(content),
-        "mime_type": file.content_type,
-    }).execute().data[0]
+    doc_row = None
 
-    link_row = supabase.table("matter_documents").insert({
-        "matter_id": matter_id,
-        "document_id": doc_row["document_id"],
-        "is_required": False,
-        "is_verified": False,
-    }).execute().data[0]
+    try:
+        doc_row = supabase.table("documents").insert({
+            "case_id": case_id,
+            "document_type_id": doc_type_rows[0]["document_type_id"] if doc_type_rows else None,
+            "uploaded_by": profile["user_id"],
+            "file_name": file.filename or storage_path,
+            "file_path": storage_path,
+            "file_size": len(content),
+            "mime_type": file.content_type,
+        }).execute().data[0]
+
+        link_row = supabase.table("matter_documents").insert({
+            "matter_id": matter_id,
+            "document_id": doc_row["document_id"],
+            "is_required": False,
+            "is_verified": False,
+        }).execute().data[0]
+    except Exception:
+        supabase.storage.from_(DOCUMENTS_BUCKET).remove([storage_path])
+        if doc_row is not None:
+            supabase.table("documents").delete().eq("document_id", doc_row["document_id"]).execute()
+        raise
 
     return {
         "matter_document_id": link_row["matter_document_id"],
