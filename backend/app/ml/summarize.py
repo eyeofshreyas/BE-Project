@@ -44,6 +44,7 @@ def summarize_text(data: SummarizeRequest, profile: dict = Depends(require_roles
             supabase.table("documents")
             .select("case_id,file_path,mime_type")
             .eq("document_id", data.document_id)
+            .eq("is_deleted", False)
             .execute()
             .data
         )

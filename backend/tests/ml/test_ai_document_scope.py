@@ -50,6 +50,27 @@ def test_summarize_rejects_out_of_scope_document():
         run_ml_subprocess.assert_not_called()
 
 
+def test_summarize_rejects_soft_deleted_document():
+    """Verifies a soft-deleted document is treated as missing by summarize, matching
+    the document download and summary fetch paths, and the ML subprocess is not run.
+    Exercises: `POST /ai/summarize` (`summarize.summarize_text()`)."""
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    fake = _fake_supabase({
+        "lawyers": [{"lawyer_id": 5}],
+        "case_lawyers": [{"case_id": 10}],
+        "documents": [],
+    })
+
+    with patch("app.middleware.auth.supabase", fake), patch("app.ml.summarize.supabase", fake), \
+         patch("app.ml.summarize.run_ml_subprocess") as run_ml_subprocess:
+        try:
+            summarize_text(SummarizeRequest(text="x", document_id=42), profile)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 404
+        run_ml_subprocess.assert_not_called()
+
+
 def test_translate_rejects_out_of_scope_document():
     """Verifies translating a document whose case is out of scope raises 403 before the ML subprocess runs. Exercises: `POST /ai/translate` (`translate.translate_text()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
@@ -66,5 +87,6 @@ def test_translate_rejects_out_of_scope_document():
 
 if __name__ == "__main__":
     test_summarize_rejects_out_of_scope_document()
+    test_summarize_rejects_soft_deleted_document()
     test_translate_rejects_out_of_scope_document()
     print("ok")
