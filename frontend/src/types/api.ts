@@ -67,6 +67,9 @@ export interface CaseSummary {
   cnr_number: string | null
   ecourts_status: string | null
   ecourts_last_synced_at: string | null
+  filing_number: string | null
+  registration_number: string | null
+  acts_sections: string | null
 }
 
 export interface CaseCreatePayload {

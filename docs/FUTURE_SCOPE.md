@@ -54,6 +54,32 @@ Supabase Edge Function, or APScheduler in the backend process) batching every ca
 a non-null `cnr_number` through the bulk-refresh flow, reusing `sync_case_from_ecourts()`'s
 per-case update logic rather than duplicating it.
 
+### 1.3 Auto-filling filing/registration number and acts & sections from eCourts
+
+`cases.filing_number`, `registration_number`, and `acts_sections` shipped as manually
+entered fields (`PATCH /cases/{id}/filing-details`) — a case's own court-assigned numbers,
+distinct from `cases.case_number` (LexFlow's internal reference) and from
+`conveyancing_matters`' registration fields (a property transaction's registration-office
+record, a different entity). The real eCourts case-status page shows all three (Filing
+Number/Date, Registration Number/Date, Under Acts/Under Sections), so `sync_case_from_ecourts()`
+is the obvious place to fill them in automatically instead of by hand once a CNR is linked.
+
+**Not done because the field shape isn't confirmed for this API**, unlike
+`historyOfCaseHearings` in §1.1, which was confirmed straight from the docs. Two attempts to
+read `https://ecourtsindia.com/api/docs` for this (`WebFetch`, then `curl` with a browser
+user-agent) both got HTTP 403 — the site blocks this environment's outbound requests
+entirely, docs page included. Guessing at key names (`filingNumber` vs `filing_number` vs
+something else `courtCaseData` doesn't even call it) risks the same silent-`null` bug
+`caseStatus`/`courtCode` already hit once from reading the wrong nesting level — worse here,
+since a wrong guess just writes nothing and looks shipped.
+
+**Unblocked by:** an eCourtsIndia API key (real account) to make one live `GET
+/api/partner/case/{cnr}` call and read the actual field names back, the same way §1.1 is
+unblocked. Once confirmed, extend `sync_case_from_ecourts()` to read them off `case_data`
+alongside `caseStatus`/`courtCode`, additively (only overwrite a field eCourts actually
+returned a value for, so a manually-entered value isn't blanked by a case eCourts hasn't
+indexed yet).
+
 ---
 
 ## 2. Feature gaps vs. the market (from the competitive review)

@@ -9,7 +9,7 @@ import {
   removeLawyerFromCase, addLawyerToCase, listAvailableCaseLawyers,
   getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
   listHearings, createHearing, listJudges, createJudge, listCourts, updateHearing, updateMeeting, deleteDocument,
-  setCaseCnr, syncCaseEcourts, requestSignature, listCaseParties, addCaseParty,
+  setCaseCnr, syncCaseEcourts, updateCaseFilingDetails, requestSignature, listCaseParties, addCaseParty,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
@@ -163,6 +163,11 @@ export default function CaseDetailPage() {
   const [cnrInput, setCnrInput] = useState('')
   const [cnrSaving, setCnrSaving] = useState(false)
   const [syncingEcourts, setSyncingEcourts] = useState(false)
+  const [filingDetailsEditing, setFilingDetailsEditing] = useState(false)
+  const [filingNumberInput, setFilingNumberInput] = useState('')
+  const [registrationNumberInput, setRegistrationNumberInput] = useState('')
+  const [actsSectionsInput, setActsSectionsInput] = useState('')
+  const [filingDetailsSaving, setFilingDetailsSaving] = useState(false)
   const [messaging, setMessaging] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -468,6 +473,33 @@ export default function CaseDetailPage() {
     }
   }
 
+  function openFilingDetailsEdit() {
+    setFilingNumberInput(caseInfo?.filing_number ?? '')
+    setRegistrationNumberInput(caseInfo?.registration_number ?? '')
+    setActsSectionsInput(caseInfo?.acts_sections ?? '')
+    setFilingDetailsEditing(true)
+  }
+
+  /** Saves the court's own filing number, registration number, and acts/sections -- manually
+   * entered; eCourts sync doesn't fill these in (see docs/FUTURE_SCOPE.md). */
+  async function saveFilingDetails() {
+    setFilingDetailsSaving(true)
+    try {
+      const updated = await updateCaseFilingDetails(numericCaseId, {
+        filing_number: filingNumberInput.trim(),
+        registration_number: registrationNumberInput.trim(),
+        acts_sections: actsSectionsInput.trim(),
+      })
+      setCaseInfo(updated)
+      setFilingDetailsEditing(false)
+      showToast('Filing details saved.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save filing details.')
+    } finally {
+      setFilingDetailsSaving(false)
+    }
+  }
+
   function openOutcomeForm(kind: 'hearing' | 'meeting', id: number, status: string, text: string) {
     setOutcomeFor({ kind, id })
     setOutcomeStatus(status)
@@ -767,6 +799,7 @@ export default function CaseDetailPage() {
           <div className={cd.facts}>
             <Fact label="Client" value={caseInfo.client ?? 'Not recorded'} />
             <Fact label="Case type" value={caseInfo.case_type ?? 'Not set'} />
+            <Fact label="Filed on" value={caseInfo.filing_date ? formatDay(caseInfo.filing_date) : 'Not recorded'} />
             <Fact label="Next hearing" value={caseInfo.hearing ? formatDay(caseInfo.hearing) : 'Not scheduled'}>
               {caseInfo.hearing && (
                 <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => navigate('/hearings')}>View in calendar</button>
@@ -1280,6 +1313,33 @@ export default function CaseDetailPage() {
                     </a>
                   )}
                 </div>
+              </Card>
+            )}
+
+            {canManage && (
+              <Card
+                title="Filing details"
+                action={!filingDetailsEditing ? <button className={cd.linkAction} onClick={openFilingDetailsEdit}>Edit</button> : undefined}
+              >
+                {filingDetailsEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input value={filingNumberInput} onChange={(e) => setFilingNumberInput(e.target.value)} placeholder="Filing number" style={inputStyle} />
+                    <input value={registrationNumberInput} onChange={(e) => setRegistrationNumberInput(e.target.value)} placeholder="Registration number" style={inputStyle} />
+                    <input value={actsSectionsInput} onChange={(e) => setActsSectionsInput(e.target.value)} placeholder="Acts & sections (e.g. IPC 420, 406)" style={inputStyle} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div className={styles.primaryChip} style={{ opacity: filingDetailsSaving ? 0.6 : 1 }} onClick={() => !filingDetailsSaving && saveFilingDetails()}>
+                        {filingDetailsSaving ? 'Saving…' : 'Save'}
+                      </div>
+                      <div className={styles.ghostChip} onClick={() => setFilingDetailsEditing(false)}>Cancel</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <Fact label="Filing number" value={caseInfo.filing_number ?? 'Not recorded'} />
+                    <Fact label="Registration number" value={caseInfo.registration_number ?? 'Not recorded'} />
+                    <Fact label="Acts & sections" value={caseInfo.acts_sections ?? 'Not recorded'} />
+                  </div>
+                )}
               </Card>
             )}
 

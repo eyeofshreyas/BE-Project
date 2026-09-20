@@ -64,8 +64,20 @@ class CaseSummary(BaseModel):
     cnr_number: str | None
     ecourts_status: str | None
     ecourts_last_synced_at: str | None
+    filing_number: str | None
+    registration_number: str | None
+    acts_sections: str | None
 
 
 class CnrUpdate(BaseModel):
     """Request body for attaching a case's eCourts CNR number."""
     cnr_number: str
+
+
+class CaseFilingUpdate(BaseModel):
+    """Request body for editing a case's court-assigned filing/registration numbers and
+    acts/sections -- manually entered (see docs/FUTURE_SCOPE.md for why eCourts sync doesn't
+    fill these in yet). Every field optional; only the ones sent are written."""
+    filing_number: str | None = None
+    registration_number: str | None = None
+    acts_sections: str | None = None

@@ -383,6 +383,10 @@ export function syncCaseEcourts(caseId: number) {
   return post<CaseSummary>(`/cases/${caseId}/sync-ecourts`, {})
 }
 
+export function updateCaseFilingDetails(caseId: number, payload: { filing_number?: string; registration_number?: string; acts_sections?: string }) {
+  return patch<CaseSummary>(`/cases/${caseId}/filing-details`, payload)
+}
+
 export function listInvoices() {
   return get<InvoiceSummary[]>('/billing/invoices')
 }

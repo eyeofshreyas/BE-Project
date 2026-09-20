@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.cases import _to_case_summary, add_lawyer_to_case, create_case, list_available_case_lawyers, remove_lawyer_from_case
-from app.models.cases import AddLawyerRequest, CaseCreate
+from app.controllers.cases import _to_case_summary, add_lawyer_to_case, create_case, list_available_case_lawyers, remove_lawyer_from_case, update_case_filing_details
+from app.models.cases import AddLawyerRequest, CaseCreate, CaseFilingUpdate
 
 
 def _role_gate(fn):
@@ -232,6 +232,29 @@ def test_associate_cannot_remove_someone_else():
     with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
         try:
             remove_lawyer_from_case(42, 5, ASSOCIATE_LAWYER_PROFILE)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 403
+
+
+def test_update_case_filing_details_writes_only_provided_fields():
+    """Verifies update_case_filing_details writes only the field(s) sent, not the ones left
+    out, and returns the refreshed case. Exercises: `PATCH /cases/{id}/filing-details`
+    (`cases.update_case_filing_details()`)."""
+    fake = _fake_supabase_for_team(assigned_case_ids={42}, case_row=TEAM_CASE_ROW, target_lawyer_org_id=7, caller_lawyer_id=5)
+    with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
+        result = update_case_filing_details(42, CaseFilingUpdate(registration_number="REG/2026/123"), PRIMARY_LAWYER_PROFILE)
+    assert result["case_id"] == 42
+    fake.table("cases").update.assert_called_once_with({"registration_number": "REG/2026/123"})
+
+
+def test_update_case_filing_details_rejects_out_of_scope_case():
+    """Verifies a lawyer not scoped to this case can't edit its filing details; raises 403.
+    Exercises: `PATCH /cases/{id}/filing-details` (`cases.update_case_filing_details()`)."""
+    fake = _fake_supabase_for_team(assigned_case_ids={99}, case_row=TEAM_CASE_ROW, target_lawyer_org_id=7, caller_lawyer_id=5)
+    with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
+        try:
+            update_case_filing_details(42, CaseFilingUpdate(filing_number="F/1"), PRIMARY_LAWYER_PROFILE)
             assert False, "expected HTTPException"
         except HTTPException as e:
             assert e.status_code == 403

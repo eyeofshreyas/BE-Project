@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, SUPER_ADMIN, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
-from app.models.cases import AddLawyerRequest, CaseCreate, CaseSummary
+from app.models.cases import AddLawyerRequest, CaseCreate, CaseFilingUpdate, CaseSummary
 
 # ponytail: hard cap, not real pagination -- an org/lawyer/client's own scope is naturally
 # bounded, but the super-admin's unrestricted view (case_ids=None) is a full-platform scan
@@ -14,7 +14,7 @@ MAX_CASES = 1000
 
 CASES_SELECT = (
     "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,description,"
-    "cnr_number,ecourts_status,ecourts_last_synced_at,"
+    "cnr_number,ecourts_status,ecourts_last_synced_at,filing_number,registration_number,acts_sections,"
     "client_id,org_id,"
     "clients(users(full_name,email,phone)),"
     "courts(court_name),"
@@ -74,6 +74,9 @@ def _to_case_summary(row: dict) -> dict:
         "cnr_number": row.get("cnr_number"),
         "ecourts_status": row.get("ecourts_status"),
         "ecourts_last_synced_at": row.get("ecourts_last_synced_at"),
+        "filing_number": row.get("filing_number"),
+        "registration_number": row.get("registration_number"),
+        "acts_sections": row.get("acts_sections"),
     }
 
 
@@ -88,6 +91,18 @@ def list_cases(profile: dict = Depends(get_current_profile)):
         query = query.in_("case_id", list(case_ids))
     rows = query.order("case_id").limit(MAX_CASES).execute().data
     return [_to_case_summary(row) for row in rows]
+
+
+def update_case_filing_details(case_id: int, data: CaseFilingUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
+    """Edit a case's court-assigned filing number, registration number, and/or acts/sections --
+    manually entered; see docs/FUTURE_SCOPE.md for why eCourts sync doesn't fill these in yet.
+    Only the fields sent are written. Calls: `ensure_case_access()`, `_to_case_summary()`."""
+    ensure_case_access(case_id, profile)
+    updates = {k: v for k, v in data.model_dump().items() if v is not None}
+    if updates:
+        supabase.table("cases").update(updates).eq("case_id", case_id).execute()
+    row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
+    return _to_case_summary(row)
 
 
 def _generate_case_number(case_type_name: str) -> str:
