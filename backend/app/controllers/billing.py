@@ -257,6 +257,15 @@ def verify_razorpay_payment(invoice_id: int, data: RazorpayVerify, profile: dict
     if payment.get("order_id") != data.razorpay_order_id or payment.get("status") != "captured":
         raise HTTPException(status_code=400, detail="Payment was not captured.")
 
+    # The signature and the payment fetch only prove this order/payment pair is Razorpay's --
+    # not that the order was raised for *this* invoice. create_razorpay_order() stamps the
+    # invoice_number as the order's receipt, so read it back and bind the two.
+    order_resp = httpx.get(f"{RAZORPAY_API}/orders/{data.razorpay_order_id}", auth=(key_id, key_secret), timeout=15)
+    if order_resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Could not confirm order with Razorpay.")
+    if order_resp.json().get("receipt") != invoice["invoice_number"]:
+        raise HTTPException(status_code=400, detail="This payment was not made for this invoice.")
+
     # idempotency: a retried/double-submitted verify call must not double-record the same
     # Razorpay payment (e.g. the client re-firing after a dropped response).
     existing = supabase.table("payments").select(PAYMENTS_SELECT).eq("transaction_reference", data.razorpay_payment_id).execute().data

@@ -79,15 +79,22 @@ def _razorpay_response(status_code=200, payload=None):
 
 
 CAPTURED = {"order_id": "order_abc", "status": "captured", "amount": 100000, "method": "upi"}
+ORDER = {"id": "order_abc", "receipt": "INV-7"}  # matches INVOICE["invoice_number"]
 
 
-def _verify(data, billing_fake, http_payload=CAPTURED, http_status=200):
-    """Run verify_razorpay_payment with Razorpay's key config and HTTP call stubbed out."""
+def _verify(data, billing_fake, http_payload=CAPTURED, http_status=200, order_payload=ORDER, order_status=200):
+    """Run verify_razorpay_payment with Razorpay's key config and HTTP calls stubbed out.
+    The payment fetch (/payments/{id}) and order fetch (/orders/{id}) are routed by URL."""
+    def fake_get(url, **kwargs):
+        if "/orders/" in url:
+            return _razorpay_response(order_status, order_payload)
+        return _razorpay_response(http_status, http_payload)
+
     with patch("app.controllers.billing.RAZORPAY_KEY_ID", KEY_ID), \
          patch("app.controllers.billing.RAZORPAY_KEY_SECRET", KEY_SECRET), \
          patch("app.middleware.auth.supabase", _auth_supabase()), \
          patch("app.controllers.billing.supabase", billing_fake), \
-         patch("app.controllers.billing.httpx.get", return_value=_razorpay_response(http_status, http_payload)):
+         patch("app.controllers.billing.httpx.get", side_effect=fake_get):
         return verify_razorpay_payment(7, data, ADMIN_PROFILE)
 
 
@@ -132,6 +139,23 @@ def test_payment_belonging_to_a_different_order_is_rejected():
     with pytest.raises(HTTPException) as err:
         _verify(data, _billing_supabase(), http_payload={**CAPTURED, "order_id": "order_someone_else"})
     assert err.value.status_code == 400
+
+
+def test_payment_for_a_different_invoices_order_is_rejected():
+    """Verifies a genuinely captured payment whose order was raised for a *different* invoice
+    (mismatched receipt) is rejected -- otherwise a client could pay their smallest invoice and
+    POST that confirmation against their largest, since the signature and capture checks alone
+    only prove the order/payment pair is Razorpay's, not which invoice it was for.
+    Exercises: `POST /invoices/{id}/razorpay/verify` (`billing.verify_razorpay_payment()`)."""
+    inserted = {}
+    data = RazorpayVerify(
+        razorpay_order_id="order_abc", razorpay_payment_id="pay_abc",
+        razorpay_signature=_signature("order_abc", "pay_abc"),
+    )
+    with pytest.raises(HTTPException) as err:
+        _verify(data, _billing_supabase(inserted_sink=inserted), order_payload={"id": "order_abc", "receipt": "INV-999"})
+    assert err.value.status_code == 400
+    assert not inserted, "a payment for someone else's invoice must not be recorded"
 
 
 def test_amount_recorded_comes_from_razorpay_not_the_caller():
