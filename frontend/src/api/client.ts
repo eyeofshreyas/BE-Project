@@ -204,9 +204,12 @@ export function getDocumentSummary(documentId: number) {
 }
 
 /** Summarizes a document. With no `text`, the backend reads the stored file's own text --
- * pass text only to override that (a scan, or a file type it can't read). */
+ * pass text only to override that (a scan, or a file type it can't read). Extracting that
+ * text (OCR included) runs in the backend as a queued job, so this returns immediately with
+ * status "pending" in that case; poll getDocumentSummary() for the result. Passing `text`
+ * skips extraction and answers with status "done" and the summary inline. */
 export function summarizeDocument(documentId: number, text = '') {
-  return post<{ summary: string }>('/ai/summarize', { text, document_id: documentId })
+  return post<{ summary: string; status: 'pending' | 'done' }>('/ai/summarize', { text, document_id: documentId })
 }
 
 export function requestSignature(documentId: number, signers: { name: string; email: string }[]) {

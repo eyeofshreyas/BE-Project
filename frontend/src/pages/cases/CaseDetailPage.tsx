@@ -457,15 +457,30 @@ export default function CaseDetailPage() {
     }
   }
 
-  /** Pulls the latest status for this case from eCourts by its CNR (`POST /cases/:id/sync-ecourts`)
-   * and refreshes the timeline, since a sync logs its own event there. */
+  /** Queues a pull of the latest status for this case from eCourts by its CNR
+   * (`POST /cases/:id/sync-ecourts`) -- the HTTP round trip runs as a backend job, so this
+   * polls `listCases()` (there's no single-case GET) until ecourts_sync_status leaves
+   * "syncing", then refreshes the timeline, since a completed sync logs its own event there. */
   async function syncEcourts() {
     setSyncingEcourts(true)
     try {
-      const updated = await syncCaseEcourts(numericCaseId)
+      let updated = await syncCaseEcourts(numericCaseId)
       setCaseInfo(updated)
-      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
-      showToast('Synced with eCourts.')
+      for (let attempt = 0; attempt < 15 && updated.ecourts_sync_status === 'syncing'; attempt++) {
+        await new Promise((r) => setTimeout(r, 2000))
+        const found = (await listCases()).find((c) => c.case_id === numericCaseId)
+        if (!found) break
+        updated = found
+        setCaseInfo(updated)
+      }
+      if (updated.ecourts_sync_status === 'error') {
+        showToast(updated.ecourts_sync_error || 'Failed to sync with eCourts.')
+      } else if (updated.ecourts_sync_status === 'syncing') {
+        showToast('Still syncing with eCourts -- check back in a moment.')
+      } else {
+        listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+        showToast('Synced with eCourts.')
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to sync with eCourts.')
     } finally {

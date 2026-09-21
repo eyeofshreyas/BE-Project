@@ -56,7 +56,9 @@ def list_documents(profile: dict = Depends(get_current_profile)):
 
     summarized_ids: set[int] = set()
     if rows:
-        summary_rows = supabase.table("ai_summaries").select("document_id").in_(
+        # Only "done" counts as summarized -- a "pending" row exists as soon as /ai/summarize
+        # queues the background job, before there's anything to show.
+        summary_rows = supabase.table("ai_summaries").select("document_id").eq("status", "done").in_(
             "document_id", [r["document_id"] for r in rows]
         ).execute().data
         summarized_ids = {r["document_id"] for r in summary_rows}
@@ -243,7 +245,7 @@ def get_document_summary(document_id: int, profile: dict = Depends(get_current_p
 
     rows = (
         supabase.table("ai_summaries")
-        .select("summary_text,translated_text,keywords,important_dates,important_sections")
+        .select("summary_text,translated_text,keywords,important_dates,important_sections,status,error_message")
         .eq("document_id", document_id)
         .order("summary_id", desc=True)
         .limit(1)

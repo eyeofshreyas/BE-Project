@@ -10,6 +10,7 @@ from app.middleware import auth
 from app.controllers.cases import _generate_case_number
 from app.controllers.client_requests import respond_client_request, send_client_request
 from app.models.client_requests import ClientRequestCreate, ClientRequestDecision
+from tests.conftest import ImmediateBackgroundTasks
 
 
 def _fake_supabase(client_id: int, request_row: dict, lawyer_user_id: int = 5):
@@ -171,7 +172,7 @@ def test_send_client_request_emails_invitee_with_no_account():
     payload = ClientRequestCreate(email="new@client.com", court_id=1, case_type_id=1)
     with patch("app.controllers.client_requests.supabase", _fake_supabase_for_send(request_row)), \
          patch("app.controllers.client_requests.send_email") as mock_send:
-        send_client_request(payload, profile)
+        send_client_request(payload, ImmediateBackgroundTasks(), profile)
         mock_send.assert_called_once()
         assert mock_send.call_args[0][0] == "new@client.com"
 
@@ -187,7 +188,7 @@ def test_send_client_request_notifies_existing_client():
     fake = _fake_supabase_for_send(request_row, existing_user={"user_id": 42, "role_id": auth.CLIENT})
     with patch("app.controllers.client_requests.supabase", fake), \
          patch("app.controllers.client_requests.send_email"):
-        send_client_request(payload, profile)
+        send_client_request(payload, ImmediateBackgroundTasks(), profile)
         inserted = fake.table("notifications").insert.call_args[0][0]
         assert inserted["user_id"] == 42
 

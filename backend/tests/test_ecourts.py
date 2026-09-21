@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from app.middleware import auth
 from app.controllers.ecourts import set_case_cnr, sync_case_from_ecourts
 from app.models.cases import CnrUpdate
+from tests.conftest import ImmediateBackgroundTasks
 
 LAWYER_SCOPED_TO_CASE_10 = {"lawyers": [{"lawyer_id": 5}], "case_lawyers": [{"case_id": 10}]}
 
@@ -68,7 +69,7 @@ def test_sync_case_rejects_case_without_cnr():
          patch("app.controllers.ecourts.supabase", _fake_supabase({"cases": [{"cnr_number": None}]})), \
          patch("app.controllers.ecourts.ECOURTS_API_KEY", "eci_live_test"):
         try:
-            sync_case_from_ecourts(10, profile)
+            sync_case_from_ecourts(10, ImmediateBackgroundTasks(), profile)
             assert False, "expected HTTPException"
         except HTTPException as e:
             assert e.status_code == 400
@@ -122,14 +123,18 @@ def test_sync_case_writes_status_and_timeline_event():
          patch("app.controllers.case_history.supabase", fake), \
          patch("app.controllers.ecourts.ECOURTS_API_KEY", "eci_live_test"), \
          patch("app.controllers.ecourts.httpx.get", return_value=fake_response) as mock_get:
-        result = sync_case_from_ecourts(10, profile)
+        result = sync_case_from_ecourts(10, ImmediateBackgroundTasks(), profile)
 
         assert result["id"] == "LX-1"
         assert mock_get.call_args.args[0].endswith(f"/api/partner/case/{cnr}")
 
+        # First cases write is the "syncing" marker set before the background job is queued;
+        # the job's own update (containing ecourts_raw) lands once ImmediateBackgroundTasks
+        # runs it synchronously.
         case_writes = [p for (t, p) in writes if t == "cases"]
-        assert case_writes[0]["ecourts_status"] == "PENDING"
-        assert case_writes[0]["ecourts_raw"] == {"courtCaseData": {"caseStatus": "PENDING", "courtCode": "DLHC01"}}
+        result_write = next(p for p in case_writes if "ecourts_raw" in p)
+        assert result_write["ecourts_status"] == "PENDING"
+        assert result_write["ecourts_raw"] == {"courtCaseData": {"caseStatus": "PENDING", "courtCode": "DLHC01"}}
 
         timeline_writes = [p for (t, p) in writes if t == "case_timeline"]
         assert timeline_writes[0]["event_type"] == "ecourts_synced"
@@ -181,11 +186,12 @@ def test_sync_case_does_not_blank_status_when_response_lacks_it():
          patch("app.controllers.case_history.supabase", fake), \
          patch("app.controllers.ecourts.ECOURTS_API_KEY", "eci_live_test"), \
          patch("app.controllers.ecourts.httpx.get", return_value=fake_response):
-        sync_case_from_ecourts(10, profile)
+        sync_case_from_ecourts(10, ImmediateBackgroundTasks(), profile)
 
     case_writes = [p for (t, p) in writes if t == "cases"]
-    assert "ecourts_status" not in case_writes[0]
-    assert "ecourts_raw" in case_writes[0] and "ecourts_last_synced_at" in case_writes[0]
+    result_write = next(p for p in case_writes if "ecourts_raw" in p)
+    assert "ecourts_status" not in result_write
+    assert "ecourts_raw" in result_write and "ecourts_last_synced_at" in result_write
 
 
 if __name__ == "__main__":

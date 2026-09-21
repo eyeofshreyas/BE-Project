@@ -14,7 +14,8 @@ MAX_CASES = 1000
 
 CASES_SELECT = (
     "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,description,"
-    "cnr_number,ecourts_status,ecourts_last_synced_at,filing_number,registration_number,acts_sections,"
+    "cnr_number,ecourts_status,ecourts_last_synced_at,ecourts_sync_status,ecourts_sync_error,"
+    "filing_number,registration_number,acts_sections,"
     "client_id,org_id,"
     "clients(users(full_name,email,phone)),"
     "courts(court_name),"
@@ -74,6 +75,8 @@ def _to_case_summary(row: dict) -> dict:
         "cnr_number": row.get("cnr_number"),
         "ecourts_status": row.get("ecourts_status"),
         "ecourts_last_synced_at": row.get("ecourts_last_synced_at"),
+        "ecourts_sync_status": row.get("ecourts_sync_status") or "idle",
+        "ecourts_sync_error": row.get("ecourts_sync_error"),
         "filing_number": row.get("filing_number"),
         "registration_number": row.get("registration_number"),
         "acts_sections": row.get("acts_sections"),

@@ -67,6 +67,8 @@ export interface CaseSummary {
   cnr_number: string | null
   ecourts_status: string | null
   ecourts_last_synced_at: string | null
+  ecourts_sync_status: 'idle' | 'syncing' | 'error'
+  ecourts_sync_error: string | null
   filing_number: string | null
   registration_number: string | null
   acts_sections: string | null
@@ -232,11 +234,13 @@ export interface DocumentSummary {
 }
 
 export interface AiSummary {
-  summary_text: string
+  summary_text: string | null
   translated_text: string | null
   keywords: string | null
   important_dates: string | null
   important_sections: string | null
+  status: 'pending' | 'done' | 'error'
+  error_message: string | null
 }
 
 export interface UserSummary {

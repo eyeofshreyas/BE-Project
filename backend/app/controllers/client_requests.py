@@ -4,7 +4,7 @@
 
 from datetime import datetime, timezone
 
-from fastapi import Depends, HTTPException
+from fastapi import BackgroundTasks, Depends, HTTPException
 from app.core.config import FRONTEND_URL
 from app.core.email import send_email
 from app.db.supabase_client import supabase
@@ -41,7 +41,7 @@ def _to_summary(row: dict) -> dict:
     }
 
 
-def send_client_request(data: ClientRequestCreate, profile: dict = Depends(require_roles(LAWYER))):
+def send_client_request(data: ClientRequestCreate, background_tasks: BackgroundTasks, profile: dict = Depends(require_roles(LAWYER))):
     """Send an invite to a client by email (existing user or not-yet-registered), notify
     an existing user in-app, and always email a link. Calls: `send_email()`, `_to_summary()`."""
     lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
@@ -83,7 +83,8 @@ def send_client_request(data: ClientRequestCreate, profile: dict = Depends(requi
         }).execute()
 
     destination = "/signup" if "invite_email" in insert else "/login"
-    send_email(
+    background_tasks.add_task(
+        send_email,
         data.email,
         f"{profile['full_name']} of {firm_name} invited you to LexFlow",
         f"{profile['full_name']} of {firm_name} would like to connect with you on LexFlow.\n\n"

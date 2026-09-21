@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from app.middleware import auth
 from app.ml.summarize import summarize_text, SummarizeRequest
 from app.ml.translate import translate_text, TranslateRequest
+from tests.conftest import ImmediateBackgroundTasks
 
 
 def _fake_supabase(rows_by_table):
@@ -43,7 +44,7 @@ def test_summarize_rejects_out_of_scope_document():
     with patch("app.middleware.auth.supabase", fake), patch("app.ml.summarize.supabase", fake), \
          patch("app.ml.summarize.run_ml_subprocess") as run_ml_subprocess:
         try:
-            summarize_text(SummarizeRequest(text="x", document_id=42), profile)
+            summarize_text(SummarizeRequest(text="x", document_id=42), ImmediateBackgroundTasks(), profile)
             assert False, "expected HTTPException"
         except HTTPException as e:
             assert e.status_code == 403

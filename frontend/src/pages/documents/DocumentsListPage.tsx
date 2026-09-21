@@ -140,7 +140,9 @@ export default function DocumentsListPage() {
     setTranslating(true)
     let source: string
     try {
-      source = (await getDocumentSummary(id)).summary_text
+      const existing = await getDocumentSummary(id)
+      if (existing.status !== 'done' || !existing.summary_text) throw new Error()
+      source = existing.summary_text
     } catch {
       setTranslateError('Generate an AI summary for this document first -- translation runs on its summary text.')
       setTranslating(false)
@@ -200,8 +202,20 @@ export default function DocumentsListPage() {
     setGenerating(true)
     setGenError('')
     try {
-      const { summary: summaryText } = await summarizeDocument(id, genText)
-      setSummary({ summary_text: summaryText, translated_text: null, keywords: null, important_dates: null, important_sections: null })
+      const { summary: summaryText, status } = await summarizeDocument(id, genText)
+      let result: AiSummary = { summary_text: summaryText, translated_text: null, keywords: null, important_dates: null, important_sections: null, status, error_message: null }
+      if (status === 'pending') {
+        // Extracting the file's text (OCR included) runs as a backend job -- poll
+        // GET /documents/:id/summary until it flips to "done"/"error".
+        for (let attempt = 0; attempt < 40; attempt++) {
+          await new Promise((r) => setTimeout(r, 3000))
+          result = await getDocumentSummary(id)
+          if (result.status !== 'pending') break
+        }
+      }
+      if (result.status === 'error') throw new Error(result.error_message || 'Failed to generate summary.')
+      if (result.status === 'pending') throw new Error('Still generating -- reopen the summary in a moment.')
+      setSummary(result)
       setSummaryError('')
       setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, has_summary: true } : d)))
     } catch (err) {
@@ -424,16 +438,19 @@ export default function DocumentsListPage() {
                     {expandedId === d.id && (
                       <div style={{ fontSize: 12.5, color: '#33302A', borderTop: '1px solid #F1EDE0', paddingTop: 10 }}>
                         {summaryLoading && <div style={{ color: MUTED }}>Loading summary…</div>}
-                        {summary && <div>{summary.summary_text}</div>}
-                        {summary?.translated_text && (
+                        {!summaryLoading && summary?.status === 'pending' && (
+                          <div style={{ color: MUTED }}>Generating summary… OCR and model inference can take a minute; reopen this panel to check.</div>
+                        )}
+                        {summary?.status === 'done' && <div>{summary.summary_text}</div>}
+                        {summary?.status === 'done' && summary.translated_text && (
                           <div style={{ marginTop: 8, borderTop: '1px solid #F1EDE0', paddingTop: 8 }}>
                             <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>Translation</div>
                             <div style={{ marginTop: 3 }}>{summary.translated_text}</div>
                           </div>
                         )}
-                        {!summaryLoading && !summary && (
+                        {!summaryLoading && (!summary || summary.status === 'error') && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            <div style={{ color: MUTED }}>{summaryError || "No AI summary yet -- generate one from the stored file's text."}</div>
+                            <div style={{ color: MUTED }}>{summary?.error_message || summaryError || "No AI summary yet -- generate one from the stored file's text."}</div>
                             <textarea
                               value={genText}
                               onChange={(e) => setGenText(e.target.value)}

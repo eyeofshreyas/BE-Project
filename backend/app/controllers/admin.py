@@ -4,7 +4,7 @@ the platform-wide settings row. Gated by require_roles(ADMIN, SUPER_ADMIN)."""
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import Depends, HTTPException
+from fastapi import BackgroundTasks, Depends, HTTPException
 from postgrest.exceptions import APIError as PostgrestAPIError
 from app.core.config import FRONTEND_URL, STORAGE_QUOTA_BYTES
 from app.core.email import send_email
@@ -29,10 +29,14 @@ def _count(query) -> int:
     return query.execute().count or 0
 
 
-def invite_lawyer(data: LawyerInviteCreate, profile: dict = Depends(require_roles(ADMIN))):
+def invite_lawyer(data: LawyerInviteCreate, background_tasks: BackgroundTasks, profile: dict = Depends(require_roles(ADMIN))):
     """Create a pending invite for a lawyer to join the caller's organization and email them a
     signup link; consumed by /signup when that email signs up as a lawyer. SUPER_ADMIN is
     deliberately excluded -- that role has no org_id to invite a lawyer into.
+
+    The email is sent after the response goes out (BackgroundTasks) -- SMTP is a slow round
+    trip and the invite row is already committed, so there's nothing left for the caller to
+    wait on.
 
     An email that already has a LexFlow account can't redeem this invite -- signup for an
     existing email fails outright, and there's no way to move an existing account between
@@ -50,7 +54,8 @@ def invite_lawyer(data: LawyerInviteCreate, profile: dict = Depends(require_role
     org_rows = supabase.table("organizations").select("name").eq("org_id", profile["org_id"]).execute().data
     firm_name = org_rows[0]["name"] if org_rows else "a firm"
 
-    send_email(
+    background_tasks.add_task(
+        send_email,
         data.email,
         f"You're invited to join {firm_name} on LexFlow",
         f"{profile['full_name']} has invited you to join {firm_name} as a lawyer on LexFlow.\n\n"

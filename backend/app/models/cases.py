@@ -64,6 +64,8 @@ class CaseSummary(BaseModel):
     cnr_number: str | None
     ecourts_status: str | None
     ecourts_last_synced_at: str | None
+    ecourts_sync_status: str
+    ecourts_sync_error: str | None
     filing_number: str | None
     registration_number: str | None
     acts_sections: str | None

@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from app.middleware import auth
 from app.controllers.admin import get_analytics, get_stats, invite_lawyer, get_settings, update_settings
 from app.models.admin import LawyerInviteCreate, PlatformSettings
+from tests.conftest import ImmediateBackgroundTasks
 
 
 def _fake_supabase(case_rows, summary_rows, summarized_count, live_docs, deleted_count):
@@ -107,7 +108,7 @@ def test_invite_lawyer_creates_pending_invite_for_own_org():
     """Verifies an org admin's invite is scoped to their own org_id and emails the invitee. Exercises: `POST /admin/lawyer-invites` (`admin.invite_lawyer()`)."""
     fake = _fake_supabase_for_invite(existing_user_rows=[])
     with patch("app.controllers.admin.supabase", fake), patch("app.controllers.admin.send_email") as mock_send:
-        result = invite_lawyer(LawyerInviteCreate(email="new@firm.example"), profile={"role_id": auth.ADMIN, "org_id": 7, "full_name": "Test Admin"})
+        result = invite_lawyer(LawyerInviteCreate(email="new@firm.example"), ImmediateBackgroundTasks(), profile={"role_id": auth.ADMIN, "org_id": 7, "full_name": "Test Admin"})
     assert result["message"] == "Invite sent."
     fake.table("lawyer_invites").insert.assert_called_once_with({"org_id": 7, "email": "new@firm.example", "status": "pending"})
     mock_send.assert_called_once()
@@ -120,7 +121,7 @@ def test_invite_lawyer_rejects_an_email_with_an_existing_account():
     fake = _fake_supabase_for_invite(existing_user_rows=[{"user_id": 5}])
     with patch("app.controllers.admin.supabase", fake), patch("app.controllers.admin.send_email") as mock_send:
         try:
-            invite_lawyer(LawyerInviteCreate(email="already@registered.com"), profile={"role_id": auth.ADMIN, "org_id": 7, "full_name": "Test Admin"})
+            invite_lawyer(LawyerInviteCreate(email="already@registered.com"), ImmediateBackgroundTasks(), profile={"role_id": auth.ADMIN, "org_id": 7, "full_name": "Test Admin"})
             assert False, "expected HTTPException"
         except HTTPException as e:
             assert e.status_code == 409
