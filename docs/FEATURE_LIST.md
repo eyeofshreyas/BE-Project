@@ -170,7 +170,10 @@ shells out to a subprocess running in an isolated venv with a fine-tuned Llama-3
 model — a LoRA adapter trained specifically on judgment summarization. Case-level
 summaries skip that adapter (it only knows judgments, not case-shaped text) and fall back
 to the base model. The model reloads from scratch on every call — a known latency
-tradeoff, not yet worth a long-lived worker.
+tradeoff, not yet worth a long-lived worker. Extraction + OCR + inference for a stored
+document runs as a background job — the request returns `status: "pending"` immediately
+and the frontend polls the document's summary endpoint until it flips to `"done"` or
+`"error"`; pasted text (no document, no extraction needed) is still answered inline.
 
 **Why it matters:** a long filing or judgment takes real time to read before a lawyer can
 act on it. A summary gets them oriented fast — the point is cutting blank-page time before
@@ -224,12 +227,15 @@ translate simply couldn't read them at all.
 
 ### eCourts CNR sync
 **How it works:** a lawyer attaches a case's 16-character CNR (Case Number Record) once;
-"Sync with eCourts" calls the eCourtsIndia API (a third-party layer over the government's
-own CAPTCHA-gated portal, which has no public API) to fetch that case's live status and
-party/court details, storing the provider's own status string separately from LexFlow's
-own workflow status — and logs what changed to the case timeline. Auto-creating hearing
-rows from the response is deferred until its exact field shape is confirmed against a live
-call (see `FUTURE_SCOPE.md`).
+"Sync with eCourts" queues a background job and returns immediately (the call to the
+eCourtsIndia API is too slow to hold the request open for); the case's `ecourts_sync_status`
+flips to `"syncing"` right away and the frontend polls the case list for it to settle at
+`"idle"` (success) or `"error"`. The eCourtsIndia API (a third-party layer over the
+government's own CAPTCHA-gated portal, which has no public API) returns that case's live
+status and party/court details, storing the provider's own status string separately from
+LexFlow's own workflow status — and logs what changed to the case timeline. Auto-creating
+hearing rows from the response is deferred until its exact field shape is confirmed against
+a live call (see `FUTURE_SCOPE.md`).
 
 **Why it matters:** the single biggest feature gap identified against India-market
 competitors (JuniorLawyer, LexiZ both treat this as core). Before this, a case's status

@@ -176,7 +176,30 @@ into `case_ai_summaries`.
   status is trusted from the browser. Both 500 via `_razorpay_auth()` if
   `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are unset; the rest of the app runs
   fine without them.
-- **SMTP** (`app/core/email.py`) -- invoice reminders and password mail.
+- **SMTP** (`app/core/email.py`) -- invoice reminders, password mail, and lawyer/client
+  invites. Invite emails (`admin.invite_lawyer`, `client_requests.send_client_request`) send
+  via FastAPI `BackgroundTasks` after the response goes out, since the invite row is already
+  committed and there's nothing left for the caller to wait on.
+
+## Background jobs (`BackgroundTasks`)
+
+Two request-thread-blocking calls -- eCourts sync and document-triggered `/ai/summarize` --
+were moved to FastAPI `BackgroundTasks` jobs: the endpoint validates, writes a pending/syncing
+status, queues the task, and returns immediately. The frontend polls the existing read
+endpoint for the result. There's no request left to raise an `HTTPException` to once the
+background function runs, so failures are written into the same status column instead of
+returned to a caller.
+
+- **eCourts sync** (`controllers/ecourts.py`) -- `sync_case_from_ecourts` sets
+  `cases.ecourts_sync_status = "syncing"` and queues `_run_ecourts_sync`; poll `GET /cases`
+  for `ecourts_sync_status` to flip to `"idle"` (success, see `ecourts_status`/`ecourts_raw`)
+  or `"error"` (see `ecourts_sync_error`).
+- **Document summarize** (`app/ml/summarize.py`) -- `summarize_text` only queues a job when
+  `document_id` is given and no text was posted (text extraction + OCR + model inference is
+  the slow path; pasted text is still answered inline). It upserts `ai_summaries.status =
+  "pending"` and queues `_run_summarize_job`; poll `GET /documents/{id}/summary` for `status`
+  to flip to `"done"` (see `summary_text`) or `"error"` (see `error_message`).
+- Both jobs' status columns were added by `migrate_async_jobs.sql`.
 
 ## Domain -> route -> controller -> model map
 
@@ -194,6 +217,7 @@ into `case_ai_summaries`.
 | Trust accounting (client money/reconciliation) | `routes/trust.py` | `controllers/trust.py` | `models/trust.py` |
 | Meetings | `routes/meetings.py` | `controllers/meetings.py` | `models/meetings.py` |
 | Hearings | `routes/hearings.py` | `controllers/hearings.py` | `models/hearings.py` |
+| eCourts CNR sync (`/cases/:id/sync-ecourts`) | `routes/cases.py` | `controllers/ecourts.py` | `models/cases.py` |
 | Judgements | `routes/judgements.py` | `controllers/judgements.py` | `models/judgements.py` |
 | Reference data (courts/case types/judges/roles/document types) | `routes/reference.py` | `controllers/reference.py` | `models/reference.py` |
 | Users (admin roster, edit, hard delete + self-service profile) | `routes/users.py` | `controllers/users.py` | `models/users.py` |

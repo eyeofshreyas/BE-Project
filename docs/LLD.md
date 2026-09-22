@@ -214,8 +214,10 @@ tables/columns: `migrate_messages.sql` + `migrate_message_reads_and_attachments.
 (conversations/messages, `client_last_read_at`/`lawyer_last_read_at`, the four
 `attachment_*` columns), `migrate_judgements.sql` (+`_reasoning`),
 `migrate_case_ai_and_notes.sql` (`case_ai_summaries`, plus `case_notes.title/checklist/pinned`),
-`migrate_case_description.sql` (`cases.description`), and
-`migrate_conveyancing_matter_progress.sql` (data backfill only).
+`migrate_case_description.sql` (`cases.description`),
+`migrate_conveyancing_matter_progress.sql` (data backfill only), and
+`migrate_async_jobs.sql` (`ai_summaries.status/error_message`,
+`cases.ecourts_sync_status/ecourts_sync_error` — see §6's background-jobs note).
 
 Unread counts are two nullable timestamps on `conversations`, not a `message_reads` join
 table — a thread only ever has two participants, so "everything the other side sent after
@@ -272,6 +274,14 @@ sequenceDiagram
         AI-->>C: 200 + result
     end
 ```
+
+Exception: `/ai/summarize` with a `document_id` and no posted text (extraction + OCR +
+inference is the slow path) skips this synchronous flow -- it upserts `ai_summaries.status =
+"pending"`, queues the same subprocess call as a FastAPI `BackgroundTasks` job, and returns
+immediately; the client polls `GET /documents/{id}/summary` for `status` to become `"done"`
+or `"error"`. eCourts sync (`POST /cases/:id/sync-ecourts`, not part of this router) follows
+the same pending-then-poll shape against `cases.ecourts_sync_status`. See
+`BACKEND_ARCHITECTURE.md`'s "Background jobs" section.
 
 ---
 
