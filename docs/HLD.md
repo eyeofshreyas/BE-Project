@@ -19,6 +19,7 @@ graph TD
     Supabase[("Supabase\n(Postgres + Auth + Storage)")]
     HF["Pretrained/fine-tuned models\n(Llama-3.2 LoRA, InLegalBert, IndicTrans2)"]
     Razorpay["Razorpay\n(payment gateway)"]
+    ECourts["eCourtsIndia API\n(third-party layer over the\ngovernment eCourts portal)"]
 
     Admin -->|manage users, view all cases| System
     Lawyer -->|manage own cases, billing, hearings, message clients| System
@@ -26,6 +27,7 @@ graph TD
     System -->|store/query data, authenticate, store files| Supabase
     System -->|summarize, translate, find similar cases| HF
     System -->|create order, verify payment| Razorpay
+    System -->|sync case status/parties by CNR| ECourts
 ```
 
 ---
@@ -48,7 +50,7 @@ graph LR
 
     subgraph BE["Backend API (FastAPI)"]
         AuthRBAC["Auth & RBAC"]
-        CaseMgmt["Case Management\n(cases, notes, timeline, status)"]
+        CaseMgmt["Case Management\n(cases, notes, timeline, status,\neCourts CNR sync)"]
         Scheduling["Scheduling\n(hearings, meetings)"]
         BillingSvc["Billing\n(invoices, payments, expenses,\nRazorpay checkout)"]
         ConvSvc["Conveyancing\n(matters, due diligence, progress)"]
@@ -62,10 +64,12 @@ graph LR
     DB[("Supabase\nPostgres + Auth + Storage")]
     MLPipeline["Offline ML Pipeline\n(fine-tuning, indexing)"]
     Razorpay["Razorpay API"]
+    ECourts["eCourtsIndia API"]
 
     FE -->|REST + Bearer token| BE
     AuthRBAC --> DB
     CaseMgmt --> DB
+    CaseMgmt -->|"background job, CNR lookup\n(see LLD.md §13)"| ECourts
     Scheduling --> DB
     BillingSvc --> DB
     BillingSvc -->|order + payment verification| Razorpay
@@ -95,8 +99,9 @@ graph TD
         L2["Schedule hearings & meetings"]
         L3["Manage billing & conveyancing matters"]
         L4["Request AI summary/translation/similar-cases,\ngenerate a case-level AI summary"]
-        L5["Record judgements"]
-        L6["Message own clients (with attachments)"]
+        L5["Sync a case's status/parties from eCourts by CNR"]
+        L6["Record judgements"]
+        L7["Message own clients (with attachments)"]
     end
 
     subgraph ClientCap["Client"]
@@ -179,3 +184,4 @@ graph TD
 - **Polling, not realtime** — messaging (thread poll, unread badge) uses plain interval polling rather than websockets/Supabase Realtime; documented as a current tradeoff, not a constraint.
 - **Money is verified server-side** — Razorpay checkout succeeds in the browser, but the payment row is only written after the backend re-checks the HMAC signature *and* re-fetches the payment from Razorpay.
 - **No shared frontend state layer** — session and data fetching are handled per-page/per-view rather than through a central store; documented as a current tradeoff, not a constraint of the design.
+- **Slow calls move off the request thread** — invite emails, eCourts sync, and document-triggered summarize (SMTP, a third-party HTTP call, and OCR+model inference, respectively) all run as FastAPI `BackgroundTasks` jobs; the endpoint returns immediately and the frontend polls an existing read endpoint for the result. See `LLD.md` §§6, 13 and `BACKEND_ARCHITECTURE.md`'s "Background jobs" section.

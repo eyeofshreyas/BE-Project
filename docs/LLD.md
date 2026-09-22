@@ -36,7 +36,7 @@ graph LR
 
     FE -->|"fetch + Bearer token\n(src/api/client.ts)"| API
     FE -->|fetch| AI
-    API -->|"supabase-py client\n(HTTP/1.1, see §13)"| DB
+    API -->|"supabase-py client\n(HTTP/1.1, see §14)"| DB
     API -->|"httpx: create order,\nverify captured payment"| RZP
     AI -->|"subprocess: JSON via stdin"| R1
     AI -->|subprocess| R2
@@ -217,7 +217,7 @@ tables/columns: `migrate_messages.sql` + `migrate_message_reads_and_attachments.
 `migrate_case_description.sql` (`cases.description`),
 `migrate_conveyancing_matter_progress.sql` (data backfill only), and
 `migrate_async_jobs.sql` (`ai_summaries.status/error_message`,
-`cases.ecourts_sync_status/ecourts_sync_error` — see §6's background-jobs note).
+`cases.ecourts_sync_status/ecourts_sync_error` — see §6's background-jobs note and §13).
 
 Unread counts are two nullable timestamps on `conversations`, not a `message_reads` join
 table — a thread only ever has two participants, so "everything the other side sent after
@@ -280,8 +280,7 @@ inference is the slow path) skips this synchronous flow -- it upserts `ai_summar
 "pending"`, queues the same subprocess call as a FastAPI `BackgroundTasks` job, and returns
 immediately; the client polls `GET /documents/{id}/summary` for `status` to become `"done"`
 or `"error"`. eCourts sync (`POST /cases/:id/sync-ecourts`, not part of this router) follows
-the same pending-then-poll shape against `cases.ecourts_sync_status`. See
-`BACKEND_ARCHITECTURE.md`'s "Background jobs" section.
+the same pending-then-poll shape against `cases.ecourts_sync_status` -- see §13.
 
 ---
 
@@ -468,7 +467,51 @@ app runs fine without them.
 
 ---
 
-## 13. Supabase Client & Concurrency
+## 13. eCourts CNR Sync Flow (`POST /cases/:id/sync-ecourts`)
+
+The eCourtsIndia HTTP round trip is slow enough that it runs as a `BackgroundTasks` job
+instead of holding the request open; the frontend polls the case list for the job to settle,
+the same pending-then-poll shape used by document summarize in §6.
+
+```mermaid
+sequenceDiagram
+    participant C as CaseDetailPage
+    participant API as controllers/ecourts.py
+    participant BG as _run_ecourts_sync (background task)
+    participant EC as eCourtsIndia API
+    participant DB as Supabase
+
+    C->>API: POST /cases/:id/sync-ecourts
+    API->>API: ensure_case_access(), require a CNR is set
+    API->>DB: update cases: ecourts_sync_status = "syncing"
+    API->>BG: background_tasks.add_task(...)
+    API-->>C: 200, ecourts_sync_status = "syncing"
+    loop poll GET /cases every 2s, up to 15 tries
+        C->>API: GET /cases
+        API-->>C: ecourts_sync_status
+    end
+    BG->>EC: GET /api/partner/case/{cnr}
+    EC-->>BG: courtCaseData (status, court, parties)
+    alt success
+        BG->>DB: update cases: ecourts_raw, ecourts_status* (only if present),\necourts_sync_status = "idle"
+        BG->>DB: add_timeline_event("ecourts_synced")
+    else 404 / >=400 / exception
+        BG->>DB: update cases: ecourts_sync_status = "error", ecourts_sync_error
+    end
+```
+
+*`ecourts_status` (the provider's own status string) is only overwritten when the response
+actually carries one -- see `FUTURE_SCOPE.md` §1.1 for why a missing field must not blank out
+a previously-set status. `ecourts_sync_status` is a separate column tracking job progress,
+not the provider's status.
+
+If the poll loop exhausts its 15 tries (~30s) while still `"syncing"`, the frontend shows "check
+back in a moment" rather than treating it as a failure -- the background job keeps running
+either way and the next page load/poll will pick up its result.
+
+---
+
+## 14. Supabase Client & Concurrency
 
 `app/db/supabase_client.py` passes its own `httpx.Client(http2=False, timeout=30s)` into
 `create_client`. supabase-py's default client is HTTP/2, which multiplexes everything over
