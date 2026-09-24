@@ -16,7 +16,10 @@ Download is ~33GB total across all (source, year) tars combined (checked via HTT
 HEAD against the real bucket) -- budget real time and disk for this on a laptop.
 Tars are kept on disk after extraction (not deleted), so a re-run skips already-
 downloaded sources and the raw PDFs stay inspectable -- budget the full ~33GB of
-disk for raw/aws_judgments/ on top of the extracted dapt_corpus.jsonl.
+disk for raw/aws_judgments/ on top of the extracted dapt_corpus.jsonl. A dropped
+connection mid-tar (wifi blip, laptop sleep) retries with an HTTP Range request
+from the partial file already on disk, up to 5 attempts, instead of restarting
+that tar from byte 0.
 
 Usage:
     python prepare_aws_judgments.py
@@ -61,7 +64,10 @@ OUT_DIR = HERE / "data"
 def download_tar(label: str, url: str) -> Path:
     """Streams a source's tar for one year from the public S3 bucket, unless a complete copy is
     already on disk -- checked against the server's Content-Length, not just file existence, so a
-    tar truncated by an interrupted run gets re-downloaded instead of silently used as-is."""
+    tar truncated by an interrupted run gets re-downloaded instead of silently used as-is.
+    Retries on connection drops (a multi-hour 33GB download over laptop wifi/sleep will hit these)
+    using an HTTP Range request to resume from the partial file already on disk, instead of
+    restarting that source's whole multi-GB tar from byte 0."""
     tar_path = RAW_DIR / f"{label}.tar"
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -70,14 +76,24 @@ def download_tar(label: str, url: str) -> Path:
         print(f"{tar_path} already downloaded, skipping.")
         return tar_path
 
-    resp = requests.get(url, stream=True, timeout=60)
-    resp.raise_for_status()
-    total = int(resp.headers.get("content-length", 0))
-    with open(tar_path, "wb") as f, tqdm(total=total, unit="B", unit_scale=True, desc=label) as bar:
-        for chunk in resp.iter_content(chunk_size=1 << 20):
-            f.write(chunk)
-            bar.update(len(chunk))
-    return tar_path
+    for attempt in range(1, 6):
+        resume_at = tar_path.stat().st_size if tar_path.exists() else 0
+        headers = {"Range": f"bytes={resume_at}-"} if resume_at else {}
+        try:
+            resp = requests.get(url, stream=True, headers=headers, timeout=(30, 60))
+            resp.raise_for_status()
+            mode = "ab" if resume_at else "wb"
+            with open(tar_path, mode) as f, tqdm(
+                total=expected_size, initial=resume_at, unit="B", unit_scale=True, desc=label
+            ) as bar:
+                for chunk in resp.iter_content(chunk_size=1 << 20):
+                    f.write(chunk)
+                    bar.update(len(chunk))
+            return tar_path
+        except requests.exceptions.RequestException as exc:
+            print(f"{label}: attempt {attempt}/5 failed ({exc}); will resume from "
+                  f"{tar_path.stat().st_size if tar_path.exists() else 0} bytes")
+    raise RuntimeError(f"{label}: download failed after 5 attempts")
 
 
 def extract_texts(tar_path: Path, limit: int) -> list[str]:
