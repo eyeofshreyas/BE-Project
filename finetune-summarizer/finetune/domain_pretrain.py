@@ -1,11 +1,12 @@
 """
-Domain-adaptive continued pretraining of Llama-3.2-1B-Instruct on raw AWS
-Supreme Court judgment text (data_prep/prepare_aws_scj.py's output) --
-unsupervised next-token prediction, no summary labels needed since the AWS
-dataset doesn't have any. Run this BEFORE finetune_llama_lora.py: it merges
-the DAPT LoRA into the base model, and finetune_llama_lora.py's MODEL_NAME
-points at that merged model so the supervised IN-Abs fine-tune starts from a
-model that's already seen more real Indian Supreme Court judgment text.
+Domain-adaptive continued pretraining of Llama-3.2-1B-Instruct on raw judgment
+text combined from AWS's Supreme Court + Delhi High Court judgment datasets
+(data_prep/prepare_aws_judgments.py's output) -- unsupervised next-token
+prediction, no summary labels needed since neither AWS dataset has any. Run
+this BEFORE finetune_llama_lora.py: it merges the DAPT LoRA into the base
+model, and finetune_llama_lora.py's MODEL_NAME points at that merged model so
+the supervised IN-Abs fine-tune starts from a model that's already seen more
+real Indian court judgment text.
 
 Same QLoRA-on-4GB-GPU setup as finetune_llama_lora.py -- see that file's
 docstring for venv setup.
@@ -47,7 +48,7 @@ def main() -> None:
         use_gradient_checkpointing="unsloth",
     )
 
-    dataset = load_dataset("json", data_files="../data_prep/data/dapt_corpus.jsonl")["train"]
+    dataset = load_dataset("json", data_files="../data_prep/data/dapt_corpus.jsonl")["train"]  # combined SCJ + Delhi HC
 
     trainer = SFTTrainer(
         model=model,
