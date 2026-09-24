@@ -9,12 +9,18 @@ Sources:
   - Indian Supreme Court Judgments: https://registry.opendata.aws/indian-supreme-court-judgments/
   - Indian High Court Judgments:    https://registry.opendata.aws/indian-high-court-judgments/
   (both CC-BY-4.0; bucket layouts: https://github.com/vanga/indian-supreme-court-judgments
-   and https://github.com/vanga/indian-high-court-judgments)
+   and https://github.com/vanga/indian-high-court-judgments -- court/bench codes from that
+   repo's opendata/docs/high_courts.csv)
+
+Download is ~33GB total across all (source, year) tars combined (checked via HTTP
+HEAD against the real bucket) -- budget real time and disk for this on a laptop.
+Each tar is deleted right after its text is extracted, so peak disk usage is one
+tar at a time (~9GB, Madras HC is the largest), not all 33GB at once.
 
 Usage:
     python prepare_aws_judgments.py
 Outputs:
-    ./data/dapt_corpus.jsonl   (one {"text": "..."} per judgment, both sources combined)
+    ./data/dapt_corpus.jsonl   (one {"text": "..."} per judgment, all sources combined)
 """
 import json
 import tarfile
@@ -24,16 +30,23 @@ import requests
 from pypdf import PdfReader
 from tqdm import tqdm
 
-YEARS = [2023, 2024]  # a couple of recent years -- full datasets are far more than a 1B DAPT run needs
-MAX_DOCS_PER_YEAR = 1000  # per source, per year -- bounds pypdf extraction time and final corpus size
+YEARS = [2023, 2024]
+# ponytail: Madras HC alone has 108,621 judgments for 2023 (checked its data.index.json) --
+# "no cap" would mean days of pypdf extraction on one bench. Capped per (source, year) instead;
+# 5 sources x 2 years x 5000 lands around the ~50k-judgment target. Raise if you have GPU/CPU
+# time to spare, or add more (source, year) pairs below instead of raising this further.
+MAX_DOCS_PER_YEAR = 5000
 MAX_CHARS = 4000  # matches IN-Abs's truncation so DAPT text length matches what the later SFT stage trains on
 
-# (label, tar URL template with {year}) -- High Court is scoped to one bench (Delhi, per
-# high_courts.csv court=7_26/bench=dhcdb) rather than all 25 courts/45 benches, per this
-# project's own "1-2 courts x recent years" recommendation for the similar-case corpus.
+# (label, tar URL template with {year}) -- 4 High Courts + Supreme Court, not all 25 courts/45
+# benches, per this project's own "1-2 courts x recent years" recommendation for the similar-case
+# corpus, widened here to a handful for DAPT's larger appetite for raw text.
 SOURCES = [
     ("scj", "https://indian-supreme-court-judgments.s3.amazonaws.com/data/tar/year={year}/english/english.tar"),
     ("hc_delhi", "https://indian-high-court-judgments.s3.amazonaws.com/data/tar/year={year}/court=7_26/bench=dhcdb/data.tar"),
+    ("hc_bombay", "https://indian-high-court-judgments.s3.amazonaws.com/data/tar/year={year}/court=27_1/bench=newos/data.tar"),
+    ("hc_madras", "https://indian-high-court-judgments.s3.amazonaws.com/data/tar/year={year}/court=33_10/bench=hc_cis_mas/data.tar"),
+    ("hc_karnataka", "https://indian-high-court-judgments.s3.amazonaws.com/data/tar/year={year}/court=29_3/bench=karnataka_bng_old/data.tar"),
 ]
 
 HERE = Path(__file__).parent
@@ -95,6 +108,7 @@ def main() -> None:
             url = url_template.format(year=year)
             tar_path = download_tar(f"{label}_{year}", url)
             texts = extract_texts(tar_path, MAX_DOCS_PER_YEAR)
+            tar_path.unlink()  # free disk before the next (multi-GB) tar rather than holding all of them at once
             all_texts.extend(texts)
             source_count += len(texts)
         counts[label] = source_count

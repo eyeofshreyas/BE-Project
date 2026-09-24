@@ -16,18 +16,21 @@ Multilingual Summary use pretrained models directly (no fine-tuning) — see the
 
 ## Data
 
-### Domain-adaptive pretraining data: AWS Supreme Court + Delhi High Court Judgments
+### Domain-adaptive pretraining data: AWS Supreme Court + 4 High Courts
 
-Runs *before* the IN-Abs supervised fine-tune, not instead of it — neither AWS dataset has
-summary labels, only raw judgment text, so they can't replace IN-Abs's training pairs. Two
-AWS sources are combined into one corpus so DAPT sees more than one court's writing style.
+Runs *before* the IN-Abs supervised fine-tune, not instead of it — none of these AWS
+datasets have summary labels, only raw judgment text, so they can't replace IN-Abs's
+training pairs. Five AWS sources are combined into one corpus so DAPT sees more than one
+court's writing style, and at meaningfully larger volume than the first pass (~4k cap) —
+raised after that was flagged as too small.
 
 | | |
 |---|---|
-| What | Raw judgment PDFs, no summaries, from two AWS open-data sources combined |
-| Sources | [Indian Supreme Court Judgments](https://registry.opendata.aws/indian-supreme-court-judgments/) (`s3://indian-supreme-court-judgments`) + [Indian High Court Judgments](https://registry.opendata.aws/indian-high-court-judgments/) (`s3://indian-high-court-judgments`, scoped to Delhi HC, `court=7_26/bench=dhcdb`) — both `ap-south-1`, CC-BY-4.0, no AWS account needed |
-| Size used | 2023–2024, up to 1,000 judgments/year per source (full datasets: SCJ ~35,000 judgments/52GB 1950–2025; HC ~17.8M judgments/1.25TiB across 25 courts — this uses a small slice of each, per this project's own "1-2 courts x recent years" scoping note) |
-| Layout | SCJ: `data/tar/year=YYYY/english/english.tar`. HC: `data/tar/year=YYYY/court=7_26/bench=dhcdb/data.tar`. Both datasets' JSON/parquet metadata is bibliographic only (case title, coram, citation) — no full judgment text, so it isn't used here. |
+| What | Raw judgment PDFs, no summaries, from five AWS open-data sources combined |
+| Sources | [Indian Supreme Court Judgments](https://registry.opendata.aws/indian-supreme-court-judgments/) (`s3://indian-supreme-court-judgments`) + [Indian High Court Judgments](https://registry.opendata.aws/indian-high-court-judgments/) (`s3://indian-high-court-judgments`), scoped to Delhi (`court=7_26/bench=dhcdb`), Bombay (`27_1/newos`), Madras (`33_10/hc_cis_mas`), Karnataka (`29_3/karnataka_bng_old`) — court/bench codes from [high_courts.csv](https://github.com/vanga/indian-high-court-judgments/blob/main/opendata/docs/high_courts.csv). Both buckets `ap-south-1`, CC-BY-4.0, no AWS account needed. |
+| Size used | 2023–2024, capped at 5,000 judgments/year/source (~50k ceiling across 5 sources × 2 years) — **not** uncapped: Madras HC alone has 108,621 judgments for 2023 alone (its own `data.index.json` `file_count`), so uncapped extraction on one bench would take days. Full datasets are far larger still: SCJ ~35,000 judgments/52GB (1950–2025); HC ~17.8M judgments/1.25TiB across all 25 courts. |
+| Download size | ~33GB total across all 10 (source, year) tars combined (measured via HTTP HEAD against the live bucket) — each tar is deleted right after its text is extracted, so peak disk use is one tar at a time (~9GB, Madras is the largest), not 33GB at once |
+| Layout | SCJ: `data/tar/year=YYYY/english/english.tar`. HC: `data/tar/year=YYYY/court={court}/bench={bench}/data.tar`. Both datasets' JSON/parquet metadata is bibliographic only (case title, coram, citation) — no full judgment text, so it isn't used here. |
 | Preprocessing | PDF text extracted with `pypdf` straight out of each tar (no disk extraction), truncated to 4,000 chars per judgment — same cap as IN-Abs, so DAPT text length matches what the SFT stage trains on |
 | Script | [`data_prep/prepare_aws_judgments.py`](data_prep/prepare_aws_judgments.py) — downloads both sources, extracts text, writes one combined `data_prep/data/dapt_corpus.jsonl` |
 | Training | [`finetune/domain_pretrain.py`](finetune/domain_pretrain.py) — QLoRA continued pretraining (unsupervised, packed sequences, 1 epoch, lower LR than the SFT stage), then merges the adapter into the base and saves to `finetune/dapt_merged/` |
