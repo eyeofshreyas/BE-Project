@@ -4,6 +4,19 @@ Covers the "AI Document Summarization" feature only. Similar-Case Discovery and
 Multilingual Summary use pretrained models directly (no fine-tuning) — see the
 "Other AI features" note at the bottom.
 
+## Datasets in use — quick reference
+
+| Dataset | Link | Used for | Status |
+|---|---|---|---|
+| IN-Abs | [github.com/Law-AI/summarization](https://github.com/Law-AI/summarization) · [Zenodo 7152317](https://zenodo.org/records/7152317) | Supervised fine-tune (judgment → headnote pairs), and the retrieval corpus for Similar Case Discovery | Run — 7,028/100 train/test pairs produced |
+| ILC | [huggingface.co/datasets/d0r1h/ILC](https://huggingface.co/datasets/d0r1h/ILC) | Out-of-distribution eval set only, not training | Script written, GPU eval run pending |
+| Indian Supreme Court Judgments (AWS) | [registry.opendata.aws/indian-supreme-court-judgments](https://registry.opendata.aws/indian-supreme-court-judgments/) | Domain-adaptive pretraining corpus (raw text, unsupervised, before the IN-Abs fine-tune) | Download in progress |
+| Indian High Court Judgments (AWS) — Delhi, Bombay, Madras, Karnataka | [registry.opendata.aws/indian-high-court-judgments](https://registry.opendata.aws/indian-high-court-judgments/) · [court/bench codes](https://github.com/vanga/indian-high-court-judgments/blob/main/opendata/docs/high_courts.csv) | Domain-adaptive pretraining corpus, combined with SCJ above | Download in progress |
+| `law-ai/InLegalBert` (model, not a dataset) | [huggingface.co/law-ai/InLegalBert](https://huggingface.co/law-ai/InLegalBert) | Pretrained embedding model for Similar Case Discovery — no training data needed, used as-is | Verified, in use |
+| `law-ai/InLegalTrans-En2Indic-1B` (model, not a dataset) | [huggingface.co/law-ai/InLegalTrans-En2Indic-1B](https://huggingface.co/law-ai/InLegalTrans-En2Indic-1B) | Pretrained translation model for Multilingual Summary — tuned by its authors on MILPaC, we don't retrain it | Verified, in use |
+
+Not used anywhere in this repo, looked into only as candidates: **MILPaC** ([github.com/Law-AI/MILPaC](https://github.com/Law-AI/MILPaC), CC BY-NC-SA — non-commercial only), **InLegalNER** ([huggingface.co/datasets/opennyaiorg/InLegalNER](https://huggingface.co/datasets/opennyaiorg/InLegalNER)), **ILDC/CJPE** ([github.com/Exploration-Lab/CJPE](https://github.com/Exploration-Lab/CJPE)), **IL-TUR** ([huggingface.co/datasets/Exploration-Lab/IL-TUR](https://huggingface.co/datasets/Exploration-Lab/IL-TUR)).
+
 ## Model
 
 | | |
