@@ -14,8 +14,9 @@ Sources:
 
 Download is ~33GB total across all (source, year) tars combined (checked via HTTP
 HEAD against the real bucket) -- budget real time and disk for this on a laptop.
-Each tar is deleted right after its text is extracted, so peak disk usage is one
-tar at a time (~9GB, Madras HC is the largest), not all 33GB at once.
+Tars are kept on disk after extraction (not deleted), so a re-run skips already-
+downloaded sources and the raw PDFs stay inspectable -- budget the full ~33GB of
+disk for raw/aws_judgments/ on top of the extracted dapt_corpus.jsonl.
 
 Usage:
     python prepare_aws_judgments.py
@@ -58,12 +59,16 @@ OUT_DIR = HERE / "data"
 
 
 def download_tar(label: str, url: str) -> Path:
-    """Streams a source's tar for one year from the public S3 bucket, unless already downloaded."""
+    """Streams a source's tar for one year from the public S3 bucket, unless a complete copy is
+    already on disk -- checked against the server's Content-Length, not just file existence, so a
+    tar truncated by an interrupted run gets re-downloaded instead of silently used as-is."""
     tar_path = RAW_DIR / f"{label}.tar"
-    if tar_path.exists():
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+
+    expected_size = int(requests.head(url, timeout=30).headers.get("content-length", 0))
+    if tar_path.exists() and tar_path.stat().st_size == expected_size:
         print(f"{tar_path} already downloaded, skipping.")
         return tar_path
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
 
     resp = requests.get(url, stream=True, timeout=60)
     resp.raise_for_status()
@@ -113,7 +118,6 @@ def main() -> None:
                 url = url_template.format(year=year)
                 tar_path = download_tar(f"{label}_{year}", url)
                 texts = extract_texts(tar_path, MAX_DOCS_PER_YEAR)
-                tar_path.unlink()  # free disk before the next (multi-GB) tar rather than holding all of them at once
                 for text in texts:
                     out.write(json.dumps({"text": text}) + "\n")
                 out.flush()
