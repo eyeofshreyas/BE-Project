@@ -8,6 +8,11 @@ pairs, via Unsloth. Sized for a 4GB local GPU (e.g. RTX 3050 laptop):
     edit MODEL_NAME to "unsloth/Llama-3.2-3B-Instruct-bnb-4bit" and drop
     MAX_SEQ_LENGTH further if you attempt it, expect possible OOM.
 
+Run domain_pretrain.py first (AWS Supreme Court judgment text, see its
+docstring) so this stage starts from a domain-adapted base instead of the
+stock instruct model. Skipping that step is fine too -- change MODEL_NAME
+back to "unsloth/Llama-3.2-1B-Instruct-bnb-4bit" if you do.
+
 Local setup (venv on a partition with disk space, not the OS drive):
     python -m venv .venv && source .venv/bin/activate
     pip install torch --index-url https://download.pytorch.org/whl/cu126
@@ -19,7 +24,7 @@ from unsloth.chat_templates import get_chat_template
 from datasets import load_dataset
 from trl import SFTTrainer, SFTConfig
 
-MODEL_NAME = "unsloth/Llama-3.2-1B-Instruct-bnb-4bit"
+MODEL_NAME = "dapt_merged"  # output of domain_pretrain.py; use "unsloth/Llama-3.2-1B-Instruct-bnb-4bit" to skip DAPT
 MAX_SEQ_LENGTH = 2048  # keep small on 4GB; raise only if you have VRAM to spare
 OUTPUT_DIR = "lora_adapter"
 

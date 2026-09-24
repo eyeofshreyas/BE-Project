@@ -16,6 +16,22 @@ Multilingual Summary use pretrained models directly (no fine-tuning) — see the
 
 ## Data
 
+### Domain-adaptive pretraining data: AWS Indian Supreme Court Judgments
+
+Runs *before* the IN-Abs supervised fine-tune, not instead of it — this dataset has no
+summary labels, only raw judgment text, so it can't replace IN-Abs's training pairs.
+
+| | |
+|---|---|
+| What | Raw Indian Supreme Court judgment PDFs, no summaries |
+| Size used | 2023–2024, up to 1,000 judgments/year (full dataset is 1950–2025, ~35,000 judgments, 52GB) |
+| Source | [AWS Open Data Registry](https://registry.opendata.aws/indian-supreme-court-judgments/), public S3 bucket `indian-supreme-court-judgments` (`ap-south-1`), CC-BY-4.0, no AWS account needed |
+| Layout | `data/tar/year=YYYY/english/english.tar` per year (bundled PDFs); metadata JSON/parquet also available but bibliographic only (case title, coram, citation) — no full judgment text, so it isn't used here |
+| Preprocessing | PDF text extracted with `pypdf` straight out of the tar (no disk extraction), truncated to 4,000 chars per judgment — same cap as IN-Abs, so DAPT text length matches what the SFT stage trains on |
+| Script | [`data_prep/prepare_aws_scj.py`](data_prep/prepare_aws_scj.py) — downloads, extracts text, writes `data_prep/data/dapt_corpus.jsonl` |
+| Training | [`finetune/domain_pretrain.py`](finetune/domain_pretrain.py) — QLoRA continued pretraining (unsupervised, packed sequences, 1 epoch, lower LR than the SFT stage), then merges the adapter into the base and saves to `finetune/dapt_merged/` |
+| Status | Scripts written, **not yet run** — needs a GPU pass same as the rest of this pipeline. `finetune_llama_lora.py`'s `MODEL_NAME` already points at `dapt_merged`; fall back to the stock base model name if you skip this stage. |
+
 ### Fine-tuning data: IN-Abs
 
 | | |
