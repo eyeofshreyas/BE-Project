@@ -24,10 +24,13 @@ that tar from byte 0.
 Usage:
     python prepare_aws_judgments.py
 Outputs:
-    ./data/dapt_corpus.jsonl   (one {"text": "..."} per judgment, all sources combined --
-                                written incrementally as each (source, year) tar finishes,
-                                not all at once at the end, so `wc -l` / `tail` against it
-                                mid-run shows real progress)
+    ./data/dapt_corpus.jsonl   (one {"text": "..."} per judgment, full extracted PDF text,
+                                untruncated -- domain_pretrain.py's packing=True re-chunks the
+                                whole corpus into fixed-length windows itself, so this file is
+                                whatever length each judgment's text actually is. Written
+                                incrementally as each (source, year) tar finishes, not all at
+                                once at the end, so `wc -l` / `tail` against it mid-run shows
+                                real progress)
 """
 import json
 import tarfile
@@ -43,11 +46,6 @@ YEARS = [2023, 2024]
 # 5 sources x 2 years x 5000 lands around the ~50k-judgment target. Raise if you have GPU/CPU
 # time to spare, or add more (source, year) pairs below instead of raising this further.
 MAX_DOCS_PER_YEAR = 5000
-# Kept as head+tail rather than a pure head truncation: a judgment's holding/conclusion sits at
-# the end, and a pure-head cut meant DAPT never saw it. Total budget (4000) still matches IN-Abs's
-# truncation so DAPT text length matches what the later SFT stage trains on.
-HEAD_CHARS = 3000
-TAIL_CHARS = 1000
 
 # (label, tar URL template with {year}) -- 4 High Courts + Supreme Court, not all 25 courts/45
 # benches, per this project's own "1-2 courts x recent years" recommendation for the similar-case
@@ -101,10 +99,11 @@ def download_tar(label: str, url: str) -> Path:
 
 
 def extract_texts(tar_path: Path, limit: int) -> list[str]:
-    """Reads up to `limit` PDFs straight out of the tar (no full extraction to disk) and returns their
-    text, kept as its first HEAD_CHARS + last TAIL_CHARS (short documents kept whole) so DAPT sees
-    both a judgment's opening and its holding/conclusion, not just the opening. Skips individual
-    malformed PDFs rather than failing the whole run."""
+    """Reads up to `limit` PDFs straight out of the tar (no full extraction to disk) and returns
+    their full text, untruncated -- domain_pretrain.py trains with packing=True, which concatenates
+    and re-chunks the whole corpus into fixed-length windows itself, so capping length per document
+    here would only throw away real judgment text for no reason. Skips individual malformed PDFs
+    rather than failing the whole run."""
     texts = []
     skipped = 0
     with tarfile.open(tar_path) as tf:
@@ -120,11 +119,7 @@ def extract_texts(tar_path: Path, limit: int) -> list[str]:
                 skipped += 1
                 continue
             if text:
-                if len(text) <= HEAD_CHARS + TAIL_CHARS:
-                    kept = text
-                else:
-                    kept = text[:HEAD_CHARS] + "\n" + text[-TAIL_CHARS:]
-                texts.append(kept)
+                texts.append(text)
     if skipped:
         print(f"{tar_path.name}: skipped {skipped} malformed PDFs")
     return texts
