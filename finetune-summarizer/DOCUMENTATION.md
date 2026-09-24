@@ -87,9 +87,14 @@ Ran to completion on the local RTX 3050: all 7,028 pairs, 2 epochs, 1,758 steps,
 
 ## Evaluation
 
-`eval/evaluate_rouge.py` scores **zero-shot base model** vs **fine-tuned model** on the 100 held-out IN-Abs test pairs, using ROUGE-L against the reference headnotes — this comparison is the actual evidence that fine-tuning helped, not just that training ran.
+`eval/evaluate_rouge.py` scores **zero-shot base model** vs **fine-tuned model** on two held-out test sets, using ROUGE-L against the reference headnotes — this comparison is the actual evidence that fine-tuning helped, not just that training ran. Loads the model once and toggles the LoRA adapter on/off (`PeftModel.disable_adapter()`) rather than reloading per eval set.
 
-**Result:**
+| Eval set | Source | Size | Purpose |
+|---|---|---|---|
+| IN-Abs | Same corpus the model trained on (held-out split) | 100 pairs | In-distribution check |
+| ILC | [Trivedi et al. 2023](https://huggingface.co/datasets/d0r1h/ILC), different judgments/annotators | 100 pairs (sampled, seed 42, via `data_prep/prepare_ilc.py`) | Out-of-distribution check — catches overfitting to IN-Abs's specific summary style |
+
+**IN-Abs result:**
 
 | | ROUGE-L |
 |---|---|
@@ -97,6 +102,8 @@ Ran to completion on the local RTX 3050: all 7,028 pairs, 2 epochs, 1,758 steps,
 | Fine-tuned model | **0.2065** |
 
 +0.033 absolute / ~19% relative improvement — the fine-tune measurably improved summary quality over the pretrained baseline.
+
+ILC numbers pending a GPU run (`prepare_ilc.py` then `evaluate_rouge.py` — see SETUP.md).
 
 ## Other AI features (no fine-tuning, no training data needed)
 

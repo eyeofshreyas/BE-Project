@@ -1,7 +1,7 @@
 """
-Compares zero-shot Llama-3.1-8B-Instruct vs the fine-tuned LoRA adapter on
-the IN-Abs held-out test set, scored with ROUGE-L against the reference
-headnotes. Run on the same Colab GPU used for training, after
+Compares zero-shot Llama-3.2-1B-Instruct vs the fine-tuned LoRA adapter on two
+held-out test sets -- IN-Abs and a sampled ILC test split (data_prep/prepare_ilc.py)
+-- scored with ROUGE-L against the reference headnotes. Run after
 finetune_llama_lora.py has produced ./lora_adapter.
 """
 import json
@@ -12,8 +12,12 @@ from rouge_score import rouge_scorer
 
 MODEL_NAME = "unsloth/Llama-3.2-1B-Instruct-bnb-4bit"
 ADAPTER_DIR = "../finetune/lora_adapter"
-TEST_FILE = "../data_prep/data/test.jsonl"
 MAX_SEQ_LENGTH = 2048
+
+EVAL_SETS = {
+    "IN-Abs": "../data_prep/data/test.jsonl",
+    "ILC": "../data_prep/data/ilc_test.jsonl",
+}
 
 PROMPT = """### Instruction:
 {instruction}
@@ -25,9 +29,9 @@ PROMPT = """### Instruction:
 """
 
 
-def load_test_set():
-    """Loads the JSONL test split produced by `data_prep.prepare_in_abs.main()` into a list of dicts."""
-    with open(TEST_FILE) as f:
+def load_test_set(path):
+    """Loads a JSONL eval split (produced by prepare_in_abs.py or prepare_ilc.py) into a list of dicts."""
+    with open(path) as f:
         return [json.loads(line) for line in f]
 
 
@@ -48,31 +52,33 @@ def score(predictions, references):
     return sum(scores) / len(scores)
 
 
-def main() -> None:
-    """Loads the test set, generates summaries with both the raw base model and the LoRA-adapted model
-    (from ../finetune/lora_adapter, produced by `finetune.finetune_llama_lora.main()`), scores each against
-    references, and prints the ROUGE-L comparison. Calls: `load_test_set()`, `generate()`, `score()`."""
-    test_set = load_test_set()
+def evaluate(finetuned_model, tokenizer, test_set):
+    """Scores one eval set's zero-shot (adapter disabled) and fine-tuned (adapter enabled) ROUGE-L against
+    its references, reusing the same loaded model for both. Calls: `generate()`, `score()`."""
     references = [ex["output"] for ex in test_set]
+    with finetuned_model.disable_adapter():
+        zero_shot_preds = [generate(finetuned_model, tokenizer, ex) for ex in test_set]
+    finetuned_preds = [generate(finetuned_model, tokenizer, ex) for ex in test_set]
+    return score(zero_shot_preds, references), score(finetuned_preds, references)
 
+
+def main() -> None:
+    """Loads the base model + LoRA adapter once (from ../finetune/lora_adapter, produced by
+    `finetune.finetune_llama_lora.main()`), then scores every eval set in EVAL_SETS against it.
+    Calls: `load_test_set()`, `evaluate()`."""
     base_model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=MODEL_NAME, max_seq_length=MAX_SEQ_LENGTH, load_in_4bit=True,
     )
     FastLanguageModel.for_inference(base_model)
 
-    zero_shot_preds = [generate(base_model, tokenizer, ex) for ex in test_set]
-    zero_shot_rouge_l = score(zero_shot_preds, references)
-
     finetuned_model = PeftModel.from_pretrained(base_model, ADAPTER_DIR)
     FastLanguageModel.for_inference(finetuned_model)
 
-    finetuned_preds = [generate(finetuned_model, tokenizer, ex) for ex in test_set]
-    finetuned_rouge_l = score(finetuned_preds, references)
-
-    print(f"Zero-shot  ROUGE-L: {zero_shot_rouge_l:.4f}")
-    print(f"Fine-tuned ROUGE-L: {finetuned_rouge_l:.4f}")
-
-    assert len(zero_shot_preds) == len(finetuned_preds) == len(references)
+    for name, path in EVAL_SETS.items():
+        test_set = load_test_set(path)
+        zero_shot_rouge_l, finetuned_rouge_l = evaluate(finetuned_model, tokenizer, test_set)
+        print(f"[{name}] Zero-shot  ROUGE-L: {zero_shot_rouge_l:.4f}")
+        print(f"[{name}] Fine-tuned ROUGE-L: {finetuned_rouge_l:.4f}")
 
 
 if __name__ == "__main__":
