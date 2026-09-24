@@ -21,6 +21,21 @@ FINETUNE_VENV_PYTHON = REPO_ROOT / "finetune-summarizer" / ".venv" / "bin" / "py
 INFERENCE_DIR = REPO_ROOT / "finetune-summarizer" / "inference"
 SUMMARIZE_RUNNER = Path(__file__).resolve().parent / "runners" / "summarize_runner.py"
 
+# "Court Order" is the only document_types entry that matches what the LoRA adapter was
+# actually trained on (Supreme Court judgment -> headnote). Everything else -- Affidavit,
+# Contract, Identity Proof, and any custom type -- goes to mode="case" (base model, no
+# adapter) instead of forcing judgment-headnote-shaped output onto a document the adapter
+# has never seen the like of.
+JUDGMENT_DOCUMENT_TYPE = "Court Order"
+
+
+def _mode_for(type_name: str | None) -> str:
+    """Maps a document_types.type_name to the summarizer mode. No type known (pasted text with
+    no document_id) keeps the pre-existing default of "judgment" so that path is unchanged."""
+    if type_name is None:
+        return "judgment"
+    return "judgment" if type_name == JUDGMENT_DOCUMENT_TYPE else "case"
+
 
 class SummarizeRequest(BaseModel):
     """Request body: a document_id, raw text, or both. With a document_id and no text, the text
@@ -39,7 +54,7 @@ class SummarizeResponse(BaseModel):
     status: str = "done"
 
 
-def _run_summarize_job(document_id: int, file_path: str, mime_type: str | None) -> None:
+def _run_summarize_job(document_id: int, file_path: str, mime_type: str | None, mode: str) -> None:
     """Background counterpart to summarize_text's inline path: extracts the stored file's
     text (OCR included) and runs the model subprocess, then writes the outcome into
     ai_summaries. There's no request left to raise an HTTPException to by the time this
@@ -51,7 +66,7 @@ def _run_summarize_job(document_id: int, file_path: str, mime_type: str | None) 
 
         result = run_ml_subprocess(
             [str(FINETUNE_VENV_PYTHON), str(SUMMARIZE_RUNNER)],
-            {"text": text},
+            {"text": text, "mode": mode},
             cwd=str(INFERENCE_DIR),
             timeout=600,
         )
@@ -90,7 +105,7 @@ def summarize_text(
     if data.document_id is not None:
         doc_rows = (
             supabase.table("documents")
-            .select("case_id,file_path,mime_type")
+            .select("case_id,file_path,mime_type,document_types(type_name)")
             .eq("document_id", data.document_id)
             .execute()
             .data
@@ -100,6 +115,8 @@ def summarize_text(
         ensure_case_access(doc_rows[0]["case_id"], profile)
         doc_row = doc_rows[0]
 
+    mode = _mode_for(doc_row["document_types"]["type_name"] if doc_row and doc_row["document_types"] else None)
+
     if doc_row is not None and not text:
         supabase.table("ai_summaries").upsert({
             "document_id": data.document_id,
@@ -107,7 +124,9 @@ def summarize_text(
             "error_message": None,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }, on_conflict="document_id").execute()
-        background_tasks.add_task(_run_summarize_job, data.document_id, doc_row["file_path"], doc_row["mime_type"])
+        background_tasks.add_task(
+            _run_summarize_job, data.document_id, doc_row["file_path"], doc_row["mime_type"], mode
+        )
         return SummarizeResponse(status="pending")
 
     if not text:
@@ -121,7 +140,7 @@ def summarize_text(
     # upgrade path if latency matters.
     result = run_ml_subprocess(
         [str(FINETUNE_VENV_PYTHON), str(SUMMARIZE_RUNNER)],
-        {"text": text},
+        {"text": text, "mode": mode},
         cwd=str(INFERENCE_DIR),
         timeout=600,
     )
