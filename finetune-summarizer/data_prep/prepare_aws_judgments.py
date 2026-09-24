@@ -20,7 +20,10 @@ tar at a time (~9GB, Madras HC is the largest), not all 33GB at once.
 Usage:
     python prepare_aws_judgments.py
 Outputs:
-    ./data/dapt_corpus.jsonl   (one {"text": "..."} per judgment, all sources combined)
+    ./data/dapt_corpus.jsonl   (one {"text": "..."} per judgment, all sources combined --
+                                written incrementally as each (source, year) tar finishes,
+                                not all at once at the end, so `wc -l` / `tail` against it
+                                mid-run shows real progress)
 """
 import json
 import tarfile
@@ -97,31 +100,32 @@ def extract_texts(tar_path: Path, limit: int) -> list[str]:
 
 
 def main() -> None:
-    """Downloads each (source, year) tar, extracts judgment text, and writes the combined
-    data/dapt_corpus.jsonl. Calls: `download_tar()`, `extract_texts()`."""
+    """Downloads each (source, year) tar, extracts judgment text, and appends it to
+    data/dapt_corpus.jsonl immediately (flushed after every tar, not batched to the end) so
+    the file's growth reflects real progress. Calls: `download_tar()`, `extract_texts()`."""
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    all_texts = []
     counts = {}
-    for label, url_template in SOURCES:
-        source_count = 0
-        for year in YEARS:
-            url = url_template.format(year=year)
-            tar_path = download_tar(f"{label}_{year}", url)
-            texts = extract_texts(tar_path, MAX_DOCS_PER_YEAR)
-            tar_path.unlink()  # free disk before the next (multi-GB) tar rather than holding all of them at once
-            all_texts.extend(texts)
-            source_count += len(texts)
-        counts[label] = source_count
+    total = 0
+    with open(OUT_DIR / "dapt_corpus.jsonl", "w") as out:
+        for label, url_template in SOURCES:
+            source_count = 0
+            for year in YEARS:
+                url = url_template.format(year=year)
+                tar_path = download_tar(f"{label}_{year}", url)
+                texts = extract_texts(tar_path, MAX_DOCS_PER_YEAR)
+                tar_path.unlink()  # free disk before the next (multi-GB) tar rather than holding all of them at once
+                for text in texts:
+                    out.write(json.dumps({"text": text}) + "\n")
+                out.flush()
+                source_count += len(texts)
+            counts[label] = source_count
+            total += source_count
 
-    with open(OUT_DIR / "dapt_corpus.jsonl", "w") as f:
-        for text in all_texts:
-            f.write(json.dumps({"text": text}) + "\n")
-
-    print(f"DAPT corpus: {len(all_texts)} judgments ({counts})")
+    print(f"DAPT corpus: {total} judgments ({counts})")
 
     # self-check: fail loudly rather than silently shipping an empty/broken corpus,
-    # and confirm both sources actually contributed (not one silently failing).
-    assert len(all_texts) > 100, f"expected several hundred+ judgments, got {len(all_texts)}"
+    # and confirm every source actually contributed (not one silently failing).
+    assert total > 100, f"expected several hundred+ judgments, got {total}"
     assert all(c > 0 for c in counts.values()), f"a source contributed zero judgments: {counts}"
 
 
