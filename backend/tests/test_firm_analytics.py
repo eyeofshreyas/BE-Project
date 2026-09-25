@@ -7,6 +7,7 @@ from fastapi import HTTPException
 
 from app.middleware import auth
 from app.controllers.admin import get_firm_analytics
+from app.controllers.cases import MAX_CASES
 
 
 def _role_gate(fn):
@@ -29,7 +30,7 @@ def _fake_supabase(case_rows, hearing_rows):
             return tables[name]
         m = MagicMock()
         if name == "cases":
-            m.select.return_value.eq.return_value.execute.return_value.data = case_rows
+            m.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = case_rows
         elif name == "hearings":
             m.select.return_value.eq.return_value.gte.return_value.in_.return_value.execute.return_value.data = hearing_rows
         tables[name] = m
@@ -143,3 +144,27 @@ def test_firm_analytics_excludes_lawyers_never_assigned_to_a_case():
     with patch("app.controllers.admin.supabase", fake):
         result = get_firm_analytics(profile={"role_id": auth.ADMIN, "org_id": 7})
     assert [w["lawyer_id"] for w in result["workload"]] == [5]
+
+
+def test_firm_analytics_caps_the_cases_query():
+    """Verifies the cases query is capped at MAX_CASES, the same as every other list query
+    in this codebase (list_cases, list_users) -- an unbounded select here would either
+    silently truncate the exposure total (if PostgREST's db-max-rows is configured) or, for
+    a large org, build an oversized case_id IN-list against `hearings` risking a 414.
+    Exercises: `GET /admin/firm-analytics` (`admin.get_firm_analytics()`)."""
+    case_rows = [_case_row(1, "Open", None, [5])]
+    fake = _fake_supabase(case_rows=case_rows, hearing_rows=[])
+    with patch("app.controllers.admin.supabase", fake):
+        get_firm_analytics(profile={"role_id": auth.ADMIN, "org_id": 7})
+    fake.table("cases").select.return_value.eq.return_value.limit.assert_called_once_with(MAX_CASES)
+
+
+def test_firm_analytics_queries_only_scheduled_future_hearings():
+    """Verifies the hearings query's actual filter values, not just its call-chain shape --
+    a Completed/Cancelled hearing, or a past Scheduled one, must not count toward workload
+    or conflicts. Exercises: `GET /admin/firm-analytics` (`admin.get_firm_analytics()`)."""
+    case_rows = [_case_row(1, "Open", None, [5])]
+    fake = _fake_supabase(case_rows=case_rows, hearing_rows=[])
+    with patch("app.controllers.admin.supabase", fake):
+        get_firm_analytics(profile={"role_id": auth.ADMIN, "org_id": 7})
+    fake.table("hearings").select.return_value.eq.assert_called_once_with("hearing_status", "Scheduled")

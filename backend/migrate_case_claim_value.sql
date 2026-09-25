@@ -1,8 +1,14 @@
--- Run once in the Supabase SQL editor: adds cases.claim_value (nullable -- every
--- existing case is simply excluded from the Firm Analytics exposure total until
--- someone sets it), and threads it through create_case_with_lawyer so a case can
--- get a claim value at filing time as well as afterward (see
--- app/controllers/cases.py's update_case_claim_value for the "afterward" path).
+-- Run once in the Supabase SQL editor, and run it BEFORE deploying the commit that adds
+-- this file: CASES_SELECT (app/controllers/cases.py) already requests claim_value and
+-- create_case already sends p_claim_value, so against a database that hasn't run this yet,
+-- GET /cases and POST /cases 500 for every role, not just the Firm Analytics tab -- this
+-- migration widens the whole case list's blast radius, unlike earlier ones that only broke
+-- their own feature until applied.
+--
+-- Adds cases.claim_value (nullable -- every existing case is simply excluded from the Firm
+-- Analytics exposure total until someone sets it), and threads it through
+-- create_case_with_lawyer so a case can get a claim value at filing time as well as
+-- afterward (see app/controllers/cases.py's update_case_claim_value for the "afterward" path).
 
 alter table cases add column if not exists claim_value numeric;
 

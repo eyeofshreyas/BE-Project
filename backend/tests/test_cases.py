@@ -6,6 +6,7 @@ import inspect
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.middleware import auth
 from app.controllers.cases import _to_case_summary, add_lawyer_to_case, create_case, list_available_case_lawyers, remove_lawyer_from_case, update_case_claim_value, update_case_filing_details
@@ -274,6 +275,22 @@ def test_update_case_claim_value_sets_and_clears():
     with patch("app.controllers.cases.supabase", fake2), patch("app.middleware.auth.supabase", fake2):
         update_case_claim_value(42, CaseClaimValueUpdate(claim_value=None), PRIMARY_LAWYER_PROFILE)
     fake2.table("cases").update.assert_called_once_with({"claim_value": None})
+
+
+def test_claim_value_update_rejects_negative_and_non_finite_values():
+    """Verifies CaseClaimValueUpdate refuses a negative, NaN, or infinite claim value --
+    a bare float would let ordinary UI use (typing '-5000' into the case-detail card and
+    clicking Save, no form-submit validation involved) silently corrupt the Firm Analytics
+    exposure total. Exercises: `PATCH /cases/{id}/claim-value` (`models.cases.CaseClaimValueUpdate`)."""
+    for bad in (-5000, float("nan"), float("inf"), float("-inf")):
+        try:
+            CaseClaimValueUpdate(claim_value=bad)
+            assert False, f"expected ValidationError for claim_value={bad}"
+        except ValidationError:
+            pass
+    CaseClaimValueUpdate(claim_value=0)
+    CaseClaimValueUpdate(claim_value=2500000)
+    CaseClaimValueUpdate(claim_value=None)
 
 
 def test_update_case_claim_value_rejects_out_of_scope_case():

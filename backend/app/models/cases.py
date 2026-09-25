@@ -15,7 +15,7 @@ class CaseCreate(BaseModel):
     priority: str = "Medium"
     next_hearing_date: str | None = None
     description: str | None = None
-    claim_value: float | None = None
+    claim_value: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
 
 class LawyerAssignment(BaseModel):
@@ -92,4 +92,4 @@ class CaseClaimValueUpdate(BaseModel):
     monetary value of the matter, used by the Firm Analytics tab's exposure total.
     Always writes exactly what's sent, including null (clearing it) -- there's no
     other field on this model to leave alone."""
-    claim_value: float | None = None
+    claim_value: float | None = Field(default=None, ge=0, allow_inf_nan=False)

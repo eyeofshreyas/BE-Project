@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from fastapi import BackgroundTasks, Depends, HTTPException
 from app.core.config import FRONTEND_URL, STORAGE_QUOTA_BYTES
 from app.core.email import send_email
-from app.controllers.cases import _active_case_lawyers
+from app.controllers.cases import MAX_CASES, _active_case_lawyers
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, CLIENT, LAWYER, SUPER_ADMIN, require_roles, get_scoped_case_ids
 from app.models.admin import LawyerInviteCreate
@@ -242,7 +242,7 @@ def get_firm_analytics(profile: dict = Depends(require_roles(ADMIN))):
         "case_id,case_title,status,claim_value,client_id,"
         "clients(users(full_name)),case_types(case_type_name),"
         "case_lawyers(lawyer_id,is_active,lawyers(users(full_name)))"
-    ).eq("org_id", profile["org_id"]).execute().data
+    ).eq("org_id", profile["org_id"]).limit(MAX_CASES).execute().data
 
     if not case_rows:
         return {"cases": [], "workload": []}
