@@ -2,17 +2,22 @@
  * (five filters: Case, Client, Case Type, Lawyer, Status) and a per-lawyer workload table
  * with a same-day multi-case hearing-conflict indicator. Loads once from
  * `getFirmAnalytics()`; every filter/sum below is client-side, the same pattern
- * `ReportsView.tsx` uses over its own array. ADMIN only -- see AdminConsolePage.tsx's
- * `adminOnly` nav filter. */
+ * `ReportsView.tsx` uses over its own array. Clicking a workload row opens a detail panel
+ * for that lawyer, the same modal-overlay pattern `UsersView.tsx`'s row actions use. ADMIN
+ * only -- see AdminConsolePage.tsx's `adminOnly` nav filter. */
 import { useEffect, useState } from 'react'
 import { Icon } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
 import { getFirmAnalytics } from '../../../api/client'
 import { formatCompactINR } from '../../../utils/money'
-import type { FirmAnalytics, FirmAnalyticsCase } from '../../../types/api'
+import type { FirmAnalytics, FirmAnalyticsCase, LawyerWorkload } from '../../../types/api'
 import styles from '../../../components/AppShell.module.css'
 
 const ALL = 'All'
+
+const CASE_STATUS_COLORS: Record<string, string> = {
+  Open: C.success, 'In Progress': C.warning, Pending: C.warning, Closed: '#8C857A',
+}
 
 const FILTER_LABEL = {
   fontSize: 9.5,
@@ -50,6 +55,7 @@ export default function FirmAnalyticsView() {
   const [lawyerFilter, setLawyerFilter] = useState(ALL)
   const [statusFilter, setStatusFilter] = useState(ALL)
   const [lawyerSearch, setLawyerSearch] = useState('')
+  const [selectedLawyer, setSelectedLawyer] = useState<LawyerWorkload | null>(null)
 
   useEffect(() => {
     getFirmAnalytics().then(setData).catch((e: Error) => setError(e.message))
@@ -87,6 +93,10 @@ export default function FirmAnalyticsView() {
   const totalExposure = exposureRows.reduce((sum, c) => sum + (c.claim_value ?? 0), 0)
 
   const visibleWorkload = data.workload.filter((w) => w.lawyer_name.toLowerCase().includes(lawyerSearch.toLowerCase()))
+
+  // The detail panel shows this lawyer's full caseload, independent of the exposure card's
+  // filters above -- it's a lookup by lawyer_id into the same payload, not a second fetch.
+  const selectedLawyerCases = selectedLawyer ? cases.filter((c) => c.lawyer_ids.includes(selectedLawyer.lawyer_id)) : []
 
   return (
     <>
@@ -155,42 +165,94 @@ export default function FirmAnalyticsView() {
           />
         </div>
 
-        <div className={styles.card} style={{ padding: 0 }}>
-          {visibleWorkload.length === 0 && (
-            <div style={{ padding: '24px 22px', fontSize: 13.5, color: C.muted }}>No lawyers match this filter.</div>
-          )}
-
-          {visibleWorkload.map((w, i) => (
-            <div
-              key={w.lawyer_id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 16,
-                padding: '16px 22px',
-                borderBottom: i === visibleWorkload.length - 1 ? 'none' : '1px solid #F1EDE0',
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: '#1A1A17' }}>{w.lawyer_name}</div>
-              <div style={{ fontSize: 12.5, color: '#6E6759', width: 130 }}>
-                Active cases <span style={{ fontWeight: 700, color: '#1A1A17' }}>{w.active_cases}</span>
-              </div>
-              <div style={{ fontSize: 12.5, color: '#6E6759', width: 160 }}>
-                Upcoming hearings <span style={{ fontWeight: 700, color: '#1A1A17' }}>{w.upcoming_hearings}</span>
-              </div>
-              {w.conflict_dates.length > 0 && (
-                <span
-                  className={styles.pill}
-                  style={pillStyle(C.warning)}
-                  title={`Double-booked on: ${w.conflict_dates.join(', ')}`}
-                >
-                  <Icon name="alert-triangle" size={12} color={C.warning} /> {w.conflict_dates.length} conflict{w.conflict_dates.length > 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-          ))}
+        <div className={styles.card}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.th}>Lawyer</th>
+                  <th className={styles.th}>Active Cases</th>
+                  <th className={styles.th}>Upcoming Hearings</th>
+                  <th className={styles.th}>Conflicts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleWorkload.length === 0 && (
+                  <tr><td className={styles.td} colSpan={4} style={{ color: C.muted }}>No lawyers match this filter.</td></tr>
+                )}
+                {visibleWorkload.map((w) => (
+                  <tr key={w.lawyer_id} className={styles.tr} style={{ cursor: 'pointer' }} onClick={() => setSelectedLawyer(w)}>
+                    <td className={styles.td} style={{ fontWeight: 600, color: '#1A1A17' }}>{w.lawyer_name}</td>
+                    <td className={styles.td}>{w.active_cases}</td>
+                    <td className={styles.td}>{w.upcoming_hearings}</td>
+                    <td className={styles.td}>
+                      {w.conflict_dates.length > 0 ? (
+                        <span className={styles.pill} style={pillStyle(C.warning)} title={`Double-booked on: ${w.conflict_dates.join(', ')}`}>
+                          <Icon name="alert-triangle" size={12} color={C.warning} /> {w.conflict_dates.length} conflict{w.conflict_dates.length > 1 ? 's' : ''}
+                        </span>
+                      ) : <span style={{ color: C.muted }}>—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
+
+      {selectedLawyer && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(35, 48, 107,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }} onClick={() => setSelectedLawyer(null)}>
+          <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 28, width: 'min(560px,100%)', maxHeight: '86vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 18 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Spectral',serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{selectedLawyer.lawyer_name}</div>
+                <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>Counsel workload detail</div>
+              </div>
+              <span className={styles.actionBtn} onClick={() => setSelectedLawyer(null)} title="Close"><Icon name="x" size={15} color="#6E6759" /></span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <div style={FILTER_LABEL}>Active Cases</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{selectedLawyer.active_cases}</div>
+              </div>
+              <div>
+                <div style={FILTER_LABEL}>Upcoming Hearings</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{selectedLawyer.upcoming_hearings}</div>
+              </div>
+            </div>
+
+            {selectedLawyer.conflict_dates.length > 0 && (
+              <div style={{ background: '#FCF3E4', border: `1px solid ${C.warning}`, borderRadius: 3, padding: '10px 14px', fontSize: 12.5, color: '#6B4E1E', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="alert-triangle" size={14} color={C.warning} />
+                Double-booked on: {selectedLawyer.conflict_dates.join(', ')}
+              </div>
+            )}
+
+            <div>
+              <div style={FILTER_LABEL}>Cases ({selectedLawyerCases.length})</div>
+              {selectedLawyerCases.length === 0 && <div style={{ fontSize: 13, color: C.muted }}>No cases on record.</div>}
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {selectedLawyerCases.map((c, i) => (
+                  <div
+                    key={c.case_id}
+                    style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, padding: '10px 0', borderBottom: i === selectedLawyerCases.length - 1 ? 'none' : '1px solid #F1EDE0' }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, color: '#1A1A17' }}>{c.case_title ?? 'Untitled matter'}</div>
+                      <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{c.client ?? '—'} · {c.case_type ?? '—'}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <span className={styles.pill} style={pillStyle(CASE_STATUS_COLORS[c.status] ?? C.muted)}>{c.status}</span>
+                      <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{c.claim_value != null ? formatCompactINR(c.claim_value) : '—'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
