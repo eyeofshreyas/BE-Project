@@ -25,7 +25,7 @@ import styles from '../../components/AppShell.module.css'
 
 type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'billing' | 'trust' | 'conflicts' | 'notifications' | 'reports' | 'analytics' | 'settings'
 
-const ROLE_LABELS: Record<number, string> = { 1: 'Admin', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
+const ROLE_LABELS: Record<number, string> = { 1: 'Law Firm Manager', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
 
 const TODAY = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 

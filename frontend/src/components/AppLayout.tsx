@@ -9,7 +9,7 @@ import { listNotifications, listConversations } from '../api/client'
 import type { UserProfile, NotificationSummary } from '../types/api'
 import styles from './AppShell.module.css'
 
-const ROLE_LABELS: Record<number, string> = { 1: 'Admin', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
+const ROLE_LABELS: Record<number, string> = { 1: 'Law Firm Manager', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
 const BRAND_SUB_LABELS: Record<number, string> = { 1: 'Admin Console', 2: 'Legal Intelligence', 3: 'Client Portal', 4: 'Admin Console' }
 const UNREAD_POLL_MS = 30000
 

@@ -35,7 +35,7 @@
 -- === Reference data ===
 
 insert into roles (role_id, role_name, description) values
-  (1, 'Admin', 'Full system access'),
+  (1, 'Law Firm Manager', 'Full system access'),
   (2, 'Lawyer', 'Manages cases, clients and billing'),
   (3, 'Client', 'Views own cases, documents and invoices')
 on conflict (role_id) do nothing;
