@@ -19,6 +19,7 @@ Outputs:
 from unsloth import FastLanguageModel, is_bfloat16_supported  # must import before trl/transformers/peft
 from datasets import load_dataset
 from trl import SFTTrainer, SFTConfig
+from transformers.trainer_utils import get_last_checkpoint
 
 MODEL_NAME = "unsloth/Llama-3.2-1B-Instruct-bnb-4bit"
 MAX_SEQ_LENGTH = 2048
@@ -66,12 +67,17 @@ def main() -> None:
             fp16=not is_bfloat16_supported(),
             bf16=is_bfloat16_supported(),
             logging_steps=20,
-            save_strategy="epoch",
+            save_strategy="steps",
+            save_steps=200,  # single epoch is one long run on a 4GB laptop GPU -- checkpoint often so a
+            save_total_limit=3,  # laptop-sleep stall (hit twice during the download) resumes instead of restarting
             max_length=MAX_SEQ_LENGTH,
         ),
     )
 
-    trainer.train()
+    last_checkpoint = get_last_checkpoint("dapt_checkpoints")
+    if last_checkpoint:
+        print(f"Resuming from {last_checkpoint}")
+    trainer.train(resume_from_checkpoint=last_checkpoint)
 
     model.save_pretrained_merged(OUTPUT_DIR, tokenizer, save_method="merged_16bit")
     print(f"Merged DAPT model saved to ./{OUTPUT_DIR} -- finetune_llama_lora.py's MODEL_NAME already points here")
