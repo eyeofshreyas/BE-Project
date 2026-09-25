@@ -18,12 +18,15 @@ import TrustReconciliationView from './views/TrustReconciliationView'
 import NotificationsView from './views/NotificationsView'
 import ReportsView from './views/ReportsView'
 import AnalyticsView from './views/AnalyticsView'
+import FirmAnalyticsView from './views/FirmAnalyticsView'
 import SettingsView from './views/SettingsView'
 import { listNotifications, markNotificationRead } from '../../api/client'
 import type { UserProfile, NotificationSummary } from '../../types/api'
 import styles from '../../components/AppShell.module.css'
 
-type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'billing' | 'trust' | 'conflicts' | 'notifications' | 'reports' | 'analytics' | 'settings'
+type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'billing' | 'trust' | 'conflicts' | 'notifications' | 'reports' | 'analytics' | 'firm-analytics' | 'settings'
+
+const ADMIN = 1
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Law Firm Manager', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
 
@@ -42,7 +45,7 @@ function loadProfile(): UserProfile | null {
   }
 }
 
-const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
+const NAV_ITEMS: { key: PageKey; label: string; icon: IconName; adminOnly?: boolean }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
   { key: 'users', label: 'Users', icon: 'users' },
   { key: 'cases', label: 'Cases', icon: 'scale' },
@@ -52,6 +55,7 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName }[] = [
   { key: 'conflicts', label: 'Conflict Search', icon: 'shield' },
   { key: 'reports', label: 'Reports', icon: 'bar-chart-2' },
   { key: 'analytics', label: 'Analytics', icon: 'pie-chart' },
+  { key: 'firm-analytics', label: 'Firm Analytics', icon: 'banknote', adminOnly: true },
 ]
 
 /**
@@ -109,6 +113,8 @@ export default function AdminConsolePage() {
     { label: 'Generate Report', icon: 'file-text' as const, primary: true, onClick: () => goTo('reports') },
   ]
 
+  const visibleNavItems = NAV_ITEMS.filter((item) => !item.adminOnly || profile?.role_id === ADMIN)
+
   return (
     <div className={styles.page}>
       <div className={styles.sidebar}>
@@ -120,7 +126,7 @@ export default function AdminConsolePage() {
           </div>
         </div>
         <div className={styles.navList}>
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const active = item.key === activePage
             return (
               <div key={item.key} className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => goTo(item.key)} title={item.label}>
@@ -181,6 +187,7 @@ export default function AdminConsolePage() {
           {activePage === 'notifications' && <NotificationsView notifications={notifications} onMarkRead={markRead} />}
           {activePage === 'reports' && <ReportsView onToast={showToast} />}
           {activePage === 'analytics' && <AnalyticsView />}
+          {activePage === 'firm-analytics' && <FirmAnalyticsView />}
           {activePage === 'settings' && <SettingsView profile={profile} onSave={showToast} onProfileChange={saveProfile} />}
         </div>
       </div>
