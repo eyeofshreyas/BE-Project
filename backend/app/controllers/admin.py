@@ -8,6 +8,7 @@ from fastapi import BackgroundTasks, Depends, HTTPException
 from postgrest.exceptions import APIError as PostgrestAPIError
 from app.core.config import FRONTEND_URL, STORAGE_QUOTA_BYTES
 from app.core.email import send_email
+from app.controllers.cases import _active_case_lawyers
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, CLIENT, LAWYER, SUPER_ADMIN, require_roles, get_scoped_case_ids
 from app.models.admin import LawyerInviteCreate, PlatformSettings
@@ -235,6 +236,77 @@ def get_analytics(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
             "quota_bytes": STORAGE_QUOTA_BYTES,
         },
     }
+
+
+def get_firm_analytics(profile: dict = Depends(require_roles(ADMIN))):
+    """Case exposure rows and per-lawyer workload for the Firm Analytics tab, scoped to
+    the caller's own org. ADMIN only -- there is no platform-wide variant for SUPER_ADMIN,
+    who has no single org's exposure to show. Calls: `_active_case_lawyers()`."""
+    case_rows = supabase.table("cases").select(
+        "case_id,case_title,status,claim_value,client_id,"
+        "clients(users(full_name)),case_types(case_type_name),"
+        "case_lawyers(lawyer_id,is_active,lawyers(users(full_name)))"
+    ).eq("org_id", profile["org_id"]).execute().data
+
+    if not case_rows:
+        return {"cases": [], "workload": []}
+
+    case_ids = [row["case_id"] for row in case_rows]
+    hearing_rows = (
+        supabase.table("hearings").select("case_id,hearing_date")
+        .eq("hearing_status", "Scheduled").gte("hearing_date", date.today().isoformat())
+        .in_("case_id", case_ids).execute().data
+    )
+
+    fa_cases = []
+    case_lawyer_ids: dict[int, list[int]] = {}
+    lawyer_names: dict[int, str] = {}
+    active_case_counts: dict[int, int] = {}
+
+    for row in case_rows:
+        active = _active_case_lawyers(row["case_lawyers"])
+        lawyer_ids = [cl["lawyer_id"] for cl in active]
+        case_lawyer_ids[row["case_id"]] = lawyer_ids
+        for cl in active:
+            lawyer_names[cl["lawyer_id"]] = cl["lawyers"]["users"]["full_name"]
+            if row["status"] != "Closed":
+                active_case_counts[cl["lawyer_id"]] = active_case_counts.get(cl["lawyer_id"], 0) + 1
+        fa_cases.append({
+            "case_id": row["case_id"],
+            "case_title": row["case_title"],
+            "client": row["clients"]["users"]["full_name"] if row.get("clients") else None,
+            "client_id": row["client_id"],
+            "case_type": row["case_types"]["case_type_name"] if row.get("case_types") else None,
+            "status": row["status"],
+            "claim_value": row["claim_value"],
+            "lawyer_ids": lawyer_ids,
+            "lawyers": [cl["lawyers"]["users"]["full_name"] for cl in active],
+        })
+
+    # lawyer_id -> hearing_date -> set of distinct case_ids that lawyer has a Scheduled
+    # hearing for on that date. A date maps to 2+ cases only when the lawyer is genuinely
+    # double-booked; the same case re-listed twice on one day (allowed, see
+    # HearingCreate.allow_duplicate) must not look like a conflict.
+    hearing_case_dates: dict[int, dict[str, set[int]]] = {}
+    upcoming_counts: dict[int, int] = {}
+    for h in hearing_rows:
+        for lawyer_id in case_lawyer_ids.get(h["case_id"], []):
+            hearing_case_dates.setdefault(lawyer_id, {}).setdefault(h["hearing_date"], set()).add(h["case_id"])
+            upcoming_counts[lawyer_id] = upcoming_counts.get(lawyer_id, 0) + 1
+
+    workload = []
+    for lawyer_id, name in lawyer_names.items():
+        dates = hearing_case_dates.get(lawyer_id, {})
+        conflicts = sorted(d for d, case_set in dates.items() if len(case_set) > 1)
+        workload.append({
+            "lawyer_id": lawyer_id,
+            "lawyer_name": name,
+            "active_cases": active_case_counts.get(lawyer_id, 0),
+            "upcoming_hearings": upcoming_counts.get(lawyer_id, 0),
+            "conflict_dates": conflicts,
+        })
+
+    return {"cases": fa_cases, "workload": workload}
 
 
 def _reraise_settings_error(error: PostgrestAPIError) -> None:

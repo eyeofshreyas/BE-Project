@@ -68,3 +68,31 @@ class PlatformSettings(BaseModel):
     new_signup_alerts: bool
     weekly_reports: bool
     auto_backup: bool
+
+
+class FirmAnalyticsCase(BaseModel):
+    """One case row shaped for the Firm Analytics tab's exposure filters and sum."""
+    case_id: int
+    case_title: str | None
+    client: str | None
+    client_id: int | None
+    case_type: str | None
+    status: str
+    claim_value: float | None
+    lawyer_ids: list[int]
+    lawyers: list[str]
+
+
+class LawyerWorkload(BaseModel):
+    """One lawyer's row in the Counsel Workload table."""
+    lawyer_id: int
+    lawyer_name: str
+    active_cases: int
+    upcoming_hearings: int
+    conflict_dates: list[str]
+
+
+class FirmAnalytics(BaseModel):
+    """Everything the Firm Analytics tab renders."""
+    cases: list[FirmAnalyticsCase]
+    workload: list[LawyerWorkload]
