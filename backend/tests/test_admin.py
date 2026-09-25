@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
 from app.middleware import auth
-from app.controllers.admin import get_analytics, get_stats, invite_lawyer, get_settings, update_settings
-from app.models.admin import LawyerInviteCreate, PlatformSettings
+from app.controllers.admin import get_analytics, get_stats, invite_lawyer
+from app.models.admin import LawyerInviteCreate
 from tests.conftest import ImmediateBackgroundTasks
 
 
@@ -126,27 +126,6 @@ def test_invite_lawyer_rejects_an_email_with_an_existing_account():
         except HTTPException as e:
             assert e.status_code == 409
     mock_send.assert_not_called()
-
-
-def test_get_settings_scoped_to_org_admins_own_org():
-    """Verifies an org admin reads only their own org's platform_settings row. Exercises: `GET /admin/settings` (`admin.get_settings()`)."""
-    fake = MagicMock()
-    fake.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
-        {"maintenance_mode": True, "new_signup_alerts": False, "weekly_reports": True, "auto_backup": True}
-    ]
-    with patch("app.controllers.admin.supabase", fake):
-        result = get_settings(profile={"role_id": auth.ADMIN, "org_id": 7})
-    assert result["maintenance_mode"] is True
-    fake.table.return_value.select.return_value.eq.assert_called_once_with("org_id", 7)
-
-
-def test_get_settings_rejects_super_admin():
-    """Verifies the super-admin (no org) is told settings are per-organization instead of crashing. Exercises: `GET /admin/settings` (`admin.get_settings()`)."""
-    try:
-        get_settings(profile={"role_id": auth.SUPER_ADMIN, "org_id": None})
-        assert False, "expected HTTPException"
-    except HTTPException as e:
-        assert e.status_code == 400
 
 
 def _fake_supabase_for_stats(case_client_rows):

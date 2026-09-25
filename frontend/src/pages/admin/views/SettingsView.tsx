@@ -1,53 +1,32 @@
 /** Admin console "Settings" tab: profile (`updateOwnProfile()`), security (password reset
- * via `forgotPassword()`), platform toggles (`getPlatformSettings()`/`updatePlatformSettings()`),
- * and a static about panel. */
-import { useEffect, useState } from 'react'
+ * via `forgotPassword()`), and a static about panel. */
+import { useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C } from '../../../components/theme'
-import { forgotPassword, getPlatformSettings, updateOwnProfile, updatePlatformSettings } from '../../../api/client'
-import type { PlatformSettings, UserProfile } from '../../../types/api'
+import { forgotPassword, updateOwnProfile } from '../../../api/client'
+import type { UserProfile } from '../../../types/api'
 import styles from '../../../components/AppShell.module.css'
 
 const MENU: { key: string; label: string; icon: IconName }[] = [
   { key: 'profile', label: 'Profile', icon: 'user' },
   { key: 'security', label: 'Security', icon: 'shield' },
-  { key: 'platform', label: 'Platform', icon: 'settings' },
   { key: 'about', label: 'About', icon: 'info' },
 ]
 
-/** Small controlled on/off switch (sliding dot) used throughout this view's toggle rows. */
-function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
-  return (
-    <div className={styles.toggleTrack} style={{ width: 40, height: 22, background: value ? C.primary : C.border, justifyContent: value ? 'flex-end' : 'flex-start' }} onClick={onChange}>
-      <div className={styles.toggleDot} style={{ width: 18, height: 18 }} />
-    </div>
-  )
-}
-
 /**
  * Left-nav-switched settings panels. Profile fields seed from the cached
- * `lexflow_profile`; platform toggles load from `/admin/settings`. "Save Changes"
- * writes both back and reports the outcome through `onSave`, which the parent toasts.
+ * `lexflow_profile`. "Save Changes" writes them back and reports the outcome
+ * through `onSave`, which the parent toasts.
  */
 export default function SettingsView({ profile, onSave, onProfileChange }: { profile: UserProfile | null; onSave: (message: string) => void; onProfileChange: (profile: UserProfile) => void }) {
   const [tab, setTab] = useState('profile')
   const [fullName, setFullName] = useState(profile?.full_name ?? '')
   const [phone, setPhone] = useState(profile?.phone ?? '')
-  const [settings, setSettings] = useState<PlatformSettings | null>(null)
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    getPlatformSettings().then(setSettings).catch((e: Error) => onSave(e.message))
-  }, [])
-
-  function toggle(key: keyof PlatformSettings) {
-    setSettings((prev) => (prev ? { ...prev, [key]: !prev[key] } : prev))
-  }
 
   function reset() {
     setFullName(profile?.full_name ?? '')
     setPhone(profile?.phone ?? '')
-    getPlatformSettings().then(setSettings).catch((e: Error) => onSave(e.message))
   }
 
   async function save() {
@@ -55,7 +34,6 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
     try {
       const updated = await updateOwnProfile({ full_name: fullName.trim(), phone: phone.trim() })
       if (profile) onProfileChange({ ...profile, full_name: updated.full_name, phone: updated.phone })
-      if (settings) await updatePlatformSettings(settings)
       onSave('Settings saved.')
     } catch (e) {
       onSave((e as Error).message)
@@ -78,7 +56,6 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
   const fieldLabel = { fontSize: 12.5, fontWeight: 600, color: '#575145', marginBottom: 7 }
   const inputWrap = { display: 'flex', alignItems: 'center', gap: 9, background: '#F6F2E9', border: `1.5px solid ${C.border}`, borderRadius: 3, padding: '11px 13px' }
   const inputStyle = { border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 13.5, color: C.text, fontFamily: "'Public Sans',sans-serif", minWidth: 0 }
-  const rowStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 2px', borderBottom: `1px solid ${C.border}` }
   const rowLastStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 2px' }
   const rowTitle = { fontSize: 13.5, fontWeight: 600, color: C.text }
   const rowDesc = { fontSize: 12, color: C.muted, marginTop: 2 }
@@ -134,19 +111,6 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
                 <div><div style={rowTitle}>Password</div><div style={rowDesc}>Email a reset link to {profile?.email ?? 'your account'}.</div></div>
                 <div style={btnGhost} onClick={sendPasswordReset}>Send reset link</div>
               </div>
-            </div>
-          )}
-
-          {tab === 'platform' && (
-            <div style={cardStyle}>
-              <div className={styles.cardTitle}>Platform Configuration</div>
-              {!settings && <div style={{ fontSize: 13, color: C.muted }}>Loading…</div>}
-              {settings && <>
-                <div style={rowStyle}><div><div style={rowTitle}>Maintenance Mode</div><div style={rowDesc}>Temporarily block user access during upkeep.</div></div><Toggle value={settings.maintenance_mode} onChange={() => toggle('maintenance_mode')} /></div>
-                <div style={rowStyle}><div><div style={rowTitle}>New Signup Alerts</div><div style={rowDesc}>Notify admins when a new user registers.</div></div><Toggle value={settings.new_signup_alerts} onChange={() => toggle('new_signup_alerts')} /></div>
-                <div style={rowStyle}><div><div style={rowTitle}>Weekly Reports</div><div style={rowDesc}>Email a platform summary report every week.</div></div><Toggle value={settings.weekly_reports} onChange={() => toggle('weekly_reports')} /></div>
-                <div style={rowLastStyle}><div><div style={rowTitle}>Automatic Backups</div><div style={rowDesc}>Back up platform data daily.</div></div><Toggle value={settings.auto_backup} onChange={() => toggle('auto_backup')} /></div>
-              </>}
             </div>
           )}
 

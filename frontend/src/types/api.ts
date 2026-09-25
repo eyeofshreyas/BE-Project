@@ -555,13 +555,6 @@ export interface FirmAnalytics {
   workload: LawyerWorkload[]
 }
 
-export interface PlatformSettings {
-  maintenance_mode: boolean
-  new_signup_alerts: boolean
-  weekly_reports: boolean
-  auto_backup: boolean
-}
-
 export interface PartySummary {
   id: number
   case_id: number

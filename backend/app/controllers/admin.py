@@ -1,25 +1,21 @@
-"""Admin-only controllers backing the admin console's Dashboard and Analytics tabs, plus
-the platform-wide settings row. Gated by require_roles(ADMIN, SUPER_ADMIN)."""
+"""Admin-only controllers backing the admin console's Dashboard and Analytics tabs.
+Gated by require_roles(ADMIN, SUPER_ADMIN)."""
 
 from collections import Counter
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 from fastapi import BackgroundTasks, Depends, HTTPException
-from postgrest.exceptions import APIError as PostgrestAPIError
 from app.core.config import FRONTEND_URL, STORAGE_QUOTA_BYTES
 from app.core.email import send_email
 from app.controllers.cases import _active_case_lawyers
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, CLIENT, LAWYER, SUPER_ADMIN, require_roles, get_scoped_case_ids
-from app.models.admin import LawyerInviteCreate, PlatformSettings
+from app.models.admin import LawyerInviteCreate
 
 TIMELINE_SELECT = (
     "timeline_id,event_type,event_title,event_description,created_at,"
     "cases(case_number),users(full_name)"
 )
-SETTINGS_FIELDS = ("maintenance_mode", "new_signup_alerts", "weekly_reports", "auto_backup")
-SETTINGS_DEFAULTS = {"maintenance_mode": False, "new_signup_alerts": True, "weekly_reports": True, "auto_backup": True}
-UNDEFINED_TABLE = "42P01"
 GROWTH_MONTHS = 6
 AI_USAGE_WEEKS = 8
 
@@ -307,41 +303,3 @@ def get_firm_analytics(profile: dict = Depends(require_roles(ADMIN))):
         })
 
     return {"cases": fa_cases, "workload": workload}
-
-
-def _reraise_settings_error(error: PostgrestAPIError) -> None:
-    """Always raises. The settings table is created by a migration run by hand in the
-    Supabase SQL editor, so "table doesn't exist" is a real thing an operator will hit --
-    name the file to run instead of falling through to main.py's generic 500."""
-    if error.code == UNDEFINED_TABLE:
-        raise HTTPException(status_code=503, detail="Platform settings aren't set up yet. Run backend/migrate_platform_settings.sql.")
-    raise error
-
-
-def get_settings(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
-    """Read the caller's own org's platform_settings row, falling back to defaults if the
-    row was deleted. Calls: `_reraise_settings_error()`."""
-    if profile["role_id"] == SUPER_ADMIN:
-        raise HTTPException(status_code=400, detail="Platform settings are managed per organization.")
-    try:
-        rows = supabase.table("platform_settings").select("*").eq("org_id", profile["org_id"]).execute().data
-    except PostgrestAPIError as e:
-        _reraise_settings_error(e)
-    if not rows:
-        return dict(SETTINGS_DEFAULTS)
-    return {field: rows[0][field] for field in SETTINGS_FIELDS}
-
-
-def update_settings(data: PlatformSettings, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
-    """Upsert the caller's own org's platform_settings row. Calls: `_reraise_settings_error()`."""
-    if profile["role_id"] == SUPER_ADMIN:
-        raise HTTPException(status_code=400, detail="Platform settings are managed per organization.")
-    try:
-        supabase.table("platform_settings").upsert({
-            "org_id": profile["org_id"],
-            **data.model_dump(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }).execute()
-    except PostgrestAPIError as e:
-        _reraise_settings_error(e)
-    return data

@@ -62,14 +62,6 @@ class LawyerInviteCreate(BaseModel):
     email: EmailStr
 
 
-class PlatformSettings(BaseModel):
-    """The single pinned `platform_settings` row (see migrate_platform_settings.sql)."""
-    maintenance_mode: bool
-    new_signup_alerts: bool
-    weekly_reports: bool
-    auto_backup: bool
-
-
 class FirmAnalyticsCase(BaseModel):
     """One case row shaped for the Firm Analytics tab's exposure filters and sum."""
     case_id: int

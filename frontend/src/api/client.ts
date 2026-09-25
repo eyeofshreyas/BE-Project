@@ -51,7 +51,6 @@ import type {
   ActivityEvent,
   AdminAnalytics,
   FirmAnalytics,
-  PlatformSettings,
   UserDeleteImpact,
   PartySummary,
   ConflictMatch,
@@ -305,14 +304,6 @@ export function getFirmAnalytics() {
 
 export function updateCaseClaimValue(caseId: number, claimValue: number | null) {
   return patch<CaseSummary>(`/cases/${caseId}/claim-value`, { claim_value: claimValue })
-}
-
-export function getPlatformSettings() {
-  return get<PlatformSettings>('/admin/settings')
-}
-
-export function updatePlatformSettings(payload: PlatformSettings) {
-  return patch<PlatformSettings>('/admin/settings', payload)
 }
 
 export function listNotifications() {
