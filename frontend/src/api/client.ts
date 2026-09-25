@@ -50,6 +50,7 @@ import type {
   AdminStats,
   ActivityEvent,
   AdminAnalytics,
+  FirmAnalytics,
   PlatformSettings,
   UserDeleteImpact,
   PartySummary,
@@ -296,6 +297,14 @@ export function listAdminActivity(limit = 15) {
 
 export function getAdminAnalytics() {
   return get<AdminAnalytics>('/admin/analytics')
+}
+
+export function getFirmAnalytics() {
+  return get<FirmAnalytics>('/admin/firm-analytics')
+}
+
+export function updateCaseClaimValue(caseId: number, claimValue: number | null) {
+  return patch<CaseSummary>(`/cases/${caseId}/claim-value`, { claim_value: claimValue })
 }
 
 export function getPlatformSettings() {

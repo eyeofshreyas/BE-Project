@@ -72,6 +72,7 @@ export interface CaseSummary {
   filing_number: string | null
   registration_number: string | null
   acts_sections: string | null
+  claim_value: number | null
 }
 
 export interface CaseCreatePayload {
@@ -527,6 +528,31 @@ export interface AdminAnalytics {
   ai_usage: LabelCount[]
   documents: { total: number; summarized: number; awaiting_summary: number; deleted: number }
   storage: { used_bytes: number; quota_bytes: number }
+}
+
+export interface FirmAnalyticsCase {
+  case_id: number
+  case_title: string | null
+  client: string | null
+  client_id: number | null
+  case_type: string | null
+  status: string
+  claim_value: number | null
+  lawyer_ids: number[]
+  lawyers: string[]
+}
+
+export interface LawyerWorkload {
+  lawyer_id: number
+  lawyer_name: string
+  active_cases: number
+  upcoming_hearings: number
+  conflict_dates: string[]
+}
+
+export interface FirmAnalytics {
+  cases: FirmAnalyticsCase[]
+  workload: LawyerWorkload[]
 }
 
 export interface PlatformSettings {
