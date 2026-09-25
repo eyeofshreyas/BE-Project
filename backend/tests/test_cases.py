@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.cases import _to_case_summary, add_lawyer_to_case, create_case, list_available_case_lawyers, remove_lawyer_from_case, update_case_filing_details
-from app.models.cases import AddLawyerRequest, CaseCreate, CaseFilingUpdate
+from app.controllers.cases import _to_case_summary, add_lawyer_to_case, create_case, list_available_case_lawyers, remove_lawyer_from_case, update_case_claim_value, update_case_filing_details
+from app.models.cases import AddLawyerRequest, CaseClaimValueUpdate, CaseCreate, CaseFilingUpdate
 
 
 def _role_gate(fn):
@@ -255,6 +255,34 @@ def test_update_case_filing_details_rejects_out_of_scope_case():
     with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
         try:
             update_case_filing_details(42, CaseFilingUpdate(filing_number="F/1"), PRIMARY_LAWYER_PROFILE)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 403
+
+
+def test_update_case_claim_value_sets_and_clears():
+    """Verifies update_case_claim_value writes the sent value, including an explicit null
+    to clear a previously-set value. Exercises: `PATCH /cases/{id}/claim-value`
+    (`cases.update_case_claim_value()`)."""
+    fake = _fake_supabase_for_team(assigned_case_ids={42}, case_row=TEAM_CASE_ROW, target_lawyer_org_id=7, caller_lawyer_id=5)
+    with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
+        result = update_case_claim_value(42, CaseClaimValueUpdate(claim_value=2500000), PRIMARY_LAWYER_PROFILE)
+    assert result["case_id"] == 42
+    fake.table("cases").update.assert_called_once_with({"claim_value": 2500000})
+
+    fake2 = _fake_supabase_for_team(assigned_case_ids={42}, case_row=TEAM_CASE_ROW, target_lawyer_org_id=7, caller_lawyer_id=5)
+    with patch("app.controllers.cases.supabase", fake2), patch("app.middleware.auth.supabase", fake2):
+        update_case_claim_value(42, CaseClaimValueUpdate(claim_value=None), PRIMARY_LAWYER_PROFILE)
+    fake2.table("cases").update.assert_called_once_with({"claim_value": None})
+
+
+def test_update_case_claim_value_rejects_out_of_scope_case():
+    """Verifies a lawyer not scoped to this case can't set its claim value; raises 403.
+    Exercises: `PATCH /cases/{id}/claim-value` (`cases.update_case_claim_value()`)."""
+    fake = _fake_supabase_for_team(assigned_case_ids={99}, case_row=TEAM_CASE_ROW, target_lawyer_org_id=7, caller_lawyer_id=5)
+    with patch("app.controllers.cases.supabase", fake), patch("app.middleware.auth.supabase", fake):
+        try:
+            update_case_claim_value(42, CaseClaimValueUpdate(claim_value=100), PRIMARY_LAWYER_PROFILE)
             assert False, "expected HTTPException"
         except HTTPException as e:
             assert e.status_code == 403

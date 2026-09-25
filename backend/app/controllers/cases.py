@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, LAWYER, SUPER_ADMIN, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
-from app.models.cases import AddLawyerRequest, CaseCreate, CaseFilingUpdate, CaseSummary
+from app.models.cases import AddLawyerRequest, CaseClaimValueUpdate, CaseCreate, CaseFilingUpdate, CaseSummary
 
 # ponytail: hard cap, not real pagination -- an org/lawyer/client's own scope is naturally
 # bounded, but the super-admin's unrestricted view (case_ids=None) is a full-platform scan
@@ -15,7 +15,7 @@ MAX_CASES = 1000
 CASES_SELECT = (
     "case_id,case_number,case_title,filing_date,created_at,status,priority,next_hearing_date,description,"
     "cnr_number,ecourts_status,ecourts_last_synced_at,ecourts_sync_status,ecourts_sync_error,"
-    "filing_number,registration_number,acts_sections,"
+    "filing_number,registration_number,acts_sections,claim_value,"
     "client_id,org_id,"
     "clients(users(full_name,email,phone)),"
     "courts(court_name),"
@@ -80,6 +80,7 @@ def _to_case_summary(row: dict) -> dict:
         "filing_number": row.get("filing_number"),
         "registration_number": row.get("registration_number"),
         "acts_sections": row.get("acts_sections"),
+        "claim_value": row.get("claim_value"),
     }
 
 
@@ -104,6 +105,18 @@ def update_case_filing_details(case_id: int, data: CaseFilingUpdate, profile: di
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if updates:
         supabase.table("cases").update(updates).eq("case_id", case_id).execute()
+    row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
+    return _to_case_summary(row)
+
+
+def update_case_claim_value(case_id: int, data: CaseClaimValueUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
+    """Set or clear a case's claim value -- the estimated monetary value of the matter,
+    fed into the Firm Analytics tab's exposure total. Unlike update_case_filing_details,
+    always writes exactly what's sent (there's only one field, and an explicit null is a
+    valid way to clear a previously-set value). Calls: `ensure_case_access()`,
+    `_to_case_summary()`."""
+    ensure_case_access(case_id, profile)
+    supabase.table("cases").update({"claim_value": data.claim_value}).eq("case_id", case_id).execute()
     row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
     return _to_case_summary(row)
 
@@ -160,6 +173,7 @@ def create_case(data: CaseCreate, profile: dict = Depends(require_roles(LAWYER))
         "p_next_hearing_date": data.next_hearing_date,
         "p_description": data.description,
         "p_lawyer_id": lawyer_rows[0]["lawyer_id"],
+        "p_claim_value": data.claim_value,
     }).execute().data
 
     row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]

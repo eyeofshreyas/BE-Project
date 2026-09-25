@@ -15,6 +15,7 @@ class CaseCreate(BaseModel):
     priority: str = "Medium"
     next_hearing_date: str | None = None
     description: str | None = None
+    claim_value: float | None = None
 
 
 class LawyerAssignment(BaseModel):
@@ -69,6 +70,7 @@ class CaseSummary(BaseModel):
     filing_number: str | None
     registration_number: str | None
     acts_sections: str | None
+    claim_value: float | None
 
 
 class CnrUpdate(BaseModel):
@@ -83,3 +85,11 @@ class CaseFilingUpdate(BaseModel):
     filing_number: str | None = None
     registration_number: str | None = None
     acts_sections: str | None = None
+
+
+class CaseClaimValueUpdate(BaseModel):
+    """Request body for setting or revising a case's claim value -- the estimated
+    monetary value of the matter, used by the Firm Analytics tab's exposure total.
+    Always writes exactly what's sent, including null (clearing it) -- there's no
+    other field on this model to leave alone."""
+    claim_value: float | None = None
