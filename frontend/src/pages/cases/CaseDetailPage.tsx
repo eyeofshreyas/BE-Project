@@ -9,7 +9,7 @@ import {
   removeLawyerFromCase, addLawyerToCase, listAvailableCaseLawyers,
   getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
   listHearings, createHearing, listJudges, createJudge, listCourts, updateHearing, updateMeeting, deleteDocument,
-  setCaseCnr, syncCaseEcourts, updateCaseFilingDetails, requestSignature, listCaseParties, addCaseParty,
+  setCaseCnr, syncCaseEcourts, updateCaseFilingDetails, updateCaseClaimValue, requestSignature, listCaseParties, addCaseParty,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
@@ -17,6 +17,7 @@ import type {
   AvailableLawyer,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
+import { formatCompactINR } from '../../utils/money'
 import { canRenderInline, uploadRejection, ESIGN_RESENDABLE, esignPill } from '../../utils/files'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
@@ -168,6 +169,9 @@ export default function CaseDetailPage() {
   const [registrationNumberInput, setRegistrationNumberInput] = useState('')
   const [actsSectionsInput, setActsSectionsInput] = useState('')
   const [filingDetailsSaving, setFilingDetailsSaving] = useState(false)
+  const [claimValueEditing, setClaimValueEditing] = useState(false)
+  const [claimValueInput, setClaimValueInput] = useState('')
+  const [claimValueSaving, setClaimValueSaving] = useState(false)
   const [messaging, setMessaging] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -512,6 +516,27 @@ export default function CaseDetailPage() {
       showToast(err instanceof Error ? err.message : 'Failed to save filing details.')
     } finally {
       setFilingDetailsSaving(false)
+    }
+  }
+
+  function openClaimValueEdit() {
+    setClaimValueInput(caseInfo?.claim_value != null ? String(caseInfo.claim_value) : '')
+    setClaimValueEditing(true)
+  }
+
+  /** Saves the case's estimated claim value, or clears it if the field is left blank. */
+  async function saveClaimValue() {
+    setClaimValueSaving(true)
+    try {
+      const trimmed = claimValueInput.trim()
+      const updated = await updateCaseClaimValue(numericCaseId, trimmed === '' ? null : Number(trimmed))
+      setCaseInfo(updated)
+      setClaimValueEditing(false)
+      showToast('Claim value saved.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save claim value.')
+    } finally {
+      setClaimValueSaving(false)
     }
   }
 
@@ -1354,6 +1379,34 @@ export default function CaseDetailPage() {
                     <Fact label="Registration number" value={caseInfo.registration_number ?? 'Not recorded'} />
                     <Fact label="Acts & sections" value={caseInfo.acts_sections ?? 'Not recorded'} />
                   </div>
+                )}
+              </Card>
+            )}
+
+            {canManage && (
+              <Card
+                title="Claim value"
+                action={!claimValueEditing ? <button className={cd.linkAction} onClick={openClaimValueEdit}>Edit</button> : undefined}
+              >
+                {claimValueEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input
+                      type="number"
+                      min="0"
+                      value={claimValueInput}
+                      onChange={(e) => setClaimValueInput(e.target.value)}
+                      placeholder="Claim value in INR (leave blank to clear)"
+                      style={inputStyle}
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div className={styles.primaryChip} style={{ opacity: claimValueSaving ? 0.6 : 1 }} onClick={() => !claimValueSaving && saveClaimValue()}>
+                        {claimValueSaving ? 'Saving…' : 'Save'}
+                      </div>
+                      <div className={styles.ghostChip} onClick={() => setClaimValueEditing(false)}>Cancel</div>
+                    </div>
+                  </div>
+                ) : (
+                  <Fact label="Claim value" value={caseInfo.claim_value != null ? formatCompactINR(caseInfo.claim_value) : 'Not recorded'} />
                 )}
               </Card>
             )}
