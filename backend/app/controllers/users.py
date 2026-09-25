@@ -218,15 +218,16 @@ def _trust_balance_held(user_id: int) -> float:
 
 
 def _assert_deletable(user_id: int, profile: dict) -> None:
-    """Refuse the deletes that shouldn't happen: your own account, the last remaining admin
-    (scoped to the caller's own org for an org admin, platform-wide for the super-admin),
-    and a client whose money the firm is still holding. Calls: `_trust_balance_held()`."""
+    """Refuse the deletes that shouldn't happen: your own account, a user outside the
+    caller's org (an org admin only, via `_assert_same_org_or_404()`), the last remaining
+    admin (scoped to the caller's own org for an org admin, platform-wide for the
+    super-admin), and a client whose money the firm is still holding. Calls:
+    `_assert_same_org_or_404()`, `_trust_balance_held()`."""
     if user_id == profile["user_id"]:
         raise HTTPException(status_code=400, detail="You can't delete your own account.")
+    _assert_same_org_or_404(user_id, profile)
     rows = supabase.table("users").select("role_id,org_id").eq("user_id", user_id).execute().data
     if not rows:
-        raise HTTPException(status_code=404, detail="User not found")
-    if profile["role_id"] == ADMIN and rows[0]["org_id"] != profile["org_id"]:
         raise HTTPException(status_code=404, detail="User not found")
     if rows[0]["role_id"] == ADMIN:
         admins_query = supabase.table("users").select("user_id", count="exact").eq("role_id", ADMIN)

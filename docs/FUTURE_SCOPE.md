@@ -334,12 +334,10 @@ Step-by-step fixes, with test code, are in
   document is stuck at SENT while Leegality retries a callback that can never succeed.
   **Fix:** `{"upsert": "true"}`, and write the status even when storing the file fails.
 
-- **Org admins can preview a client delete but the delete 404s** —
-  `app/controllers/users.py:213`. `get_user_delete_impact()` uses
-  `_assert_same_org_or_404()`, which handles a client's `NULL` `org_id` explicitly;
-  `_assert_deletable()` compares raw, so `None != org_id` → 404 for a user the impact
-  dialog just described. An org admin can never delete a client at all.
-  **Fix:** have `_assert_deletable()` delegate scoping to `_assert_same_org_or_404()`.
+- ~~**Org admins can preview a client delete but the delete 404s**~~ — Done.
+  `_assert_deletable()` now delegates scoping to `_assert_same_org_or_404()` instead of
+  comparing `org_id` raw, so a client's `NULL` `org_id` is handled the same way in both the
+  preview and the delete.
 
 - **Deleting a user leaves their Supabase Auth account** — `app/controllers/users.py:231`.
   The cascade clears the `users` row and storage; nothing calls the Auth admin API

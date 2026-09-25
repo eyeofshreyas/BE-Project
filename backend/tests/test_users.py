@@ -279,6 +279,66 @@ def test_last_admin_check_is_scoped_to_the_admins_own_org():
     fake.table.return_value.select.return_value.eq.return_value.eq.assert_called_once_with("org_id", 7)
 
 
+def test_org_admin_can_delete_a_client_with_a_case_in_their_org():
+    """Verifies the client.org_id-is-always-NULL carve-out in `_assert_same_org_or_404` lets
+    an org admin delete a client who has a case with them -- before the fix, the raw
+    `org_id != profile["org_id"]` compare 404'd every client unconditionally, since a
+    client's `users.org_id` is always NULL. Exercises: `DELETE /users/{id}`."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "users":
+            def select(cols):
+                sel = MagicMock()
+                sel.eq.return_value.execute.return_value.data = [{"org_id": None}] if cols == "org_id" else [{"role_id": auth.CLIENT, "org_id": None}]
+                return sel
+            m.select.side_effect = select
+        elif name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        elif name == "cases":
+            m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        elif name == "trust_transactions":
+            m.select.return_value.eq.return_value.execute.return_value.data = []
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    fake.rpc.return_value.execute.return_value.data = {"user_id": 9, "storage_paths": []}
+    with patch("app.controllers.users.supabase", fake):
+        assert delete_user(9, ORG_ADMIN_PROFILE)["user_id"] == 9
+
+
+def test_org_admin_cannot_delete_a_client_with_no_case_in_their_org():
+    """Verifies the client carve-out doesn't turn into a platform-wide bypass -- a client with
+    no case in the caller's org still 404s. Exercises: `DELETE /users/{id}`."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "users":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"org_id": None}]
+        elif name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        elif name == "cases":
+            m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.users.supabase", fake):
+        with pytest.raises(HTTPException) as exc:
+            delete_user(9, ORG_ADMIN_PROFILE)
+    assert exc.value.status_code == 404
+    fake.rpc.assert_not_called()
+
+
 def test_admin_cannot_delete_their_own_account():
     """Verifies deleting yourself is refused before anything is touched. Exercises: `DELETE /users/:id`."""
     with patch("app.controllers.users.supabase", _fake_supabase(auth.CLIENT, 2)) as fake:
