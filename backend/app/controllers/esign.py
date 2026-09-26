@@ -8,6 +8,7 @@ See docs/FUTURE_SCOPE.md for why this is bought rather than built in-house."""
 import base64
 import hashlib
 import hmac
+import logging
 
 import httpx
 from fastapi import Depends, HTTPException
@@ -17,6 +18,8 @@ from app.core.config import LEEGALITY_API_BASE, LEEGALITY_AUTH_TOKEN, LEEGALITY_
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, require_roles
 from app.models.documents import SignatureRequestCreate
+
+logger = logging.getLogger(__name__)
 
 
 def _leegality_auth() -> str:
@@ -122,25 +125,27 @@ def handle_esign_webhook(payload: dict):
     update: dict = {"esign_status": status}
 
     if status == "COMPLETED":
-        details = httpx.get(
-            f"{LEEGALITY_API_BASE}/v3.3/document/details",
-            headers={"X-Auth-Token": LEEGALITY_AUTH_TOKEN},
-            params={"documentId": document_id, "file": "true"},
-            timeout=30,
-        )
-        file_url = details.json().get("data", {}).get("file")
-        if file_url:
-            signed_bytes = httpx.get(file_url, timeout=30).content
-            signed_path = f"case-{doc['case_id']}/signed-{document_id}.pdf"
-            try:
+        try:
+            details = httpx.get(
+                f"{LEEGALITY_API_BASE}/v3.3/document/details",
+                headers={"X-Auth-Token": LEEGALITY_AUTH_TOKEN},
+                params={"documentId": document_id, "file": "true"},
+                timeout=30,
+            )
+            file_url = details.json().get("data", {}).get("file")
+            if file_url:
+                signed_bytes = httpx.get(file_url, timeout=30).content
+                signed_path = f"case-{doc['case_id']}/signed-{document_id}.pdf"
                 supabase.storage.from_(DOCUMENTS_BUCKET).upload(
                     signed_path,
                     signed_bytes,
                     {"content-type": "application/pdf", "upsert": "true"},
                 )
                 update["esign_signed_file_path"] = signed_path
-            except Exception:
-                pass
+        except Exception as err:
+            # Fetching/storing the signed PDF is best-effort -- esign_status still has to land
+            # below, or a flaky Leegality request leaves the document stuck at SENT forever.
+            logger.warning("Failed to store signed PDF for document %s: %s", document_id, err)
 
     supabase.table("documents").update(update).eq("document_id", doc["document_id"]).execute()
     return {"message": "ok"}
