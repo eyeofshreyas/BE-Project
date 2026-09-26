@@ -327,6 +327,56 @@ def test_webhook_writes_status_when_signed_file_upload_fails():
     assert result == {"message": "ok"}
     assert writes[0]["esign_status"] == "COMPLETED"
 
+
+def test_webhook_writes_status_when_leegality_fetch_fails():
+    """Verifies a Completed webhook still writes COMPLETED status when fetching the
+    document details or downloading the signed PDF from Leegality raises -- not just
+    when the storage upload itself fails."""
+    salt = "shh"
+    document_id = "LEG123"
+    mac = hmac.new(salt.encode(), document_id.encode(), hashlib.sha1).hexdigest()
+
+    writes = []
+    fake = MagicMock()
+
+    def table(name):
+        m = MagicMock()
+        if name == "documents":
+            m.select.return_value.eq.return_value.execute.return_value.data = [
+                {"document_id": 1, "case_id": 10, "file_name": "Deed.pdf"}
+            ]
+
+            def update(payload):
+                writes.append(payload)
+                return MagicMock(
+                    eq=MagicMock(return_value=MagicMock(execute=MagicMock()))
+                )
+
+            m.update.side_effect = update
+        return m
+
+    fake.table.side_effect = table
+
+    payload = {
+        "documentId": document_id,
+        "documentStatus": "Completed",
+        "mac": mac,
+    }
+
+    with patch("app.controllers.esign.supabase", fake), \
+         patch("app.controllers.esign.LEEGALITY_PRIVATE_SALT", salt), \
+         patch("app.controllers.esign.LEEGALITY_AUTH_TOKEN", "test"), \
+         patch(
+             "app.controllers.esign.httpx.get",
+             side_effect=Exception("Leegality request timed out"),
+         ):
+        result = handle_esign_webhook(payload)
+
+    assert result == {"message": "ok"}
+    assert writes[0]["esign_status"] == "COMPLETED"
+    assert "esign_signed_file_path" not in writes[0]
+
+
 def test_webhook_marks_rejected_distinctly_from_pending():
     """Verifies a rejection sets esign_status to REJECTED, not the raw documentStatus value --
     Leegality's own payload leaves documentStatus as "Sent" on a rejection, identical to a
@@ -457,6 +507,7 @@ if __name__ == "__main__":
     test_webhook_downloads_signed_file_on_completion()
     test_webhook_redelivery_is_idempotent()
     test_webhook_writes_status_when_signed_file_upload_fails()
+    test_webhook_writes_status_when_leegality_fetch_fails()
     test_webhook_marks_rejected_distinctly_from_pending()
     test_webhook_marks_expired_distinctly_from_pending()
     test_unconfigured_webhook_gives_clean_error_not_a_crash()
