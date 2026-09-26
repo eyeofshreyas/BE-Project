@@ -55,6 +55,10 @@ the Supabase dashboard. Nobody else's database gets the change otherwise.
 on request models, or the HMAC verification in `billing.py` / `esign.py`. If one
 of them is in your way, that's an issue to raise, not an edit to make.
 
+For security vulnerabilities involving these controls or other security-sensitive
+behavior, do not open a public issue. Follow the reporting instructions in
+[`SECURITY.md`](SECURITY.md).
+
 ## 4. Test it
 
 Backend, from `backend/`:
