@@ -132,8 +132,15 @@ def handle_esign_webhook(payload: dict):
         if file_url:
             signed_bytes = httpx.get(file_url, timeout=30).content
             signed_path = f"case-{doc['case_id']}/signed-{document_id}.pdf"
-            supabase.storage.from_(DOCUMENTS_BUCKET).upload(signed_path, signed_bytes, {"content-type": "application/pdf"})
-            update["esign_signed_file_path"] = signed_path
+            try:
+                supabase.storage.from_(DOCUMENTS_BUCKET).upload(
+                    signed_path,
+                    signed_bytes,
+                    {"content-type": "application/pdf", "upsert": "true"},
+                )
+                update["esign_signed_file_path"] = signed_path
+            except Exception:
+                pass
 
     supabase.table("documents").update(update).eq("document_id", doc["document_id"]).execute()
     return {"message": "ok"}
