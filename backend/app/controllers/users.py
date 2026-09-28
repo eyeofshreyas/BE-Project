@@ -217,16 +217,17 @@ def _trust_balance_held(user_id: int) -> float:
     return round(sum(r["amount"] if r["type"] == "deposit" else -r["amount"] for r in rows), 2)
 
 
-def _assert_deletable(user_id: int, profile: dict) -> None:
+def _assert_deletable(user_id: int, profile: dict) -> str:
     """Refuse the deletes that shouldn't happen: your own account, a user outside the
     caller's org (an org admin only, via `_assert_same_org_or_404()`), the last remaining
     admin (scoped to the caller's own org for an org admin, platform-wide for the
-    super-admin), and a client whose money the firm is still holding. Calls:
+    super-admin), and a client whose money the firm is still holding. Returns the target's
+    email, so the caller can remove their Supabase Auth account after the cascade. Calls:
     `_assert_same_org_or_404()`, `_trust_balance_held()`."""
     if user_id == profile["user_id"]:
         raise HTTPException(status_code=400, detail="You can't delete your own account.")
     _assert_same_org_or_404(user_id, profile)
-    rows = supabase.table("users").select("role_id,org_id").eq("user_id", user_id).execute().data
+    rows = supabase.table("users").select("role_id,org_id,email").eq("user_id", user_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="User not found")
     if rows[0]["role_id"] == ADMIN:
@@ -245,6 +246,24 @@ def _assert_deletable(user_id: int, profile: dict) -> None:
             detail=f"This client still has {held:.2f} held in the trust account. Return or disburse it before deleting them.",
         )
 
+    return rows[0]["email"]
+
+
+def _delete_auth_account(email: str) -> None:
+    """Best-effort removal of a deleted user's Supabase Auth login. Nothing ties a `users`
+    row to `auth.users` but the email (see delete_user_cascade.sql's note at the top), so
+    finding the account means paging admin.list_users() for a match."""
+    page = 1
+    while page <= 50:  # ponytail: hard cap, not real pagination -- same reasoning as MAX_USERS
+        page_users = supabase.auth.admin.list_users(page=page, per_page=200)
+        if not page_users:
+            return
+        match = next((u for u in page_users if u.email == email), None)
+        if match:
+            supabase.auth.admin.delete_user(match.id)
+            return
+        page += 1
+
 
 def get_user_delete_impact(user_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """Preview what deleting this user would destroy, without touching anything; 404 if
@@ -256,8 +275,8 @@ def get_user_delete_impact(user_id: int, profile: dict = Depends(require_roles(A
 def delete_user(user_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN))):
     """Permanently delete a user and everything cascading off them. Irreversible -- callers
     are expected to have shown `get_user_delete_impact()` first.
-    Calls: `_assert_deletable()`, `_cascade()`."""
-    _assert_deletable(user_id, profile)
+    Calls: `_assert_deletable()`, `_cascade()`, `_delete_auth_account()`."""
+    email = _assert_deletable(user_id, profile)
     result = _cascade(user_id, dry_run=False)
 
     # Storage lives outside the transaction, so this runs after the rows are gone and can
@@ -268,4 +287,13 @@ def delete_user(user_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER
             supabase.storage.from_(DOCUMENTS_BUCKET).remove(paths)
         except StorageApiError:
             logger.exception("User %s deleted but %d storage object(s) were left behind", user_id, len(paths))
+
+    # Supabase Auth is a separate system from the users table the cascade just cleared --
+    # best effort, same stance as the storage cleanup above: log and move on, the app-side
+    # delete already committed.
+    try:
+        _delete_auth_account(email)
+    except Exception:
+        logger.exception("User %s deleted but removing their Supabase Auth account failed", user_id)
+
     return result

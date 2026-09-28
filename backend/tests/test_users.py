@@ -21,7 +21,7 @@ def _fake_supabase(target_role: int, admin_count: int, target_org_id: int = 7, t
     held-money check in `_assert_deletable()` passes and the other rules get exercised."""
     fake = MagicMock()
     m = MagicMock()
-    m.select.return_value.eq.return_value.execute.return_value.data = [{"role_id": target_role, "org_id": target_org_id}]
+    m.select.return_value.eq.return_value.execute.return_value.data = [{"role_id": target_role, "org_id": target_org_id, "email": "deleted@example.com"}]
     m.select.return_value.eq.return_value.eq.return_value.execute.return_value.count = admin_count
 
     trust = MagicMock()
@@ -32,6 +32,7 @@ def _fake_supabase(target_role: int, admin_count: int, target_org_id: int = 7, t
     fake.table.side_effect = lambda name: {"trust_transactions": trust, "clients": clients}.get(name, m)
     fake.table.return_value = m
     fake.rpc.return_value.execute.return_value.data = {"user_id": 2, "storage_paths": ["case-1/a.pdf"]}
+    fake.auth.admin.list_users.return_value = []
     return fake
 
 
@@ -294,7 +295,7 @@ def test_org_admin_can_delete_a_client_with_a_case_in_their_org():
         if name == "users":
             def select(cols):
                 sel = MagicMock()
-                sel.eq.return_value.execute.return_value.data = [{"org_id": None}] if cols == "org_id" else [{"role_id": auth.CLIENT, "org_id": None}]
+                sel.eq.return_value.execute.return_value.data = [{"org_id": None}] if cols == "org_id" else [{"role_id": auth.CLIENT, "org_id": None, "email": "client@example.com"}]
                 return sel
             m.select.side_effect = select
         elif name == "clients":
@@ -308,6 +309,7 @@ def test_org_admin_can_delete_a_client_with_a_case_in_their_org():
 
     fake.table.side_effect = table
     fake.rpc.return_value.execute.return_value.data = {"user_id": 9, "storage_paths": []}
+    fake.auth.admin.list_users.return_value = []
     with patch("app.controllers.users.supabase", fake):
         assert delete_user(9, ORG_ADMIN_PROFILE)["user_id"] == 9
 
@@ -399,6 +401,29 @@ def test_storage_failure_does_not_undo_the_delete():
     Exercises: `DELETE /users/:id`."""
     fake = _fake_supabase(auth.CLIENT, 2)
     fake.storage.from_.return_value.remove.side_effect = StorageApiError("boom", "500", 500)
+    with patch("app.controllers.users.supabase", fake):
+        assert delete_user(2, ADMIN_PROFILE)["user_id"] == 2
+
+
+def test_delete_removes_the_supabase_auth_account():
+    """Verifies the Supabase Auth login is removed after a successful cascade -- nothing ties
+    a `users` row to `auth.users` but the email, so this pages admin.list_users() looking
+    for a match and deletes it by id. Exercises: `DELETE /users/:id`."""
+    fake = _fake_supabase(auth.CLIENT, 2)
+    fake.auth.admin.list_users.return_value = [
+        MagicMock(email="someone-else@example.com", id="uid-other"),
+        MagicMock(email="deleted@example.com", id="uid-target"),
+    ]
+    with patch("app.controllers.users.supabase", fake):
+        assert delete_user(2, ADMIN_PROFILE)["user_id"] == 2
+    fake.auth.admin.delete_user.assert_called_once_with("uid-target")
+
+
+def test_auth_account_removal_failure_does_not_undo_the_delete():
+    """Verifies a failure removing the Auth account is logged, not raised -- same stance as
+    the storage cleanup above it. Exercises: `DELETE /users/:id`."""
+    fake = _fake_supabase(auth.CLIENT, 2)
+    fake.auth.admin.list_users.side_effect = Exception("boom")
     with patch("app.controllers.users.supabase", fake):
         assert delete_user(2, ADMIN_PROFILE)["user_id"] == 2
 
