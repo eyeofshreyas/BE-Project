@@ -152,10 +152,11 @@ def signup(data: SignupRequest):
         invite_row = invites[0]
 
     try:
-        new_auth_client().auth.sign_up({
-            "email": data.email,
-            "password": data.password
-        })
+        with new_auth_client() as auth_client:
+            auth_client.auth.sign_up({
+                "email": data.email,
+                "password": data.password
+            })
     except Exception:
         logger.exception("Signup failed for %s", data.email)
         raise HTTPException(status_code=400, detail="Signup failed. Check your details and try again.")
@@ -198,10 +199,11 @@ def login(data: LoginRequest):
     """Authenticate against Supabase Auth and return tokens plus the LexFlow profile row.
     Calls: `supabase.auth.sign_in_with_password()`."""
     try:
-        result = new_auth_client().auth.sign_in_with_password({
-            "email": data.email,
-            "password": data.password
-        })
+        with new_auth_client() as auth_client:
+            result = auth_client.auth.sign_in_with_password({
+                "email": data.email,
+                "password": data.password
+            })
     except AuthApiError as e:
         if e.code == "email_not_confirmed":
             raise HTTPException(status_code=403, detail="Please confirm your email before logging in -- check your inbox for the verification link.")
