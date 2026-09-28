@@ -65,25 +65,31 @@ def _scope_org(profile: dict, org_id: int | None) -> int:
 
 
 def _ensure_client_access(client_id: int, org_id: int, profile: dict) -> None:
-    """403 unless the caller can see a case for this client. `require_roles()` checks *what*
-    the caller is, not *whose* money they may touch -- without this any lawyer at any firm
-    could read or draw down any client's trust balance. Calls: `get_scoped_case_ids()`."""
+    """403 unless the caller can see a case for this client -- or the client has no case
+    anywhere yet. A retainer is the normal first step in a matter, arriving before the case
+    that would otherwise scope it, so a case-less client falls back to being reachable by
+    any caller scoped to an org: there's no firm relationship yet to check against. A client
+    who DOES have a case, just not one this caller can see, stays refused -- that's what
+    stops a lawyer at one firm (or with no assignment to this client's cases) from touching
+    another firm's client money, and it must not regress. `require_roles()` checks *what*
+    the caller is, not *whose* money they may touch. Calls: `get_scoped_case_ids()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is None:          # super-admin
         return
-    if not case_ids:
-        raise HTTPException(status_code=403, detail="You don't have access to this client")
-    rows = (
-        supabase.table("cases")
-        .select("case_id")
-        .eq("client_id", client_id)
-        .eq("org_id", org_id)
-        .in_("case_id", list(case_ids))
-        .limit(1)
-        .execute()
-        .data
-    )
-    if not rows:
+    if case_ids:
+        rows = (
+            supabase.table("cases")
+            .select("case_id")
+            .eq("client_id", client_id)
+            .eq("org_id", org_id)
+            .in_("case_id", list(case_ids))
+            .limit(1)
+            .execute()
+            .data
+        )
+        if rows:
+            return
+    if supabase.table("cases").select("case_id").eq("client_id", client_id).limit(1).execute().data:
         raise HTTPException(status_code=403, detail="You don't have access to this client")
 
 

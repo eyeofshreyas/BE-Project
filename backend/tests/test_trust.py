@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.controllers.trust import (
+    _ensure_client_access,
     create_bank_statement,
     create_trust_transaction,
     get_client_balance,
@@ -70,8 +71,11 @@ class TestCreateTrustTransaction:
             deposit(amount=-100.00)
 
     @patch("app.controllers.trust.get_scoped_case_ids", return_value=set())
-    def test_client_outside_the_callers_scope_is_403(self, _scoped):
-        """require_roles() checks what the caller is, not whose money they may touch."""
+    @patch("app.controllers.trust.supabase")
+    def test_client_outside_the_callers_scope_is_403(self, mock_supabase, _scoped):
+        """require_roles() checks what the caller is, not whose money they may touch -- a
+        caller with zero case access anywhere must not reach a client retained elsewhere."""
+        mock_supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = [{"case_id": 1}]
         with pytest.raises(HTTPException) as exc:
             create_trust_transaction(deposit(client_id=999), LAWYER_PROFILE)
         assert exc.value.status_code == 403
@@ -150,10 +154,25 @@ class TestClientBalance:
         assert result == {"client_id": 1, "org_id": 10, "balance": 2750.50}
 
     @patch("app.controllers.trust.get_scoped_case_ids", return_value=set())
-    def test_unscoped_client_is_403(self, _scoped):
+    @patch("app.controllers.trust.supabase")
+    def test_client_with_a_case_elsewhere_is_still_403_for_an_unscoped_caller(self, mock_supabase, _scoped):
+        """A caller with zero case access anywhere must not reach a client who's already
+        retained by some other firm -- the case-less fallback (#36) must not swallow this."""
+        mock_supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = [{"case_id": 1}]
         with pytest.raises(HTTPException) as exc:
             get_client_balance(999, None, LAWYER_PROFILE)
         assert exc.value.status_code == 403
+
+    @patch("app.controllers.trust._get_balance", return_value=0.0)
+    @patch("app.controllers.trust.get_scoped_case_ids", return_value=set())
+    @patch("app.controllers.trust.supabase")
+    def test_case_less_client_is_reachable_even_by_an_unscoped_caller(self, mock_supabase, _scoped, _balance):
+        """Before the fix, `if not case_ids: raise 403` locked a caller with zero case access
+        out of trust entirely -- even for a client with no case anywhere yet, the normal
+        state for a retainer that arrives before the matter is opened."""
+        mock_supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = []
+        result = get_client_balance(999, None, LAWYER_PROFILE)
+        assert result == {"client_id": 999, "org_id": 10, "balance": 0.0}
 
     @patch("app.controllers.trust._ensure_client_access")
     @patch("app.controllers.trust.supabase")
@@ -164,6 +183,63 @@ class TestClientBalance:
         # client_id then org_id
         eq_calls = mock_supabase.table.return_value.select.return_value.eq.call_args_list
         assert eq_calls[0].args == ("client_id", 1)
+
+
+# ─────────────────────────────────────────────────────────────
+# _ensure_client_access -- case-less client fallback (#36)
+# ─────────────────────────────────────────────────────────────
+
+def _cases_table_for(scoped_rows: list, any_case_rows: list) -> MagicMock:
+    """A `cases` table double distinguishing `_ensure_client_access()`'s two possible
+    queries by chain shape: the org+case_ids-scoped lookup (two `.eq()`s, then `.in_()`)
+    vs. the "any case for this client, anywhere" fallback (one `.eq()`, straight to
+    `.limit()`)."""
+    cases = MagicMock()
+    after_client_eq = cases.select.return_value.eq.return_value
+    after_client_eq.eq.return_value.in_.return_value.limit.return_value.execute.return_value.data = scoped_rows
+    after_client_eq.limit.return_value.execute.return_value.data = any_case_rows
+    return cases
+
+
+class TestEnsureClientAccess:
+
+    @patch("app.controllers.trust.get_scoped_case_ids", return_value=None)
+    def test_super_admin_bypasses_the_check_entirely(self, _scoped):
+        _ensure_client_access(client_id=1, org_id=10, profile=SUPER_ADMIN_PROFILE)  # does not raise
+
+    @patch("app.controllers.trust.get_scoped_case_ids", return_value={1, 2})
+    @patch("app.controllers.trust.supabase")
+    def test_case_less_client_is_reachable_at_the_callers_own_firm(self, mock_supabase, _scoped):
+        """A retainer for a client with no case yet is the normal first step in a matter --
+        it must not 403 just because there's no case yet to scope by."""
+        mock_supabase.table.return_value = _cases_table_for(scoped_rows=[], any_case_rows=[])
+        _ensure_client_access(client_id=1, org_id=10, profile=ADMIN_PROFILE)  # does not raise
+
+    @patch("app.controllers.trust.get_scoped_case_ids", return_value=set())
+    @patch("app.controllers.trust.supabase")
+    def test_admin_at_a_brand_new_firm_with_no_cases_at_all_can_still_deposit(self, mock_supabase, _scoped):
+        """Before the fix, `if not case_ids: raise 403` locked an admin with zero cases in
+        their org out of trust entirely, even for a client with no case anywhere."""
+        mock_supabase.table.return_value = _cases_table_for(scoped_rows=[], any_case_rows=[])
+        _ensure_client_access(client_id=1, org_id=10, profile=ADMIN_PROFILE)  # does not raise
+
+    @patch("app.controllers.trust.get_scoped_case_ids", return_value={1, 2})
+    @patch("app.controllers.trust.supabase")
+    def test_a_client_with_a_case_at_another_firm_is_still_refused(self, mock_supabase, _scoped):
+        """The case-less fallback must not swallow a client who's already retained
+        elsewhere -- that's the check that stops one firm touching another's client money."""
+        mock_supabase.table.return_value = _cases_table_for(scoped_rows=[], any_case_rows=[{"case_id": 99}])
+        with pytest.raises(HTTPException) as exc:
+            _ensure_client_access(client_id=1, org_id=10, profile=ADMIN_PROFILE)
+        assert exc.value.status_code == 403
+
+    @patch("app.controllers.trust.get_scoped_case_ids", return_value={5})
+    @patch("app.controllers.trust.supabase")
+    def test_a_lawyer_with_no_assignment_to_any_of_the_clients_cases_is_still_refused(self, mock_supabase, _scoped):
+        mock_supabase.table.return_value = _cases_table_for(scoped_rows=[], any_case_rows=[{"case_id": 42}])
+        with pytest.raises(HTTPException) as exc:
+            _ensure_client_access(client_id=1, org_id=10, profile=LAWYER_PROFILE)
+        assert exc.value.status_code == 403
 
 
 # ─────────────────────────────────────────────────────────────
