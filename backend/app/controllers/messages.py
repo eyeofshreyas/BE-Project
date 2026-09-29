@@ -276,7 +276,7 @@ def send_message(
     if file is not None:
         if not _is_allowed_attachment(file.content_type):
             raise HTTPException(status_code=400, detail="Only images, video, and documents can be attached")
-        content = file.file.read()
+        content = file.file.read(MAX_ATTACHMENT_BYTES + 1)
         if not content:
             raise HTTPException(status_code=400, detail="That file is empty")
         if len(content) > MAX_ATTACHMENT_BYTES:
