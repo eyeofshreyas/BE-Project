@@ -107,6 +107,7 @@ def summarize_text(
             supabase.table("documents")
             .select("case_id,file_path,mime_type,document_types(type_name)")
             .eq("document_id", data.document_id)
+            .eq("is_deleted", False)
             .execute()
             .data
         )
