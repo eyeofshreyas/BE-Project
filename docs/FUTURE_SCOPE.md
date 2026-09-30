@@ -299,18 +299,17 @@ from this document.
 
 ---
 
-## 4. Audit findings (2026-09-18) — queued fixes
+## 4. Audit findings (2026-09-18)
 
 A read of the backend and frontend against the open issue list turned up eighteen things
-none of the existing issues covered. Unlike everything above, **these are defects, not
-deferred features** — they're recorded here because the fix is scheduled for a later
-cycle, not because something external unblocks them. The trigger for §4.1–§4.5 is simply
-the next fix cycle. Only §4.6 has a real external trigger.
+none of the existing issues covered. Unlike everything above, **these were defects, not
+deferred features.** All but §4.4 (frontend refresh token) and §4.6 (genuinely deferred,
+see below) have since been fixed — this section is kept as the record of what was found
+and closed, not as an active queue.
 
-Six are filed: [#20](https://github.com/eyeofshreyas/BE-Project/issues/20)–[#25](https://github.com/eyeofshreyas/BE-Project/issues/25). The rest are recorded here and
-not yet filed — §4.1 and §4.2 describe exploitable paths, and this repo is public, so they
-should be reported through private vulnerability reporting (§4.5) rather than opened as
-public issues.
+Six were filed: [#20](https://github.com/eyeofshreyas/BE-Project/issues/20)–[#25](https://github.com/eyeofshreyas/BE-Project/issues/25),
+covered by §4.5 below. §4.1–§4.3 describe exploitable paths on a public repo and were fixed
+directly rather than filed as public issues.
 
 Step-by-step fixes, with test code, are in
 `docs/superpowers/plans/2026-09-18-audit-findings-remediation.md` (gitignored, local only).
@@ -327,54 +326,36 @@ Step-by-step fixes, with test code, are in
 
 ### 4.2 Correctness
 
-- **The e-sign webhook isn't idempotent** — `app/controllers/esign.py:134`. The signed PDF
-  goes to a fixed `signed-{document_id}.pdf`, Supabase Storage's `upload` rejects an
-  existing path, and the call isn't wrapped the way `messages.py:284` is. A redelivery
-  500s, and because `esign_status` is written *after* the upload (`esign.py:138`) the
-  document is stuck at SENT while Leegality retries a callback that can never succeed.
-  **Fix:** `{"upsert": "true"}`, and write the status even when storing the file fails.
+- ~~**The e-sign webhook isn't idempotent**~~ — Done. `app/controllers/esign.py`'s upload
+  now passes `{"upsert": "true"}`, so a Leegality redelivery overwrites the existing
+  `signed-{document_id}.pdf` instead of 500ing on it.
 
 - ~~**Org admins can preview a client delete but the delete 404s**~~ — Done.
   `_assert_deletable()` now delegates scoping to `_assert_same_org_or_404()` instead of
   comparing `org_id` raw, so a client's `NULL` `org_id` is handled the same way in both the
   preview and the delete.
 
-- **Deleting a user leaves their Supabase Auth account** — `app/controllers/users.py:231`.
-  The cascade clears the `users` row and storage; nothing calls the Auth admin API
-  (`grep -rn "auth.admin" backend/` finds nothing, and `migrate_delete_user_cascade.sql`
-  doesn't touch `auth.users`). The person still authenticates and gets `profile: null`,
-  which reads as a broken app rather than a closed account, and their email can't be
-  signed up again. **Fix:** `supabase.auth.admin.delete_user()` after the cascade, logged
-  but not fatal — same stance as the storage cleanup beside it. Matching is by email;
-  there's no UUID column linking the two (see the note at the top of `seed.sql`).
+- ~~**Deleting a user leaves their Supabase Auth account**~~ — Done.
+  `app/controllers/users.py` now calls `supabase.auth.admin.delete_user()` (matched by
+  email, listed via `auth.admin.list_users()`) after the cascade, logged but not fatal —
+  same stance as the storage cleanup beside it.
 
-- **`/ai/summarize` reads soft-deleted documents** — `app/ml/summarize.py:46`. Download
-  and summary-fetch both filter `is_deleted=False`; this query doesn't, so a deleted
-  document is still pulled out of storage and summarized during the reaper's grace window.
-  **Fix:** add the filter the other two call sites have.
+- ~~**`/ai/summarize` reads soft-deleted documents**~~ — Done. `app/ml/summarize.py` now
+  filters `is_deleted=False` the same as the other two call sites.
 
 ### 4.3 Resources
 
-- **Message attachments are buffered in full before the size check** —
-  `app/controllers/messages.py:279`. `file.file.read()` with no argument reads to EOF;
-  the 25 MB check happens after. `documents.read_upload()` reads `MAX + 1` and documents
-  why. A 2 GB attachment is rejected — after 2 GB is allocated to decide that.
-  **Fix:** `file.file.read(MAX_ATTACHMENT_BYTES + 1)`.
+- ~~**Message attachments are buffered in full before the size check**~~ — Done.
+  `app/controllers/messages.py` now reads `file.file.read(MAX_ATTACHMENT_BYTES + 1)`,
+  matching `documents.read_upload()`.
 
-- **Every login and signup leaks an httpx connection pool** —
-  `app/db/supabase_client.py:26`, filed as
-  [#25](https://github.com/eyeofshreyas/BE-Project/issues/25). `new_auth_client()` builds a
-  fresh `httpx.Client` per call and nothing closes it. The reason it exists is sound (see
-  its docstring — don't "fix" this by going back to the shared client); only the lifetime
-  is wrong. **Fix:** make it a `@contextmanager`. Note this renames the patch target in
-  ~6 places in `tests/test_auth.py`.
+- ~~**Every login and signup leaks an httpx connection pool**~~ — Done, closes
+  [#25](https://github.com/eyeofshreyas/BE-Project/issues/25). `new_auth_client()` is now a
+  `@contextmanager` that closes its `httpx.Client` when the call is done.
 
-- **A failed `documents` insert orphans the uploaded file** —
-  `app/controllers/documents.py:131`. The object is already in the bucket, and
-  `reap_storage.py` only walks rows, so nothing will ever find it. Same shape in
-  `messages.py:303`. **Fix:** delete the object if the insert raises. A bucket-side sweep
-  would catch what's already orphaned — only worth building if a check shows orphans have
-  actually accumulated.
+- ~~**A failed `documents` insert orphans the uploaded file**~~ — Done.
+  `app/controllers/documents.py`'s `upload_document` now removes the storage object if the
+  row insert raises.
 
 ### 4.4 Frontend
 
@@ -388,25 +369,22 @@ Step-by-step fixes, with test code, are in
   in `request()`, so six parallel dashboard 401s trigger one refresh, not six. No frontend
   test framework exists yet (#16), so this half is verified by clicking through.
 
-### 4.5 Repo hygiene — all filed
+### 4.5 Repo hygiene — all filed, all done in code
 
-- [#20](https://github.com/eyeofshreyas/BE-Project/issues/20) **No `LICENSE`.** Public repo,
-  `licenseInfo: null`. No license means nobody has permission to use the code, and
-  contributors have no stated terms — public visibility changes neither.
-- [#21](https://github.com/eyeofshreyas/BE-Project/issues/21) **No `SECURITY.md`.** Nowhere
-  to report §4.1/§4.2-shaped findings except a public issue. Do this one first: it's what
-  makes the rest fileable.
-- [#22](https://github.com/eyeofshreyas/BE-Project/issues/22) **No issue or PR templates.**
-  `CONTRIBUTING.md` §1 and §6 specify what each must contain; nothing puts that in front of
-  the person filling the form in, so `Closes #N` gets forgotten and issues outlive their fix.
-- [#23](https://github.com/eyeofshreyas/BE-Project/issues/23) **No `CODE_OF_CONDUCT.md`.**
-  A file you adopt, not one you write — the Contributor Covenant, with a genuinely
-  monitored enforcement contact.
-- [#24](https://github.com/eyeofshreyas/BE-Project/issues/24) **No `frontend/.env.example`.**
-  `VITE_API_URL` (`client.ts:57`) is discoverable only by grepping, and its
-  `?? 'http://localhost:8000'` fallback keeps it quiet until the first build for somewhere
-  that isn't a laptop. Vite inlines `VITE_*` at **build** time, so a wrong value can't be
-  corrected on the server afterwards.
+Note: this repo's PRs target `develop`, so GitHub's closing keywords don't auto-close these
+against `main` — the issues may still show OPEN even though each fix below has landed.
+
+- ~~[#20](https://github.com/eyeofshreyas/BE-Project/issues/20) **No `LICENSE`.**~~ Done —
+  `LICENSE` exists at repo root.
+- ~~[#21](https://github.com/eyeofshreyas/BE-Project/issues/21) **No `SECURITY.md`.**~~ Done —
+  `SECURITY.md` exists at repo root.
+- ~~[#22](https://github.com/eyeofshreyas/BE-Project/issues/22) **No issue or PR templates.**~~
+  Done — `.github/ISSUE_TEMPLATE/` (`bug_report.md`, `feature_request.md`, `config.yml`) and
+  `.github/pull_request_template.md` exist.
+- ~~[#23](https://github.com/eyeofshreyas/BE-Project/issues/23) **No `CODE_OF_CONDUCT.md`.**~~
+  Done — `CODE_OF_CONDUCT.md` exists at repo root.
+- ~~[#24](https://github.com/eyeofshreyas/BE-Project/issues/24) **No `frontend/.env.example`.**~~
+  Done — `frontend/.env.example` exists.
 
 ### 4.6 Genuinely deferred — these have real triggers
 
