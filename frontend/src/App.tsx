@@ -1,33 +1,38 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import LandingPage from './pages/auth/LandingPage'
-import LoginPage from './pages/auth/LoginPage'
-import SignUpPage from './pages/auth/SignUpPage'
-import RoleSelectionPage from './pages/auth/RoleSelectionPage'
-import AdminConsolePage from './pages/admin/AdminConsolePage'
-import ConveyancingDashboardPage from './pages/conveyancing/ConveyancingDashboardPage'
-import CreateMatterPage from './pages/conveyancing/CreateMatterPage'
-import MatterDetailPage from './pages/conveyancing/MatterDetailPage'
-import DashboardPage from './pages/DashboardPage'
-import CaseDetailPage from './pages/cases/CaseDetailPage'
-import CasesListPage from './pages/cases/CasesListPage'
-import CreateCasePage from './pages/cases/CreateCasePage'
-import DocumentsListPage from './pages/documents/DocumentsListPage'
-import DocumentPreviewPage from './pages/documents/DocumentPreviewPage'
-import BillingPage from './pages/billing/BillingPage'
-import RecordPaymentPage from './pages/billing/RecordPaymentPage'
-import GenerateInvoicePage from './pages/billing/GenerateInvoicePage'
-import HearingsPage from './pages/hearings/HearingsPage'
-import ClientsPage from './pages/clients/ClientsPage'
-import CreateClientPage from './pages/clients/CreateClientPage'
-import ClientDetailPage from './pages/clients/ClientDetailPage'
-import MessagesPage from './pages/messages/MessagesPage'
-import JudgementsPage from './pages/judgements/JudgementsPage'
-import JudgementDetailPage from './pages/judgements/JudgementDetailPage'
-import ReferenceJudgementPage from './pages/judgements/ReferenceJudgementPage'
-import SettingsPage from './pages/settings/SettingsPage'
-import NotificationsPage from './pages/notifications/NotificationsPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/AppLayout'
+
+// Lazy-loaded so each page ships as its own chunk instead of all 25 landing in
+// the one 665KB bundle Vite was warning about -- nothing here needs to be
+// available before its route is visited.
+const LandingPage = lazy(() => import('./pages/auth/LandingPage'))
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
+const SignUpPage = lazy(() => import('./pages/auth/SignUpPage'))
+const RoleSelectionPage = lazy(() => import('./pages/auth/RoleSelectionPage'))
+const AdminConsolePage = lazy(() => import('./pages/admin/AdminConsolePage'))
+const ConveyancingDashboardPage = lazy(() => import('./pages/conveyancing/ConveyancingDashboardPage'))
+const CreateMatterPage = lazy(() => import('./pages/conveyancing/CreateMatterPage'))
+const MatterDetailPage = lazy(() => import('./pages/conveyancing/MatterDetailPage'))
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const CaseDetailPage = lazy(() => import('./pages/cases/CaseDetailPage'))
+const CasesListPage = lazy(() => import('./pages/cases/CasesListPage'))
+const CreateCasePage = lazy(() => import('./pages/cases/CreateCasePage'))
+const DocumentsListPage = lazy(() => import('./pages/documents/DocumentsListPage'))
+const DocumentPreviewPage = lazy(() => import('./pages/documents/DocumentPreviewPage'))
+const BillingPage = lazy(() => import('./pages/billing/BillingPage'))
+const RecordPaymentPage = lazy(() => import('./pages/billing/RecordPaymentPage'))
+const GenerateInvoicePage = lazy(() => import('./pages/billing/GenerateInvoicePage'))
+const HearingsPage = lazy(() => import('./pages/hearings/HearingsPage'))
+const ClientsPage = lazy(() => import('./pages/clients/ClientsPage'))
+const CreateClientPage = lazy(() => import('./pages/clients/CreateClientPage'))
+const ClientDetailPage = lazy(() => import('./pages/clients/ClientDetailPage'))
+const MessagesPage = lazy(() => import('./pages/messages/MessagesPage'))
+const JudgementsPage = lazy(() => import('./pages/judgements/JudgementsPage'))
+const JudgementDetailPage = lazy(() => import('./pages/judgements/JudgementDetailPage'))
+const ReferenceJudgementPage = lazy(() => import('./pages/judgements/ReferenceJudgementPage'))
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'))
+const NotificationsPage = lazy(() => import('./pages/notifications/NotificationsPage'))
 
 /**
  * Single top-level route table for the SPA. Gated routes are wrapped in
@@ -38,6 +43,7 @@ import AppLayout from './components/AppLayout'
 export default function App() {
   return (
     <BrowserRouter>
+      <Suspense fallback={null}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -68,6 +74,7 @@ export default function App() {
         <Route path="/notifications" element={<ProtectedRoute><AppLayout><NotificationsPage /></AppLayout></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><AppLayout><SettingsPage /></AppLayout></ProtectedRoute>} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }
