@@ -51,6 +51,43 @@ describe('request() -- 500', () => {
     })
     expect(fetch).toHaveBeenCalledTimes(1)
   })
+
+  it('retries a GET once on a 5xx response (not just a network error), then recovers', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse(503, { detail: 'Temporarily unavailable' }))
+      .mockResolvedValueOnce(jsonResponse(200, [{ id: 1 }]))
+
+    await expect(listCourts()).resolves.toEqual([{ id: 1 }])
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('throws the second 5xx if a GET retry also fails', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(500, { detail: 'Still down' }))
+
+    await expect(listCourts()).rejects.toMatchObject({ message: 'Still down', status: 500 })
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('request() -- auth header', () => {
+  it('attaches Authorization when a token is stored', async () => {
+    localStorage.setItem('lexflow_token', 'my-token')
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, []))
+
+    await listCourts()
+
+    const headers = vi.mocked(fetch).mock.calls[0][1]?.headers as Record<string, string>
+    expect(headers.Authorization).toBe('Bearer my-token')
+  })
+
+  it('omits Authorization when there is no token', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, []))
+
+    await listCourts()
+
+    const headers = vi.mocked(fetch).mock.calls[0][1]?.headers as Record<string, string>
+    expect(headers.Authorization).toBeUndefined()
+  })
 })
 
 describe('request() -- network failure', () => {
