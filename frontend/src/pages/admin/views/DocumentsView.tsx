@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { C } from '../../../components/theme'
-import { listDocuments, listCases, getDocumentDownloadUrl } from '../../../api/client'
+import { listDocuments, listCases, getDocumentDownloadUrl, deleteDocument } from '../../../api/client'
 import type { DocumentSummary, CaseSummary } from '../../../types/api'
 import { formatDate } from '../../../utils/date'
+import { Icon } from '../../../components/icons'
 import styles from '../../../components/AppShell.module.css'
 
-const DOC_COLUMNS = ['File', 'Type', 'Case', 'Uploaded By', 'Upload Date']
+const DOC_COLUMNS = ['File', 'Type', 'Case', 'Uploaded By', 'Upload Date', 'Actions']
 
 /** Fetches all documents via `listDocuments()` and lists them. */
 export default function DocumentsView() {
@@ -53,6 +54,16 @@ export default function DocumentsView() {
     }
   }
 
+  async function removeDocument(id: number) {
+    if (!window.confirm('Delete this document? This cannot be undone.')) return
+    try {
+      await deleteDocument(id)
+      setDocuments((prev) => prev.filter((d) => d.id !== id))
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : 'Failed to delete document.')
+    }
+  }
+
   return (
     <>
       <div>
@@ -75,13 +86,7 @@ export default function DocumentsView() {
               <tbody>
                 {documents.map((doc) => (
                   <tr key={doc.id} className={styles.tr}>
-                    <td
-                      className={styles.td}
-                      style={{ fontWeight: 600, color: '#1A1A17', cursor: 'pointer', textDecoration: 'underline' }}
-                      onClick={() => openDocument(doc.id)}
-                    >
-                      {doc.file_name}
-                    </td>
+                    <td className={styles.td} style={{ fontWeight: 600, color: '#1A1A17' }}>{doc.file_name}</td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{doc.document_type ?? '—'}</td>
                     <td
                       className={styles.td}
@@ -96,6 +101,12 @@ export default function DocumentsView() {
                     </td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{doc.uploaded_by ?? '—'}</td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{formatDate(doc.upload_date)}</td>
+                    <td className={styles.td}>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <div onClick={() => openDocument(doc.id)} className={styles.actionBtn} title="Open"><Icon name="globe" size={14} color="#575145" /></div>
+                        <div onClick={() => removeDocument(doc.id)} className={styles.actionBtnDanger} title="Delete"><Icon name="trash-2" size={14} color="#B3282D" /></div>
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 {documents.length === 0 && (
