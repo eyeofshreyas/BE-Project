@@ -127,12 +127,12 @@ export default function ClientDashboardPage() {
   const firstName = profile?.full_name.split(' ')[0] ?? 'there'
 
   const statCards = [
-    { label: 'Active Cases', value: String(activeCases.length), sublabel: 'Currently open', icon: 'briefcase' as const },
-    { label: 'Upcoming Hearings', value: String(scheduledHearings.length), sublabel: nextHearing ? `Next ${formatDate(nextHearing.hearing_date)}` : 'None scheduled', icon: 'calendar' as const },
-    { label: 'Pending Payments', value: money(pendingAmount), sublabel: nearestDue ? dueLabel(nearestDue) : 'All settled', icon: 'receipt' as const },
-    { label: 'Uploaded Documents', value: String(documents.length), sublabel: recentDocsCount > 0 ? `+${recentDocsCount} this week` : 'All time', icon: 'file-text' as const },
-    { label: 'Unread Notifications', value: String(unreadCount), sublabel: unreadCount > 0 ? 'Needs attention' : 'All caught up', icon: 'bell' as const },
-    { label: 'Completed Cases', value: String(completedCases.length), sublabel: 'All time', icon: 'check-circle' as const },
+    { label: 'Active Cases', value: String(activeCases.length), sublabel: 'Currently open', icon: 'briefcase' as const, to: '/cases' },
+    { label: 'Upcoming Hearings', value: String(scheduledHearings.length), sublabel: nextHearing ? `Next ${formatDate(nextHearing.hearing_date)}` : 'None scheduled', icon: 'calendar' as const, to: '/hearings' },
+    { label: 'Pending Payments', value: money(pendingAmount), sublabel: nearestDue ? dueLabel(nearestDue) : 'All settled', icon: 'receipt' as const, to: '/billing' },
+    { label: 'Uploaded Documents', value: String(documents.length), sublabel: recentDocsCount > 0 ? `+${recentDocsCount} this week` : 'All time', icon: 'file-text' as const, to: '/documents' },
+    { label: 'Unread Notifications', value: String(unreadCount), sublabel: unreadCount > 0 ? 'Needs attention' : 'All caught up', icon: 'bell' as const, to: '/notifications' },
+    { label: 'Completed Cases', value: String(completedCases.length), sublabel: 'All time', icon: 'check-circle' as const, to: '/cases' },
   ]
 
   return (
@@ -180,7 +180,7 @@ export default function ClientDashboardPage() {
           <>
             <div className={styles.statCards}>
               {statCards.map((s) => (
-                <div key={s.label} className={styles.statCard}>
+                <div key={s.label} className={styles.statCard} style={{ cursor: 'pointer' }} onClick={() => navigate(s.to)}>
                   <div className={styles.statIconRow}><div className={styles.statIconWrap}><Icon name={s.icon} size={19} color={PRIMARY_DARK} /></div></div>
                   <div>
                     <div className={styles.statValue}>{s.value}</div>

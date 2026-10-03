@@ -80,12 +80,12 @@ export default function LawyerDashboardPage() {
   const invoicePctChange = invoicedLastMonth > 0 ? Math.round(((invoicedThisMonth - invoicedLastMonth) / invoicedLastMonth) * 100) : null
 
   const statCards = [
-    { label: 'Total Cases', value: String(cases.length), pill: `+${casesThisMonth} this mo`, icon: 'briefcase' as const },
-    { label: 'Active Cases', value: String(activeCases.length), pill: `+${activeCasesThisMonth} this mo`, icon: 'bar-chart-2' as const },
-    { label: 'Pending Hearings', value: String(pendingHearingsThisWeek.length), pill: 'This week', icon: 'calendar' as const },
-    { label: 'Total Clients', value: String(clients.length), pill: `${activeClientsCount} active`, icon: 'users' as const },
-    { label: 'Invoices Generated', value: formatLakh(totalInvoiced), pill: invoicePctChange !== null ? `${invoicePctChange >= 0 ? '+' : ''}${invoicePctChange}%` : null, icon: 'receipt' as const },
-    { label: 'AI Summaries', value: String(aiSummaryCount), pill: `+${aiSummariesThisMonth} this mo`, icon: 'sparkles' as const },
+    { label: 'Total Cases', value: String(cases.length), pill: `+${casesThisMonth} this mo`, icon: 'briefcase' as const, to: '/cases' },
+    { label: 'Active Cases', value: String(activeCases.length), pill: `+${activeCasesThisMonth} this mo`, icon: 'bar-chart-2' as const, to: '/cases' },
+    { label: 'Pending Hearings', value: String(pendingHearingsThisWeek.length), pill: 'This week', icon: 'calendar' as const, to: '/hearings' },
+    { label: 'Total Clients', value: String(clients.length), pill: `${activeClientsCount} active`, icon: 'users' as const, to: '/clients' },
+    { label: 'Invoices Generated', value: formatLakh(totalInvoiced), pill: invoicePctChange !== null ? `${invoicePctChange >= 0 ? '+' : ''}${invoicePctChange}%` : null, icon: 'receipt' as const, to: '/billing' },
+    { label: 'AI Summaries', value: String(aiSummaryCount), pill: `+${aiSummariesThisMonth} this mo`, icon: 'sparkles' as const, to: '/documents' },
   ]
 
   // Monthly "cases filed" histogram for the last 12 months, using filing_date
@@ -137,7 +137,7 @@ export default function LawyerDashboardPage() {
           <>
             <div className={styles.statCards}>
               {statCards.map((s) => (
-                <div key={s.label} className={styles.statCard} style={{ gap: 8 }}>
+                <div key={s.label} className={styles.statCard} style={{ gap: 8, cursor: 'pointer' }} onClick={() => navigate(s.to)}>
                   <div className={styles.statIconRow}>
                     <div className={styles.statIconWrap}><Icon name={s.icon} size={19} color={PRIMARY_DARK} /></div>
                     {s.pill && <span className={styles.statusBadge} style={{ background: '#E6E0CE', color: PRIMARY_DARK }}>{s.pill}</span>}

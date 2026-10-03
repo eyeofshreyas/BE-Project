@@ -143,7 +143,7 @@ function StaffBillingView() {
   const filtered = invoices.filter((inv) => {
     const status = displayStatus(inv)
     const matchesSearch = !searchLower || inv.invoice_number.toLowerCase().includes(searchLower) || (inv.client ?? '').toLowerCase().includes(searchLower) || (inv.case_number ?? '').toLowerCase().includes(searchLower)
-    const matchesStatus = statusFilter === 'All' || status === statusFilter
+    const matchesStatus = statusFilter === 'All' || (statusFilter === 'Unpaid' ? status !== 'Paid' : status === statusFilter)
     const matchesTime = withinTimeFilter(inv.issue_date, timeFilter)
     return matchesSearch && matchesStatus && matchesTime
   })
@@ -169,7 +169,7 @@ function StaffBillingView() {
         </div>
 
         <div className={styles.statCards}>
-          <div className={styles.statCard} style={{ gap: 4 }}>
+          <div className={styles.statCard} style={{ gap: 4, cursor: 'pointer', ...(statusFilter === 'All' ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : {}) }} onClick={() => setStatusFilter('All')} title="Show all invoices">
             <div className={styles.statIconRow}>
               <div className={styles.statLabel} style={{ margin: 0 }}>Total Billed</div>
               <div className={styles.statIconWrap}><Icon name="file-text" size={16} color={PRIMARY} /></div>
@@ -177,7 +177,7 @@ function StaffBillingView() {
             <div className={styles.statValue} style={{ fontSize: 22 }}>{moneyRound(totalBilled)}</div>
             <div style={{ fontSize: 11.5, color: MUTED }}>Professional fees, all invoices</div>
           </div>
-          <div className={styles.statCard} style={{ gap: 4 }}>
+          <div className={styles.statCard} style={{ gap: 4, cursor: 'pointer', ...(statusFilter === 'Paid' ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : {}) }} onClick={() => setStatusFilter('Paid')} title="Show paid invoices">
             <div className={styles.statIconRow}>
               <div className={styles.statLabel} style={{ margin: 0 }}>Revenue Collected</div>
               <div className={styles.statIconWrap}><Icon name="bar-chart-2" size={16} color={PRIMARY} /></div>
@@ -186,7 +186,7 @@ function StaffBillingView() {
             <div style={{ fontSize: 11.5, color: MUTED }}>{recoveryPct}% recovery rate</div>
             <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${recoveryPct}%` }} /></div>
           </div>
-          <div className={styles.statCard} style={{ gap: 4 }}>
+          <div className={styles.statCard} style={{ gap: 4, cursor: 'pointer', ...(statusFilter === 'Unpaid' ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : {}) }} onClick={() => setStatusFilter('Unpaid')} title="Show unpaid invoices">
             <div className={styles.statIconRow}>
               <div className={styles.statLabel} style={{ margin: 0 }}>Outstanding Balance</div>
               <div className={styles.statIconWrap}><Icon name="info" size={16} color={PRIMARY} /></div>
@@ -212,7 +212,7 @@ function StaffBillingView() {
             style={{ flex: 1, minWidth: 220, padding: '9px 14px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}
           />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '9px 12px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}>
-            {['All', 'Paid', 'Partially Paid', 'Pending', 'Overdue'].map((s) => <option key={s} value={s}>{s === 'All' ? 'Status: All' : s}</option>)}
+            {['All', 'Paid', 'Unpaid', 'Partially Paid', 'Pending', 'Overdue'].map((s) => <option key={s} value={s}>{s === 'All' ? 'Status: All' : s}</option>)}
           </select>
           <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as (typeof TIME_FILTERS)[number])} style={{ padding: '9px 12px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}>
             {TIME_FILTERS.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -344,6 +344,7 @@ function ClientInvoicesView() {
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState<string | null>(null)
   const [payingId, setPayingId] = useState<number | null>(null)
+  const [cardFilter, setCardFilter] = useState<'all' | 'pending' | 'paid'>('all')
 
   function fireAction(label: string) {
     setToast(`${label}…`)
@@ -407,7 +408,8 @@ function ClientInvoicesView() {
 
   const searchLower = search.toLowerCase()
   const filtered = invoices.filter((inv) =>
-    !searchLower || inv.invoice_number.toLowerCase().includes(searchLower) || inv.payment_status.toLowerCase().includes(searchLower)
+    (!searchLower || inv.invoice_number.toLowerCase().includes(searchLower) || inv.payment_status.toLowerCase().includes(searchLower)) &&
+    (cardFilter === 'all' || (cardFilter === 'paid' ? inv.payment_status === 'Paid' : inv.payment_status !== 'Paid'))
   )
 
   const pendingInvoices = invoices.filter((i) => i.payment_status !== 'Paid')
@@ -448,7 +450,7 @@ function ClientInvoicesView() {
         {!loading && !error && (
           <>
             <div className={styles.statCards} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-              <div className={styles.statCard} style={{ background: '#FEF6EA', border: '1px solid #F3EBD9' }}>
+              <div className={styles.statCard} style={{ background: '#FEF6EA', border: cardFilter === 'pending' ? '1.5px solid #8A6A2F' : '1px solid #F3EBD9', cursor: 'pointer' }} onClick={() => setCardFilter('pending')} title="Show pending invoices">
                 <div className={styles.statIconRow}>
                   <div className={styles.statIconWrap} style={{ background: '#F3EBD9' }}><Icon name="clock" size={16} color="#8A6A2F" /></div>
                   <span className={styles.statusBadge} style={{ color: '#8A6A2F', background: '#F3EBD9' }}>OPEN</span>
@@ -457,7 +459,7 @@ function ClientInvoicesView() {
                 <div className={styles.statLabel}>Pending</div>
                 <div style={{ fontSize: 11.5, color: MUTED }}>Awaiting payment</div>
               </div>
-              <div className={styles.statCard} style={{ background: '#EEF9F1', border: '1px solid #BFE6CB' }}>
+              <div className={styles.statCard} style={{ background: '#EEF9F1', border: cardFilter === 'paid' ? '1.5px solid #4A6B4E' : '1px solid #BFE6CB', cursor: 'pointer' }} onClick={() => setCardFilter('paid')} title="Show paid invoices">
                 <div className={styles.statIconRow}>
                   <div className={styles.statIconWrap} style={{ background: '#BFE6CB' }}><Icon name="check-circle" size={16} color="#4A6B4E" /></div>
                   <span className={styles.statusBadge} style={{ color: '#4A6B4E', background: '#E4EDE5' }}>CLEARED</span>
@@ -466,7 +468,7 @@ function ClientInvoicesView() {
                 <div className={styles.statLabel}>Paid</div>
                 <div style={{ fontSize: 11.5, color: MUTED }}>Settled invoices</div>
               </div>
-              <div className={styles.statCard} style={{ background: '#23306B', border: '1px solid #23306B' }}>
+              <div className={styles.statCard} style={{ background: '#23306B', border: cardFilter === 'all' ? '1.5px solid #CFC6B0' : '1px solid #23306B', cursor: 'pointer' }} onClick={() => setCardFilter('all')} title="Show all invoices">
                 <div className={styles.statIconRow}>
                   <div className={styles.statIconWrap} style={{ background: '#33302A' }}><Icon name="banknote" size={16} color="#CFC6B0" /></div>
                   <span className={styles.statusBadge} style={{ color: '#CFC6B0', background: '#33302A' }}>TOTAL</span>

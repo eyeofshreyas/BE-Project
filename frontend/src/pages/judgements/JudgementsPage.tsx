@@ -156,7 +156,13 @@ export default function JudgementsPage() {
 
         <div className={styles.statCards}>
           {statCards.map((s) => (
-            <div key={s.label} className={styles.statCard} style={{ gap: 4 }}>
+            <div
+              key={s.label}
+              className={styles.statCard}
+              style={{ gap: 4, ...(s.label === 'Judgements on Record' ? { cursor: 'pointer' } : {}) }}
+              onClick={s.label === 'Judgements on Record' ? () => setOutcomeFilter('All') : undefined}
+              title={s.label === 'Judgements on Record' ? 'Show all judgements' : undefined}
+            >
               <div className={styles.statIconRow}>
                 <div className={styles.statIconWrap}><Icon name={s.icon} size={18} color={PRIMARY} /></div>
                 <span style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>{s.label}</span>

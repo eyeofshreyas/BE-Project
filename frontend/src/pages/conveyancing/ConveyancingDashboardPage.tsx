@@ -1,5 +1,5 @@
 /** `/conveyancing` route: role-dispatches to `StaffConveyancingView` (lawyer/admin) or `ClientConveyancingView`, both driven by `getConveyancingSummary()`. */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getConveyancingSummary, listAllMeetings, updateMatter, uploadMatterDocument } from '../../api/client'
 import type { ConveyancingSummary, MeetingSummary, UserProfile } from '../../types/api'
@@ -34,6 +34,11 @@ const KeyIcon = () => <svg {...iconProps} width={16} height={16}><circle cx={8} 
 const CloseIcon = () => <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><line x1={18} y1={6} x2={6} y2={18} /><line x1={6} y1={6} x2={18} y2={18} /></svg>
 
 const DONUT_COLORS = [PRIMARY, '#D9822B', '#4A6B4E', '#5C8AB0', '#9E5CB0', '#B3282D']
+
+// Mirrors backend/app/controllers/conveyancing.py's COMPLETED_STATUSES/PENDING_STATUSES
+// so a stat card's count matches what clicking it actually filters to.
+const COMPLETED_REG_STATUSES = new Set(['Completed', 'Registered'])
+const PENDING_REG_STATUSES = new Set(['Pending', 'Registration Scheduled', 'Documents Pending'])
 
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
   'Documents Pending': ['#8A6A2F', '#F3EBD9'],
@@ -180,6 +185,8 @@ function StaffConveyancingView() {
   const [priorityFilter, setPriorityFilter] = useState('Any')
   const [dateFilter, setDateFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [cardFilter, setCardFilter] = useState<'all' | 'active' | 'pending' | 'completed'>('all')
+  const appointmentsRef = useRef<HTMLDivElement>(null)
 
   const [filterOpen, setFilterOpen] = useState(false)
   const [draftStatus, setDraftStatus] = useState('All')
@@ -251,10 +258,10 @@ function StaffConveyancingView() {
     : '#CFC6B0 0% 100%'
 
   const statCards = summary ? [
-    { label: 'Active Matters', value: String(summary.stats.active_matters), icon: <BriefcaseIcon /> },
-    { label: 'Pending Reg.', value: String(summary.stats.pending_registrations), icon: <ClockIcon /> },
-    { label: 'Completed Reg.', value: String(summary.stats.completed_registrations), icon: <CheckCircleIcon /> },
-    { label: 'Upcoming Appts', value: String(summary.stats.upcoming_appointments), icon: <CalendarIcon /> },
+    { label: 'Active Matters', value: String(summary.stats.active_matters), icon: <BriefcaseIcon />, cardFilter: 'active' as const },
+    { label: 'Pending Reg.', value: String(summary.stats.pending_registrations), icon: <ClockIcon />, cardFilter: 'pending' as const },
+    { label: 'Completed Reg.', value: String(summary.stats.completed_registrations), icon: <CheckCircleIcon />, cardFilter: 'completed' as const },
+    { label: 'Upcoming Appts', value: String(summary.stats.upcoming_appointments), icon: <CalendarIcon />, cardFilter: null },
   ] : []
 
   const matters = summary?.recent_matters ?? []
@@ -272,7 +279,11 @@ function StaffConveyancingView() {
     matchesFacet(m.status, statusFilter) &&
     (priorityFilter === 'Any' || m.priority === priorityFilter) &&
     withinDateRange(m.created_at, dateFilter) &&
-    (!searchLower || m.number.toLowerCase().includes(searchLower) || (m.client ?? '').toLowerCase().includes(searchLower))
+    (!searchLower || m.number.toLowerCase().includes(searchLower) || (m.client ?? '').toLowerCase().includes(searchLower)) &&
+    (cardFilter === 'all' ||
+      (cardFilter === 'completed' ? COMPLETED_REG_STATUSES.has(m.status)
+        : cardFilter === 'pending' ? PENDING_REG_STATUSES.has(m.status)
+        : !COMPLETED_REG_STATUSES.has(m.status)))
   )
   const totalPages = Math.max(1, Math.ceil(filteredMatters.length / MATTERS_PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -380,7 +391,19 @@ function StaffConveyancingView() {
             <div className={styles.topGrid}>
               <div className={styles.statCards}>
                 {statCards.map((s) => (
-                  <div key={s.label} className={styles.statCard}>
+                  <div
+                    key={s.label}
+                    className={styles.statCard}
+                    style={{
+                      cursor: 'pointer',
+                      ...(s.cardFilter && cardFilter === s.cardFilter ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : {}),
+                    }}
+                    title={s.cardFilter ? `Show ${s.label.toLowerCase()}` : 'View upcoming appointments'}
+                    onClick={() => {
+                      if (s.cardFilter) { setCardFilter(s.cardFilter); setPage(1) }
+                      else appointmentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }}
+                  >
                     <div className={styles.statIconRow}><div className={styles.statIconWrap}>{s.icon}</div></div>
                     <div>
                       <div className={styles.statValue}>{s.value}</div>
@@ -420,7 +443,7 @@ function StaffConveyancingView() {
                 </div>
               </div>
 
-              <div className={styles.panelCard}>
+              <div className={styles.panelCard} ref={appointmentsRef}>
                 <div className={styles.panelTitle}>Upcoming Appointments</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {upcomingMeetings.map((m, i) => (
@@ -668,6 +691,7 @@ function ClientConveyancingView() {
   const [summary, setSummary] = useState<ConveyancingSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [cardFilter, setCardFilter] = useState<'all' | 'active' | 'pending' | 'completed'>('all')
 
   useEffect(() => {
     getConveyancingSummary()
@@ -677,11 +701,18 @@ function ClientConveyancingView() {
   }, [])
 
   const statCards = summary ? [
-    { label: 'Active Matters', value: summary.stats.active_matters, sublabel: 'In progress', icon: 'briefcase' as const },
-    { label: 'Pending Registrations', value: summary.stats.pending_registrations, sublabel: 'Awaiting slot', icon: 'bar-chart-2' as const },
-    { label: 'Completed', value: summary.stats.completed_registrations, sublabel: 'All time', icon: 'check-circle' as const },
-    { label: 'Upcoming Appointments', value: summary.stats.upcoming_appointments, sublabel: 'This week', icon: 'calendar' as const },
+    { label: 'Active Matters', value: summary.stats.active_matters, sublabel: 'In progress', icon: 'briefcase' as const, cardFilter: 'active' as const },
+    { label: 'Pending Registrations', value: summary.stats.pending_registrations, sublabel: 'Awaiting slot', icon: 'bar-chart-2' as const, cardFilter: 'pending' as const },
+    { label: 'Completed', value: summary.stats.completed_registrations, sublabel: 'All time', icon: 'check-circle' as const, cardFilter: 'completed' as const },
+    { label: 'Upcoming Appointments', value: summary.stats.upcoming_appointments, sublabel: 'This week', icon: 'calendar' as const, cardFilter: null },
   ] : []
+
+  const visibleMatters = (summary?.recent_matters ?? []).filter((m) =>
+    cardFilter === 'all' ||
+    (cardFilter === 'completed' ? COMPLETED_REG_STATUSES.has(m.status)
+      : cardFilter === 'pending' ? PENDING_REG_STATUSES.has(m.status)
+      : !COMPLETED_REG_STATUSES.has(m.status))
+  )
 
   return (
     <div className={styles.page}>
@@ -700,7 +731,16 @@ function ClientConveyancingView() {
           <>
             <div className={styles.statCards}>
               {statCards.map((s) => (
-                <div key={s.label} className={styles.statCard}>
+                <div
+                  key={s.label}
+                  className={styles.statCard}
+                  style={{
+                    cursor: s.cardFilter ? 'pointer' : 'default',
+                    ...(s.cardFilter && cardFilter === s.cardFilter ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : {}),
+                  }}
+                  title={s.cardFilter ? `Show ${s.label.toLowerCase()}` : undefined}
+                  onClick={() => s.cardFilter && setCardFilter(s.cardFilter)}
+                >
                   <div className={styles.statIconRow}><div className={styles.statIconWrap}><Icon name={s.icon} size={18} color={PRIMARY_DARK} /></div></div>
                   <div>
                     <div className={styles.statValue}>{s.value}</div>
@@ -728,7 +768,7 @@ function ClientConveyancingView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {summary.recent_matters.map((m) => {
+                  {visibleMatters.map((m) => {
                     const [color, bg] = STATUS_STYLE_MAP[m.status] || DEFAULT_STATUS_STYLE
                     return (
                       <tr key={m.matter_id} className={styles.tr}>
@@ -744,8 +784,8 @@ function ClientConveyancingView() {
                       </tr>
                     )
                   })}
-                  {summary.recent_matters.length === 0 && (
-                    <tr><td className={styles.td} colSpan={7} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No conveyancing matters yet.</td></tr>
+                  {visibleMatters.length === 0 && (
+                    <tr><td className={styles.td} colSpan={7} style={{ color: MUTED, textAlign: 'center', padding: '20px 0' }}>No conveyancing matters match this filter.</td></tr>
                   )}
                 </tbody>
               </table>
