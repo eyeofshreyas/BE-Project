@@ -26,6 +26,7 @@ import styles from '../../components/AppShell.module.css'
 type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'billing' | 'trust' | 'conflicts' | 'notifications' | 'reports' | 'analytics' | 'firm-analytics' | 'settings'
 
 const ADMIN = 1
+const SUPER_ADMIN = 4
 const SEARCH_RESULT_LIMIT = 5
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Law Firm Manager', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
@@ -45,14 +46,14 @@ function loadProfile(): UserProfile | null {
   }
 }
 
-const NAV_ITEMS: { key: PageKey; label: string; icon: IconName; adminOnly?: boolean }[] = [
+const NAV_ITEMS: { key: PageKey; label: string; icon: IconName; adminOnly?: boolean; hiddenForSuperAdmin?: boolean }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
   { key: 'users', label: 'Users', icon: 'users' },
   { key: 'cases', label: 'Cases', icon: 'scale' },
   { key: 'documents', label: 'Documents', icon: 'file-text' },
   { key: 'billing', label: 'Billing', icon: 'receipt' },
-  { key: 'trust', label: 'Trust', icon: 'shield' },
-  { key: 'conflicts', label: 'Conflict Search', icon: 'shield' },
+  { key: 'trust', label: 'Trust', icon: 'shield', hiddenForSuperAdmin: true },
+  { key: 'conflicts', label: 'Conflict Search', icon: 'shield', hiddenForSuperAdmin: true },
   { key: 'reports', label: 'Reports', icon: 'bar-chart-2' },
   { key: 'analytics', label: 'Analytics', icon: 'pie-chart' },
   { key: 'firm-analytics', label: 'Firm Analytics', icon: 'banknote', adminOnly: true },
@@ -146,7 +147,9 @@ export default function AdminConsolePage() {
     { label: 'Generate Report', icon: 'file-text' as const, primary: true, onClick: () => goTo('reports') },
   ]
 
-  const visibleNavItems = NAV_ITEMS.filter((item) => !item.adminOnly || profile?.role_id === ADMIN)
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => (!item.adminOnly || profile?.role_id === ADMIN) && (!item.hiddenForSuperAdmin || profile?.role_id !== SUPER_ADMIN),
+  )
 
   return (
     <div className={styles.page}>
