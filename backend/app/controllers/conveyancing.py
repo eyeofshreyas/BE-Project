@@ -279,7 +279,7 @@ def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profil
         lawyer = reg.get("lawyers")
         registration = {**reg, "registered_by": lawyer["users"]["full_name"] if lawyer else None}
 
-    doc_rows = supabase.table("matter_documents").select("*,documents(file_name,mime_type),lawyers(users(full_name))").eq("matter_id", matter_id).execute().data
+    doc_rows = supabase.table("matter_documents").select("*,documents(file_name,mime_type,is_deleted),lawyers(users(full_name))").eq("matter_id", matter_id).execute().data
     documents = [
         {
             "matter_document_id": d["matter_document_id"],
@@ -291,6 +291,9 @@ def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profil
             "verified_by": d["lawyers"]["users"]["full_name"] if d.get("lawyers") else None,
         }
         for d in doc_rows
+        # the embed follows the FK regardless of the linked document's own soft-delete
+        # flag, so a deleted document would otherwise keep showing up here
+        if not (d.get("documents") and d["documents"].get("is_deleted"))
     ]
 
     return {
