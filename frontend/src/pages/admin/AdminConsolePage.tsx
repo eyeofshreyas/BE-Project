@@ -51,7 +51,7 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName; adminOnly?: bool
   { key: 'users', label: 'Users', icon: 'users' },
   { key: 'cases', label: 'Cases', icon: 'scale' },
   { key: 'documents', label: 'Documents', icon: 'file-text' },
-  { key: 'billing', label: 'Billing', icon: 'receipt' },
+  { key: 'billing', label: 'Billing', icon: 'receipt', hiddenForSuperAdmin: true },
   { key: 'trust', label: 'Trust', icon: 'shield', hiddenForSuperAdmin: true },
   { key: 'conflicts', label: 'Conflict Search', icon: 'shield', hiddenForSuperAdmin: true },
   { key: 'reports', label: 'Reports', icon: 'bar-chart-2' },
