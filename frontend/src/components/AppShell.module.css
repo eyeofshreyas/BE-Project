@@ -202,6 +202,65 @@
   font-family: 'Public Sans', sans-serif;
 }
 
+.searchDropdown {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  width: 340px;
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
+  box-shadow: 0 12px 32px rgba(35, 48, 107, .14);
+  padding: 6px;
+  animation: lf-fade .15s ease-out;
+  z-index: 40;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.searchGroup + .searchGroup {
+  margin-top: 4px;
+}
+
+.searchGroupLabel {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #8C857A;
+  font-family: 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: .13em;
+  padding: 6px 10px 2px;
+}
+
+.searchResultItem {
+  composes: resetBtnBlock;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #1A1A17;
+  border-radius: 3px;
+  text-align: left;
+}
+
+.searchResultItem span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchResultItem:hover {
+  background: #E6E0CE;
+}
+
+.searchEmpty {
+  padding: 12px 10px;
+  font-size: 12.5px;
+  color: #8C857A;
+}
+
 .topbarRight {
   display: flex;
   align-items: center;

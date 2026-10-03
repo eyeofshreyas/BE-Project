@@ -5,9 +5,11 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import logo from '../assets/logo.svg'
 import { Icon, type IconName } from './icons'
 import { C } from './theme'
-import { listNotifications, listConversations } from '../api/client'
-import type { UserProfile, NotificationSummary } from '../types/api'
+import { listNotifications, listConversations, listCases, listClients, listDocuments } from '../api/client'
+import type { UserProfile, NotificationSummary, CaseSummary, ClientSummary, DocumentSummary } from '../types/api'
 import styles from './AppShell.module.css'
+
+const SEARCH_RESULT_LIMIT = 5
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Law Firm Manager', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
 const BRAND_SUB_LABELS: Record<number, string> = { 1: 'Admin Console', 2: 'Legal Intelligence', 3: 'Client Portal', 4: 'Admin Console' }
@@ -74,6 +76,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
   const [profileOpen, setProfileOpen] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchData, setSearchData] = useState<{ cases: CaseSummary[]; clients: ClientSummary[]; documents: DocumentSummary[] } | null>(null)
+  const isClient = profile?.role_id === 3
 
   // Notifications for the bell dropdown. Polled so a reminder/update sent while the
   // user is elsewhere (or just sitting on a page) shows up without a manual reload.
@@ -107,6 +113,36 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   function closeMenus() {
     setProfileOpen(false)
+    setSearchOpen(false)
+  }
+
+  // Loaded once per session on first use, then filtered client-side on every
+  // keystroke -- same scoped list endpoints the Cases/Clients/Documents pages
+  // already call, so results respect the caller's own role-based access.
+  function openSearch() {
+    setSearchOpen(true)
+    if (searchData) return
+    Promise.all([listCases(), isClient ? Promise.resolve([]) : listClients(), listDocuments()])
+      .then(([cases, clients, documents]) => setSearchData({ cases, clients, documents }))
+      .catch(() => setSearchData({ cases: [], clients: [], documents: [] }))
+  }
+
+  const searchLower = searchQuery.trim().toLowerCase()
+  const matchedCases = !searchData || !searchLower ? [] : searchData.cases
+    .filter((c) => c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower))
+    .slice(0, SEARCH_RESULT_LIMIT)
+  const matchedClients = !searchData || !searchLower ? [] : searchData.clients
+    .filter((c) => c.full_name.toLowerCase().includes(searchLower) || c.email.toLowerCase().includes(searchLower))
+    .slice(0, SEARCH_RESULT_LIMIT)
+  const matchedDocuments = !searchData || !searchLower ? [] : searchData.documents
+    .filter((d) => d.file_name.toLowerCase().includes(searchLower))
+    .slice(0, SEARCH_RESULT_LIMIT)
+  const hasSearchResults = matchedCases.length > 0 || matchedClients.length > 0 || matchedDocuments.length > 0
+
+  function goToSearchResult(path: string) {
+    navigate(path)
+    setSearchQuery('')
+    setSearchOpen(false)
   }
 
   const navItems = profile?.role_id === 3 ? CLIENT_NAV : profile?.role_id === 1 || profile?.role_id === 4 ? ADMIN_STAFF_NAV : LAWYER_NAV
@@ -158,9 +194,56 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
       <div className={styles.main}>
         <div className={styles.topbar}>
-          <div className={styles.searchBox}>
-            <Icon name="search" size={17} color="#8C857A" />
-            <input placeholder="Search cases, clients, documents..." className={styles.searchInput} disabled />
+          <div style={{ position: 'relative' }}>
+            <div className={styles.searchBox}>
+              <Icon name="search" size={17} color="#8C857A" />
+              <input
+                placeholder={isClient ? 'Search cases, documents...' : 'Search cases, clients, documents...'}
+                className={styles.searchInput}
+                value={searchQuery}
+                onFocus={openSearch}
+                onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true) }}
+              />
+            </div>
+            {searchOpen && searchQuery.trim() && (
+              <div className={styles.searchDropdown}>
+                {!searchData && <div className={styles.searchEmpty}>Loading…</div>}
+                {searchData && !hasSearchResults && <div className={styles.searchEmpty}>No matches for "{searchQuery.trim()}".</div>}
+                {matchedCases.length > 0 && (
+                  <div className={styles.searchGroup}>
+                    <div className={styles.searchGroupLabel}>Cases</div>
+                    {matchedCases.map((c) => (
+                      <button key={c.id} type="button" className={styles.searchResultItem} onClick={() => goToSearchResult(`/cases/${c.case_id}`)}>
+                        <Icon name="briefcase" size={14} color="#575145" />
+                        <span>{c.case_title ?? c.id}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {matchedClients.length > 0 && (
+                  <div className={styles.searchGroup}>
+                    <div className={styles.searchGroupLabel}>Clients</div>
+                    {matchedClients.map((c) => (
+                      <button key={c.id} type="button" className={styles.searchResultItem} onClick={() => goToSearchResult(`/clients/${c.id}`)}>
+                        <Icon name="users" size={14} color="#575145" />
+                        <span>{c.full_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {matchedDocuments.length > 0 && (
+                  <div className={styles.searchGroup}>
+                    <div className={styles.searchGroupLabel}>Documents</div>
+                    {matchedDocuments.map((d) => (
+                      <button key={d.id} type="button" className={styles.searchResultItem} onClick={() => goToSearchResult(`/documents/${d.id}`)}>
+                        <Icon name="file-text" size={14} color="#575145" />
+                        <span>{d.file_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className={styles.topbarRight}>
             <div className={styles.todayLabel}>{new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
