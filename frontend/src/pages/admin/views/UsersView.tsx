@@ -23,14 +23,16 @@ function isSuperAdmin(): boolean {
 
 const USER_COLUMNS = ['User', 'Role', 'Email', 'Phone', 'Status', 'Registered', 'Actions']
 
-const ROLE_COLORS: Record<string, string> = { Lawyer: C.primary, Client: '#575145', Admin: C.danger }
+const ROLE_COLORS: Record<string, string> = { Lawyer: C.primary, Client: '#575145', 'Law Firm Manager': C.danger, 'Super Admin': C.danger }
 
 /** Chip label -> the `role` it keeps, or null for "everyone". */
 const FILTERS: { label: string; role: string | null }[] = [
   { label: 'All Users', role: null },
   { label: 'Lawyers', role: 'Lawyer' },
   { label: 'Clients', role: 'Client' },
-  { label: 'Admins', role: 'Admin' },
+  // One manager per org (see backend's one_admin_per_org index), so this count is also the
+  // count of registered law firms.
+  { label: 'Law Firm Managers', role: 'Law Firm Manager' },
 ]
 
 type PanelMode = 'view' | 'edit' | 'delete'
