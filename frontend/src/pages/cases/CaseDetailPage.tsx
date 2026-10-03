@@ -127,7 +127,7 @@ export default function CaseDetailPage() {
   const canManage = profile?.role_id === LAWYER || profile?.role_id === ADMIN
   const canAddNote = profile?.role_id === LAWYER
   const canMessage = profile?.role_id === LAWYER
-  const canUploadDocs = profile?.role_id === CLIENT || profile?.role_id === LAWYER
+  const canUploadDocs = profile?.role_id === CLIENT || profile?.role_id === LAWYER || profile?.role_id === ADMIN
 
   const [caseInfo, setCaseInfo] = useState<CaseSummary | null>(null)
   const [notes, setNotes] = useState<NoteSummary[]>([])
@@ -1324,7 +1324,7 @@ export default function CaseDetailPage() {
           </div>
 
           <div className={cd.col}>
-            {canMessage && caseInfo.client && (
+            {canManage && caseInfo.client && (
               <Card title="Client">
                 <div className={cd.clientRow}>
                   <div className={cd.avatar}>{initialsOf(caseInfo.client)}</div>
@@ -1339,20 +1339,24 @@ export default function CaseDetailPage() {
                     {caseInfo.client_phone && <div className={cd.contactItem}><Icon name="phone" size={14} color="#8C857A" />{caseInfo.client_phone}</div>}
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                  <div
-                    className={styles.primaryChip}
-                    style={{ flex: 1, justifyContent: 'center', opacity: messaging || !caseInfo.client_id ? 0.6 : 1, cursor: messaging || !caseInfo.client_id ? 'default' : 'pointer' }}
-                    onClick={() => !messaging && openConversation(caseInfo.client_id)}
-                  >
-                    <Icon name="message-circle" size={15} color="#FCFAF4" /> {messaging ? 'Opening…' : 'Message'}
+                {(canMessage || caseInfo.client_phone) && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                    {canMessage && (
+                      <div
+                        className={styles.primaryChip}
+                        style={{ flex: 1, justifyContent: 'center', opacity: messaging || !caseInfo.client_id ? 0.6 : 1, cursor: messaging || !caseInfo.client_id ? 'default' : 'pointer' }}
+                        onClick={() => !messaging && openConversation(caseInfo.client_id)}
+                      >
+                        <Icon name="message-circle" size={15} color="#FCFAF4" /> {messaging ? 'Opening…' : 'Message'}
+                      </div>
+                    )}
+                    {caseInfo.client_phone && (
+                      <a href={`tel:${caseInfo.client_phone}`} className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
+                        <Icon name="phone" size={15} color={MUTED} /> Call
+                      </a>
+                    )}
                   </div>
-                  {caseInfo.client_phone && (
-                    <a href={`tel:${caseInfo.client_phone}`} className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
-                      <Icon name="phone" size={15} color={MUTED} /> Call
-                    </a>
-                  )}
-                </div>
+                )}
               </Card>
             )}
 
