@@ -54,6 +54,7 @@ import type {
   UserDeleteImpact,
   PartySummary,
   ConflictMatch,
+  ConflictSearchHistoryEntry,
   AvailableLawyer,
   SuspendedFirm,
 } from '../types/api'
@@ -224,8 +225,16 @@ export function addCaseParty(caseId: number, name: string, role?: string) {
   return post<PartySummary>(`/cases/${caseId}/parties`, { name, role })
 }
 
-export function searchConflicts(name: string) {
-  return get<ConflictMatch[]>(`/conflict-check?name=${encodeURIComponent(name)}`)
+export function searchConflicts(criteria: { name?: string; clientId?: number; caseNumber?: string }) {
+  const params = new URLSearchParams()
+  if (criteria.name) params.set('name', criteria.name)
+  if (criteria.clientId != null) params.set('client_id', String(criteria.clientId))
+  if (criteria.caseNumber) params.set('case_number', criteria.caseNumber)
+  return get<ConflictMatch[]>(`/conflict-check?${params.toString()}`)
+}
+
+export function listConflictSearchHistory() {
+  return get<ConflictSearchHistoryEntry[]>('/conflict-check/history')
 }
 
 export function findSimilarCases(query: string, topK = 5) {

@@ -13,6 +13,8 @@ from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, 
 from app.models.conflict_check import PartyCreate
 
 CASE_PARTIES_SELECT = "party_id,case_id,name,role,created_at"
+CONFLICT_SEARCH_HISTORY_SELECT = "search_id,name,case_number,result_count,created_at,users(full_name)"
+MAX_SEARCH_HISTORY = 50
 
 
 def _to_party_summary(row: dict) -> dict:
@@ -55,16 +57,43 @@ def add_case_party(case_id: int, data: PartyCreate, profile: dict = Depends(requ
     return _to_party_summary(row)
 
 
-def search_conflicts(name: str, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
+def _log_conflict_search(profile: dict, name: str | None, case_number: str | None, result_count: int) -> None:
+    """Record a conflict search for the compliance audit trail. Best-effort: a logging
+    failure shouldn't break the search itself, so this swallows errors rather than raising."""
+    try:
+        supabase.table("conflict_searches").insert({
+            "org_id": profile.get("org_id"),
+            "searched_by": profile["user_id"],
+            "name": name,
+            "case_number": case_number,
+            "result_count": result_count,
+        }).execute()
+    except Exception:
+        pass
+
+
+def search_conflicts(
+    name: str | None = None,
+    client_id: int | None = None,
+    case_number: str | None = None,
+    profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER)),
+):
     """Search every client and case party across the caller's own organization for a name
     match (platform-wide for the super-admin) -- run before opening a new case, to catch
-    representing someone your firm already opposes (or once opposed). Matching is a plain
-    case-insensitive substring check in Python, not a fuzzy/phonetic search -- fine at a
-    small firm's scale; a real search index (pg_trgm, similarity()) is the upgrade path if
-    this starts missing real matches or a firm's data grows large enough that fetching
-    every case/party per search gets slow."""
-    query = name.strip().lower()
-    if not query:
+    representing someone your firm already opposes (or once opposed). `client_id` searches
+    by that client's own name instead of typing it; `case_number` narrows matches to one
+    matter, with or without a name. Matching is a plain case-insensitive substring check in
+    Python, not a fuzzy/phonetic search -- fine at a small firm's scale; a real search index
+    (pg_trgm, similarity()) is the upgrade path if this starts missing real matches or a
+    firm's data grows large enough that fetching every case/party per search gets slow.
+    Every search is logged via `_log_conflict_search()` for the compliance audit trail."""
+    query = (name or "").strip().lower()
+    if client_id is not None:
+        client_rows = supabase.table("clients").select("users(full_name)").eq("client_id", client_id).execute().data
+        if client_rows and client_rows[0].get("users"):
+            query = client_rows[0]["users"]["full_name"].strip().lower()
+    case_filter = (case_number or "").strip().lower()
+    if not query and not case_filter:
         return []
 
     org_scoped = profile["role_id"] != SUPER_ADMIN
@@ -77,9 +106,11 @@ def search_conflicts(name: str, profile: dict = Depends(require_roles(ADMIN, SUP
         cases_query = cases_query.eq("org_id", profile["org_id"])
     case_rows = cases_query.execute().data
     for row in case_rows:
+        if case_filter and case_filter not in row["case_number"].lower():
+            continue
         client = row.get("clients")
         client_name = client["users"]["full_name"] if client and client.get("users") else None
-        if client_name and query in client_name.lower():
+        if client_name and (not query or query in client_name.lower()):
             matches.append({
                 "source": "client", "name": client_name, "case_id": row["case_id"],
                 "case_number": row["case_number"], "lawyer": _active_lawyer_name(row.get("case_lawyers")), "role": None,
@@ -93,10 +124,37 @@ def search_conflicts(name: str, profile: dict = Depends(require_roles(ADMIN, SUP
         case = row.get("cases") or {}
         if org_scoped and case.get("org_id") != profile["org_id"]:
             continue
-        if query in row["name"].lower():
-            matches.append({
-                "source": "party", "name": row["name"], "case_id": row["case_id"],
-                "case_number": case.get("case_number", ""), "lawyer": _active_lawyer_name(case.get("case_lawyers")), "role": row["role"],
-            })
+        if case_filter and case_filter not in (case.get("case_number") or "").lower():
+            continue
+        if query and query not in row["name"].lower():
+            continue
+        matches.append({
+            "source": "party", "name": row["name"], "case_id": row["case_id"],
+            "case_number": case.get("case_number", ""), "lawyer": _active_lawyer_name(case.get("case_lawyers")), "role": row["role"],
+        })
 
+    _log_conflict_search(profile, name, case_number, len(matches))
     return matches
+
+
+def _to_history_entry(row: dict) -> dict:
+    """Shape a raw `conflict_searches` row into the ConflictSearchHistoryEntry dict."""
+    return {
+        "search_id": row["search_id"],
+        "name": row["name"],
+        "case_number": row["case_number"],
+        "result_count": row["result_count"],
+        "created_at": row["created_at"],
+        "searched_by": row["users"]["full_name"] if row.get("users") else None,
+    }
+
+
+def list_conflict_search_history(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
+    """List past conflict searches, newest first -- the compliance audit trail. Same
+    visibility as search_conflicts() itself: org-scoped for ADMIN/LAWYER, platform-wide for
+    the super-admin. Calls: `_to_history_entry()`."""
+    query = supabase.table("conflict_searches").select(CONFLICT_SEARCH_HISTORY_SELECT).order("created_at", desc=True).limit(MAX_SEARCH_HISTORY)
+    if profile["role_id"] != SUPER_ADMIN:
+        query = query.eq("org_id", profile["org_id"])
+    rows = query.execute().data
+    return [_to_history_entry(r) for r in rows]

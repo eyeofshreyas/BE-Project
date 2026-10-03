@@ -572,6 +572,15 @@ export interface ConflictMatch {
   role: string | null
 }
 
+export interface ConflictSearchHistoryEntry {
+  search_id: number
+  name: string | null
+  case_number: string | null
+  result_count: number
+  created_at: string
+  searched_by: string | null
+}
+
 export interface TrustTransaction {
   id: number
   client_id: number

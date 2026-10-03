@@ -84,7 +84,7 @@ def test_search_conflicts_finds_client_match_on_an_unscoped_case():
     }
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
          patch("app.controllers.conflict_check.supabase", _fake_supabase({"cases": [case_row], "case_parties": []})):
-        results = search_conflicts("priya", profile)
+        results = search_conflicts("priya", profile=profile)
 
     assert len(results) == 1
     assert results[0]["source"] == "client"
@@ -102,7 +102,7 @@ def test_search_conflicts_finds_party_match():
     }
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
          patch("app.controllers.conflict_check.supabase", _fake_supabase({"cases": [], "case_parties": [party_row]})):
-        results = search_conflicts("metro", profile)
+        results = search_conflicts("metro", profile=profile)
 
     assert len(results) == 1
     assert results[0]["source"] == "party"
@@ -134,7 +134,7 @@ def test_search_conflicts_blank_query_returns_nothing():
     the whole firm. Exercises: `GET /conflict-check` (`conflict_check.search_conflicts()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)):
-        assert search_conflicts("   ", profile) == []
+        assert search_conflicts("   ", profile=profile) == []
 
 
 if __name__ == "__main__":
