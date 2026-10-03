@@ -1,8 +1,10 @@
-/** Admin console "Documents" tab: read-only table of all uploaded documents (`listDocuments()`). */
+/** Admin console "Documents" tab: table of all uploaded documents (`listDocuments()`),
+ * with the same open/case-navigation behavior as the lawyer-facing documents page. */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { C } from '../../../components/theme'
-import { listDocuments } from '../../../api/client'
-import type { DocumentSummary } from '../../../types/api'
+import { listDocuments, listCases, getDocumentDownloadUrl } from '../../../api/client'
+import type { DocumentSummary, CaseSummary } from '../../../types/api'
 import { formatDate } from '../../../utils/date'
 import styles from '../../../components/AppShell.module.css'
 
@@ -10,16 +12,46 @@ const DOC_COLUMNS = ['File', 'Type', 'Case', 'Uploaded By', 'Upload Date']
 
 /** Fetches all documents via `listDocuments()` and lists them. */
 export default function DocumentsView() {
+  const navigate = useNavigate()
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
+  const [cases, setCases] = useState<CaseSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
 
   useEffect(() => {
-    listDocuments()
-      .then(setDocuments)
+    Promise.all([listDocuments(), listCases()])
+      .then(([docs, allCases]) => { setDocuments(docs); setCases(allCases) })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load documents.'))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(''), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  function caseIdOf(caseNumber: string | null) {
+    return cases.find((c) => c.id === caseNumber)?.case_id
+  }
+
+  function openCase(caseNumber: string | null) {
+    const caseId = caseIdOf(caseNumber)
+    if (caseId) navigate(`/cases/${caseId}`)
+    else setToast("That case isn't in your list.")
+  }
+
+  async function openDocument(id: number) {
+    const tab = window.open('', '_blank')
+    try {
+      const { url } = await getDocumentDownloadUrl(id)
+      if (tab) tab.location.href = url
+    } catch {
+      tab?.close()
+      setToast('Failed to open document.')
+    }
+  }
 
   return (
     <>
@@ -43,9 +75,25 @@ export default function DocumentsView() {
               <tbody>
                 {documents.map((doc) => (
                   <tr key={doc.id} className={styles.tr}>
-                    <td className={styles.td} style={{ fontWeight: 600, color: '#1A1A17' }}>{doc.file_name}</td>
+                    <td
+                      className={styles.td}
+                      style={{ fontWeight: 600, color: '#1A1A17', cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={() => openDocument(doc.id)}
+                    >
+                      {doc.file_name}
+                    </td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{doc.document_type ?? '—'}</td>
-                    <td className={styles.td} style={{ color: '#6E6759' }}>{doc.case_number ?? '—'}</td>
+                    <td
+                      className={styles.td}
+                      style={{
+                        color: '#6E6759',
+                        cursor: caseIdOf(doc.case_number) ? 'pointer' : 'default',
+                        textDecoration: caseIdOf(doc.case_number) ? 'underline' : 'none',
+                      }}
+                      onClick={() => openCase(doc.case_number)}
+                    >
+                      {doc.case_number ?? '—'}
+                    </td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{doc.uploaded_by ?? '—'}</td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{formatDate(doc.upload_date)}</td>
                   </tr>
@@ -58,6 +106,8 @@ export default function DocumentsView() {
           </div>
         )}
       </div>
+
+      {toast && <div className={styles.toast}>{toast}</div>}
     </>
   )
 }
