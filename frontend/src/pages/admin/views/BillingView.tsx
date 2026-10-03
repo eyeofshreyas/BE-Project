@@ -1,5 +1,8 @@
-/** Admin console "Billing" tab: read-only table of every invoice across the firm (`listInvoices()`). */
+/** Admin console "Billing" tab: table of every invoice across the firm (`listInvoices()`).
+ * Rows open the full billing page (`/billing`), which has invoice detail, payment history,
+ * and the record-payment/send-reminder actions this read-only table doesn't. */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { C, pillStyle } from '../../../components/theme'
 import { listInvoices } from '../../../api/client'
 import type { InvoiceSummary } from '../../../types/api'
@@ -26,6 +29,7 @@ function displayStatus(inv: InvoiceSummary): string {
 }
 
 export default function BillingView() {
+  const navigate = useNavigate()
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -62,7 +66,7 @@ export default function BillingView() {
                 {invoices.map((inv) => {
                   const status = displayStatus(inv)
                   return (
-                    <tr key={inv.id} className={styles.tr}>
+                    <tr key={inv.id} className={styles.tr} style={{ cursor: 'pointer' }} onClick={() => navigate('/billing')}>
                       <td className={styles.td} style={{ fontWeight: 600, color: '#1A1A17' }}>{inv.invoice_number}</td>
                       <td className={styles.td} style={{ color: '#33302A' }}>{inv.client ?? '—'}</td>
                       <td className={styles.td} style={{ color: '#6E6759' }}>{inv.case_number ?? '—'}</td>
