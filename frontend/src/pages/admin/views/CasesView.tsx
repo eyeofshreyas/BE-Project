@@ -1,6 +1,7 @@
 /** Admin console "Cases" tab: table of every case on the platform (`listCases()`), with a
  * CSV export and per-row links to the case page and its documents. */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { C, pillStyle } from '../../../components/theme'
 import { listCases } from '../../../api/client'
 import { formatDate } from '../../../utils/date'
@@ -17,9 +18,9 @@ const STATUS_COLORS: Record<string, string> = {
 const PRIORITY_COLORS: Record<string, string> = { High: C.danger, Medium: C.warning, Low: C.success }
 
 /** Fetches all cases via `listCases()` and renders them as a status/priority-badged table.
- * A read-only overview -- admin doesn't get into a case's own detail page or document
- * library from here. */
+ * Each row opens that case's detail page, same as the lawyer-facing cases list. */
 export default function CasesView() {
+  const navigate = useNavigate()
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -60,7 +61,7 @@ export default function CasesView() {
               </thead>
               <tbody>
                 {cases.map((row) => (
-                  <tr key={row.id} className={styles.tr}>
+                  <tr key={row.id} className={styles.tr} style={{ cursor: 'pointer' }} onClick={() => navigate(`/cases/${row.case_id}`)}>
                     <td className={styles.td}>
                       <span style={{ fontWeight: 700, color: '#8A6A2F' }}>{row.id}</span>
                     </td>
