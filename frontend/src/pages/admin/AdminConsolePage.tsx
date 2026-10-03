@@ -20,13 +20,14 @@ import ReportsView from './views/ReportsView'
 import AnalyticsView from './views/AnalyticsView'
 import FirmAnalyticsView from './views/FirmAnalyticsView'
 import SettingsView from './views/SettingsView'
-import { listNotifications, markNotificationRead } from '../../api/client'
-import type { UserProfile, NotificationSummary } from '../../types/api'
+import { listNotifications, markNotificationRead, listCases, listClients, listDocuments } from '../../api/client'
+import type { UserProfile, NotificationSummary, CaseSummary, ClientSummary, DocumentSummary } from '../../types/api'
 import styles from '../../components/AppShell.module.css'
 
 type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'billing' | 'trust' | 'conflicts' | 'notifications' | 'reports' | 'analytics' | 'firm-analytics' | 'settings'
 
 const ADMIN = 1
+const SEARCH_RESULT_LIMIT = 5
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Law Firm Manager', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
 
@@ -71,6 +72,9 @@ export default function AdminConsolePage() {
   const [toast, setToast] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(loadProfile)
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchData, setSearchData] = useState<{ cases: CaseSummary[]; clients: ClientSummary[]; documents: DocumentSummary[] } | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -97,6 +101,36 @@ export default function AdminConsolePage() {
 
   function closeMenus() {
     setProfileOpen(false)
+    setSearchOpen(false)
+  }
+
+  // Loaded once per session on first use, then filtered client-side on every
+  // keystroke -- same scoped list endpoints AppLayout's own search uses, so
+  // results respect the manager's own org-scoped access.
+  function openSearch() {
+    setSearchOpen(true)
+    if (searchData) return
+    Promise.all([listCases(), listClients(), listDocuments()])
+      .then(([cases, clients, documents]) => setSearchData({ cases, clients, documents }))
+      .catch(() => setSearchData({ cases: [], clients: [], documents: [] }))
+  }
+
+  const searchLower = searchQuery.trim().toLowerCase()
+  const matchedCases = !searchData || !searchLower ? [] : searchData.cases
+    .filter((c) => c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower))
+    .slice(0, SEARCH_RESULT_LIMIT)
+  const matchedClients = !searchData || !searchLower ? [] : searchData.clients
+    .filter((c) => c.full_name.toLowerCase().includes(searchLower) || c.email.toLowerCase().includes(searchLower))
+    .slice(0, SEARCH_RESULT_LIMIT)
+  const matchedDocuments = !searchData || !searchLower ? [] : searchData.documents
+    .filter((d) => d.file_name.toLowerCase().includes(searchLower))
+    .slice(0, SEARCH_RESULT_LIMIT)
+  const hasSearchResults = matchedCases.length > 0 || matchedClients.length > 0 || matchedDocuments.length > 0
+
+  function goToSearchResult(path: string) {
+    navigate(path)
+    setSearchQuery('')
+    setSearchOpen(false)
   }
 
   function goTo(key: PageKey) {
@@ -150,9 +184,56 @@ export default function AdminConsolePage() {
 
       <div className={styles.main}>
         <div className={styles.topbar}>
-          <div className={styles.searchBox}>
-            <Icon name="search" size={17} color="#8C857A" />
-            <input placeholder="Search users, lawyers, clients, cases, documents..." className={styles.searchInput} />
+          <div style={{ position: 'relative' }}>
+            <div className={styles.searchBox}>
+              <Icon name="search" size={17} color="#8C857A" />
+              <input
+                placeholder="Search cases, clients, documents..."
+                className={styles.searchInput}
+                value={searchQuery}
+                onFocus={openSearch}
+                onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true) }}
+              />
+            </div>
+            {searchOpen && searchQuery.trim() && (
+              <div className={styles.searchDropdown}>
+                {!searchData && <div className={styles.searchEmpty}>Loading…</div>}
+                {searchData && !hasSearchResults && <div className={styles.searchEmpty}>No matches for "{searchQuery.trim()}".</div>}
+                {matchedCases.length > 0 && (
+                  <div className={styles.searchGroup}>
+                    <div className={styles.searchGroupLabel}>Cases</div>
+                    {matchedCases.map((c) => (
+                      <button key={c.id} type="button" className={styles.searchResultItem} onClick={() => goToSearchResult(`/cases/${c.case_id}`)}>
+                        <Icon name="briefcase" size={14} color="#575145" />
+                        <span>{c.case_title ?? c.id}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {matchedClients.length > 0 && (
+                  <div className={styles.searchGroup}>
+                    <div className={styles.searchGroupLabel}>Clients</div>
+                    {matchedClients.map((c) => (
+                      <button key={c.id} type="button" className={styles.searchResultItem} onClick={() => goToSearchResult(`/clients/${c.id}`)}>
+                        <Icon name="users" size={14} color="#575145" />
+                        <span>{c.full_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {matchedDocuments.length > 0 && (
+                  <div className={styles.searchGroup}>
+                    <div className={styles.searchGroupLabel}>Documents</div>
+                    {matchedDocuments.map((d) => (
+                      <button key={d.id} type="button" className={styles.searchResultItem} onClick={() => goToSearchResult(`/documents/${d.id}`)}>
+                        <Icon name="file-text" size={14} color="#575145" />
+                        <span>{d.file_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className={styles.topbarRight}>
             <div className={styles.todayLabel}>{TODAY}</div>
