@@ -10,6 +10,17 @@ import type { UserDeleteImpact, UserSummary } from '../../../types/api'
 import { downloadCsv } from '../../../utils/files'
 import styles from '../../../components/AppShell.module.css'
 
+const SUPER_ADMIN = 4
+
+function isSuperAdmin(): boolean {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw).role_id === SUPER_ADMIN : false
+  } catch {
+    return false
+  }
+}
+
 const USER_COLUMNS = ['User', 'Role', 'Email', 'Phone', 'Status', 'Registered', 'Actions']
 
 const ROLE_COLORS: Record<string, string> = { Lawyer: C.primary, Client: '#575145', Admin: C.danger }
@@ -83,6 +94,7 @@ export default function UsersView() {
   const [inviteBusy, setInviteBusy] = useState(false)
   const [inviteError, setInviteError] = useState('')
   const [inviteSent, setInviteSent] = useState(false)
+  const canDeleteClients = useMemo(isSuperAdmin, [])
 
   useEffect(() => {
     listUsers()
@@ -243,10 +255,11 @@ export default function UsersView() {
                     <td className={styles.td} style={{ color: '#33302A' }}>{formatRegistered(u.created_at)}</td>
                     <td className={styles.td}>
                       {u.role === 'Client' ? (
-                        // A client is global -- the same person can have cases with other firms too -- so
-                        // Delete stays off-limits from here (it would destroy their account and cases with
-                        // every other firm). View/Edit only touch shared contact info. Suspend/reactivate is
-                        // per-firm (org_clients), never touching the client's global account.
+                        // A client is global -- the same person can have cases with other firms too -- so an
+                        // org admin can't Delete from here (it would destroy their account and cases with
+                        // every other firm they work with). View/Edit only touch shared contact info.
+                        // Suspend/reactivate is per-firm (org_clients), never touching the client's global
+                        // account. The super-admin has platform-wide authority, so they get Delete too.
                         <div style={{ display: 'flex', gap: 4 }}>
                           <span className={styles.actionBtn} title="View" onClick={() => openPanel(u, 'view')}><Icon name="eye" size={15} color="#575145" /></span>
                           <span className={styles.actionBtn} title="Edit" onClick={() => openPanel(u, 'edit')}><Icon name="edit" size={15} color="#575145" /></span>
@@ -257,6 +270,9 @@ export default function UsersView() {
                           >
                             <Icon name={u.suspended ? 'check-circle' : 'ban'} size={15} color={u.suspended ? C.success : C.warning} />
                           </span>
+                          {canDeleteClients && (
+                            <span className={styles.actionBtnDanger} title="Delete permanently" onClick={() => openPanel(u, 'delete')}><Icon name="trash-2" size={15} color={C.danger} /></span>
+                          )}
                         </div>
                       ) : (
                         <div style={{ display: 'flex', gap: 4 }}>
