@@ -37,6 +37,7 @@ def _fake_supabase(target_role: int, admin_count: int, target_org_id: int = 7, t
 
 
 ORG_ADMIN_PROFILE = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
+SUPER_ADMIN_PROFILE = {"role_id": auth.SUPER_ADMIN, "user_id": 1, "org_id": None}
 
 
 def test_org_admin_only_lists_their_own_org_users():
@@ -280,11 +281,11 @@ def test_last_admin_check_is_scoped_to_the_admins_own_org():
     fake.table.return_value.select.return_value.eq.return_value.eq.assert_called_once_with("org_id", 7)
 
 
-def test_org_admin_can_delete_a_client_with_a_case_in_their_org():
-    """Verifies the client.org_id-is-always-NULL carve-out in `_assert_same_org_or_404` lets
-    an org admin delete a client who has a case with them -- before the fix, the raw
-    `org_id != profile["org_id"]` compare 404'd every client unconditionally, since a
-    client's `users.org_id` is always NULL. Exercises: `DELETE /users/{id}`."""
+def test_org_admin_cannot_delete_a_client_even_with_a_case_in_their_org():
+    """A client is global -- the same person can have cases with other firms too -- so only
+    the super-admin may delete one, even an org admin whose own org the client has a case
+    with (and who therefore clears the `_assert_same_org_or_404` carve-out). Exercises:
+    `DELETE /users/{id}`."""
     fake = MagicMock()
     tables: dict[str, MagicMock] = {}
 
@@ -308,10 +309,38 @@ def test_org_admin_can_delete_a_client_with_a_case_in_their_org():
         return m
 
     fake.table.side_effect = table
+    with patch("app.controllers.users.supabase", fake):
+        with pytest.raises(HTTPException) as exc:
+            delete_user(9, ORG_ADMIN_PROFILE)
+    assert exc.value.status_code == 403
+    fake.rpc.assert_not_called()
+
+
+def test_super_admin_can_delete_a_client():
+    """The super-admin has platform-wide authority, so the client-role restriction in
+    `test_org_admin_cannot_delete_a_client_even_with_a_case_in_their_org` doesn't apply to
+    them. Exercises: `DELETE /users/{id}`."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "users":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"role_id": auth.CLIENT, "org_id": None, "email": "client@example.com"}]
+        elif name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 9}]
+        elif name == "trust_transactions":
+            m.select.return_value.eq.return_value.execute.return_value.data = []
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
     fake.rpc.return_value.execute.return_value.data = {"user_id": 9, "storage_paths": []}
     fake.auth.admin.list_users.return_value = []
     with patch("app.controllers.users.supabase", fake):
-        assert delete_user(9, ORG_ADMIN_PROFILE)["user_id"] == 9
+        assert delete_user(9, SUPER_ADMIN_PROFILE)["user_id"] == 9
 
 
 def test_org_admin_cannot_delete_a_client_with_no_case_in_their_org():
@@ -367,7 +396,7 @@ def test_client_holding_trust_money_cannot_be_deleted():
     fake = _fake_supabase(auth.CLIENT, 2, trust_rows=[{"type": "deposit", "amount": 5000.00}])
     with patch("app.controllers.users.supabase", fake):
         with pytest.raises(HTTPException) as exc:
-            delete_user(2, ADMIN_PROFILE)
+            delete_user(2, SUPER_ADMIN_PROFILE)
     assert exc.value.status_code == 400
     assert "trust account" in exc.value.detail
     fake.rpc.assert_not_called()
@@ -381,13 +410,13 @@ def test_client_with_a_drawn_down_trust_balance_can_be_deleted():
         {"type": "invoice_payment", "amount": 5000.00},
     ])
     with patch("app.controllers.users.supabase", fake):
-        assert delete_user(2, ADMIN_PROFILE)["user_id"] == 2
+        assert delete_user(2, SUPER_ADMIN_PROFILE)["user_id"] == 2
 
 
 def test_delete_runs_the_cascade_and_clears_storage():
     """Verifies a permitted delete calls the SQL cascade for real (not a dry run) and removes
     the storage objects it reports orphaning. Exercises: `DELETE /users/:id`."""
-    fake = _fake_supabase(auth.CLIENT, 2)
+    fake = _fake_supabase(auth.LAWYER, 2)
     with patch("app.controllers.users.supabase", fake):
         result = delete_user(2, ADMIN_PROFILE)
     fake.rpc.assert_called_once_with("delete_user_cascade", {"p_user_id": 2, "p_dry_run": False})
@@ -399,7 +428,7 @@ def test_storage_failure_does_not_undo_the_delete():
     """Verifies a bucket error after the rows are gone is logged, not raised -- the transaction
     already committed, so failing here would report a rollback that never happened.
     Exercises: `DELETE /users/:id`."""
-    fake = _fake_supabase(auth.CLIENT, 2)
+    fake = _fake_supabase(auth.LAWYER, 2)
     fake.storage.from_.return_value.remove.side_effect = StorageApiError("boom", "500", 500)
     with patch("app.controllers.users.supabase", fake):
         assert delete_user(2, ADMIN_PROFILE)["user_id"] == 2
@@ -409,7 +438,7 @@ def test_delete_removes_the_supabase_auth_account():
     """Verifies the Supabase Auth login is removed after a successful cascade -- nothing ties
     a `users` row to `auth.users` but the email, so this pages admin.list_users() looking
     for a match and deletes it by id. Exercises: `DELETE /users/:id`."""
-    fake = _fake_supabase(auth.CLIENT, 2)
+    fake = _fake_supabase(auth.LAWYER, 2)
     fake.auth.admin.list_users.return_value = [
         MagicMock(email="someone-else@example.com", id="uid-other"),
         MagicMock(email="deleted@example.com", id="uid-target"),
@@ -422,7 +451,7 @@ def test_delete_removes_the_supabase_auth_account():
 def test_auth_account_removal_failure_does_not_undo_the_delete():
     """Verifies a failure removing the Auth account is logged, not raised -- same stance as
     the storage cleanup above it. Exercises: `DELETE /users/:id`."""
-    fake = _fake_supabase(auth.CLIENT, 2)
+    fake = _fake_supabase(auth.LAWYER, 2)
     fake.auth.admin.list_users.side_effect = Exception("boom")
     with patch("app.controllers.users.supabase", fake):
         assert delete_user(2, ADMIN_PROFILE)["user_id"] == 2

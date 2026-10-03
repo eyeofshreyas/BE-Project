@@ -219,17 +219,21 @@ def _trust_balance_held(user_id: int) -> float:
 
 def _assert_deletable(user_id: int, profile: dict) -> str:
     """Refuse the deletes that shouldn't happen: your own account, a user outside the
-    caller's org (an org admin only, via `_assert_same_org_or_404()`), the last remaining
-    admin (scoped to the caller's own org for an org admin, platform-wide for the
-    super-admin), and a client whose money the firm is still holding. Returns the target's
-    email, so the caller can remove their Supabase Auth account after the cascade. Calls:
-    `_assert_same_org_or_404()`, `_trust_balance_held()`."""
+    caller's org (an org admin only, via `_assert_same_org_or_404()`), a client account for
+    anyone but the super-admin (a client is global -- deleting one destroys their cases with
+    every other firm too, not just the caller's), the last remaining admin (scoped to the
+    caller's own org for an org admin, platform-wide for the super-admin), and a client whose
+    money the firm is still holding. Returns the target's email, so the caller can remove
+    their Supabase Auth account after the cascade. Calls: `_assert_same_org_or_404()`,
+    `_trust_balance_held()`."""
     if user_id == profile["user_id"]:
         raise HTTPException(status_code=400, detail="You can't delete your own account.")
     _assert_same_org_or_404(user_id, profile)
     rows = supabase.table("users").select("role_id,org_id,email").eq("user_id", user_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="User not found")
+    if rows[0]["role_id"] == CLIENT and profile["role_id"] != SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Only a super-admin can delete a client account -- they're global, and belong to other firms too.")
     if rows[0]["role_id"] == ADMIN:
         admins_query = supabase.table("users").select("user_id", count="exact").eq("role_id", ADMIN)
         if profile["role_id"] == ADMIN:
