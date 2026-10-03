@@ -30,12 +30,22 @@ const LAWYER_NAV: NavDef[] = [
 ]
 
 // An admin drilling into a case/document/etc. lands in this same shared shell (it's built
-// for lawyer use, but the backend permits admin on all of it too) -- swap the Dashboard
-// link for one back to the admin console, since /dashboard is the lawyer's own dashboard
-// and an admin arriving here has no other way back to /admin.
+// for lawyer use, but the backend permits admin on all of it too). Mirrors the Admin
+// Console's own sidebar (AdminConsolePage's NAV_ITEMS) so the nav doesn't visibly swap to
+// the lawyer's -- items with no standalone route (Users, Trust, Conflict Search, Reports,
+// Analytics, Firm Analytics are tabs inside AdminConsolePage, not pages of their own) go
+// back to /admin, same as Dashboard.
 const ADMIN_STAFF_NAV: NavDef[] = [
-  { label: 'Admin Console', icon: 'grid', path: '/admin' },
-  ...LAWYER_NAV.slice(1),
+  { label: 'Dashboard', icon: 'grid', path: '/admin' },
+  { label: 'Users', icon: 'users', path: '/admin' },
+  { label: 'Cases', icon: 'scale', path: '/cases' },
+  { label: 'Documents', icon: 'file-text', path: '/documents' },
+  { label: 'Billing', icon: 'receipt', path: '/billing' },
+  { label: 'Trust', icon: 'shield', path: '/admin' },
+  { label: 'Conflict Search', icon: 'shield', path: '/admin' },
+  { label: 'Reports', icon: 'bar-chart-2', path: '/admin' },
+  { label: 'Analytics', icon: 'pie-chart', path: '/admin' },
+  { label: 'Firm Analytics', icon: 'banknote', path: '/admin' },
 ]
 
 const CLIENT_NAV: NavDef[] = [
