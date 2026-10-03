@@ -12,7 +12,6 @@ import DashboardView from './views/DashboardView'
 import UsersView from './views/UsersView'
 import CasesView from './views/CasesView'
 import DocumentsView from './views/DocumentsView'
-import BillingView from './views/BillingView'
 import ConflictSearchView from './views/ConflictSearchView'
 import TrustReconciliationView from './views/TrustReconciliationView'
 import NotificationsView from './views/NotificationsView'
@@ -163,7 +162,7 @@ export default function AdminConsolePage() {
           {visibleNavItems.map((item) => {
             const active = item.key === activePage
             return (
-              <div key={item.key} className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => goTo(item.key)} title={item.label}>
+              <div key={item.key} className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => (item.key === 'billing' ? navigate('/billing') : goTo(item.key))} title={item.label}>
                 <span className={styles.navIcon}><Icon name={item.icon} size={18} color={active ? C.primaryDark : '#8C857A'} /></span>
                 <span className={styles.navLabel} style={{ fontWeight: active ? 600 : 500, color: active ? C.text : '#575145' }}>{item.label}</span>
               </div>
@@ -262,7 +261,6 @@ export default function AdminConsolePage() {
           {activePage === 'users' && <UsersView />}
           {activePage === 'cases' && <CasesView />}
           {activePage === 'documents' && <DocumentsView />}
-          {activePage === 'billing' && <BillingView />}
           {activePage === 'trust' && <TrustReconciliationView />}
           {activePage === 'conflicts' && <ConflictSearchView />}
           {activePage === 'notifications' && <NotificationsView notifications={notifications} onMarkRead={markRead} />}
