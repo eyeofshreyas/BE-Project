@@ -119,6 +119,20 @@ def test_search_conflicts_scoped_to_callers_org_for_lawyer():
     fake.table.return_value.select.return_value.eq.assert_any_call("org_id", 7)
 
 
+def test_search_conflicts_client_id_from_another_org_is_ignored():
+    """A client_id belonging to another org must not resolve to that client's name --
+    otherwise any ADMIN/LAWYER could probe arbitrary client_ids platform-wide and learn
+    whose name is behind one. Exercises: `GET /conflict-check`
+    (`conflict_check.search_conflicts()`)."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value.data = []
+    with patch("app.controllers.conflict_check.supabase", fake):
+        result = search_conflicts(client_id=99, profile={"role_id": auth.LAWYER, "user_id": 1, "org_id": 7})
+    assert result == []
+    fake.table.assert_any_call("cases")
+    assert ("clients",) not in [c.args for c in fake.table.call_args_list]
+
+
 def test_search_conflicts_unscoped_for_super_admin():
     """Verifies the super-admin's conflict search stays platform-wide (today's behavior). Exercises: `GET /conflicts` (`conflict_check.search_conflicts()`)."""
     fake = MagicMock()
@@ -144,6 +158,7 @@ if __name__ == "__main__":
     test_search_conflicts_finds_client_match_on_an_unscoped_case()
     test_search_conflicts_finds_party_match()
     test_search_conflicts_scoped_to_callers_org_for_lawyer()
+    test_search_conflicts_client_id_from_another_org_is_ignored()
     test_search_conflicts_unscoped_for_super_admin()
     test_search_conflicts_blank_query_returns_nothing()
     print("ok")

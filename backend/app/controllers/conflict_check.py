@@ -87,16 +87,22 @@ def search_conflicts(
     (pg_trgm, similarity()) is the upgrade path if this starts missing real matches or a
     firm's data grows large enough that fetching every case/party per search gets slow.
     Every search is logged via `_log_conflict_search()` for the compliance audit trail."""
+    org_scoped = profile["role_id"] != SUPER_ADMIN
     query = (name or "").strip().lower()
     if client_id is not None:
-        client_rows = supabase.table("clients").select("users(full_name)").eq("client_id", client_id).execute().data
-        if client_rows and client_rows[0].get("users"):
-            query = client_rows[0]["users"]["full_name"].strip().lower()
+        # A client_id belonging to another org must not resolve a name -- otherwise any
+        # ADMIN/LAWYER could probe arbitrary client_ids platform-wide and learn whose name
+        # is behind one, the exact cross-tenant leak org scoping exists to prevent.
+        in_scope = not org_scoped or supabase.table("cases").select("case_id") \
+            .eq("org_id", profile["org_id"]).eq("client_id", client_id).limit(1).execute().data
+        if in_scope:
+            client_rows = supabase.table("clients").select("users(full_name)").eq("client_id", client_id).execute().data
+            if client_rows and client_rows[0].get("users"):
+                query = client_rows[0]["users"]["full_name"].strip().lower()
     case_filter = (case_number or "").strip().lower()
     if not query and not case_filter:
         return []
 
-    org_scoped = profile["role_id"] != SUPER_ADMIN
     matches = []
 
     cases_query = supabase.table("cases").select(
