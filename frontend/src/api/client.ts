@@ -59,11 +59,48 @@ import type {
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+let refreshPromise: Promise<string> | null = null
 
 /** Reads the bearer token from `localStorage` (`lexflow_token`) and builds the Authorization header, if present. */
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('lexflow_token')
   return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+async function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const refreshToken = localStorage.getItem('lexflow_refresh_token')
+
+      if (!refreshToken) {
+        throw new Error('No refresh token available')
+      }
+
+      const res = await fetch(`${API_URL}/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      })
+
+      if (!res.ok) {
+        throw new Error('Token refresh failed')
+      }
+
+      const data = await res.json()
+
+      localStorage.setItem('lexflow_token', data.access_token)
+
+      if (data.refresh_token) {
+        localStorage.setItem('lexflow_refresh_token', data.refresh_token)
+      }
+
+      return data.access_token as string
+    })().finally(() => {
+      refreshPromise = null
+    })
+  }
+
+  return refreshPromise
 }
 
 /**
@@ -89,14 +126,25 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       throw err
     }
 
-    if (res.status === 401 && localStorage.getItem('lexflow_token')) {
-      // Session token rejected by the backend (expired/revoked) -- clear it and
-      // send the user back to log in instead of leaving every view stuck on a
-      // silent or generic "failed to load" error forever.
-      localStorage.removeItem('lexflow_token')
-      localStorage.removeItem('lexflow_profile')
-      window.location.href = '/login'
-      return new Promise<T>(() => {})
+    if (
+      res.status === 401 &&
+      localStorage.getItem('lexflow_token') &&
+      path !== '/refresh'
+    ) {
+      try {
+        await refreshAccessToken()
+
+        res = await fetch(`${API_URL}${path}`, {
+          ...options,
+          headers: { ...authHeaders(), ...(options.headers ?? {}) },
+        })
+      } catch {
+        localStorage.removeItem('lexflow_token')
+        localStorage.removeItem('lexflow_refresh_token')
+        localStorage.removeItem('lexflow_profile')
+        window.location.href = '/login'
+        return new Promise<T>(() => {})
+      }
     }
     if (res.status >= 500 && attempt < maxAttempts) {
       await new Promise((r) => setTimeout(r, 300))
