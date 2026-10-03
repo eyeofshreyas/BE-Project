@@ -81,12 +81,13 @@ export default function CasesListPage() {
   return <StaffCasesView />
 }
 
-type SortKey = 'case' | 'client' | 'type' | 'priority' | 'status' | 'hearing'
+type SortKey = 'case' | 'client' | 'lawyer' | 'type' | 'priority' | 'status' | 'hearing'
 
 /** Sort value per column. Cases with no hearing sort to the end of an ascending sort. */
 const SORT_VALUES: Record<SortKey, (c: CaseSummary) => string | number> = {
   case: (c) => (c.case_title ?? c.id).toLowerCase(),
   client: (c) => (c.client ?? '').toLowerCase(),
+  lawyer: (c) => (c.lawyer ?? '').toLowerCase(),
   type: (c) => (c.case_type ?? '').toLowerCase(),
   priority: (c) => PRIORITY_RANK[c.priority] ?? 9,
   status: (c) => statusLabel(c.status),
@@ -184,6 +185,7 @@ function StaffCasesView() {
                 <tr>
                   <SortHead label="Case" sortKey="case" />
                   <SortHead label="Client" sortKey="client" />
+                  <SortHead label="Assigned Lawyer" sortKey="lawyer" />
                   <SortHead label="Type" sortKey="type" />
                   <SortHead label="Priority" sortKey="priority" />
                   <SortHead label="Status" sortKey="status" />
@@ -200,6 +202,7 @@ function StaffCasesView() {
                         <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: '#23306B', marginTop: 2 }}>{c.id}</div>
                       </td>
                       <td className={styles.td}>{c.client ?? 'No client'}</td>
+                      <td className={styles.td}>{c.lawyer ?? '—'}</td>
                       <td className={styles.td}>{c.case_type ?? '—'}</td>
                       <td className={styles.td}>
                         <span className={cd.priority}>
@@ -216,7 +219,7 @@ function StaffCasesView() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td className={styles.td} colSpan={6} style={{ padding: '28px 22px' }}>
+                    <td className={styles.td} colSpan={7} style={{ padding: '28px 22px' }}>
                       <div className={cd.empty}>
                         {cases.length === 0 ? 'No cases on file yet.' : 'No cases match this search.'}
                       </div>
