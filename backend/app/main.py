@@ -122,6 +122,10 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class RefreshRequest(BaseModel):
+    """Request body for /refresh."""
+    refresh_token: str
+
 class ForgotPasswordRequest(BaseModel):
     """Request body for /forgot-password."""
     email: EmailStr
@@ -218,6 +222,32 @@ def login(data: LoginRequest):
         "user_email": result.user.email,
         "profile": profile_rows[0] if profile_rows else None,
     }
+@app.post("/refresh")
+def refresh(data: RefreshRequest):
+    """Exchange a Supabase refresh token for a new access token."""
+    try:
+        with new_auth_client() as auth_client:
+            result = auth_client.auth.refresh_session(data.refresh_token)
+
+        if not result.session:
+            raise HTTPException(
+                status_code=401,
+                detail="Unable to refresh session"
+            )
+
+        return {
+            "access_token": result.session.access_token,
+            "refresh_token": result.session.refresh_token,
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Token refresh failed")
+        raise HTTPException(
+            status_code=401,
+            detail="Session expired"
+        )
 
 @app.post("/forgot-password", dependencies=[Depends(rate_limit(5, 60))])
 def forgot_password(data: ForgotPasswordRequest):
