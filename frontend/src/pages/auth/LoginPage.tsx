@@ -153,6 +153,7 @@ export default function LoginPage() {
       // Session source of truth: every loadProfile()/ProtectedRoute check and
       // api/client.ts's authHeaders() read these same two keys back.
       localStorage.setItem('lexflow_token', result.access_token)
+      localStorage.setItem('lexflow_refresh_token', result.refresh_token)
       if (result.profile) localStorage.setItem('lexflow_profile', JSON.stringify(result.profile))
       setToast('Signed in — redirecting to your dashboard…')
       const dest = result.profile?.role_id === 1 || result.profile?.role_id === 4 ? '/admin' : '/dashboard'
