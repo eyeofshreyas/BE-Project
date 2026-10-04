@@ -107,9 +107,10 @@ export default function TermsPage() {
         <div style={SECTION_STYLE}>
           <h2 style={H2_STYLE}>9. Governing law and disputes</h2>
           <p style={P_STYLE}>
-            [NEEDS INPUT: these terms are governed by the laws of India; courts of
-            [city] have exclusive jurisdiction — confirm the city, and whether disputes go
-            to arbitration first or straight to those courts.]
+            These terms are governed by the laws of India, and courts in India have
+            exclusive jurisdiction over any dispute arising from them. [Pin this to a
+            specific city once the firm's registered office is finalized, and confirm
+            whether disputes go to arbitration first or straight to court.]
           </p>
         </div>
 
