@@ -6,11 +6,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
 import { formatDate } from '../../../utils/date'
+import { formatCompactINR } from '../../../utils/money'
 import { downloadCsv } from '../../../utils/files'
+import { listCases, listClients, listDocuments } from '../../../api/client'
+import type { CaseSummary, ClientSummary, DocumentSummary, UserProfile } from '../../../types/api'
 import styles from '../../../components/AppShell.module.css'
 
 type ReportType = 'Scheduled' | 'One-off'
 type ReportStatus = 'Ready' | 'Pending'
+
+type ReportMetric = { label: string; value: string }
 
 type Report = {
   id: string
@@ -24,6 +29,19 @@ type Report = {
   caseRef?: string
   client?: string
   lawyer?: string
+  generatedBy?: string
+  metrics?: ReportMetric[]
+  tableColumns?: string[]
+  tableRows?: string[][]
+}
+
+function loadProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
 }
 
 const CATEGORY_CHIPS = ['All Reports', 'Cases', 'Revenue', 'Lawyers', 'Clients', 'AI', 'Compliance']
@@ -62,6 +80,19 @@ function seedReports(): Report[] {
       status: 'Ready',
       generated: day(1),
       caseRef: 'CASE-1042',
+      generatedBy: 'Meera Sharma',
+      metrics: [
+        { label: 'Total Cases', value: '48' },
+        { label: 'Open', value: '19' },
+        { label: 'Closed', value: '22' },
+        { label: 'High Priority', value: '7' },
+      ],
+      tableColumns: ['Case', 'Client', 'Status', 'Priority', 'Next Hearing'],
+      tableRows: [
+        ['CASE-1042', 'Jane Doe', 'Open', 'High', '12 Oct'],
+        ['CASE-1038', 'Meridian Holdings', 'Closed', 'Medium', '—'],
+        ['CASE-1025', 'Harlow & Finch LLP', 'In Progress', 'Low', '20 Oct'],
+      ],
     },
     {
       id: 'seed-2',
@@ -72,6 +103,17 @@ function seedReports(): Report[] {
       type: 'Scheduled',
       status: 'Ready',
       generated: day(2),
+      generatedBy: 'Meera Sharma',
+      metrics: [
+        { label: 'Total Claim Value', value: '₹2.4 Cr' },
+        { label: 'Cases With Claim Value', value: '31' },
+        { label: 'Average Claim Value', value: '₹7.7 L' },
+      ],
+      tableColumns: ['Case', 'Client', 'Claim Value'],
+      tableRows: [
+        ['CASE-0987', 'Harlow & Finch LLP', '₹42.5 L'],
+        ['CASE-1042', 'Jane Doe', '₹18.0 L'],
+      ],
     },
     {
       id: 'seed-3',
@@ -83,6 +125,18 @@ function seedReports(): Report[] {
       status: 'Ready',
       generated: day(2),
       lawyer: 'Aisha Khan',
+      generatedBy: 'Meera Sharma',
+      metrics: [
+        { label: 'Active Lawyers', value: '6' },
+        { label: 'Total Assignments', value: '48' },
+        { label: 'Avg Cases / Lawyer', value: '8.0' },
+      ],
+      tableColumns: ['Lawyer', 'Cases Assigned'],
+      tableRows: [
+        ['Aisha Khan', '14'],
+        ['Rohan Verma', '11'],
+        ['Priya Nair', '9'],
+      ],
     },
     {
       id: 'seed-4',
@@ -94,6 +148,17 @@ function seedReports(): Report[] {
       status: 'Pending',
       generated: day(3),
       client: 'Meridian Holdings',
+      generatedBy: 'Meera Sharma',
+      metrics: [
+        { label: 'Total Clients', value: '52' },
+        { label: 'Active Clients', value: '45' },
+        { label: 'Total Pending Amount', value: '₹6.1 L' },
+      ],
+      tableColumns: ['Client', 'Status', 'Active Cases', 'Pending Amount'],
+      tableRows: [
+        ['Meridian Holdings', 'Active', '3', '₹1.2 L'],
+        ['Harlow & Finch LLP', 'Active', '2', '₹0'],
+      ],
     },
     {
       id: 'seed-5',
@@ -104,6 +169,16 @@ function seedReports(): Report[] {
       type: 'One-off',
       status: 'Ready',
       generated: day(3),
+      generatedBy: 'Meera Sharma',
+      metrics: [
+        { label: 'Documents Uploaded', value: '134' },
+        { label: 'AI Summaries Generated', value: '98' },
+      ],
+      tableColumns: ['Document', 'Case', 'AI Summary'],
+      tableRows: [
+        ['affidavit.pdf', 'CASE-1042', 'Yes'],
+        ['contract.pdf', 'CASE-0987', 'No'],
+      ],
     },
     {
       id: 'seed-6',
@@ -114,6 +189,16 @@ function seedReports(): Report[] {
       type: 'Scheduled',
       status: 'Pending',
       generated: day(4),
+      generatedBy: 'Meera Sharma',
+      metrics: [
+        { label: 'Documents Logged', value: '134' },
+        { label: 'Pending Signature', value: '5' },
+      ],
+      tableColumns: ['Document', 'Type', 'Uploaded By', 'Upload Date'],
+      tableRows: [
+        ['nda.pdf', 'Agreement', 'Aisha Khan', 'Sep 28, 2026'],
+        ['poa.pdf', 'Power of Attorney', 'Rohan Verma', 'Sep 25, 2026'],
+      ],
     },
     {
       id: 'seed-7',
@@ -125,6 +210,17 @@ function seedReports(): Report[] {
       status: 'Ready',
       generated: day(5),
       caseRef: 'CASE-0987',
+      generatedBy: 'Meera Sharma',
+      metrics: [
+        { label: 'Total Cases', value: '48' },
+        { label: 'Avg Days Open', value: '34' },
+        { label: 'Backlogged (30d+)', value: '11' },
+      ],
+      tableColumns: ['Case', 'Client', 'Status', 'Priority', 'Next Hearing'],
+      tableRows: [
+        ['CASE-0987', 'Harlow & Finch LLP', 'In Progress', 'High', '18 Oct'],
+        ['CASE-1012', 'Meridian Holdings', 'Open', 'Medium', '—'],
+      ],
     },
     {
       id: 'seed-8',
@@ -135,6 +231,16 @@ function seedReports(): Report[] {
       type: 'One-off',
       status: 'Pending',
       generated: day(5),
+      generatedBy: 'Meera Sharma',
+      metrics: [
+        { label: 'Total Claim Value', value: '₹1.1 Cr' },
+        { label: 'Cases With Claim Value', value: '14' },
+        { label: 'Average Claim Value', value: '₹7.9 L' },
+      ],
+      tableColumns: ['Case', 'Client', 'Claim Value'],
+      tableRows: [
+        ['CASE-1042', 'Jane Doe', '₹18.0 L'],
+      ],
     },
     {
       id: 'seed-9',
@@ -146,6 +252,16 @@ function seedReports(): Report[] {
       status: 'Ready',
       generated: day(6),
       client: 'Harlow & Finch LLP',
+      generatedBy: 'Meera Sharma',
+      metrics: [
+        { label: 'Total Clients', value: '52' },
+        { label: 'Active Clients', value: '45' },
+        { label: 'Total Pending Amount', value: '₹6.1 L' },
+      ],
+      tableColumns: ['Client', 'Status', 'Active Cases', 'Pending Amount'],
+      tableRows: [
+        ['Harlow & Finch LLP', 'Active', '2', '₹0'],
+      ],
     },
     {
       id: 'seed-10',
@@ -156,6 +272,15 @@ function seedReports(): Report[] {
       type: 'One-off',
       status: 'Ready',
       generated: day(6),
+      generatedBy: 'Meera Sharma',
+      metrics: [
+        { label: 'Documents Logged', value: '134' },
+        { label: 'Pending Signature', value: '5' },
+      ],
+      tableColumns: ['Document', 'Type', 'Uploaded By', 'Upload Date'],
+      tableRows: [
+        ['retention-policy.pdf', 'Policy', 'Meera Sharma', 'Sep 20, 2026'],
+      ],
     },
   ]
 }
@@ -244,6 +369,27 @@ export default function ReportsView({
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
   const [panel, setPanel] = useState<{ mode: 'preview' | 'edit' | 'delete'; report: Report } | null>(null)
   const [editDraft, setEditDraft] = useState({ label: '', desc: '' })
+  const [configOpen, setConfigOpen] = useState(false)
+  const [configDraft, setConfigDraft] = useState({
+    category: 'Cases',
+    date: 'This Month' as (typeof DATE_RANGES)[number],
+  })
+
+  // Backs real report content (see buildReportContent) -- loaded once, same data
+  // source the Cases/Clients/Documents admin tabs already use.
+  const [liveCases, setLiveCases] = useState<CaseSummary[]>([])
+  const [liveClients, setLiveClients] = useState<ClientSummary[]>([])
+  const [liveDocuments, setLiveDocuments] = useState<DocumentSummary[]>([])
+
+  useEffect(() => {
+    Promise.all([listCases(), listClients(), listDocuments()])
+      .then(([cases, clients, documents]) => {
+        setLiveCases(cases)
+        setLiveClients(clients)
+        setLiveDocuments(documents)
+      })
+      .catch(() => {})
+  }, [])
 
   const now = useMemo(() => new Date(), [])
   const lastUpdated = now.toLocaleTimeString('en-US', {
@@ -288,24 +434,164 @@ export default function ReportsView({
     setActive(defaults)
   }
 
-  function generateReport() {
-    const cat = category === 'All Reports' ? 'Cases' : category
+  function casesInRange(range: string) {
+    return liveCases.filter((c) => {
+      const iso = c.filing_date ?? c.created_at
+      return iso ? inDateRange(new Date(iso), range, now) : false
+    })
+  }
+
+  function documentsInRange(range: string) {
+    return liveDocuments.filter((d) => inDateRange(new Date(d.upload_date), range, now))
+  }
+
+  // Pulls real counts/rows out of whatever's currently loaded from the Cases/Clients/
+  // Documents endpoints, scoped to the chosen date range -- this is what makes a
+  // generated report contain actual data instead of just metadata.
+  function buildReportContent(cat: string, range: string): { desc: string; metrics: ReportMetric[]; tableColumns: string[]; tableRows: string[][] } {
+    const rangeLabel = range.toLowerCase()
+
+    if (cat === 'Cases') {
+      const scoped = casesInRange(range)
+      const closed = scoped.filter((c) => c.status === 'Closed' || c.status === 'Completed').length
+      const open = scoped.filter((c) => c.status === 'Open').length
+      const highPriority = scoped.filter((c) => c.priority === 'High').length
+      return {
+        desc: `${scoped.length} case${scoped.length === 1 ? '' : 's'} filed ${rangeLabel}, generated just now.`,
+        metrics: [
+          { label: 'Total Cases', value: String(scoped.length) },
+          { label: 'Open', value: String(open) },
+          { label: 'Closed', value: String(closed) },
+          { label: 'High Priority', value: String(highPriority) },
+        ],
+        tableColumns: ['Case', 'Client', 'Status', 'Priority', 'Next Hearing'],
+        tableRows: scoped.slice(0, 10).map((c) => [c.id, c.client ?? '—', c.status, c.priority, c.hearing ? formatDate(c.hearing) : '—']),
+      }
+    }
+
+    if (cat === 'Revenue') {
+      const scoped = casesInRange(range).filter((c) => c.claim_value != null)
+      const total = scoped.reduce((sum, c) => sum + (c.claim_value ?? 0), 0)
+      const avg = scoped.length ? total / scoped.length : 0
+      return {
+        desc: `${formatCompactINR(total)} in claim value across ${scoped.length} case${scoped.length === 1 ? '' : 's'} filed ${rangeLabel}.`,
+        metrics: [
+          { label: 'Total Claim Value', value: formatCompactINR(total) },
+          { label: 'Cases With Claim Value', value: String(scoped.length) },
+          { label: 'Average Claim Value', value: formatCompactINR(avg) },
+        ],
+        tableColumns: ['Case', 'Client', 'Claim Value'],
+        tableRows: [...scoped]
+          .sort((a, b) => (b.claim_value ?? 0) - (a.claim_value ?? 0))
+          .slice(0, 10)
+          .map((c) => [c.id, c.client ?? '—', formatCompactINR(c.claim_value ?? 0)]),
+      }
+    }
+
+    if (cat === 'Lawyers') {
+      const scoped = casesInRange(range)
+      const byLawyer = new Map<string, number>()
+      for (const c of scoped) {
+        const name = c.lawyer ?? 'Unassigned'
+        byLawyer.set(name, (byLawyer.get(name) ?? 0) + 1)
+      }
+      const rows = [...byLawyer.entries()].sort((a, b) => b[1] - a[1])
+      return {
+        desc: `Caseload across ${rows.length} lawyer${rows.length === 1 ? '' : 's'} for cases filed ${rangeLabel}.`,
+        metrics: [
+          { label: 'Active Lawyers', value: String(rows.length) },
+          { label: 'Total Assignments', value: String(scoped.length) },
+          { label: 'Avg Cases / Lawyer', value: rows.length ? (scoped.length / rows.length).toFixed(1) : '0' },
+        ],
+        tableColumns: ['Lawyer', 'Cases Assigned'],
+        tableRows: rows.slice(0, 10).map(([name, count]) => [name, String(count)]),
+      }
+    }
+
+    if (cat === 'Clients') {
+      const scoped = liveClients
+      const active = scoped.filter((c) => c.status === 'Active').length
+      const pendingTotal = scoped.reduce((sum, c) => sum + (c.pending_amount ?? 0), 0)
+      return {
+        desc: `${scoped.length} client${scoped.length === 1 ? '' : 's'} on the platform, generated just now.`,
+        metrics: [
+          { label: 'Total Clients', value: String(scoped.length) },
+          { label: 'Active Clients', value: String(active) },
+          { label: 'Total Pending Amount', value: formatCompactINR(pendingTotal) },
+        ],
+        tableColumns: ['Client', 'Status', 'Active Cases', 'Pending Amount'],
+        tableRows: scoped.slice(0, 10).map((c) => [c.full_name, c.status, String(c.active_cases), formatCompactINR(c.pending_amount ?? 0)]),
+      }
+    }
+
+    if (cat === 'AI') {
+      const scoped = documentsInRange(range)
+      const withSummary = scoped.filter((d) => d.has_summary).length
+      return {
+        desc: `${withSummary} of ${scoped.length} document${scoped.length === 1 ? '' : 's'} uploaded ${rangeLabel} have an AI summary.`,
+        metrics: [
+          { label: 'Documents Uploaded', value: String(scoped.length) },
+          { label: 'AI Summaries Generated', value: String(withSummary) },
+        ],
+        tableColumns: ['Document', 'Case', 'AI Summary'],
+        tableRows: scoped.slice(0, 10).map((d) => [d.file_name, d.case_number ?? '—', d.has_summary ? 'Yes' : 'No']),
+      }
+    }
+
+    // Compliance
+    const scoped = documentsInRange(range)
+    const pendingSignature = scoped.filter((d) => d.esign_status && d.esign_status !== 'completed').length
+    return {
+      desc: `${scoped.length} document${scoped.length === 1 ? '' : 's'} logged ${rangeLabel}.`,
+      metrics: [
+        { label: 'Documents Logged', value: String(scoped.length) },
+        { label: 'Pending Signature', value: String(pendingSignature) },
+      ],
+      tableColumns: ['Document', 'Type', 'Uploaded By', 'Upload Date'],
+      tableRows: scoped.slice(0, 10).map((d) => [d.file_name, d.document_type ?? '—', d.uploaded_by ?? '—', formatDate(d.upload_date)]),
+    }
+  }
+
+  function openGenerateConfig() {
+    setConfigDraft({ category: category !== 'All Reports' ? category : 'Cases', date: 'This Month' })
+    setConfigOpen(true)
+  }
+
+  function submitGenerate() {
+    const cat = configDraft.category
+    const today = new Date()
+    const label = `${cat} Report — ${today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`
+
+    // One auto-labeled report per category per day -- repeat clicks reopen the
+    // existing report instead of cluttering the library with identical copies.
+    const duplicate = reports.find((r) => r.category === cat && r.type === 'One-off' && r.generated.toDateString() === today.toDateString())
+    if (duplicate) {
+      setConfigOpen(false)
+      setPanel({ mode: 'preview', report: duplicate })
+      onToast?.(`A ${cat} report was already generated today — showing the existing one.`)
+      return
+    }
+
+    const content = buildReportContent(cat, configDraft.date)
 
     const report: Report = {
       id: crypto.randomUUID(),
-      label: `${cat} Report — ${now.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-      })}`,
-      desc: `On-demand summary of ${cat.toLowerCase()} activity, generated just now.`,
+      label,
+      desc: content.desc,
       icon: CATEGORY_ICON[cat] ?? 'file-text',
       category: cat,
       type: 'One-off',
       status: 'Ready',
-      generated: new Date(),
+      generated: today,
+      generatedBy: loadProfile()?.full_name ?? 'You',
+      metrics: content.metrics,
+      tableColumns: content.tableColumns,
+      tableRows: content.tableRows,
     }
 
     setReports((prev) => [report, ...prev])
+    setConfigOpen(false)
+    setPanel({ mode: 'preview', report })
     onToast?.('Report generated.')
   }
 
@@ -581,7 +867,7 @@ export default function ReportsView({
               alignItems: 'center',
               gap: 8,
             }}
-            onClick={generateReport}
+            onClick={openGenerateConfig}
           >
             <Icon name="plus" size={15} color="#FCFAF4" />
             <span>Generate Report</span>
@@ -1066,6 +1352,7 @@ export default function ReportsView({
               >
                 Last generated:{' '}
                 {formatDate(r.generated.toISOString())}
+                {r.generatedBy && <> &middot; by {r.generatedBy}</>}
               </div>
 
               <div
@@ -1101,6 +1388,78 @@ export default function ReportsView({
           ))}
         </div>
       </div>
+
+      {configOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(35, 48, 107,.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+            padding: 20,
+          }}
+          onClick={() => setConfigOpen(false)}
+        >
+          <div
+            style={{
+              background: '#FCFAF4',
+              border: `1px solid ${C.border}`,
+              borderRadius: 3,
+              padding: 28,
+              width: 'min(420px,100%)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div style={{ fontFamily: "'Spectral',serif", fontSize: 20, fontWeight: 700, color: C.text }}>Generate Report</div>
+              <span className={styles.actionBtn} onClick={() => setConfigOpen(false)} title="Close">
+                <Icon name="x" size={15} color="#6E6759" />
+              </span>
+            </div>
+
+            <div>
+              <div style={FILTER_LABEL}>Report Type</div>
+              <select
+                value={configDraft.category}
+                onChange={(e) => setConfigDraft((d) => ({ ...d, category: e.target.value }))}
+                style={{ ...SELECT_STYLE, width: '100%' }}
+              >
+                {CATEGORY_CHIPS.filter((c) => c !== 'All Reports').map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div style={FILTER_LABEL}>Date Range</div>
+              <select
+                value={configDraft.date}
+                onChange={(e) => setConfigDraft((d) => ({ ...d, date: e.target.value as typeof configDraft.date }))}
+                style={{ ...SELECT_STYLE, width: '100%' }}
+              >
+                {DATE_RANGES.map((d) => (
+                  <option key={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ fontSize: 12, color: C.muted }}>
+              Pulls from {configDraft.category === 'Clients' ? liveClients.length : configDraft.category === 'AI' || configDraft.category === 'Compliance' ? liveDocuments.length : liveCases.length} currently loaded record(s).
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <div style={BTN_GHOST} onClick={() => setConfigOpen(false)}>Cancel</div>
+              <div style={BTN_PRIMARY} onClick={submitGenerate}>Generate</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {panel && (
         <div
@@ -1152,7 +1511,46 @@ export default function ReportsView({
                   {panel.report.caseRef && <div><div style={FILTER_LABEL}>Case</div>{panel.report.caseRef}</div>}
                   {panel.report.client && <div><div style={FILTER_LABEL}>Client</div>{panel.report.client}</div>}
                   {panel.report.lawyer && <div><div style={FILTER_LABEL}>Lawyer</div>{panel.report.lawyer}</div>}
+                  {panel.report.generatedBy && <div><div style={FILTER_LABEL}>Generated By</div>{panel.report.generatedBy}</div>}
                 </div>
+
+                {panel.report.metrics && panel.report.metrics.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10 }}>
+                    {panel.report.metrics.map((m) => (
+                      <div key={m.label} style={{ background: '#F6F2E9', border: `1px solid ${C.border}`, borderRadius: 3, padding: '10px 12px' }}>
+                        <div style={FILTER_LABEL}>{m.label}</div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: '#1A1A17' }}>{m.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {panel.report.tableRows && panel.report.tableRows.length > 0 && (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                      <thead>
+                        <tr>
+                          {panel.report.tableColumns?.map((c) => (
+                            <th key={c} style={{ textAlign: 'left', padding: '6px 8px', borderBottom: `1.5px solid ${C.border}`, color: '#6E6759' }}>{c}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {panel.report.tableRows.map((row, i) => (
+                          <tr key={i}>
+                            {row.map((cell, j) => (
+                              <td key={j} style={{ padding: '6px 8px', borderBottom: '1px solid #F1EDE0' }}>{cell}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {panel.report.tableRows && panel.report.tableRows.length === 0 && (
+                  <div style={{ fontSize: 12.5, color: C.muted }}>No records matched this report's scope.</div>
+                )}
 
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                   <div style={BTN_GHOST} onClick={() => setPanel(null)}>Close</div>
@@ -1242,9 +1640,52 @@ export default function ReportsView({
                       )}
                     </td>
                   </tr>
+
+                  {selectedReport.generatedBy && (
+                    <tr>
+                      <th>Generated By</th>
+                      <td>{selectedReport.generatedBy}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {selectedReport.metrics && selectedReport.metrics.length > 0 && (
+              <div className="lexflow-print-section">
+                <h2>Summary</h2>
+                <table>
+                  <tbody>
+                    {selectedReport.metrics.map((m) => (
+                      <tr key={m.label}>
+                        <th>{m.label}</th>
+                        <td>{m.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {selectedReport.tableRows && selectedReport.tableRows.length > 0 && (
+              <div className="lexflow-print-section">
+                <h2>Detail</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      {selectedReport.tableColumns?.map((c) => <th key={c}>{c}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedReport.tableRows.map((row, i) => (
+                      <tr key={i}>
+                        {row.map((cell, j) => <td key={j}>{cell}</td>)}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         ) : (
           <>
