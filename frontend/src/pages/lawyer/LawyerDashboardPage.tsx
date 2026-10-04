@@ -49,6 +49,8 @@ export default function LawyerDashboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  const [pickingHearingCase, setPickingHearingCase] = useState(false)
+
   const firstName = profile?.full_name.split(' ')[0] ?? 'there'
   const todayLabel = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 
@@ -126,7 +128,34 @@ export default function LawyerDashboardPage() {
           <div className={styles.headerActions}>
             <div className={styles.primaryChip} onClick={() => navigate('/cases/new')}><Icon name="plus" size={15} color="#FCFAF4" /> New Case</div>
             <div className={styles.ghostChip} onClick={() => navigate('/documents')}><Icon name="file-text" size={15} color="#1A1A17" /> Upload Document</div>
-            <div className={styles.ghostChip} onClick={() => navigate('/cases')} title="Pick a case to schedule its hearing"><Icon name="calendar" size={15} color="#1A1A17" /> Schedule Hearing</div>
+            <div style={{ position: 'relative' }}>
+              <div
+                className={styles.ghostChip}
+                onClick={() => {
+                  if (activeCases.length === 0) navigate('/cases')
+                  else if (activeCases.length === 1) navigate(`/cases/${activeCases[0].case_id}?hearing=1`)
+                  else setPickingHearingCase((o) => !o)
+                }}
+              >
+                <Icon name="calendar" size={15} color="#1A1A17" /> Schedule Hearing
+              </div>
+              {pickingHearingCase && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setPickingHearingCase(false)} />
+                  <div className={styles.dropdownMenu} style={{ right: 0, left: 'auto' }}>
+                    {activeCases.map((c) => (
+                      <div
+                        key={c.case_id}
+                        className={styles.dropdownItem}
+                        onClick={() => navigate(`/cases/${c.case_id}?hearing=1`)}
+                      >
+                        {c.id} — {c.case_title ?? c.court ?? 'Untitled case'}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

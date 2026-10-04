@@ -2,7 +2,7 @@
  * optional checklists), timeline, meetings, and documents (preview on `/documents/:documentId`).
  * Role controls which actions (status change, unassign, add/edit note, upload) are shown. */
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
@@ -123,6 +123,7 @@ export function Empty({ children, action }: { children: React.ReactNode; action?
 export default function CaseDetailPage() {
   const { caseId } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const profile = loadProfile()
   const canManage = profile?.role_id === LAWYER || profile?.role_id === ADMIN
   const canAddNote = profile?.role_id === LAWYER
@@ -266,6 +267,17 @@ export default function CaseDetailPage() {
     if (canManage) getCaseAiSummary(numericCaseId).then(setAiSummary).catch(() => setAiSummary(null))
     if (canManage) listCaseParties(numericCaseId).then(setParties).catch(() => {})
   }, [numericCaseId, canUploadDocs, canManage])
+
+  // Deep link from the dashboard's "Schedule Hearing" quick action (?hearing=1): open the
+  // form as soon as the case has loaded, instead of making the lawyer find the button again.
+  useEffect(() => {
+    if (!loading && canManage && searchParams.get('hearing') === '1') {
+      setHearingOpen(true)
+      setScheduleKind('hearing')
+      meetingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setSearchParams((prev) => { prev.delete('hearing'); return prev }, { replace: true })
+    }
+  }, [loading, canManage])
 
   function showToast(msg: string) {
     setToast(msg)
