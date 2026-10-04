@@ -114,7 +114,9 @@ export default function AdminConsolePage() {
   }
 
   const searchLower = searchQuery.trim().toLowerCase()
-  const matchedCases = !searchData || !searchLower ? [] : searchData.cases
+  // Super Admin can't open a case's full detail (see CasesView), so don't surface
+  // a search result that would dead-end there.
+  const matchedCases = !searchData || !searchLower || profile?.role_id === SUPER_ADMIN ? [] : searchData.cases
     .filter((c) => c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower))
     .slice(0, SEARCH_RESULT_LIMIT)
   const matchedClients = !searchData || !searchLower ? [] : searchData.clients

@@ -4,12 +4,23 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { C } from '../../../components/theme'
 import { listDocuments, listCases, getDocumentDownloadUrl, deleteDocument } from '../../../api/client'
-import type { DocumentSummary, CaseSummary } from '../../../types/api'
+import type { DocumentSummary, CaseSummary, UserProfile } from '../../../types/api'
 import { formatDate } from '../../../utils/date'
 import { Icon } from '../../../components/icons'
 import styles from '../../../components/AppShell.module.css'
 
+const SUPER_ADMIN = 4
+
 const DOC_COLUMNS = ['File', 'Type', 'Case', 'Uploaded By', 'Upload Date', 'Actions']
+
+function loadProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
 
 /** Fetches all documents via `listDocuments()` and lists them. */
 export default function DocumentsView() {
@@ -19,6 +30,9 @@ export default function DocumentsView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
+  // Super Admin can see that a document belongs to a case, but can't open that case's
+  // full detail -- same restriction as the Cases tab.
+  const canOpenCase = loadProfile()?.role_id !== SUPER_ADMIN
 
   useEffect(() => {
     Promise.all([listDocuments(), listCases()])
@@ -38,6 +52,7 @@ export default function DocumentsView() {
   }
 
   function openCase(caseNumber: string | null) {
+    if (!canOpenCase) return
     const caseId = caseIdOf(caseNumber)
     if (caseId) navigate(`/cases/${caseId}`)
     else setToast("That case isn't in your list.")
@@ -92,8 +107,8 @@ export default function DocumentsView() {
                       className={styles.td}
                       style={{
                         color: '#6E6759',
-                        cursor: caseIdOf(doc.case_number) ? 'pointer' : 'default',
-                        textDecoration: caseIdOf(doc.case_number) ? 'underline' : 'none',
+                        cursor: canOpenCase && caseIdOf(doc.case_number) ? 'pointer' : 'default',
+                        textDecoration: canOpenCase && caseIdOf(doc.case_number) ? 'underline' : 'none',
                       }}
                       onClick={() => openCase(doc.case_number)}
                     >
