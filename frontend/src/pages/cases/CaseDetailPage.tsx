@@ -1492,27 +1492,39 @@ export default function CaseDetailPage() {
                 )}
                 {caseInfo.lawyers.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {caseInfo.lawyers.map((l) => (
-                      <div key={l.lawyer_id} className={cd.listRow}>
-                        <div className={cd.rowTitle}>
-                          {l.name}
-                          {l.assigned_role && <span style={{ fontWeight: 400, color: MUTED, fontSize: 12 }}> · {l.assigned_role}</span>}
-                        </div>
-                        <div className={cd.metaRow}>
-                          <span>{l.email}</span>
-                          {confirmRemoveLawyerId === l.lawyer_id ? (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeTeammate(l.lawyer_id)}>
-                                {removingLawyerId === l.lawyer_id ? 'Removing…' : 'Remove'}
-                              </button>
-                              <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(null)}>Keep</button>
-                            </span>
-                          ) : (
-                            <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(l.lawyer_id)}>Remove</button>
+                    {caseInfo.lawyers.map((l) => {
+                      // Self-removing the Primary leaves the case without one -- only an
+                      // admin can assign a new Primary afterward, so that specific removal
+                      // gets a sharper warning than the generic Remove/Keep confirm.
+                      const isSelfPrimary = l.assigned_role === 'Primary' && profile?.email === l.email
+                      return (
+                        <div key={l.lawyer_id} className={cd.listRow}>
+                          <div className={cd.rowTitle}>
+                            {l.name}
+                            {l.assigned_role && <span style={{ fontWeight: 400, color: MUTED, fontSize: 12 }}> · {l.assigned_role}</span>}
+                          </div>
+                          {confirmRemoveLawyerId === l.lawyer_id && isSelfPrimary && (
+                            <div style={{ fontSize: 12.5, color: '#B3282D', marginTop: 2 }}>
+                              You're the Primary on this case. Removing yourself leaves it without one --
+                              only an admin can assign a new Primary afterward.
+                            </div>
                           )}
+                          <div className={cd.metaRow}>
+                            <span>{l.email}</span>
+                            {confirmRemoveLawyerId === l.lawyer_id ? (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeTeammate(l.lawyer_id)}>
+                                  {removingLawyerId === l.lawyer_id ? 'Removing…' : isSelfPrimary ? 'Remove anyway' : 'Remove'}
+                                </button>
+                                <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(null)}>Keep</button>
+                              </span>
+                            ) : (
+                              <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(l.lawyer_id)}>Remove</button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : !teamFormOpen && (
                   <Empty>No lawyers assigned to this case yet.</Empty>
