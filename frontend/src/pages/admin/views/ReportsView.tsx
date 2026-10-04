@@ -39,9 +39,12 @@ const TYPE_FILTERS = ['All Reports', 'Scheduled', 'One-off'] as const
 const STATUS_FILTERS = ['All', 'Ready', 'Pending'] as const
 
 function seedReports(): Report[] {
+  // Clamped to the current month so the default "This Month" filter always
+  // has matches, even on the 1st-6th when a fixed offset would spill into
+  // the previous month.
   const day = (offset: number) => {
     const d = new Date()
-    d.setDate(d.getDate() - offset)
+    d.setDate(Math.max(1, d.getDate() - offset))
     return d
   }
 
