@@ -21,6 +21,9 @@ type Report = {
   type: ReportType
   status: ReportStatus
   generated: Date
+  caseRef?: string
+  client?: string
+  lawyer?: string
 }
 
 const CATEGORY_CHIPS = ['All Reports', 'Cases', 'Revenue', 'Lawyers', 'Clients', 'AI', 'Compliance']
@@ -58,6 +61,7 @@ function seedReports(): Report[] {
       type: 'Scheduled',
       status: 'Ready',
       generated: day(1),
+      caseRef: 'CASE-1042',
     },
     {
       id: 'seed-2',
@@ -78,6 +82,7 @@ function seedReports(): Report[] {
       type: 'One-off',
       status: 'Ready',
       generated: day(2),
+      lawyer: 'Aisha Khan',
     },
     {
       id: 'seed-4',
@@ -88,6 +93,7 @@ function seedReports(): Report[] {
       type: 'Scheduled',
       status: 'Pending',
       generated: day(3),
+      client: 'Meridian Holdings',
     },
     {
       id: 'seed-5',
@@ -118,6 +124,7 @@ function seedReports(): Report[] {
       type: 'One-off',
       status: 'Ready',
       generated: day(5),
+      caseRef: 'CASE-0987',
     },
     {
       id: 'seed-8',
@@ -138,6 +145,7 @@ function seedReports(): Report[] {
       type: 'One-off',
       status: 'Ready',
       generated: day(6),
+      client: 'Harlow & Finch LLP',
     },
     {
       id: 'seed-10',
@@ -222,6 +230,8 @@ export default function ReportsView({
   const [reports, setReports] = useState<Report[]>(seedReports)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All Reports')
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [advanced, setAdvanced] = useState({ caseRef: '', client: '', lawyer: '' })
 
   const [pending, setPending] = useState({
     date: 'This Month' as (typeof DATE_RANGES)[number],
@@ -232,6 +242,8 @@ export default function ReportsView({
   const [active, setActive] = useState(pending)
   const [exportOpen, setExportOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
+  const [panel, setPanel] = useState<{ mode: 'preview' | 'edit' | 'delete'; report: Report } | null>(null)
+  const [editDraft, setEditDraft] = useState({ label: '', desc: '' })
 
   const now = useMemo(() => new Date(), [])
   const lastUpdated = now.toLocaleTimeString('en-US', {
@@ -254,12 +266,17 @@ export default function ReportsView({
     if (active.status !== 'All' && r.status !== active.status) return false
     if (!inDateRange(r.generated, active.date, now)) return false
 
+    if (advanced.caseRef && !(r.caseRef ?? '').toLowerCase().includes(advanced.caseRef.toLowerCase())) return false
+    if (advanced.client && !(r.client ?? '').toLowerCase().includes(advanced.client.toLowerCase())) return false
+    if (advanced.lawyer && !(r.lawyer ?? '').toLowerCase().includes(advanced.lawyer.toLowerCase())) return false
+
     return true
   })
 
   function resetFilters() {
     setSearch('')
     setCategory('All Reports')
+    setAdvanced({ caseRef: '', client: '', lawyer: '' })
 
     const defaults = {
       date: 'This Month' as const,
@@ -318,6 +335,43 @@ export default function ReportsView({
     setTimeout(() => {
       window.print()
     }, 0)
+  }
+
+  function openEdit(report: Report) {
+    setEditDraft({ label: report.label, desc: report.desc })
+    setPanel({ mode: 'edit', report })
+  }
+
+  function saveEdit() {
+    if (!panel) return
+    const { report } = panel
+
+    setReports((prev) =>
+      prev.map((r) => (r.id === report.id ? { ...r, label: editDraft.label, desc: editDraft.desc } : r)),
+    )
+    setPanel(null)
+    onToast?.('Report updated.')
+  }
+
+  function duplicateReport(report: Report) {
+    const copy: Report = {
+      ...report,
+      id: crypto.randomUUID(),
+      label: `${report.label} (Copy)`,
+      type: 'One-off',
+      status: 'Ready',
+      generated: new Date(),
+    }
+
+    setReports((prev) => [copy, ...prev])
+    onToast?.('Report duplicated.')
+  }
+
+  function confirmDelete() {
+    if (!panel) return
+    setReports((prev) => prev.filter((r) => r.id !== panel.report.id))
+    setPanel(null)
+    onToast?.('Report deleted.')
   }
 
   return (
@@ -572,7 +626,50 @@ export default function ReportsView({
                 color: C.text,
               }}
             />
+
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: C.primaryDark,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onClick={() => setAdvancedOpen((v) => !v)}
+            >
+              Advanced
+            </span>
           </div>
+
+          {advancedOpen && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 10,
+                flexWrap: 'wrap',
+                marginTop: 10,
+              }}
+            >
+              <input
+                placeholder="Case #"
+                value={advanced.caseRef}
+                onChange={(e) => setAdvanced((a) => ({ ...a, caseRef: e.target.value }))}
+                style={{ ...SELECT_STYLE, flex: '1 1 140px' }}
+              />
+              <input
+                placeholder="Client"
+                value={advanced.client}
+                onChange={(e) => setAdvanced((a) => ({ ...a, client: e.target.value }))}
+                style={{ ...SELECT_STYLE, flex: '1 1 140px' }}
+              />
+              <input
+                placeholder="Lawyer"
+                value={advanced.lawyer}
+                onChange={(e) => setAdvanced((a) => ({ ...a, lawyer: e.target.value }))}
+                style={{ ...SELECT_STYLE, flex: '1 1 140px' }}
+              />
+            </div>
+          )}
         </div>
 
         <div>
@@ -979,7 +1076,7 @@ export default function ReportsView({
                   gap: 7,
                   whiteSpace: 'nowrap',
                 }}
-                onClick={() => printReport(r)}
+                onClick={() => setPanel({ mode: 'preview', report: r })}
               >
                 <Icon
                   name="file-text"
@@ -988,10 +1085,123 @@ export default function ReportsView({
                 />
                 <span>View Report</span>
               </div>
+
+              <span className={styles.actionBtn} title="Edit" onClick={() => openEdit(r)}>
+                <Icon name="edit" size={14} color="#575145" />
+              </span>
+
+              <span className={styles.actionBtn} title="Duplicate" onClick={() => duplicateReport(r)}>
+                <Icon name="copy" size={14} color="#575145" />
+              </span>
+
+              <span className={styles.actionBtnDanger} title="Delete" onClick={() => setPanel({ mode: 'delete', report: r })}>
+                <Icon name="trash-2" size={14} color={C.danger} />
+              </span>
             </div>
           ))}
         </div>
       </div>
+
+      {panel && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(35, 48, 107,.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+            padding: 20,
+          }}
+          onClick={() => setPanel(null)}
+        >
+          <div
+            style={{
+              background: '#FCFAF4',
+              border: `1px solid ${C.border}`,
+              borderRadius: 3,
+              padding: 28,
+              width: 'min(480px,100%)',
+              maxHeight: '86vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div style={{ fontFamily: "'Spectral',serif", fontSize: 20, fontWeight: 700, color: C.text }}>
+                {panel.mode === 'preview' ? panel.report.label : panel.mode === 'edit' ? 'Edit Report' : 'Delete Report'}
+              </div>
+              <span className={styles.actionBtn} onClick={() => setPanel(null)} title="Close">
+                <Icon name="x" size={15} color="#6E6759" />
+              </span>
+            </div>
+
+            {panel.mode === 'preview' && (
+              <>
+                <div style={{ fontSize: 13.5, color: C.muted }}>{panel.report.desc}</div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+                  <div><div style={FILTER_LABEL}>Category</div>{panel.report.category}</div>
+                  <div><div style={FILTER_LABEL}>Type</div>{panel.report.type}</div>
+                  <div><div style={FILTER_LABEL}>Status</div>{panel.report.status}</div>
+                  <div><div style={FILTER_LABEL}>Last Generated</div>{formatDate(panel.report.generated.toISOString())}</div>
+                  {panel.report.caseRef && <div><div style={FILTER_LABEL}>Case</div>{panel.report.caseRef}</div>}
+                  {panel.report.client && <div><div style={FILTER_LABEL}>Client</div>{panel.report.client}</div>}
+                  {panel.report.lawyer && <div><div style={FILTER_LABEL}>Lawyer</div>{panel.report.lawyer}</div>}
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <div style={BTN_GHOST} onClick={() => setPanel(null)}>Close</div>
+                  <div style={BTN_PRIMARY} onClick={() => { printReport(panel.report); setPanel(null) }}>Print / Export PDF</div>
+                </div>
+              </>
+            )}
+
+            {panel.mode === 'edit' && (
+              <>
+                <div>
+                  <div style={FILTER_LABEL}>Label</div>
+                  <input
+                    value={editDraft.label}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, label: e.target.value }))}
+                    style={{ ...SELECT_STYLE, width: '100%' }}
+                  />
+                </div>
+                <div>
+                  <div style={FILTER_LABEL}>Description</div>
+                  <input
+                    value={editDraft.desc}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, desc: e.target.value }))}
+                    style={{ ...SELECT_STYLE, width: '100%' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <div style={BTN_GHOST} onClick={() => setPanel(null)}>Cancel</div>
+                  <div style={BTN_PRIMARY} onClick={saveEdit}>Save</div>
+                </div>
+              </>
+            )}
+
+            {panel.mode === 'delete' && (
+              <>
+                <div style={{ fontSize: 13.5, color: C.text }}>
+                  This permanently removes <strong>{panel.report.label}</strong> from the report library. It cannot be undone.
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <div style={BTN_GHOST} onClick={() => setPanel(null)}>Cancel</div>
+                  <div style={{ ...BTN_PRIMARY, background: C.danger, boxShadow: 'none' }} onClick={confirmDelete}>Delete permanently</div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Print-only report content. It is hidden during normal browsing
           and displayed only when the browser print dialog is opened. */}
