@@ -68,7 +68,6 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName; adminOnly?: bool
  */
 export default function AdminConsolePage() {
   const [activePage, setActivePage] = useState<PageKey>('dashboard')
-  const [profileOpen, setProfileOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(loadProfile)
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
@@ -100,7 +99,6 @@ export default function AdminConsolePage() {
   }
 
   function closeMenus() {
-    setProfileOpen(false)
     setSearchOpen(false)
   }
 
@@ -245,16 +243,10 @@ export default function AdminConsolePage() {
             </div>
             <div className={styles.vDivider} />
             <div style={{ position: 'relative' }}>
-              <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v) }}>
+              <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); goTo('settings') }}>
                 <div className={styles.avatarCircle}>{profile ? initialsOf(profile.full_name) : '—'}</div>
                 <div style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{profile?.full_name ?? 'Unknown user'}</div><div style={{ fontSize: 11, color: '#8C857A' }}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'User') : ''}</div></div>
-                <span style={{ color: '#8C857A', display: 'flex' }}><Icon name="chevron-down" size={15} color="#8C857A" /></span>
               </div>
-              {profileOpen && (
-                <div className={styles.profileDropdown}>
-                  <div className={styles.profileDropdownItem}>Admin Profile</div>
-                </div>
-              )}
             </div>
           </div>
         </div>
