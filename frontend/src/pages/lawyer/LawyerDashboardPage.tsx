@@ -126,7 +126,7 @@ export default function LawyerDashboardPage() {
           <div className={styles.headerActions}>
             <div className={styles.primaryChip} onClick={() => navigate('/cases/new')}><Icon name="plus" size={15} color="#FCFAF4" /> New Case</div>
             <div className={styles.ghostChip} onClick={() => navigate('/documents')}><Icon name="file-text" size={15} color="#1A1A17" /> Upload Document</div>
-            <div className={styles.ghostChip} style={{ opacity: .5, cursor: 'default' }} title="Hearing scheduling coming soon"><Icon name="calendar" size={15} color="#1A1A17" /> Schedule Hearing</div>
+            <div className={styles.ghostChip} onClick={() => navigate('/cases')} title="Pick a case to schedule its hearing"><Icon name="calendar" size={15} color="#1A1A17" /> Schedule Hearing</div>
           </div>
         </div>
 
