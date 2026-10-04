@@ -254,7 +254,7 @@ export default function AdminConsolePage() {
         </div>
 
         <div className={styles.content} onClick={closeMenus}>
-          {activePage === 'dashboard' && <DashboardView quickActions={quickActions} adminName={profile?.full_name ?? null} />}
+          {activePage === 'dashboard' && <DashboardView quickActions={quickActions} adminName={profile?.full_name ?? null} onGoTo={goTo} isSuperAdmin={profile?.role_id === SUPER_ADMIN} />}
           {activePage === 'users' && <UsersView />}
           {activePage === 'cases' && <CasesView />}
           {activePage === 'documents' && <DocumentsView />}
