@@ -176,9 +176,11 @@ step("conflict check on the new party", "GET",
      "/conflict-check?" + urllib.parse.urlencode({"name": "Opposing Party Pvt Ltd"}), lawyer)
 
 print("\n=== hearings ===")
-future = (date.today() + timedelta(days=14)).isoformat()
+# Dated in the past (not "future") so the outcome recorded just below -- Completed -- is
+# legitimate: the backend now refuses Completed for a hearing that hasn't happened yet.
+past = (date.today() - timedelta(days=3)).isoformat()
 s, hearing = step("schedule hearing", "POST", "/hearings", lawyer,
-                  {"case_id": case_id, "judge_id": judge_id, "hearing_date": future,
+                  {"case_id": case_id, "judge_id": judge_id, "hearing_date": past,
                    "hearing_time": "11:00", "courtroom": "3", "notes": "E2E first hearing"})
 hid = (hearing.get("id") or hearing.get("hearing_id")) if isinstance(hearing, dict) else None
 if hid:
@@ -187,8 +189,17 @@ if hid:
          {"hearing_status": "Completed", "hearing_outcome": "Adjourned",
           "next_hearing_date": (date.today() + timedelta(days=45)).isoformat()})
 step("flag duplicate hearing", "POST", "/hearings", lawyer,
-     {"case_id": case_id, "judge_id": judge_id, "hearing_date": future, "hearing_time": "11:00"},
+     {"case_id": case_id, "judge_id": judge_id, "hearing_date": past, "hearing_time": "11:00"},
      expect=(400, 409, 422))
+
+future = (date.today() + timedelta(days=14)).isoformat()
+s, future_hearing = step("schedule a future hearing", "POST", "/hearings", lawyer,
+                         {"case_id": case_id, "judge_id": judge_id, "hearing_date": future,
+                          "hearing_time": "15:00", "allow_duplicate": True})
+future_hid = (future_hearing.get("id") or future_hearing.get("hearing_id")) if isinstance(future_hearing, dict) else None
+if future_hid:
+    step("reject Completed on a hearing that hasn't happened yet", "PATCH", f"/hearings/{future_hid}", lawyer,
+         {"hearing_status": "Completed"}, expect=(400,))
 # a past listing is legitimately back-filled, so 200 is the intended behaviour here
 step("hearing with no time set (was a 500)", "POST", "/hearings", lawyer,
      {"case_id": case_id, "judge_id": judge_id,
