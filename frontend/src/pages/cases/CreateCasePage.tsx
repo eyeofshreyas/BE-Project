@@ -110,7 +110,7 @@ export default function CreateCasePage() {
     if (!q) return
     setConflictSearching(true)
     try {
-      setConflictResults(await searchConflicts(q))
+      setConflictResults(await searchConflicts({ name: q }))
     } catch {
       setConflictResults(null)
     } finally {
