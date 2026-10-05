@@ -549,3 +549,23 @@
   align-items: center;
   justify-content: center;
 }
+
+@media (max-width: 760px) {
+  .page { padding: 16px; }
+
+  .split {
+    grid-template-columns: 1fr;
+    grid-auto-rows: minmax(0, auto);
+    overflow: visible;
+  }
+
+  .threadList {
+    border-right: none;
+    border-bottom: 1px solid #CFC6B0;
+    max-height: 40vh;
+  }
+
+  .chatPane {
+    min-height: 50vh;
+  }
+}

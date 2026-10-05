@@ -1,6 +1,5 @@
 .page {
   min-height: 100vh;
-  min-width: 1024px;
   background: #F6F2E9;
   font-family: 'Public Sans', sans-serif;
   padding: 32px;
@@ -605,4 +604,6 @@
 }
 @media (max-width: 860px) {
   .matterGrid { grid-template-columns: 1fr; }
+  .page { padding: 16px; }
+  .topGrid, .midGrid { grid-template-columns: 1fr; }
 }

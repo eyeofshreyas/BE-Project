@@ -85,6 +85,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [profile] = useState<UserProfile | null>(loadProfile)
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
   const [profileOpen, setProfileOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -159,7 +160,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className={styles.page}>
-      <div className={styles.sidebar}>
+      {sidebarOpen && <div className={styles.sidebarBackdrop} onClick={() => setSidebarOpen(false)} />}
+      <div className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.sidebarBrandRow}>
           <img src={logo} alt="LexFlow" className={styles.sidebarLogo} />
           <div>
@@ -180,7 +182,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               )
             }
             return (
-              <button key={item.label} type="button" className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => navigate(item.path!)} title={item.label} aria-current={active ? 'page' : undefined}>
+              <button key={item.label} type="button" className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => { navigate(item.path!); setSidebarOpen(false) }} title={item.label} aria-current={active ? 'page' : undefined}>
                 <span className={styles.navIcon}><Icon name={item.icon} size={18} color={active ? C.primaryDark : '#8C857A'} /></span>
                 <span className={styles.navLabel} style={{ fontWeight: active ? 600 : 500, color: active ? C.text : '#575145' }}>{item.label}</span>
                 {item.path === '/messages' && unreadMessages > 0 && (
@@ -191,7 +193,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           })}
         </div>
         <div className={styles.sidebarFooter}>
-          <button type="button" className={styles.navRow} style={{ background: location.pathname === '/settings' ? '#E6E0CE' : 'transparent' }} onClick={() => navigate('/settings')} title="Settings">
+          <button type="button" className={styles.navRow} style={{ background: location.pathname === '/settings' ? '#E6E0CE' : 'transparent' }} onClick={() => { navigate('/settings'); setSidebarOpen(false) }} title="Settings">
             <span className={styles.navIcon}><Icon name="settings" size={18} color={location.pathname === '/settings' ? C.primaryDark : '#8C857A'} /></span>
             <span className={styles.navLabel} style={{ fontWeight: location.pathname === '/settings' ? 600 : 500, color: location.pathname === '/settings' ? C.text : '#575145' }}>Settings</span>
           </button>
@@ -204,7 +206,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
       <div className={styles.main}>
         <div className={styles.topbar}>
-          <div style={{ position: 'relative' }}>
+          <button type="button" className={styles.hamburgerBtn} onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle menu">
+            <Icon name="menu" size={20} color="#575145" />
+          </button>
+          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
             <div className={styles.searchBox}>
               <Icon name="search" size={17} color="#8C857A" />
               <input

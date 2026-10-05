@@ -8,7 +8,7 @@ export type IconName =
   | 'check-circle' | 'database' | 'server' | 'hard-drive' | 'eye' | 'edit' | 'ban'
   | 'trash-2' | 'mail' | 'phone' | 'shield' | 'info' | 'x' | 'gavel' | 'clock' | 'filter'
   | 'home' | 'more-horizontal' | 'star' | 'upload-cloud' | 'globe' | 'message-circle' | 'send'
-  | 'paperclip' | 'play-circle' | 'signature' | 'building' | 'copy'
+  | 'paperclip' | 'play-circle' | 'signature' | 'building' | 'copy' | 'menu'
 
 /** Renders a stroke SVG icon selected by `name`; `size`/`color`/`strokeWidth` are the only customization points. */
 export function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 1.8 }: Props) {
@@ -48,6 +48,7 @@ export function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 1.
     case 'shield': return <svg {...common}><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /><path d="M9 12l2 2 4-4" /></svg>
     case 'info': return <svg {...common}><circle cx={12} cy={12} r={9} /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
     case 'x': return <svg {...common}><path d="M18 6L6 18" /><path d="M6 6l12 12" /></svg>
+    case 'menu': return <svg {...common}><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></svg>
     case 'gavel': return <svg {...common}><path d="M14 4l6 6" /><path d="M4 14l6 6" /><path d="M9.5 8.5l-6 6" /><path d="M15.5 2.5l6 6" /><path d="M10.5 13.5L18 6" /><path d="M2 22h10" /></svg>
     case 'clock': return <svg {...common}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l3.5 2" /></svg>
     case 'filter': return <svg {...common}><path d="M4 5h16l-6 8v6l-4-2v-4z" /></svg>

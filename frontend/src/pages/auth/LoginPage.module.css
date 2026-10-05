@@ -361,3 +361,8 @@
   z-index: 60;
   animation: lf-fade .2s ease-out;
 }
+
+@media (max-width: 760px) {
+  .side { display: none; }
+  .formSide { padding: 32px 20px; }
+}
