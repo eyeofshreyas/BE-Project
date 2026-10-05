@@ -153,11 +153,11 @@ export default function GenerateInvoicePage() {
           <span className={styles.statusBadge} style={{ color: '#1A2551', background: '#E6E0CE' }}>DRAFT STATUS</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 20, alignItems: 'start' }}>
+        <div className={styles.stackOnMobile} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 20, alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
             <div className={styles.panelCard}>
               <div className={styles.panelTitle}>Client Details</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
                 <div ref={clientBoxRef} style={{ position: 'relative' }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#575145', marginBottom: 5 }}>Client Name</div>
                   <input

@@ -8,6 +8,7 @@ import { Icon, type IconName } from './icons'
 import { C } from './theme'
 import type { NotificationSummary } from '../types/api'
 import { timeAgo } from '../utils/date'
+import styles from './AppShell.module.css'
 
 function notifStyle(n: NotificationSummary): { icon: IconName; color: string } {
   const text = `${n.notification_type} ${n.title ?? ''}`.toLowerCase()
@@ -24,7 +25,7 @@ export default function NotificationsPanel({ notifications, onMarkRead }: { noti
   const detail = notifications.find((n) => n.id === selectedId) ?? null
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: detail ? '340px minmax(0,1fr)' : 'minmax(0,1fr)', gap: 20, alignItems: 'start' }}>
+    <div className={styles.stackOnMobile} style={{ display: 'grid', gridTemplateColumns: detail ? '340px minmax(0,1fr)' : 'minmax(0,1fr)', gap: 20, alignItems: 'start' }}>
       <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden', boxShadow: '0 1px 2px rgba(35, 48, 107,.04)' }}>
         <div style={{ padding: '13px 16px', fontSize: 9.5, fontWeight: 700, letterSpacing: '.13em', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', color: '#6E6759', borderBottom: `1px solid ${C.border}` }}>All notifications</div>
         {notifications.length === 0 && <div style={{ padding: '14px 16px', fontSize: 12.5, color: '#8C857A' }}>No notifications.</div>}

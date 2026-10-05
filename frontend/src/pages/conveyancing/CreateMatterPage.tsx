@@ -128,7 +128,7 @@ export default function CreateMatterPage() {
             <input placeholder="e.g. Smith - 123 Main St Purchase" value={matterName} onChange={(e) => setMatterName(e.target.value)} style={inputStyle} />
           </Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
             <Field label="Matter Type">
               <select value={matterType} onChange={(e) => setMatterType(e.target.value)} style={inputStyle}>
                 {MATTER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -189,7 +189,7 @@ export default function CreateMatterPage() {
             <input placeholder="Enter full property address" value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} style={inputStyle} />
           </Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
             <Field label="Property Type">
               <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)} style={inputStyle}>
                 {PROPERTY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}

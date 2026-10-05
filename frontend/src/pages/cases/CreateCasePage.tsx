@@ -207,7 +207,7 @@ export default function CreateCasePage() {
             </div>
           </Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
             <Field label="Case Name"><input placeholder="e.g. Smith vs. Johnson" value={caseName} onChange={(e) => setCaseName(e.target.value)} style={inputStyle} /></Field>
             <Field label="Priority">
               <div style={{ display: 'flex', gap: 6, background: '#F6F2E9', border: '1.5px solid #CFC6B0', borderRadius: 3, padding: 4 }}>

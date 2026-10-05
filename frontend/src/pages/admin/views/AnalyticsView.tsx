@@ -104,7 +104,7 @@ export default function AnalyticsView() {
 
       <div>
         <div className={styles.sectionTitle} style={{ marginBottom: 14 }}>System Analytics</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 1.3fr', gap: 20, alignItems: 'stretch' }}>
+        <div className={styles.stackOnMobile} style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 1.3fr', gap: 20, alignItems: 'stretch' }}>
           <div className={styles.card} style={{ display: 'flex', flexDirection: 'column' }}>
             <div className={styles.cardTitle} style={{ marginBottom: 4 }}>Case Status</div>
             <div style={{ fontSize: 12, color: '#6E6759', marginBottom: 16 }}>Distribution across all cases</div>

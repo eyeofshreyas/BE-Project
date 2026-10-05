@@ -1503,7 +1503,7 @@ export default function ReportsView({
               <>
                 <div style={{ fontSize: 13.5, color: C.muted }}>{panel.report.desc}</div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, fontSize: 13 }}>
                   <div><div style={FILTER_LABEL}>Category</div>{panel.report.category}</div>
                   <div><div style={FILTER_LABEL}>Type</div>{panel.report.type}</div>
                   <div><div style={FILTER_LABEL}>Status</div>{panel.report.status}</div>

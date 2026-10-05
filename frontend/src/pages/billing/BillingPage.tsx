@@ -510,7 +510,7 @@ function ClientInvoicesView() {
 
         {!loading && !error && (
           <>
-            <div className={styles.statCards} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className={styles.statCards}>
               <div className={styles.statCard} style={{ background: '#FEF6EA', border: cardFilter === 'pending' ? '1.5px solid #8A6A2F' : '1px solid #F3EBD9', cursor: 'pointer' }} onClick={() => setCardFilter('pending')} title="Show pending invoices">
                 <div className={styles.statIconRow}>
                   <div className={styles.statIconWrap} style={{ background: '#F3EBD9' }}><Icon name="clock" size={16} color="#8A6A2F" /></div>

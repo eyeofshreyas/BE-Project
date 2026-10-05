@@ -332,7 +332,7 @@ export default function UsersView() {
               </>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12 }}>
                   <div><div style={FIELD_LABEL}>Email</div><div style={{ fontSize: 13.5, color: C.text, wordBreak: 'break-all' }}>{panel.user.email}</div></div>
                   <div><div style={FIELD_LABEL}>Phone</div><div style={{ fontSize: 13.5, color: C.text }}>{panel.user.phone}</div></div>
                   <div>

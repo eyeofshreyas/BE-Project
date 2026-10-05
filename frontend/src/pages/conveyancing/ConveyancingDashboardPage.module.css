@@ -219,7 +219,7 @@
   background: #FCFAF4;
   border: 1px solid #CFC6B0;
   border-radius: 3px;
-  overflow: hidden;
+  overflow-x: auto;
   box-shadow: 0 1px 2px rgba(35, 48, 107, .04);
 }
 
@@ -606,4 +606,9 @@
   .matterGrid { grid-template-columns: 1fr; }
   .page { padding: 16px; }
   .topGrid, .midGrid { grid-template-columns: 1fr; }
+
+  /* Escape hatch for inline grid-template-columns on one-off page layouts. */
+  .stackOnMobile {
+    grid-template-columns: 1fr !important;
+  }
 }

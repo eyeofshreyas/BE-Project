@@ -73,6 +73,7 @@ export default function AdminConsolePage() {
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchData, setSearchData] = useState<{ cases: CaseSummary[]; clients: ClientSummary[]; documents: DocumentSummary[] } | null>(null)
   const navigate = useNavigate()
 
@@ -153,7 +154,8 @@ export default function AdminConsolePage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.sidebar}>
+      {sidebarOpen && <div className={styles.sidebarBackdrop} onClick={() => setSidebarOpen(false)} />}
+      <div className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.sidebarBrandRow}>
           <img src={logo} alt="LexFlow" className={styles.sidebarLogo} />
           <div>
@@ -165,7 +167,7 @@ export default function AdminConsolePage() {
           {visibleNavItems.map((item) => {
             const active = item.key === activePage
             return (
-              <div key={item.key} className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => (item.key === 'billing' ? navigate('/billing') : goTo(item.key))} title={item.label}>
+              <div key={item.key} className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => { if (item.key === 'billing') navigate('/billing'); else goTo(item.key); setSidebarOpen(false) }} title={item.label}>
                 <span className={styles.navIcon}><Icon name={item.icon} size={18} color={active ? C.primaryDark : '#8C857A'} /></span>
                 <span className={styles.navLabel} style={{ fontWeight: active ? 600 : 500, color: active ? C.text : '#575145' }}>{item.label}</span>
               </div>
@@ -173,7 +175,7 @@ export default function AdminConsolePage() {
           })}
         </div>
         <div className={styles.sidebarFooter}>
-          <div className={styles.navRow} style={{ background: activePage === 'settings' ? '#E6E0CE' : 'transparent' }} onClick={() => goTo('settings')} title="Settings">
+          <div className={styles.navRow} style={{ background: activePage === 'settings' ? '#E6E0CE' : 'transparent' }} onClick={() => { goTo('settings'); setSidebarOpen(false) }} title="Settings">
             <span className={styles.navIcon}><Icon name="settings" size={18} color={activePage === 'settings' ? C.primaryDark : '#8C857A'} /></span>
             <span className={styles.navLabel} style={{ fontWeight: activePage === 'settings' ? 600 : 500, color: activePage === 'settings' ? C.text : '#575145' }}>Settings</span>
           </div>
@@ -186,7 +188,10 @@ export default function AdminConsolePage() {
 
       <div className={styles.main}>
         <div className={styles.topbar}>
-          <div style={{ position: 'relative' }}>
+          <button type="button" className={styles.hamburgerBtn} onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle menu">
+            <Icon name="menu" size={20} color="#575145" />
+          </button>
+          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
             <div className={styles.searchBox}>
               <Icon name="search" size={17} color="#8C857A" />
               <input

@@ -591,4 +591,11 @@
   .content {
     padding: 20px 16px 28px;
   }
+
+  /* Escape hatch for inline grid-template-columns set on one-off page layouts
+     (asymmetric sidebar+content/panel splits) -- !important is needed because
+     those are React inline styles, which otherwise always win over a class. */
+  .stackOnMobile {
+    grid-template-columns: 1fr !important;
+  }
 }

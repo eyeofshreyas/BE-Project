@@ -157,7 +157,7 @@ export default function CreateClientPage() {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
                 {isOrg ? (
                   <>
                     <Field label="Organization Name" required><input placeholder="e.g. Vance Textiles Pvt. Ltd." value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} /></Field>

@@ -70,7 +70,7 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
         <div className={styles.pageTitle}>Platform Settings</div>
         <div className={styles.pageSubtitle}>Manage your admin account, platform configuration and preferences.</div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 20, alignItems: 'start' }}>
+      <div className={styles.stackOnMobile} style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 20, alignItems: 'start' }}>
         <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {MENU.map((m) => {
             const active = tab === m.key
@@ -91,7 +91,7 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
                 <div style={{ width: 56, height: 56, borderRadius: 3, background: 'linear-gradient(135deg,#23306B,#CFC6B0)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FCFAF4', fontFamily: "'Spectral',serif", fontWeight: 700, fontSize: 18, flexShrink: 0 }}>{adminInitials}</div>
                 <div><div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{fullName}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{profile?.role_id === 4 ? 'Super Admin' : 'Admin'}</div></div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16 }}>
                 <div><div style={fieldLabel}>Full Name</div><div style={inputWrap}><Icon name="user" size={16} color={C.muted} /><input value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} /></div></div>
                 <div>
                   <div style={fieldLabel}>Email Address</div>
