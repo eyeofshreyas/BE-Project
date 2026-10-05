@@ -204,21 +204,23 @@ export default function GenerateInvoicePage() {
                 <div className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12.5 }} onClick={addItem}><Icon name="plus" size={13} color="#575145" /> Add Item</div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 110px 28px', gap: 8, fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>
-                  <div>Description</div><div>Qty / Hrs</div><div>Rate (₹)</div><div>Amount</div><div />
-                </div>
-                {parsedItems.map((it, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 110px 28px', gap: 8, alignItems: 'center' }}>
-                    <input value={it.description} onChange={(e) => updateItem(i, 'description', e.target.value)} style={fieldStyle()} />
-                    <input type="number" min="0" value={it.qty} onChange={(e) => updateItem(i, 'qty', e.target.value)} style={fieldStyle()} />
-                    <input type="number" min="0" value={it.rate} onChange={(e) => updateItem(i, 'rate', e.target.value)} style={fieldStyle()} />
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17', textAlign: 'right' }}>{money(it.amount)}</div>
-                    <div onClick={() => items.length > 1 && removeItem(i)} style={{ cursor: items.length > 1 ? 'pointer' : 'default', opacity: items.length > 1 ? 1 : 0.3, display: 'flex', justifyContent: 'center' }}>
-                      <Icon name="trash-2" size={15} color="#B3282D" />
-                    </div>
+              <div style={{ overflowX: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, minWidth: 480 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 90px 110px 110px 28px', gap: 8, fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>
+                    <div>Description</div><div>Qty / Hrs</div><div>Rate (₹)</div><div>Amount</div><div />
                   </div>
-                ))}
+                  {parsedItems.map((it, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 90px 110px 110px 28px', gap: 8, alignItems: 'center' }}>
+                      <input value={it.description} onChange={(e) => updateItem(i, 'description', e.target.value)} style={fieldStyle()} />
+                      <input type="number" min="0" value={it.qty} onChange={(e) => updateItem(i, 'qty', e.target.value)} style={fieldStyle()} />
+                      <input type="number" min="0" value={it.rate} onChange={(e) => updateItem(i, 'rate', e.target.value)} style={fieldStyle()} />
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17', textAlign: 'right' }}>{money(it.amount)}</div>
+                      <div onClick={() => items.length > 1 && removeItem(i)} style={{ cursor: items.length > 1 ? 'pointer' : 'default', opacity: items.length > 1 ? 1 : 0.3, display: 'flex', justifyContent: 'center' }}>
+                        <Icon name="trash-2" size={15} color="#B3282D" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div style={{ borderTop: '1px solid #F1EDE0', marginTop: 16, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
