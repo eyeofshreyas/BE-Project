@@ -62,45 +62,42 @@ Supabase Edge Function, or APScheduler in the backend process) batching every ca
 a non-null `cnr_number` through the bulk-refresh flow, reusing `sync_case_from_ecourts()`'s
 per-case update logic rather than duplicating it.
 
-### 1.3 Auto-filling filing/registration number and acts & sections from eCourts
+### 1.3 ~~Auto-filling filing/registration number~~ from eCourts; acts & sections still open
 
 `cases.filing_number`, `registration_number`, and `acts_sections` shipped as manually
 entered fields (`PATCH /cases/{id}/filing-details`) — a case's own court-assigned numbers,
 distinct from `cases.case_number` (LexFlow's internal reference) and from
 `conveyancing_matters`' registration fields (a property transaction's registration-office
 record, a different entity). The real eCourts case-status page shows all three (Filing
-Number/Date, Registration Number/Date, Under Acts/Under Sections), so `sync_case_from_ecourts()`
-is the obvious place to fill them in automatically instead of by hand once a CNR is linked.
+Number/Date, Registration Number/Date, Under Acts/Under Sections).
 
-**Field names now confirmed live.** The same 2026-10-05 call against `DLST020314162024`
-(see §1.1) returned, all as plain strings directly under `courtCaseData` — the same level
-as `caseStatus`/`courtCode`:
+**Filing number / registration number: done.** A live 2026-10-05 call against
+`DLST020314162024` (see §1.1) confirmed `filingNumber`/`registrationNumber` come back as
+plain strings directly under `courtCaseData` — the same level as `caseStatus`/`courtCode`:
 
 ```json
 { "filingNumber": "31398/2024", "filingDate": "2024-08-29",
   "registrationNumber": "30623/2024", "registrationDate": "2024-08-30" }
 ```
 
-`filingNumber`/`registrationNumber` confirms the guess the docs-403 blocker (below) had
-flagged as risky to make without a live call. There's no dedicated "Under Acts/Under
-Sections" field, though — the closest candidate observed is `caseTypeSub` (e.g.
-`"Indian Penal Code - 411,"`), which reads like a single act+section string rather than the
-structured `acts_sections` this app stores; whether that's really the right source field, or
-whether acts/sections show up elsewhere in the payload, still needs checking against a case
-with multiple charged sections.
+`sync_case_from_ecourts()` (`app/controllers/ecourts.py`) now writes `filing_number`/
+`registration_number` additively, same guard as `ecourts_status` — only overwrites when the
+response actually carried a value, so a manually-entered value isn't blanked by a case
+eCourts hasn't indexed yet. `filingDate`/`registrationDate` aren't stored — there's no
+column for them, only `filing_number`/`registration_number` text fields. Covered by
+`test_sync_case_fills_filing_and_registration_number` in `tests/test_ecourts.py`.
 
-Originally not done because the field shape wasn't confirmed for this API, unlike
-`historyOfCaseHearings` in §1.1 (confirmed straight from the docs). Two attempts to read
-`https://ecourtsindia.com/api/docs` for this (`WebFetch`, then `curl` with a browser
-user-agent) both got HTTP 403 — the site blocks this environment's outbound requests
-entirely, docs page included.
+**Acts & sections: still open.** No dedicated "Under Acts/Under Sections" field was found in
+the response — the closest candidate is `caseTypeSub` (e.g. `"Indian Penal Code - 411,"`),
+which reads like a single act+section string rather than the structured `acts_sections` this
+app stores. Deliberately left unwired rather than guessed at (`sync_case_from_ecourts()` has
+a comment noting why) — risks the same silent-wrong-field class of bug `caseStatus`/
+`courtCode` already hit once from a wrong guess at nesting level.
 
-**Unblocked by:** a CNR with more than one charged act/section to confirm where
-`acts_sections` should actually be read from. Once confirmed, extend
-`sync_case_from_ecourts()` to read `filingNumber`/`filingDate`/`registrationNumber`/
-`registrationDate`/acts-and-sections off `case_data` alongside `caseStatus`/`courtCode`,
-additively (only overwrite a field eCourts actually returned a value for, so a
-manually-entered value isn't blanked by a case eCourts hasn't indexed yet).
+**Unblocked by:** a CNR with more than one charged act/section to confirm whether
+`caseTypeSub` is really the right source, or whether acts/sections show up elsewhere in the
+payload under a different name. Once confirmed, extend the same additive block in
+`sync_case_from_ecourts()` to also fill `acts_sections`.
 
 ---
 
