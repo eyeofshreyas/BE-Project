@@ -144,8 +144,9 @@ def test_sync_case_writes_status_and_timeline_event():
 def test_sync_case_fills_filing_and_registration_number():
     """Verifies a sync additively fills filing_number/registration_number from eCourts'
     filingNumber/registrationNumber fields (confirmed live 2026-10-05, see
-    docs/FUTURE_SCOPE.md §1.3), without touching acts_sections (no confirmed source field
-    yet). Exercises: `POST /cases/{id}/sync-ecourts` (`ecourts.sync_case_from_ecourts()`)."""
+    docs/FUTURE_SCOPE.md §1.3), and acts_sections from caseTypeSub with its trailing comma
+    stripped (best-effort mapping, unconfirmed against a multi-charge case -- see the same
+    §1.3). Exercises: `POST /cases/{id}/sync-ecourts` (`ecourts.sync_case_from_ecourts()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     cnr = "DLST020314162024"
     case_row = {
@@ -180,6 +181,7 @@ def test_sync_case_fills_filing_and_registration_number():
     fake_response = MagicMock(status_code=200)
     fake_response.json.return_value = {"data": {"courtCaseData": {
         "caseStatus": "DISPOSED", "filingNumber": "31398/2024", "registrationNumber": "30623/2024",
+        "caseTypeSub": "Indian Penal Code - 411,",
     }}}
 
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
@@ -193,7 +195,7 @@ def test_sync_case_fills_filing_and_registration_number():
     result_write = next(p for p in case_writes if "ecourts_raw" in p)
     assert result_write["filing_number"] == "31398/2024"
     assert result_write["registration_number"] == "30623/2024"
-    assert "acts_sections" not in result_write
+    assert result_write["acts_sections"] == "Indian Penal Code - 411"
 
 
 def test_sync_case_does_not_blank_status_when_response_lacks_it():

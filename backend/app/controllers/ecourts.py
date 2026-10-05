@@ -63,7 +63,7 @@ def _run_ecourts_sync(case_id: int, cnr: str, token: str, user_id: int) -> None:
         # shape eCourts changes on us (a renamed field, a court type that nests it differently
         # -- courtCaseData itself was one such surprise, see docs/FUTURE_SCOPE.md §1.1) must
         # not silently blank out a value a previous, working sync (or a manual edit) already
-        # set. acts_sections isn't filled here -- no confirmed source field yet, see §1.3.
+        # set.
         updates = {
             "ecourts_raw": record,
             "ecourts_last_synced_at": datetime.now(timezone.utc).isoformat(),
@@ -76,6 +76,12 @@ def _run_ecourts_sync(case_id: int, cnr: str, token: str, user_id: int) -> None:
             updates["filing_number"] = case_data["filingNumber"]
         if case_data.get("registrationNumber") is not None:
             updates["registration_number"] = case_data["registrationNumber"]
+        # ponytail: best-effort mapping, not a confirmed acts/sections field -- caseTypeSub is
+        # the only candidate seen in a live response so far (e.g. "Indian Penal Code - 411,"),
+        # and that was from a single-charge case. Upgrade once a multi-charge CNR confirms it,
+        # or finds the real field -- see docs/FUTURE_SCOPE.md §1.3.
+        if case_data.get("caseTypeSub"):
+            updates["acts_sections"] = case_data["caseTypeSub"].strip().rstrip(",").strip()
         supabase.table("cases").update(updates).eq("case_id", case_id).execute()
 
         add_timeline_event(

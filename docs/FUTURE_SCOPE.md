@@ -62,7 +62,7 @@ Supabase Edge Function, or APScheduler in the backend process) batching every ca
 a non-null `cnr_number` through the bulk-refresh flow, reusing `sync_case_from_ecourts()`'s
 per-case update logic rather than duplicating it.
 
-### 1.3 ~~Auto-filling filing/registration number~~ from eCourts; acts & sections still open
+### 1.3 ~~Auto-filling filing/registration number and acts & sections~~ from eCourts
 
 `cases.filing_number`, `registration_number`, and `acts_sections` shipped as manually
 entered fields (`PATCH /cases/{id}/filing-details`) — a case's own court-assigned numbers,
@@ -87,17 +87,20 @@ eCourts hasn't indexed yet. `filingDate`/`registrationDate` aren't stored — th
 column for them, only `filing_number`/`registration_number` text fields. Covered by
 `test_sync_case_fills_filing_and_registration_number` in `tests/test_ecourts.py`.
 
-**Acts & sections: still open.** No dedicated "Under Acts/Under Sections" field was found in
-the response — the closest candidate is `caseTypeSub` (e.g. `"Indian Penal Code - 411,"`),
-which reads like a single act+section string rather than the structured `acts_sections` this
-app stores. Deliberately left unwired rather than guessed at (`sync_case_from_ecourts()` has
-a comment noting why) — risks the same silent-wrong-field class of bug `caseStatus`/
-`courtCode` already hit once from a wrong guess at nesting level.
+**Acts & sections: wired, but best-effort.** No dedicated "Under Acts/Under Sections" field
+exists in the response — the closest (only) candidate is `caseTypeSub` (e.g.
+`"Indian Penal Code - 411,"`), which `sync_case_from_ecourts()` now writes into
+`acts_sections` with the trailing comma stripped, same additive guard as the other fields.
+It's marked with a `ponytail:` comment in the code rather than treated as confirmed, because
+the only live response checked so far (`DLST020314162024`) had a single charge — whether
+`caseTypeSub` reliably holds every charged section on a multi-charge case, comma-joined or
+some other format, is unconfirmed, and this reads like a single act+section string rather
+than the structured field this app's manual entry implies.
 
-**Unblocked by:** a CNR with more than one charged act/section to confirm whether
-`caseTypeSub` is really the right source, or whether acts/sections show up elsewhere in the
-payload under a different name. Once confirmed, extend the same additive block in
-`sync_case_from_ecourts()` to also fill `acts_sections`.
+**Upgrade condition:** a CNR with more than one charged act/section, to confirm
+`caseTypeSub`'s format holds (or find the real field if it doesn't). Until then, treat
+auto-filled `acts_sections` values as worth a lawyer's spot-check, same as any other
+eCourts-sourced field on a case eCourts hasn't fully indexed.
 
 ---
 
