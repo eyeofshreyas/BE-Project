@@ -1278,6 +1278,7 @@ export default function ReportsView({
               style={{
                 display: 'flex',
                 alignItems: 'center',
+                flexWrap: 'wrap',
                 gap: 16,
                 padding: '18px 22px',
                 borderBottom:
@@ -1308,7 +1309,7 @@ export default function ReportsView({
               <div
                 style={{
                   flex: 1,
-                  minWidth: 0,
+                  minWidth: 160,
                 }}
               >
                 <div
@@ -1334,11 +1335,14 @@ export default function ReportsView({
 
               <span
                 className={styles.pill}
-                style={pillStyle(
-                  r.status === 'Ready'
-                    ? C.success
-                    : C.warning,
-                )}
+                style={{
+                  ...pillStyle(
+                    r.status === 'Ready'
+                      ? C.success
+                      : C.warning,
+                  ),
+                  flexShrink: 0,
+                }}
               >
                 {r.status}
               </span>
@@ -1348,6 +1352,7 @@ export default function ReportsView({
                   fontSize: 12,
                   color: C.muted,
                   whiteSpace: 'nowrap',
+                  flexShrink: 0,
                 }}
               >
                 Last generated:{' '}
@@ -1362,6 +1367,7 @@ export default function ReportsView({
                   alignItems: 'center',
                   gap: 7,
                   whiteSpace: 'nowrap',
+                  flexShrink: 0,
                 }}
                 onClick={() => setPanel({ mode: 'preview', report: r })}
               >
@@ -1373,15 +1379,15 @@ export default function ReportsView({
                 <span>View Report</span>
               </div>
 
-              <span className={styles.actionBtn} title="Edit" onClick={() => openEdit(r)}>
+              <span className={styles.actionBtn} style={{ flexShrink: 0 }} title="Edit" onClick={() => openEdit(r)}>
                 <Icon name="edit" size={14} color="#575145" />
               </span>
 
-              <span className={styles.actionBtn} title="Duplicate" onClick={() => duplicateReport(r)}>
+              <span className={styles.actionBtn} style={{ flexShrink: 0 }} title="Duplicate" onClick={() => duplicateReport(r)}>
                 <Icon name="copy" size={14} color="#575145" />
               </span>
 
-              <span className={styles.actionBtnDanger} title="Delete" onClick={() => setPanel({ mode: 'delete', report: r })}>
+              <span className={styles.actionBtnDanger} style={{ flexShrink: 0 }} title="Delete" onClick={() => setPanel({ mode: 'delete', report: r })}>
                 <Icon name="trash-2" size={14} color={C.danger} />
               </span>
             </div>
