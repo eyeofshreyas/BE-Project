@@ -72,6 +72,9 @@
   gap: 20px;
   align-items: start;
 }
+.topGrid > * {
+  min-width: 0;
+}
 
 .statCards {
   display: grid;
@@ -213,6 +216,9 @@
   grid-template-columns: 2fr 1fr;
   gap: 20px;
   align-items: start;
+}
+.midGrid > * {
+  min-width: 0;
 }
 
 .tableCard {
@@ -603,6 +609,9 @@
   gap: 20px;
   margin-top: 20px;
 }
+.matterGrid > * {
+  min-width: 0;
+}
 @media (max-width: 860px) {
   .matterGrid { grid-template-columns: 1fr; }
   .page { padding: 16px; }
@@ -611,6 +620,12 @@
   /* Escape hatch for inline grid-template-columns on one-off page layouts. */
   .stackOnMobile {
     grid-template-columns: 1fr !important;
+  }
+
+  /* Grid items default to min-width:auto, which floors them at their content's
+     unbroken min-content width regardless of the column's own track sizing. */
+  .stackOnMobile > * {
+    min-width: 0;
   }
 
   /* 7 equal columns leave very little room per day on a phone -- shrink the

@@ -133,7 +133,7 @@ export default function AnalyticsView() {
             <div style={{ fontSize: 12, color: '#6E6759', marginBottom: 18 }}>New cases filed, last 6 months</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, height: 150, padding: '0 4px' }}>
               {data.case_growth.map((m) => (
-                <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, height: '100%', justifyContent: 'flex-end' }}>
+                <div key={m.label} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, height: '100%', justifyContent: 'flex-end' }}>
                   <div style={{ fontSize: 11, color: '#6E6759', fontWeight: 600 }}>{m.count}</div>
                   <div style={{ width: '60%', maxWidth: 34, height: `${(m.count / growthMax) * 110}px`, minHeight: 2, borderRadius: '3px 8px 3px 3px', background: 'linear-gradient(180deg,#C9A47C,#23306B)' }} />
                   <div style={{ fontSize: 11.5, color: '#6E6759', fontWeight: 500 }}>{m.label}</div>

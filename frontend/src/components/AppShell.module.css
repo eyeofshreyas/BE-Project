@@ -613,4 +613,12 @@
   .stackOnMobile {
     grid-template-columns: 1fr !important;
   }
+
+  /* Grid items default to min-width:auto, which floors them at their content's
+     unbroken min-content width (e.g. a long filename) regardless of the
+     column's own track sizing -- without this, long text can still force the
+     single stacked column wider than the viewport. */
+  .stackOnMobile > * {
+    min-width: 0;
+  }
 }

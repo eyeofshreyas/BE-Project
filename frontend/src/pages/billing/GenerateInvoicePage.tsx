@@ -290,12 +290,12 @@ export default function GenerateInvoicePage() {
                 </div>
 
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px 60px 70px', gap: 6, fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', borderBottom: '1px solid #F1EDE0', paddingBottom: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 40px 60px 70px', gap: 6, fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', borderBottom: '1px solid #F1EDE0', paddingBottom: 6 }}>
                     <div>Description</div><div>Hrs</div><div>Rate</div><div style={{ textAlign: 'right' }}>Amount</div>
                   </div>
                   {parsedItems.filter((it) => it.description.trim()).map((it, i) => (
-                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 40px 60px 70px', gap: 6, fontSize: 11.5, padding: '7px 0', borderBottom: '1px solid #F8F2E4' }}>
-                      <div style={{ color: PRIMARY, fontWeight: 600 }}>{it.description}</div>
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 40px 60px 70px', gap: 6, fontSize: 11.5, padding: '7px 0', borderBottom: '1px solid #F8F2E4' }}>
+                      <div style={{ color: PRIMARY, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.description}</div>
                       <div style={{ color: MUTED }}>{it.qty}</div>
                       <div style={{ color: MUTED }}>{money(Number(it.rate) || 0).replace('.00', '')}</div>
                       <div style={{ textAlign: 'right', fontWeight: 600 }}>{money(it.amount).replace('.00', '')}</div>
