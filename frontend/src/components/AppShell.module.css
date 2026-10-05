@@ -213,6 +213,7 @@
   color: #1A1A17;
   background: transparent;
   flex: 1;
+  min-width: 0;
   font-family: 'Public Sans', sans-serif;
 }
 
@@ -586,6 +587,20 @@
 
   .todayLabel {
     display: none;
+  }
+
+  .profileNameBlock {
+    display: none;
+  }
+
+  /* !important needed -- the chevron span also carries an inline display:flex. */
+  .profileChevron {
+    display: none !important;
+  }
+
+  .profileBtn {
+    gap: 0;
+    padding: 4px;
   }
 
   .content {
