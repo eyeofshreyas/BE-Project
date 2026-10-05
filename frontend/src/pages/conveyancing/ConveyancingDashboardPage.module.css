@@ -428,6 +428,7 @@
 
 .barCol {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -634,5 +635,17 @@
   .calendarChip {
     padding: 2px 3px;
     font-size: 9px;
+  }
+
+  /* 12 monthly bars with a 14px gap eat ~154px before any bar gets width --
+     shrink the gap and label so the row fits a phone instead of overflowing. */
+  .barChartArea {
+    gap: 4px;
+    padding: 26px 0 0;
+  }
+
+  .barMonthLabel {
+    font-size: 8.5px;
+    white-space: nowrap;
   }
 }
