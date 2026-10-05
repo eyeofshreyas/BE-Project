@@ -14,16 +14,24 @@ in `cases.ecourts_raw` for future use. Two things were deliberately left out of 
 
 ### 1.1 Auto-creating hearing rows from eCourts data
 
-Field shape confirmed from the official docs (`https://ecourtsindia.com/api/docs`, v4.0)
-without needing a live API key — no account is provisioned yet. `GET /api/partner/case/{cnr}`
-returns `data.courtCaseData.historyOfCaseHearings`, an array of
-`{ judge, businessOnDate, hearingDate, purposeOfListing }` (district-court cases; shape may
-vary for High Court/Supreme Court CNRs, unconfirmed). Example from the docs:
+Field shape originally confirmed from the official docs (`https://ecourtsindia.com/api/docs`,
+v4.0) without a live API key — no account was provisioned yet at the time. An account is
+now provisioned (`ECOURTS_API_KEY` in `backend/.env`), and a live `GET
+/api/partner/case/DLST020314162024` call (2026-10-05, a disposed district-court case)
+confirms `data.courtCaseData.historyOfCaseHearings` exists at the documented nesting level,
+but with one difference from the docs example: this record's only entry had no `hearingDate`
+key at all (not even `null`) —
 
 ```json
-{ "judge": "Chief Metropolitan Magistrate", "businessOnDate": "2016-04-07",
-  "hearingDate": "2016-05-19", "purposeOfListing": "Misc./ Appearance" }
+{ "judge": "Judicial Magistrate First Class-03", "businessOnDate": "2024-09-14",
+  "purposeOfListing": "Disposed" }
 ```
+
+— vs. the docs example's `{ judge, businessOnDate, hearingDate, purposeOfListing }`. Whether
+`hearingDate` is omitted specifically for a disposed/single-hearing case, or the docs example
+is simply stale, is still unconfirmed — needs a live call against a CNR with multiple or
+upcoming hearings before coding against this field. High Court/Supreme Court CNR shape is
+also still unconfirmed (only a district-court CNR has been checked so far).
 
 Note this whole object sits under `data.courtCaseData`, not directly under `data` —
 `sync_case_from_ecourts()` originally read `caseStatus`/`courtCode` off the wrong level
@@ -34,12 +42,12 @@ or create endpoint for `judges` today (it's seed-only, see `app/controllers/refe
 so an unmatched name needs either a name-match against existing judges or a way to create
 one on the fly.
 
-**Unblocked by:** an eCourtsIndia API key (real account, not just docs) to confirm this
-holds for a live response and to see whether High Court/Supreme Court CNRs use the same
-field. Once confirmed, extend `sync_case_from_ecourts()` to diff `historyOfCaseHearings`
-against existing `hearings` rows for the case and insert any hearing eCourts knows about
-that LexFlow doesn't, following the same insert + `add_timeline_event()` pattern
-`create_hearing()` already uses in `app/controllers/hearings.py`.
+**Unblocked by:** a CNR with multiple/future hearings to confirm whether `hearingDate` is
+reliably present, and a High Court/Supreme Court CNR to check the shape holds there too. Once
+confirmed, extend `sync_case_from_ecourts()` to diff `historyOfCaseHearings` against existing
+`hearings` rows for the case and insert any hearing eCourts knows about that LexFlow doesn't,
+following the same insert + `add_timeline_event()` pattern `create_hearing()` already uses in
+`app/controllers/hearings.py`.
 
 ### 1.2 Scheduled bulk sync (no manual click needed)
 
@@ -64,21 +72,35 @@ record, a different entity). The real eCourts case-status page shows all three (
 Number/Date, Registration Number/Date, Under Acts/Under Sections), so `sync_case_from_ecourts()`
 is the obvious place to fill them in automatically instead of by hand once a CNR is linked.
 
-**Not done because the field shape isn't confirmed for this API**, unlike
-`historyOfCaseHearings` in §1.1, which was confirmed straight from the docs. Two attempts to
-read `https://ecourtsindia.com/api/docs` for this (`WebFetch`, then `curl` with a browser
-user-agent) both got HTTP 403 — the site blocks this environment's outbound requests
-entirely, docs page included. Guessing at key names (`filingNumber` vs `filing_number` vs
-something else `courtCaseData` doesn't even call it) risks the same silent-`null` bug
-`caseStatus`/`courtCode` already hit once from reading the wrong nesting level — worse here,
-since a wrong guess just writes nothing and looks shipped.
+**Field names now confirmed live.** The same 2026-10-05 call against `DLST020314162024`
+(see §1.1) returned, all as plain strings directly under `courtCaseData` — the same level
+as `caseStatus`/`courtCode`:
 
-**Unblocked by:** an eCourtsIndia API key (real account) to make one live `GET
-/api/partner/case/{cnr}` call and read the actual field names back, the same way §1.1 is
-unblocked. Once confirmed, extend `sync_case_from_ecourts()` to read them off `case_data`
-alongside `caseStatus`/`courtCode`, additively (only overwrite a field eCourts actually
-returned a value for, so a manually-entered value isn't blanked by a case eCourts hasn't
-indexed yet).
+```json
+{ "filingNumber": "31398/2024", "filingDate": "2024-08-29",
+  "registrationNumber": "30623/2024", "registrationDate": "2024-08-30" }
+```
+
+`filingNumber`/`registrationNumber` confirms the guess the docs-403 blocker (below) had
+flagged as risky to make without a live call. There's no dedicated "Under Acts/Under
+Sections" field, though — the closest candidate observed is `caseTypeSub` (e.g.
+`"Indian Penal Code - 411,"`), which reads like a single act+section string rather than the
+structured `acts_sections` this app stores; whether that's really the right source field, or
+whether acts/sections show up elsewhere in the payload, still needs checking against a case
+with multiple charged sections.
+
+Originally not done because the field shape wasn't confirmed for this API, unlike
+`historyOfCaseHearings` in §1.1 (confirmed straight from the docs). Two attempts to read
+`https://ecourtsindia.com/api/docs` for this (`WebFetch`, then `curl` with a browser
+user-agent) both got HTTP 403 — the site blocks this environment's outbound requests
+entirely, docs page included.
+
+**Unblocked by:** a CNR with more than one charged act/section to confirm where
+`acts_sections` should actually be read from. Once confirmed, extend
+`sync_case_from_ecourts()` to read `filingNumber`/`filingDate`/`registrationNumber`/
+`registrationDate`/acts-and-sections off `case_data` alongside `caseStatus`/`courtCode`,
+additively (only overwrite a field eCourts actually returned a value for, so a
+manually-entered value isn't blanked by a case eCourts hasn't indexed yet).
 
 ---
 
