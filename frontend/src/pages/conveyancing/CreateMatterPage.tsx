@@ -155,8 +155,8 @@ export default function CreateMatterPage() {
           <SectionTitle>Client</SectionTitle>
 
           <Field label="Select Client" required>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <div style={{ position: 'relative', flex: 1 }} onBlur={() => setTimeout(() => setClientDropdownOpen(false), 120)}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 160 }} onBlur={() => setTimeout(() => setClientDropdownOpen(false), 120)}>
                 <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Icon name="search" size={14} color={MUTED} />
                   <input
