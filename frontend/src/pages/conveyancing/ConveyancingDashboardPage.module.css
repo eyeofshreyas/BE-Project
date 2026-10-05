@@ -492,7 +492,7 @@
 
 .calendarGrid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .calendarDowCell {
@@ -610,5 +610,29 @@
   /* Escape hatch for inline grid-template-columns on one-off page layouts. */
   .stackOnMobile {
     grid-template-columns: 1fr !important;
+  }
+
+  /* 7 equal columns leave very little room per day on a phone -- shrink the
+     chrome so the day number and chip text still have space to breathe. */
+  .calendarCell {
+    min-height: 64px;
+    padding: 4px;
+  }
+
+  .calendarDowCell {
+    padding: 8px 2px;
+    font-size: 8.5px;
+    letter-spacing: 0;
+  }
+
+  .calendarDayNum {
+    font-size: 11px;
+    width: 18px;
+    height: 18px;
+  }
+
+  .calendarChip {
+    padding: 2px 3px;
+    font-size: 9px;
   }
 }
