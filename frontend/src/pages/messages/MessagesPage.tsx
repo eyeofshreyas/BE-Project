@@ -115,6 +115,10 @@ export default function MessagesPage() {
   const [listError, setListError] = useState('')
   const [search, setSearch] = useState('')
   const autoOpened = useRef(false)
+  // On a phone the list and chat panes can't both fit -- show one at a time. Defaults to
+  // the chat pane only when the user arrived via a direct link to a conversation; otherwise
+  // they land on the inbox list first, same as any messaging app.
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>(conversationId ? 'chat' : 'list')
 
   const [conversation, setConversation] = useState<ConversationDetail | null>(null)
   const [threadError, setThreadError] = useState('')
@@ -231,7 +235,7 @@ export default function MessagesPage() {
 
       {!listError && (
           <div className={styles.split}>
-            <div className={styles.threadList}>
+            <div className={`${styles.threadList} ${mobileView === 'chat' ? styles.hiddenMobile : ''}`}>
               <div className={styles.threadListHead}>
                 <div className={styles.threadListTitle}>Messages</div>
                 <div className={styles.threadListCount}>{loadingList ? 'Loading…' : `${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`}</div>
@@ -247,7 +251,7 @@ export default function MessagesPage() {
                   <div
                     key={c.id}
                     className={`${styles.threadRow} ${String(c.id) === conversationId ? styles.active : ''}`}
-                    onClick={() => navigate(`/messages/${c.id}`)}
+                    onClick={() => { navigate(`/messages/${c.id}`); setMobileView('chat') }}
                   >
                     <div className={styles.avatar}>{c.other_party_name ? initialsOf(c.other_party_name) : '—'}</div>
                     <div className={styles.threadMeta}>
@@ -266,7 +270,7 @@ export default function MessagesPage() {
               </div>
             </div>
 
-            <div className={styles.chatPane}>
+            <div className={`${styles.chatPane} ${mobileView === 'list' ? styles.hiddenMobile : ''}`}>
               {!conversationId || !conversation ? (
                 <div className={styles.chatEmpty}>
                   <div className={styles.chatEmptyIcon}><Icon name="message-circle" size={21} color={MUTED} /></div>
@@ -275,6 +279,9 @@ export default function MessagesPage() {
               ) : (
                 <>
                   <div className={styles.chatHead}>
+                    <div className={styles.backBtn} onClick={() => setMobileView('list')} title="Back to conversations">
+                      <span style={{ display: 'flex', transform: 'rotate(90deg)' }}><Icon name="chevron-down" size={18} color={MUTED} /></span>
+                    </div>
                     <div className={styles.avatar}>{conversation.other_party_name ? initialsOf(conversation.other_party_name) : '—'}</div>
                     <div>
                       <div className={styles.chatName}>{conversation.other_party_name ?? 'Unknown'}</div>
