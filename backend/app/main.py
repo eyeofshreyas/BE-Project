@@ -223,7 +223,7 @@ def login(data: LoginRequest):
         "user_email": result.user.email,
         "profile": profile_rows[0] if profile_rows else None,
     }
-@app.post("/refresh")
+@app.post("/refresh", dependencies=[Depends(rate_limit(10, 60))])
 def refresh(data: RefreshRequest):
     """Exchange a Supabase refresh token for a new access token."""
     try:
