@@ -84,12 +84,16 @@ CAPTURED = {"order_id": "order_abc", "status": "captured", "amount": 100000, "me
 ORDER = {"id": "order_abc", "receipt": "INV-7"}  # matches INVOICE["invoice_number"]
 
 
-def _verify(data, billing_fake, http_payload=CAPTURED, http_status=200, order_payload=ORDER, order_status=200):
+def _verify(data, billing_fake, http_payload=CAPTURED, http_status=200, order_payload=ORDER, order_status=200,
+            transfers_payload=None, transfers_status=200):
     """Run verify_razorpay_payment with Razorpay's key config and HTTP calls stubbed out.
-    The payment fetch (/payments/{id}) and order fetch (/orders/{id}) are routed by URL."""
+    The payment fetch (/payments/{id}), order fetch (/orders/{id}), and transfers fetch
+    (/payments/{id}/transfers) are routed by URL."""
     def fake_get(url, **kwargs):
         if "/orders/" in url:
             return _razorpay_response(order_status, order_payload)
+        if url.endswith("/transfers"):
+            return _razorpay_response(transfers_status, transfers_payload or {"items": [{"amount": 99500, "status": "processed"}]})
         return _razorpay_response(http_status, http_payload)
 
     with patch("app.controllers.billing.RAZORPAY_KEY_ID", KEY_ID), \
@@ -162,7 +166,8 @@ def test_payment_for_a_different_invoices_order_is_rejected():
 
 def test_amount_recorded_comes_from_razorpay_not_the_caller():
     """Verifies the banked amount is Razorpay's captured paise converted to rupees, not anything
-    the caller supplied, and that the payment lands as Completed with the gateway reference.
+    the caller supplied, that the payment lands as Completed with the gateway reference, and
+    that the transfer split is recorded from Razorpay's transfers response.
     Exercises: `POST /invoices/{id}/razorpay/verify` (`billing.verify_razorpay_payment()`)."""
     inserted, updated = {}, {}
     data = RazorpayVerify(
@@ -174,6 +179,26 @@ def test_amount_recorded_comes_from_razorpay_not_the_caller():
     assert inserted["payment_status"] == "Completed"
     assert inserted["transaction_reference"] == "pay_abc"
     assert inserted["payment_method"] == "UPI"    # mapped from Razorpay's "upi"
+    assert inserted["platform_fee_paise"] == 500      # 0.5% of 100000
+    assert inserted["firm_amount_paise"] == 99500
+    assert inserted["transfer_status"] == "processed"
+
+
+def test_verify_records_failed_transfer_status_when_transfer_fetch_errors():
+    """A payment is still recorded as Completed (the client did pay) even when the transfers
+    fetch itself errors -- but transfer_status is flagged 'failed' for manual reconciliation
+    rather than silently assuming the firm got paid.
+    Exercises: `POST /invoices/{id}/razorpay/verify` (`billing.verify_razorpay_payment()`)."""
+    inserted = {}
+    data = RazorpayVerify(
+        razorpay_order_id="order_abc", razorpay_payment_id="pay_abc",
+        razorpay_signature=_signature("order_abc", "pay_abc"),
+    )
+    _verify(data, _billing_supabase(inserted_sink=inserted), transfers_status=500)
+    assert inserted["payment_status"] == "Completed"
+    assert inserted["transfer_status"] == "failed"
+    assert inserted["firm_amount_paise"] is None
+    assert inserted["platform_fee_paise"] is None
 
 
 def test_a_retried_verify_does_not_bank_the_same_payment_twice():
