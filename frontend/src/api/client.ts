@@ -27,6 +27,8 @@ import type {
   HearingSummary,
   ClientSummary,
   RazorpayOrder,
+  RazorpayAccountStatus,
+  RazorpayOnboardingPayload,
   JudgementSummary,
   JudgementCreatePayload,
   CaseCreatePayload,
@@ -284,6 +286,14 @@ export function getUserDeleteImpact(userId: number) {
 
 export function inviteLawyer(email: string) {
   return post<{ message: string }>('/admin/lawyer-invites', { email })
+}
+
+export function getRazorpayAccountStatus() {
+  return get<RazorpayAccountStatus>('/admin/razorpay-account')
+}
+
+export function submitRazorpayOnboarding(payload: RazorpayOnboardingPayload) {
+  return post<RazorpayAccountStatus>('/admin/razorpay-account', payload)
 }
 
 /** Irreversible: removes the user and everything cascading off them. Show the impact first. */

@@ -413,6 +413,21 @@ export interface RazorpayOrder {
   key_id: string
 }
 
+export interface RazorpayAccountStatus {
+  status: 'not_started' | 'pending' | 'needs_clarification' | 'activated' | 'rejected'
+  error: string | null
+}
+
+export interface RazorpayOnboardingPayload {
+  business_name: string
+  business_type: string
+  pan: string
+  contact_email: string
+  contact_phone: string
+  bank_account_number: string
+  bank_ifsc: string
+}
+
 export interface InvoiceSummary {
   id: number
   invoice_number: string

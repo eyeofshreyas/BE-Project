@@ -1,15 +1,16 @@
 /** Admin console "Settings" tab: profile (`updateOwnProfile()`), security (password reset
  * via `forgotPassword()`), and a static about panel. */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C } from '../../../components/theme'
-import { forgotPassword, updateOwnProfile } from '../../../api/client'
-import type { UserProfile } from '../../../types/api'
+import { forgotPassword, getRazorpayAccountStatus, submitRazorpayOnboarding, updateOwnProfile } from '../../../api/client'
+import type { RazorpayAccountStatus, RazorpayOnboardingPayload, UserProfile } from '../../../types/api'
 import styles from '../../../components/AppShell.module.css'
 
 const MENU: { key: string; label: string; icon: IconName }[] = [
   { key: 'profile', label: 'Profile', icon: 'user' },
   { key: 'security', label: 'Security', icon: 'shield' },
+  { key: 'payments', label: 'Payments', icon: 'banknote' },
   { key: 'about', label: 'About', icon: 'info' },
 ]
 
@@ -23,6 +24,31 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
   const [fullName, setFullName] = useState(profile?.full_name ?? '')
   const [phone, setPhone] = useState(profile?.phone ?? '')
   const [saving, setSaving] = useState(false)
+  const [razorpay, setRazorpay] = useState<RazorpayAccountStatus | null>(null)
+  const [razorpayLoading, setRazorpayLoading] = useState(true)
+  const [onboardForm, setOnboardForm] = useState<RazorpayOnboardingPayload>({
+    business_name: '', business_type: 'partnership', pan: '', contact_email: '', contact_phone: '',
+    bank_account_number: '', bank_ifsc: '',
+  })
+  const [onboarding, setOnboarding] = useState(false)
+
+  useEffect(() => {
+    if (profile?.role_id === 4) { setRazorpayLoading(false); return } // Super Admin has no org to onboard
+    getRazorpayAccountStatus().then(setRazorpay).catch(() => setRazorpay(null)).finally(() => setRazorpayLoading(false))
+  }, [profile])
+
+  async function submitOnboarding() {
+    setOnboarding(true)
+    try {
+      const result = await submitRazorpayOnboarding(onboardForm)
+      setRazorpay(result)
+      onSave('Payment account submitted for review.')
+    } catch (e) {
+      onSave((e as Error).message)
+    } finally {
+      setOnboarding(false)
+    }
+  }
 
   function reset() {
     setFullName(profile?.full_name ?? '')
@@ -111,6 +137,44 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
                 <div><div style={rowTitle}>Password</div><div style={rowDesc}>Email a reset link to {profile?.email ?? 'your account'}.</div></div>
                 <div style={btnGhost} onClick={sendPasswordReset}>Send reset link</div>
               </div>
+            </div>
+          )}
+
+          {tab === 'payments' && (
+            <div style={cardStyle}>
+              <div className={styles.cardTitle}>Payment Account</div>
+              {razorpayLoading ? (
+                <div style={rowDesc}>Loading…</div>
+              ) : razorpay?.status === 'activated' ? (
+                <div style={rowLastStyle}>
+                  <div><div style={rowTitle}>Connected</div><div style={rowDesc}>Client payments settle to this firm's linked Razorpay account.</div></div>
+                </div>
+              ) : razorpay?.status === 'pending' ? (
+                <div style={rowLastStyle}>
+                  <div><div style={rowTitle}>Under review</div><div style={rowDesc}>Razorpay is reviewing your submitted details. This can take a few days.</div></div>
+                </div>
+              ) : (
+                <>
+                  {razorpay?.status === 'needs_clarification' && razorpay.error && (
+                    <div style={{ ...rowDesc, color: '#B3282D' }}>Razorpay needs more information: {razorpay.error}</div>
+                  )}
+                  {razorpay?.status === 'rejected' && (
+                    <div style={{ ...rowDesc, color: '#B3282D' }}>Your previous submission was rejected{razorpay.error ? `: ${razorpay.error}` : '.'} Please correct and resubmit.</div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16 }}>
+                    <div><div style={fieldLabel}>Business Name</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.business_name} onChange={(e) => setOnboardForm({ ...onboardForm, business_name: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>Business Type</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.business_type} onChange={(e) => setOnboardForm({ ...onboardForm, business_type: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>PAN</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.pan} onChange={(e) => setOnboardForm({ ...onboardForm, pan: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>Contact Email</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.contact_email} onChange={(e) => setOnboardForm({ ...onboardForm, contact_email: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>Contact Phone</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.contact_phone} onChange={(e) => setOnboardForm({ ...onboardForm, contact_phone: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>Bank Account Number</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.bank_account_number} onChange={(e) => setOnboardForm({ ...onboardForm, bank_account_number: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>Bank IFSC</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.bank_ifsc} onChange={(e) => setOnboardForm({ ...onboardForm, bank_ifsc: e.target.value })} /></div></div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <div style={{ ...btnPrimary, opacity: onboarding ? 0.6 : 1 }} onClick={() => !onboarding && submitOnboarding()}>{onboarding ? 'Submitting…' : 'Connect Razorpay Account'}</div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
