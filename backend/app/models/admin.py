@@ -62,6 +62,24 @@ class LawyerInviteCreate(BaseModel):
     email: EmailStr
 
 
+class RazorpayOnboardingCreate(BaseModel):
+    """Request body for submitting a law firm's Razorpay Route KYC to create its linked account."""
+    business_name: str
+    business_type: str
+    pan: str
+    contact_email: EmailStr
+    contact_phone: str
+    bank_account_number: str
+    bank_ifsc: str
+
+
+class RazorpayAccountStatus(BaseModel):
+    """The caller's org's Razorpay Route onboarding status, for the admin console's Payment
+    Account panel."""
+    status: str
+    error: str | None
+
+
 class FirmAnalyticsCase(BaseModel):
     """One case row shaped for the Firm Analytics tab's exposure filters and sum."""
     case_id: int

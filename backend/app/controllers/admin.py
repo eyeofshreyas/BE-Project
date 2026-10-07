@@ -4,13 +4,15 @@ Gated by require_roles(ADMIN, SUPER_ADMIN)."""
 from collections import Counter
 from datetime import date, datetime, timedelta
 
+import httpx
 from fastapi import BackgroundTasks, Depends, HTTPException
-from app.core.config import FRONTEND_URL, STORAGE_QUOTA_BYTES
+from app.core.config import FRONTEND_URL, STORAGE_QUOTA_BYTES, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
 from app.core.email import send_email
+from app.controllers.billing import RAZORPAY_API
 from app.controllers.cases import MAX_CASES, _active_case_lawyers
 from app.db.supabase_client import supabase
 from app.middleware.auth import ADMIN, CLIENT, LAWYER, SUPER_ADMIN, require_roles, get_scoped_case_ids
-from app.models.admin import LawyerInviteCreate
+from app.models.admin import LawyerInviteCreate, RazorpayOnboardingCreate
 
 TIMELINE_SELECT = (
     "timeline_id,event_type,event_title,event_description,created_at,"
@@ -303,3 +305,85 @@ def get_firm_analytics(profile: dict = Depends(require_roles(ADMIN))):
         })
 
     return {"cases": fa_cases, "workload": workload}
+
+
+def _razorpay_auth() -> tuple[str, str]:
+    """Return (key_id, key_secret) or 500 if Razorpay isn't configured -- see .env.example.
+    Deliberately duplicated from billing.py: each module keeps its own copy of
+    RAZORPAY_KEY_ID/SECRET so tests can patch them independently (the existing convention --
+    see Global Constraints in the plan this came from)."""
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=500, detail="Razorpay is not configured on this server.")
+    return RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
+
+
+def get_razorpay_account_status(profile: dict = Depends(require_roles(ADMIN))):
+    """Read the caller's org's Razorpay Route onboarding status, for the admin console's
+    Payment Account panel."""
+    rows = supabase.table("platform_settings").select(
+        "razorpay_account_status,razorpay_account_error"
+    ).eq("org_id", profile["org_id"]).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="No platform settings found for this organization.")
+    return {"status": rows[0]["razorpay_account_status"], "error": rows[0]["razorpay_account_error"]}
+
+
+def submit_razorpay_onboarding(data: RazorpayOnboardingCreate, profile: dict = Depends(require_roles(ADMIN))):
+    """Create a Razorpay Route linked account for the caller's org and submit its KYC and
+    settlement (bank account) details. Razorpay reviews asynchronously -- /webhooks/razorpay
+    (payments_webhook.handle_razorpay_webhook()) is what actually flips this row to
+    'activated'/'needs_clarification'/'rejected'.
+
+    NOTE: the request shapes below reflect Razorpay's Route onboarding API at the time this
+    was written -- verify field names against Razorpay's current Accounts/Products API docs
+    before going live, since that API has changed shape before.
+    Calls: `_razorpay_auth()`."""
+    key_id, key_secret = _razorpay_auth()
+    rows = supabase.table("platform_settings").select("razorpay_account_status").eq("org_id", profile["org_id"]).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="No platform settings found for this organization.")
+    current_status = rows[0]["razorpay_account_status"]
+    if current_status in ("pending", "activated"):
+        raise HTTPException(status_code=409, detail=f"A Razorpay account is already {current_status} for this organization.")
+
+    resp = httpx.post(
+        f"{RAZORPAY_API}/accounts",
+        auth=(key_id, key_secret),
+        json={
+            "email": data.contact_email,
+            "phone": data.contact_phone,
+            "legal_business_name": data.business_name,
+            "business_type": data.business_type,
+            "contact_name": data.business_name,
+            "profile": {"category": "legal", "subcategory": "legal_services"},
+            "legal_info": {"pan": data.pan},
+        },
+        timeout=15,
+    )
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Razorpay could not create the linked account.")
+    account = resp.json()
+
+    settlement_resp = httpx.post(
+        f"{RAZORPAY_API}/accounts/{account['id']}/products",
+        auth=(key_id, key_secret),
+        json={
+            "product_name": "route",
+            "tnc_accepted": True,
+            "settlements": {
+                "account_number": data.bank_account_number,
+                "ifsc_code": data.bank_ifsc,
+                "beneficiary_name": data.business_name,
+            },
+        },
+        timeout=15,
+    )
+    if settlement_resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Razorpay could not attach settlement details to the linked account.")
+
+    supabase.table("platform_settings").update({
+        "razorpay_account_id": account["id"],
+        "razorpay_account_status": "pending",
+        "razorpay_account_error": None,
+    }).eq("org_id", profile["org_id"]).execute()
+    return {"status": "pending", "error": None}

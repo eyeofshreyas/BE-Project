@@ -16,9 +16,16 @@ PUBLIC_ROUTES = {
     ("POST", "/signup"),                 # creates the account that later auth depends on
     ("POST", "/login"),                  # same
     ("POST", "/forgot-password"),        # same -- no session to check yet
+    ("POST", "/refresh"),                # exchanges a refresh token for a new access token --
+                                          # the caller's access token may already be expired,
+                                          # so it can't be the thing gating this route
     ("POST", "/webhooks/leegality"),     # called by Leegality's server, not a LexFlow user;
                                           # verifies its own HMAC `mac` field instead (see
                                           # controllers/esign.py's handle_esign_webhook)
+    ("POST", "/webhooks/razorpay"),      # called by Razorpay's server, not a LexFlow user;
+                                          # verifies its own HMAC signature over the raw body
+                                          # instead (see controllers/payments_webhook.py's
+                                          # handle_razorpay_webhook)
     ("GET", "/_boom_for_test"),           # test-only route mounted onto the shared `app`
                                           # singleton by test_error_handling.py, not a real endpoint
 }
