@@ -48,12 +48,26 @@ reaches LexFlow if the second one is filled in too.
 
 ### Local webhook testing (ngrok)
 
-Razorpay's account-status webhook (`/webhooks/razorpay`, used by the Route
-onboarding flow — see `app/controllers/payments_webhook.py`) has the same
-problem as Leegality's: Razorpay has to reach your machine over the public
-internet, and `localhost:8000` isn't reachable from there. [ngrok](https://ngrok.com/download)
-tunnels a public HTTPS URL to your local backend so you can test onboarding
-end-to-end without deploying anywhere.
+**Why ngrok is needed here:** when a firm submits its Razorpay onboarding
+KYC, Razorpay reviews it and then calls *your server back* to report the
+result (`account.activated` / `account.needs_clarification` /
+`account.rejected`) at `/webhooks/razorpay` — see
+`app/controllers/payments_webhook.py`. Razorpay's servers live on the public
+internet and have no way to reach `localhost:8000` on your machine directly;
+`localhost` only means something to processes on that same machine. Without
+a public URL for Razorpay to call, onboarding submissions stay stuck on
+"pending" forever during local development.
+
+[ngrok](https://ngrok.com/download) solves this by opening a tunnel: it
+hands you a public HTTPS URL that forwards straight through to your local
+port 8000, so Razorpay's webhook calls actually reach your real local
+server. Leegality's e-signature webhook has the exact same problem, for the
+same reason.
+
+This is a **local-development-only** need. Once the backend is deployed
+somewhere with a real domain, Razorpay's webhook points at
+`https://your-real-domain.com/webhooks/razorpay` directly and ngrok isn't
+involved at all.
 
 ```bash
 # Install (pick one):
