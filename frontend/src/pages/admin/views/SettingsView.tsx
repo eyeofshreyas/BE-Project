@@ -185,10 +185,12 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
             </div>
           )}
 
-          <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: '16px 20px', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <div style={btnGhost} onClick={reset}>Cancel</div>
-            <div style={btnPrimary} onClick={() => { if (!saving) save() }}>{saving ? 'Saving…' : 'Save Changes'}</div>
-          </div>
+          {tab === 'profile' && (
+            <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: '16px 20px', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={btnGhost} onClick={reset}>Cancel</div>
+              <div style={btnPrimary} onClick={() => { if (!saving) save() }}>{saving ? 'Saving…' : 'Save Changes'}</div>
+            </div>
+          )}
         </div>
       </div>
     </>
