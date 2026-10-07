@@ -7,6 +7,7 @@ import hashlib
 import hmac
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 from fastapi import HTTPException
 
@@ -85,7 +86,7 @@ ORDER = {"id": "order_abc", "receipt": "INV-7"}  # matches INVOICE["invoice_numb
 
 
 def _verify(data, billing_fake, http_payload=CAPTURED, http_status=200, order_payload=ORDER, order_status=200,
-            transfers_payload=None, transfers_status=200):
+            transfers_payload=None, transfers_status=200, transfers_raises=None):
     """Run verify_razorpay_payment with Razorpay's key config and HTTP calls stubbed out.
     The payment fetch (/payments/{id}), order fetch (/orders/{id}), and transfers fetch
     (/payments/{id}/transfers) are routed by URL."""
@@ -93,6 +94,8 @@ def _verify(data, billing_fake, http_payload=CAPTURED, http_status=200, order_pa
         if "/orders/" in url:
             return _razorpay_response(order_status, order_payload)
         if url.endswith("/transfers"):
+            if transfers_raises is not None:
+                raise transfers_raises
             return _razorpay_response(transfers_status, transfers_payload or {"items": [{"amount": 99500, "status": "processed"}]})
         return _razorpay_response(http_status, http_payload)
 
@@ -195,6 +198,24 @@ def test_verify_records_failed_transfer_status_when_transfer_fetch_errors():
         razorpay_signature=_signature("order_abc", "pay_abc"),
     )
     _verify(data, _billing_supabase(inserted_sink=inserted), transfers_status=500)
+    assert inserted["payment_status"] == "Completed"
+    assert inserted["transfer_status"] == "failed"
+    assert inserted["firm_amount_paise"] is None
+    assert inserted["platform_fee_paise"] is None
+
+
+def test_verify_records_failed_transfer_status_when_transfer_fetch_raises():
+    """Same as the sibling test above, but the transfers fetch fails at the connection level
+    (timeout/DNS/refused) instead of returning a 4xx/5xx -- a payment Razorpay genuinely
+    captured must still be recorded as Completed, flagged for manual reconciliation, rather
+    than 500ing the whole verify call after the client has already been charged.
+    Exercises: `POST /invoices/{id}/razorpay/verify` (`billing.verify_razorpay_payment()`)."""
+    inserted = {}
+    data = RazorpayVerify(
+        razorpay_order_id="order_abc", razorpay_payment_id="pay_abc",
+        razorpay_signature=_signature("order_abc", "pay_abc"),
+    )
+    _verify(data, _billing_supabase(inserted_sink=inserted), transfers_raises=httpx.ConnectError("connection refused"))
     assert inserted["payment_status"] == "Completed"
     assert inserted["transfer_status"] == "failed"
     assert inserted["firm_amount_paise"] is None

@@ -312,8 +312,11 @@ def verify_razorpay_payment(invoice_id: int, data: RazorpayVerify, profile: dict
     # than trusted from the order's own `transfers` request, since Razorpay is the only source
     # of truth for whether it actually went through. A failed fetch doesn't block recording
     # the payment itself (the client genuinely paid); it's flagged for manual reconciliation.
-    transfers_resp = httpx.get(f"{RAZORPAY_API}/payments/{data.razorpay_payment_id}/transfers", auth=(key_id, key_secret), timeout=15)
-    transfer = (transfers_resp.json().get("items") or [{}])[0] if transfers_resp.status_code < 400 else {}
+    try:
+        transfers_resp = httpx.get(f"{RAZORPAY_API}/payments/{data.razorpay_payment_id}/transfers", auth=(key_id, key_secret), timeout=15)
+        transfer = (transfers_resp.json().get("items") or [{}])[0] if transfers_resp.status_code < 400 else {}
+    except httpx.HTTPError:
+        transfer = {}
     firm_amount_paise = transfer.get("amount")
     platform_fee_paise = (payment["amount"] - firm_amount_paise) if firm_amount_paise is not None else None
     transfer_status = transfer.get("status", "failed")
