@@ -17,6 +17,7 @@ from app.models.billing import (
 )
 
 RAZORPAY_API = "https://api.razorpay.com/v1"
+PLATFORM_FEE_RATE = Decimal("0.005")
 RAZORPAY_METHOD_LABELS = {"card": "Credit/Debit Card", "netbanking": "Net Banking", "upi": "UPI", "wallet": "Wallet", "emi": "EMI"}
 
 # ponytail: hard cap, not real pagination -- same reasoning as cases.MAX_CASES.
@@ -24,7 +25,7 @@ MAX_INVOICES = 1000
 
 INVOICES_SELECT = (
     "invoice_id,invoice_number,amount,tax,total_amount,issue_date,due_date,payment_status,remarks,case_id,"
-    "cases(case_number,clients(users(full_name)))"
+    "cases(case_number,org_id,clients(users(full_name)))"
 )
 
 PAYMENTS_SELECT = "payment_id,invoice_id,amount,payment_method,transaction_reference,payment_date,payment_status"
@@ -76,9 +77,28 @@ def _invoice_status_for(total_paid: Decimal, total_amount) -> str:
     return "Pending"
 
 
-def _to_invoice_summary(row: dict) -> dict:
-    """Shape a raw `invoices` row (joined with cases/clients) into the InvoiceSummary dict."""
+def _org_payment_accounts(org_ids: set[int]) -> dict[int, dict]:
+    """Map each org_id to its {org_id, razorpay_account_id, razorpay_account_status}
+    platform_settings row. Batched so listing N invoices costs one extra query, not N --
+    callers needing a single org's row just pass a one-element set."""
+    if not org_ids:
+        return {}
+    rows = supabase.table("platform_settings").select(
+        "org_id,razorpay_account_id,razorpay_account_status"
+    ).in_("org_id", list(org_ids)).execute().data
+    return {r["org_id"]: r for r in rows}
+
+
+def _to_invoice_summary(row: dict, accounts: dict[int, dict] | None = None) -> dict:
+    """Shape a raw `invoices` row (joined with cases/clients/org) into the InvoiceSummary dict.
+    `accounts` is the org_id -> platform_settings row map from `_org_payment_accounts()`;
+    carries `org_id`/`razorpay_account_id` too for create_razorpay_order's internal use --
+    response_model=InvoiceSummary drops them before they reach the wire, since that model
+    doesn't declare them."""
+    accounts = accounts or {}
     case = row.get("cases")
+    org_id = case["org_id"] if case else None
+    account = accounts.get(org_id) if org_id is not None else None
     return {
         "id": row["invoice_id"],
         "invoice_number": row["invoice_number"],
@@ -90,23 +110,29 @@ def _to_invoice_summary(row: dict) -> dict:
         "issue_date": row["issue_date"],
         "due_date": row["due_date"],
         "payment_status": row["payment_status"],
+        "razorpay_enabled": bool(account and account["razorpay_account_status"] == "activated"),
+        "org_id": org_id,
+        "razorpay_account_id": account["razorpay_account_id"] if account else None,
     }
 
 
 # shared fetch+scope-check used by get_invoice, list_invoice_payments, and
 # create_payment so each doesn't reimplement the 404/403 checks.
 def _get_invoice(invoice_id: int, case_ids: set[int] | None = None) -> dict:
-    """Fetch one invoice by ID; 404 if missing, 403 if outside case_ids. Calls: `_to_invoice_summary()`."""
+    """Fetch one invoice by ID; 404 if missing, 403 if outside case_ids. Calls: `_to_invoice_summary()`, `_org_payment_accounts()`."""
     rows = supabase.table("invoices").select(INVOICES_SELECT).eq("invoice_id", invoice_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Invoice not found")
     if case_ids is not None and rows[0]["case_id"] not in case_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this invoice")
-    return _to_invoice_summary(rows[0])
+    case = rows[0].get("cases")
+    org_id = case["org_id"] if case else None
+    accounts = _org_payment_accounts({org_id} if org_id is not None else set())
+    return _to_invoice_summary(rows[0], accounts)
 
 
 def list_invoices(profile: dict = Depends(get_current_profile)):
-    """List invoices for cases in the caller's scope. Calls: `get_scoped_case_ids()`, `_to_invoice_summary()`."""
+    """List invoices for cases in the caller's scope. Calls: `get_scoped_case_ids()`, `_to_invoice_summary()`, `_org_payment_accounts()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None and not case_ids:
         return []
@@ -115,7 +141,9 @@ def list_invoices(profile: dict = Depends(get_current_profile)):
     if case_ids is not None:
         query = query.in_("case_id", list(case_ids))
     rows = query.order("invoice_id", desc=True).limit(MAX_INVOICES).execute().data
-    return [_to_invoice_summary(row) for row in rows]
+    org_ids = {r["cases"]["org_id"] for r in rows if r.get("cases")}
+    accounts = _org_payment_accounts(org_ids)
+    return [_to_invoice_summary(row, accounts) for row in rows]
 
 
 def get_invoice(invoice_id: int, profile: dict = Depends(get_current_profile)):
@@ -212,20 +240,28 @@ def _razorpay_auth() -> tuple[str, str]:
 
 def create_razorpay_order(invoice_id: int, profile: dict = Depends(get_current_profile)):
     """Start a Razorpay checkout for an invoice's outstanding balance (total minus Completed
-    payments so far). The client-side Checkout.js modal opens against the returned order_id;
-    `key_id` is Razorpay's public key, safe to hand to the browser. Calls: `_get_invoice()`,
-    `_razorpay_auth()`."""
+    payments so far), split via Route so 99.5% transfers to the firm's linked account and 0.5%
+    stays with the platform. 403s if the firm's linked account isn't activated yet -- there's
+    nowhere for the firm's share to go otherwise. `key_id` is Razorpay's public key, safe to
+    hand to the browser. Calls: `_get_invoice()`, `_razorpay_auth()`."""
     key_id, key_secret = _razorpay_auth()
     invoice = _get_invoice(invoice_id, get_scoped_case_ids(profile))
     due = _amount_due(invoice_id, invoice["total_amount"])
     if due <= 0:
         raise HTTPException(status_code=400, detail="This invoice is already paid.")
+    if not invoice["razorpay_enabled"]:
+        raise HTTPException(status_code=403, detail="Payments aren't enabled yet for this firm.")
 
     paise = int((due * 100).to_integral_value(rounding=ROUND_HALF_UP))
+    fee_paise = int((Decimal(paise) * PLATFORM_FEE_RATE).to_integral_value(rounding=ROUND_HALF_UP))
+    firm_paise = paise - fee_paise
     resp = httpx.post(
         f"{RAZORPAY_API}/orders",
         auth=(key_id, key_secret),
-        json={"amount": paise, "currency": "INR", "receipt": invoice["invoice_number"]},
+        json={
+            "amount": paise, "currency": "INR", "receipt": invoice["invoice_number"],
+            "transfers": [{"account": invoice["razorpay_account_id"], "amount": firm_paise, "currency": "INR"}],
+        },
         timeout=15,
     )
     if resp.status_code >= 400:
