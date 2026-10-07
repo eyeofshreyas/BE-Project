@@ -439,6 +439,7 @@ export interface InvoiceSummary {
   issue_date: string
   due_date: string | null
   payment_status: string
+  razorpay_enabled: boolean
 }
 
 export interface PaymentSummary {

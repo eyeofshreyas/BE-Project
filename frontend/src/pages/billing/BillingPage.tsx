@@ -564,9 +564,15 @@ function ClientInvoicesView() {
                           <td className={styles.td}>
                             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
                               {inv.payment_status !== 'Paid' && (
-                                <div className={styles.darkBtn} style={{ opacity: payingId === inv.id ? .6 : 1, cursor: payingId === inv.id ? 'default' : 'pointer' }} onClick={() => payingId !== inv.id && payInvoice(inv)}>
-                                  {payingId === inv.id ? 'Processing…' : 'Pay Now'}
-                                </div>
+                                inv.razorpay_enabled ? (
+                                  <div className={styles.darkBtn} style={{ opacity: payingId === inv.id ? .6 : 1, cursor: payingId === inv.id ? 'default' : 'pointer' }} onClick={() => payingId !== inv.id && payInvoice(inv)}>
+                                    {payingId === inv.id ? 'Processing…' : 'Pay Now'}
+                                  </div>
+                                ) : (
+                                  <div className={styles.darkBtn} style={{ opacity: 0.5, cursor: 'default' }} title="Online payment isn't set up for this firm yet.">
+                                    Pay Now
+                                  </div>
+                                )
                               )}
                               <span style={{ fontSize: 12, fontWeight: 600, color: '#23306B', cursor: 'pointer' }} onClick={() => downloadInvoice(inv)}>Download</span>
                             </div>
