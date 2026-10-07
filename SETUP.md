@@ -59,7 +59,8 @@ end-to-end without deploying anywhere.
 # Install (pick one):
 brew install ngrok              # macOS
 sudo apt install ngrok          # Debian/Ubuntu, if the ngrok apt repo is set up
-# or download the binary directly from https://ngrok.com/download
+choco install ngrok             # Windows (Chocolatey)
+# or download the binary/installer directly from https://ngrok.com/download
 
 ngrok config add-authtoken <your-token>   # from your ngrok dashboard, one-time
 ```
