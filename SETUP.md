@@ -46,6 +46,45 @@ these without a tunnel (ngrok or similar) during development. Set it on
 URL** (rejections/failures) — they're separate fields, and a rejection only
 reaches LexFlow if the second one is filled in too.
 
+### Local webhook testing (ngrok)
+
+Razorpay's account-status webhook (`/webhooks/razorpay`, used by the Route
+onboarding flow — see `app/controllers/payments_webhook.py`) has the same
+problem as Leegality's: Razorpay has to reach your machine over the public
+internet, and `localhost:8000` isn't reachable from there. [ngrok](https://ngrok.com/download)
+tunnels a public HTTPS URL to your local backend so you can test onboarding
+end-to-end without deploying anywhere.
+
+```bash
+# Install (pick one):
+brew install ngrok              # macOS
+sudo apt install ngrok          # Debian/Ubuntu, if the ngrok apt repo is set up
+# or download the binary directly from https://ngrok.com/download
+
+ngrok config add-authtoken <your-token>   # from your ngrok dashboard, one-time
+```
+
+With the backend running (`uvicorn app.main:app --reload --port 8000`, or
+`./start.sh`), in a separate terminal:
+
+```bash
+ngrok http 8000
+```
+
+ngrok prints a `Forwarding` line with a URL like
+`https://ab12-34-56-78-90.ngrok-free.app`. In the Razorpay dashboard's
+Webhooks tab, create a webhook pointing at
+`https://<that-ngrok-id>.ngrok-free.app/webhooks/razorpay`, subscribed to the
+`account.activated` / `account.needs_clarification` / `account.rejected`
+events — the only three `payments_webhook.py` acts on. Razorpay shows you a
+webhook secret when you create it; put that in `RAZORPAY_WEBHOOK_SECRET` in
+`.env` (restart the backend after changing it).
+
+On the free ngrok tier, the forwarding URL changes every time you restart
+`ngrok http`, so you'll need to update the webhook URL in the Razorpay
+dashboard each session. A paid ngrok plan with a reserved domain avoids that,
+but isn't required just to test the flow locally.
+
 OCR on scanned PDFs/images (used by `/ai/summarize` and `/ai/translate` via
 `extract_document_text()`) needs the `tesseract-ocr` and `poppler-utils`
 system packages — `sudo apt install tesseract-ocr poppler-utils` on Debian/
