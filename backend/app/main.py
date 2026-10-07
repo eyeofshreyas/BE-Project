@@ -43,6 +43,7 @@ from app.routes.judgements import router as judgements_router
 from app.routes.messages import router as messages_router
 from app.routes.admin import router as admin_router
 from app.routes.esign import router as esign_router
+from app.routes.payments_webhook import router as payments_webhook_router
 from app.routes.conflict_check import router as conflict_check_router
 from app.routes.trust import router as trust_router, invoice_trust_router
 
@@ -98,6 +99,7 @@ app.include_router(judgements_router)
 app.include_router(messages_router)
 app.include_router(admin_router)
 app.include_router(esign_router)
+app.include_router(payments_webhook_router)
 app.include_router(conflict_check_router)
 app.include_router(trust_router)
 app.include_router(invoice_trust_router)
