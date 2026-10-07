@@ -65,12 +65,15 @@ choco install ngrok             # Windows (Chocolatey)
 ngrok config add-authtoken <your-token>   # from your ngrok dashboard, one-time
 ```
 
-With the backend running (`uvicorn app.main:app --reload --port 8000`, or
-`./start.sh`), in a separate terminal:
+With the backend running, start the tunnel alongside it:
 
 ```bash
-ngrok http 8000
+./start.sh --ngrok        # or: start.bat --ngrok on Windows
 ```
+
+(`--ngrok` is opt-in — plain `./start.sh` never touches ngrok, so it's not
+required unless you're testing the webhook.) Or run it standalone in a
+separate terminal: `ngrok http 8000`.
 
 ngrok prints a `Forwarding` line with a URL like
 `https://ab12-34-56-78-90.ngrok-free.app`. In the Razorpay dashboard's
