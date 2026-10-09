@@ -12,4 +12,9 @@ logs/
 .worktrees/
 .firecrawl/
 mermaid-skill/
+brag-output/
 CLAUDE.md
+.claude/
+.agents/
+PRESENTATION_NOTES.md
+finetune-summarizer/
