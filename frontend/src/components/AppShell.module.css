@@ -1,7 +1,6 @@
 .page {
   display: flex;
   height: 100vh;
-  min-width: 1280px;
   width: 100%;
   overflow: hidden;
   font-family: 'Public Sans', sans-serif;
@@ -61,13 +60,32 @@
   overflow-y: auto;
 }
 
+/* Strips default <button> chrome so a real <button> can drop in wherever a clickable
+   div used to be, with no visual change -- see AppLayout.tsx's nav/logout/bell/profile
+   controls. resetBtnBlock also fills the row's width, for a button meant to stretch
+   the way a block-level div did (sidebar/dropdown rows); resetBtn alone stays
+   content-sized, for an icon/pill-shaped button. */
+.resetBtn {
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.resetBtnBlock {
+  composes: resetBtn;
+  width: 100%;
+  text-align: left;
+}
+
 .navRow {
+  composes: resetBtnBlock;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 11px 14px;
   border-radius: 3px;
-  cursor: pointer;
   margin-bottom: 2px;
   transition: background .15s;
 }
@@ -125,13 +143,28 @@
   flex-shrink: 0;
 }
 
+.hamburgerBtn {
+  composes: resetBtn;
+  display: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 3px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebarBackdrop {
+  display: none;
+}
+
 .logoutRow {
+  composes: resetBtnBlock;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 11px 14px;
   border-radius: 3px;
-  cursor: pointer;
   transition: background .18s ease-out;
 }
 
@@ -180,7 +213,67 @@
   color: #1A1A17;
   background: transparent;
   flex: 1;
+  min-width: 0;
   font-family: 'Public Sans', sans-serif;
+}
+
+.searchDropdown {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  width: 340px;
+  background: #FCFAF4;
+  border: 1px solid #CFC6B0;
+  border-radius: 3px;
+  box-shadow: 0 12px 32px rgba(35, 48, 107, .14);
+  padding: 6px;
+  animation: lf-fade .15s ease-out;
+  z-index: 40;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.searchGroup + .searchGroup {
+  margin-top: 4px;
+}
+
+.searchGroupLabel {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #8C857A;
+  font-family: 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: .13em;
+  padding: 6px 10px 2px;
+}
+
+.searchResultItem {
+  composes: resetBtnBlock;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #1A1A17;
+  border-radius: 3px;
+  text-align: left;
+}
+
+.searchResultItem span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchResultItem:hover {
+  background: #E6E0CE;
+}
+
+.searchEmpty {
+  padding: 12px 10px;
+  font-size: 12.5px;
+  color: #8C857A;
 }
 
 .topbarRight {
@@ -197,6 +290,7 @@
 }
 
 .bellBtn {
+  composes: resetBtn;
   position: relative;
   width: 38px;
   height: 38px;
@@ -204,7 +298,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
 }
 
 .bellDot {
@@ -225,10 +318,10 @@
 }
 
 .profileBtn {
+  composes: resetBtn;
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
   padding: 4px 6px;
   border-radius: 3px;
 }
@@ -266,11 +359,12 @@
 }
 
 .profileDropdownItem {
+  composes: resetBtnBlock;
+  display: block;
   padding: 9px 12px;
   font-size: 13px;
   color: #1A1A17;
   border-radius: 3px;
-  cursor: pointer;
 }
 
 .profileDropdownItem:hover {
@@ -447,4 +541,84 @@
   font-weight: 600;
   color: #CFC6B0;
   cursor: pointer;
+}
+
+@media (max-width: 860px) {
+  .hamburgerBtn {
+    display: flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform .2s ease-out;
+    box-shadow: 0 0 24px rgba(0, 0, 0, .2);
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+
+  .sidebarBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 26, 23, .4);
+    z-index: 45;
+  }
+
+  .topbar {
+    padding: 0 16px;
+    gap: 12px;
+  }
+
+  .searchBox {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .searchDropdown {
+    width: 100%;
+  }
+
+  .todayLabel {
+    display: none;
+  }
+
+  .profileNameBlock {
+    display: none;
+  }
+
+  /* !important needed -- the chevron span also carries an inline display:flex. */
+  .profileChevron {
+    display: none !important;
+  }
+
+  .profileBtn {
+    gap: 0;
+    padding: 4px;
+  }
+
+  .content {
+    padding: 20px 16px 28px;
+  }
+
+  /* Escape hatch for inline grid-template-columns set on one-off page layouts
+     (asymmetric sidebar+content/panel splits) -- !important is needed because
+     those are React inline styles, which otherwise always win over a class. */
+  .stackOnMobile {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Grid items default to min-width:auto, which floors them at their content's
+     unbroken min-content width (e.g. a long filename) regardless of the
+     column's own track sizing -- without this, long text can still force the
+     single stacked column wider than the viewport. */
+  .stackOnMobile > * {
+    min-width: 0;
+  }
 }

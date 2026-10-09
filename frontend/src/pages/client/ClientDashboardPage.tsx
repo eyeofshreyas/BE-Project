@@ -3,11 +3,11 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   listCases, listHearings, listInvoices, listDocuments, listNotifications,
-  listClientRequests, respondClientRequest, getDocumentDownloadUrl, getOrCreateConversation,
+  listClientRequests, respondClientRequest, getDocumentDownloadUrl, getOrCreateConversation, listMySuspensions,
 } from '../../api/client'
 import type {
   CaseSummary, HearingSummary, InvoiceSummary, DocumentSummary,
-  NotificationSummary, ClientRequestSummary, UserProfile,
+  NotificationSummary, ClientRequestSummary, UserProfile, SuspendedFirm,
 } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { formatDate } from '../../utils/date'
@@ -62,14 +62,15 @@ export default function ClientDashboardPage() {
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
   const [clientRequests, setClientRequests] = useState<ClientRequestSummary[]>([])
+  const [suspensions, setSuspensions] = useState<SuspendedFirm[]>([])
   const [respondingId, setRespondingId] = useState<number | null>(null)
   const [messaging, setMessaging] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    Promise.all([listCases(), listHearings(), listInvoices(), listDocuments(), listNotifications(), listClientRequests()])
-      .then(([c, h, i, d, n, r]) => { setCases(c); setHearings(h); setInvoices(i); setDocuments(d); setNotifications(n); setClientRequests(r) })
+    Promise.all([listCases(), listHearings(), listInvoices(), listDocuments(), listNotifications(), listClientRequests(), listMySuspensions()])
+      .then(([c, h, i, d, n, r, s]) => { setCases(c); setHearings(h); setInvoices(i); setDocuments(d); setNotifications(n); setClientRequests(r); setSuspensions(s) })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load your dashboard.'))
       .finally(() => setLoading(false))
   }, [])
@@ -126,12 +127,12 @@ export default function ClientDashboardPage() {
   const firstName = profile?.full_name.split(' ')[0] ?? 'there'
 
   const statCards = [
-    { label: 'Active Cases', value: String(activeCases.length), sublabel: 'Currently open', icon: 'briefcase' as const },
-    { label: 'Upcoming Hearings', value: String(scheduledHearings.length), sublabel: nextHearing ? `Next ${formatDate(nextHearing.hearing_date)}` : 'None scheduled', icon: 'calendar' as const },
-    { label: 'Pending Payments', value: money(pendingAmount), sublabel: nearestDue ? dueLabel(nearestDue) : 'All settled', icon: 'receipt' as const },
-    { label: 'Uploaded Documents', value: String(documents.length), sublabel: recentDocsCount > 0 ? `+${recentDocsCount} this week` : 'All time', icon: 'file-text' as const },
-    { label: 'Unread Notifications', value: String(unreadCount), sublabel: unreadCount > 0 ? 'Needs attention' : 'All caught up', icon: 'bell' as const },
-    { label: 'Completed Cases', value: String(completedCases.length), sublabel: 'All time', icon: 'check-circle' as const },
+    { label: 'Active Cases', value: String(activeCases.length), sublabel: 'Currently open', icon: 'briefcase' as const, to: '/cases' },
+    { label: 'Upcoming Hearings', value: String(scheduledHearings.length), sublabel: nextHearing ? `Next ${formatDate(nextHearing.hearing_date)}` : 'None scheduled', icon: 'calendar' as const, to: '/hearings' },
+    { label: 'Pending Payments', value: money(pendingAmount), sublabel: nearestDue ? dueLabel(nearestDue) : 'All settled', icon: 'receipt' as const, to: '/billing' },
+    { label: 'Uploaded Documents', value: String(documents.length), sublabel: recentDocsCount > 0 ? `+${recentDocsCount} this week` : 'All time', icon: 'file-text' as const, to: '/documents' },
+    { label: 'Unread Notifications', value: String(unreadCount), sublabel: unreadCount > 0 ? 'Needs attention' : 'All caught up', icon: 'bell' as const, to: '/notifications' },
+    { label: 'Completed Cases', value: String(completedCases.length), sublabel: 'All time', icon: 'check-circle' as const, to: '/cases' },
   ]
 
   return (
@@ -169,11 +170,17 @@ export default function ClientDashboardPage() {
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading your dashboard…</div>}
         {error && <div style={{ padding: '24px 4px', color: '#B3282D', fontSize: 13.5 }}>{error}</div>}
 
+        {suspensions.map((s) => (
+          <div key={s.firm_name} style={{ background: '#F7E4E5', border: '1px solid #E8C4C6', borderRadius: 3, padding: '12px 16px', margin: '0 0 16px', fontSize: 13.5, color: '#B3282D' }}>
+            Your access with <strong>{s.firm_name}</strong> has been suspended. Contact them directly if you believe this is a mistake.
+          </div>
+        ))}
+
         {!loading && !error && (
           <>
             <div className={styles.statCards}>
               {statCards.map((s) => (
-                <div key={s.label} className={styles.statCard}>
+                <div key={s.label} className={styles.statCard} style={{ cursor: 'pointer' }} onClick={() => navigate(s.to)}>
                   <div className={styles.statIconRow}><div className={styles.statIconWrap}><Icon name={s.icon} size={19} color={PRIMARY_DARK} /></div></div>
                   <div>
                     <div className={styles.statValue}>{s.value}</div>

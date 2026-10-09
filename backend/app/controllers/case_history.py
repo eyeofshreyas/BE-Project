@@ -1,13 +1,16 @@
 """Controllers for case notes, timeline events, and status history/changes."""
 
+from datetime import date
+
 from fastapi import Depends, HTTPException
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles, ensure_case_access
 from app.models.case_history import NoteSummary, NoteCreate, NoteUpdate, TimelineEvent, StatusHistoryEntry, StatusChange
 
 NOTES_SELECT = "note_id,case_id,title,note,checklist,pinned,created_at,lawyers(users(full_name))"
 TIMELINE_SELECT = "timeline_id,case_id,event_type,event_title,event_description,created_at,users(full_name)"
 STATUS_HISTORY_SELECT = "history_id,case_id,previous_status,current_status,changed_at,users(full_name)"
+CLOSED_STATUSES = {"Completed", "Closed"}
 
 
 def _to_note(row: dict) -> dict:
@@ -65,7 +68,7 @@ def _to_status_history(row: dict) -> dict:
     }
 
 
-def list_case_notes(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def list_case_notes(case_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """List notes for a case the caller has access to. Notes are the firm's internal work
     product -- only staff may read them, so this is role-gated as well as case-scoped, and
     so is the AI summary built from them (see case_ai_summary.get_case_ai_summary).
@@ -129,7 +132,7 @@ def list_status_history(case_id: int, profile: dict = Depends(get_current_profil
     return [_to_status_history(row) for row in rows]
 
 
-def change_case_status(case_id: int, data: StatusChange, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def change_case_status(case_id: int, data: StatusChange, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Update a case's status, and record both a status-history row and a timeline event.
     Calls: `ensure_case_access()`, `_to_status_history()`."""
     ensure_case_access(case_id, profile)
@@ -138,6 +141,23 @@ def change_case_status(case_id: int, data: StatusChange, profile: dict = Depends
         raise HTTPException(status_code=404, detail="Case not found")
     previous_status = case_rows[0]["status"]
     changed_by = profile["user_id"]
+
+    # A case marked Completed/Closed with a hearing still Scheduled ahead of it reads as a
+    # contradiction everywhere the case is summarised (dashboard, cases list). Past Scheduled
+    # hearings (missed, outcome never recorded) are a separate, pre-existing problem and not
+    # blocked here -- only a hearing that's still genuinely upcoming holds up the close.
+    if data.new_status in CLOSED_STATUSES:
+        pending = (
+            supabase.table("hearings").select("hearing_id")
+            .eq("case_id", case_id).eq("hearing_status", "Scheduled")
+            .gte("hearing_date", date.today().isoformat())
+            .limit(1).execute().data
+        )
+        if pending:
+            raise HTTPException(
+                status_code=400,
+                detail="This case has an upcoming scheduled hearing. Record its outcome or cancel it before closing the case.",
+            )
 
     supabase.table("cases").update({"status": data.new_status}).eq("case_id", case_id).execute()
 

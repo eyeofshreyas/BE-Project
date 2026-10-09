@@ -21,7 +21,7 @@ def _fake_supabase(lawyer_id: int, case_ids: list[int], judgement_rows: list[dic
         elif name == "case_lawyers":
             m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"case_id": cid} for cid in case_ids]
         elif name == "judgements":
-            m.select.return_value.in_.return_value.order.return_value.execute.return_value.data = judgement_rows
+            m.select.return_value.in_.return_value.order.return_value.limit.return_value.execute.return_value.data = judgement_rows
         tables[name] = m
         return m
 

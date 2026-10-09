@@ -67,6 +67,17 @@ def _relationship_exists(client_id: int, lawyer_id: int) -> bool:
     return len(rows) > 0
 
 
+def _client_suspended_for_lawyer(client_id: int, lawyer_id: int) -> bool:
+    """True if the given lawyer's own org has suspended this client -- see
+    docs/superpowers/specs/2026-09-13-per-firm-client-suspension-design.md."""
+    lawyer_rows = supabase.table("lawyers").select("user_id,users(org_id)").eq("lawyer_id", lawyer_id).execute().data
+    if not lawyer_rows or not lawyer_rows[0].get("users"):
+        return False
+    org_id = lawyer_rows[0]["users"]["org_id"]
+    rows = supabase.table("org_clients").select("is_active").eq("org_id", org_id).eq("client_id", client_id).execute().data
+    return bool(rows) and not rows[0]["is_active"]
+
+
 def _read_column(viewer_role_id: int) -> str:
     """The conversations column holding this viewer's read marker."""
     return "client_last_read_at" if viewer_role_id == CLIENT else "lawyer_last_read_at"
@@ -130,10 +141,11 @@ def _get_conversation_row(conversation_id: int) -> dict:
 
 
 def _ensure_participant(row: dict, profile: dict) -> None:
-    """Raise 403 unless the caller is the client or lawyer on this conversation."""
+    """Raise 403 unless the caller is the client or lawyer on this conversation, and (for a
+    client) their firm hasn't suspended them."""
     if profile["role_id"] == CLIENT:
         my_id = _own_client_id(profile["user_id"])
-        ok = my_id is not None and row["client_id"] == my_id
+        ok = my_id is not None and row["client_id"] == my_id and not _client_suspended_for_lawyer(my_id, row["lawyer_id"])
     elif profile["role_id"] == LAWYER:
         my_id = _own_lawyer_id(profile["user_id"])
         ok = my_id is not None and row["lawyer_id"] == my_id
@@ -163,6 +175,9 @@ def get_or_create_conversation(data: ConversationCreate, profile: dict = Depends
     if not _relationship_exists(client_id, lawyer_id):
         raise HTTPException(status_code=403, detail="You don't have a case with this person yet")
 
+    if profile["role_id"] == CLIENT and _client_suspended_for_lawyer(client_id, lawyer_id):
+        raise HTTPException(status_code=403, detail="Your access with this firm has been suspended")
+
     existing = supabase.table("conversations").select(CONVERSATIONS_SELECT) \
         .eq("client_id", client_id).eq("lawyer_id", lawyer_id).execute().data
     if existing:
@@ -181,6 +196,7 @@ def list_conversations(profile: dict = Depends(get_current_profile)):
         if my_id is None:
             return []
         rows = supabase.table("conversations").select(CONVERSATIONS_SELECT).eq("client_id", my_id).execute().data
+        rows = [r for r in rows if not _client_suspended_for_lawyer(my_id, r["lawyer_id"])]
     elif profile["role_id"] == LAWYER:
         my_id = _own_lawyer_id(profile["user_id"])
         if my_id is None:
@@ -256,11 +272,11 @@ def send_message(
         "sender_user_id": profile["user_id"],
         "body": body,
     }
-
+    uploaded_attachment_path = None
     if file is not None:
         if not _is_allowed_attachment(file.content_type):
             raise HTTPException(status_code=400, detail="Only images, video, and documents can be attached")
-        content = file.file.read()
+        content = file.file.read(MAX_ATTACHMENT_BYTES + 1)
         if not content:
             raise HTTPException(status_code=400, detail="That file is empty")
         if len(content) > MAX_ATTACHMENT_BYTES:
@@ -277,6 +293,7 @@ def send_message(
             # so the composer can show it instead of a bare "failed to send".
             logger.warning("Attachment upload failed for conversation %s: %s", conversation_id, err)
             raise HTTPException(status_code=400, detail=f"Couldn't upload that file: {err}")
+        uploaded_attachment_path = storage_path
         record |= {
             "attachment_path": storage_path,
             "attachment_name": file.filename or storage_path,
@@ -284,7 +301,12 @@ def send_message(
             "attachment_size": len(content),
         }
 
-    supabase.table("messages").insert(record).execute()
+    try:
+        supabase.table("messages").insert(record).execute()
+    except Exception:
+        if uploaded_attachment_path is not None:
+            supabase.storage.from_(ATTACHMENTS_BUCKET).remove([uploaded_attachment_path])
+        raise
 
     inserted = supabase.table("messages").select(MESSAGES_SELECT) \
         .eq("conversation_id", conversation_id).order("created_at", desc=True).limit(1).execute().data[0]

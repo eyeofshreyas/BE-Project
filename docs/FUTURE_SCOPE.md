@@ -14,19 +14,40 @@ in `cases.ecourts_raw` for future use. Two things were deliberately left out of 
 
 ### 1.1 Auto-creating hearing rows from eCourts data
 
-The eCourtsIndia single-CNR response is documented to include "per-case process,
-interim-application, transfer, and hearing-history arrays" on the district-court side,
-but the exact field names and shape weren't confirmed against a live response at
-implementation time — no API key was available yet. Guessing at a field name in a
-correctness-sensitive domain (a wrong date silently written to `hearings`) was worse
-than shipping without it.
+Field shape originally confirmed from the official docs (`https://ecourtsindia.com/api/docs`,
+v4.0) without a live API key — no account was provisioned yet at the time. An account is
+now provisioned (`ECOURTS_API_KEY` in `backend/.env`), and a live `GET
+/api/partner/case/DLST020314162024` call (2026-10-05, a disposed district-court case)
+confirms `data.courtCaseData.historyOfCaseHearings` exists at the documented nesting level,
+but with one difference from the docs example: this record's only entry had no `hearingDate`
+key at all (not even `null`) —
 
-**Unblocked by:** getting `ECOURTS_API_KEY` configured and making one real
-`GET /api/partner/case/{cnr}` call to see the actual `hearingHistory` (or equivalently
-named) field. Once confirmed, extend `sync_case_from_ecourts()` to diff that array
-against existing `hearings` rows for the case and insert any hearing eCourts knows
-about that LexFlow doesn't, following the same insert + `add_timeline_event()` pattern
-`create_hearing()` already uses in `app/controllers/hearings.py`.
+```json
+{ "judge": "Judicial Magistrate First Class-03", "businessOnDate": "2024-09-14",
+  "purposeOfListing": "Disposed" }
+```
+
+— vs. the docs example's `{ judge, businessOnDate, hearingDate, purposeOfListing }`. Whether
+`hearingDate` is omitted specifically for a disposed/single-hearing case, or the docs example
+is simply stale, is still unconfirmed — needs a live call against a CNR with multiple or
+upcoming hearings before coding against this field. High Court/Supreme Court CNR shape is
+also still unconfirmed (only a district-court CNR has been checked so far).
+
+Note this whole object sits under `data.courtCaseData`, not directly under `data` —
+`sync_case_from_ecourts()` originally read `caseStatus`/`courtCode` off the wrong level
+(always `null`/`n/a`); fixed once this was confirmed.
+
+`judge` is a free-text name string, not this app's `judges.judge_id` — there's no lookup
+or create endpoint for `judges` today (it's seed-only, see `app/controllers/reference.py`),
+so an unmatched name needs either a name-match against existing judges or a way to create
+one on the fly.
+
+**Unblocked by:** a CNR with multiple/future hearings to confirm whether `hearingDate` is
+reliably present, and a High Court/Supreme Court CNR to check the shape holds there too. Once
+confirmed, extend `sync_case_from_ecourts()` to diff `historyOfCaseHearings` against existing
+`hearings` rows for the case and insert any hearing eCourts knows about that LexFlow doesn't,
+following the same insert + `add_timeline_event()` pattern `create_hearing()` already uses in
+`app/controllers/hearings.py`.
 
 ### 1.2 Scheduled bulk sync (no manual click needed)
 
@@ -41,6 +62,46 @@ Supabase Edge Function, or APScheduler in the backend process) batching every ca
 a non-null `cnr_number` through the bulk-refresh flow, reusing `sync_case_from_ecourts()`'s
 per-case update logic rather than duplicating it.
 
+### 1.3 ~~Auto-filling filing/registration number and acts & sections~~ from eCourts
+
+`cases.filing_number`, `registration_number`, and `acts_sections` shipped as manually
+entered fields (`PATCH /cases/{id}/filing-details`) — a case's own court-assigned numbers,
+distinct from `cases.case_number` (LexFlow's internal reference) and from
+`conveyancing_matters`' registration fields (a property transaction's registration-office
+record, a different entity). The real eCourts case-status page shows all three (Filing
+Number/Date, Registration Number/Date, Under Acts/Under Sections).
+
+**Filing number / registration number: done.** A live 2026-10-05 call against
+`DLST020314162024` (see §1.1) confirmed `filingNumber`/`registrationNumber` come back as
+plain strings directly under `courtCaseData` — the same level as `caseStatus`/`courtCode`:
+
+```json
+{ "filingNumber": "31398/2024", "filingDate": "2024-08-29",
+  "registrationNumber": "30623/2024", "registrationDate": "2024-08-30" }
+```
+
+`sync_case_from_ecourts()` (`app/controllers/ecourts.py`) now writes `filing_number`/
+`registration_number` additively, same guard as `ecourts_status` — only overwrites when the
+response actually carried a value, so a manually-entered value isn't blanked by a case
+eCourts hasn't indexed yet. `filingDate`/`registrationDate` aren't stored — there's no
+column for them, only `filing_number`/`registration_number` text fields. Covered by
+`test_sync_case_fills_filing_and_registration_number` in `tests/test_ecourts.py`.
+
+**Acts & sections: wired, but best-effort.** No dedicated "Under Acts/Under Sections" field
+exists in the response — the closest (only) candidate is `caseTypeSub` (e.g.
+`"Indian Penal Code - 411,"`), which `sync_case_from_ecourts()` now writes into
+`acts_sections` with the trailing comma stripped, same additive guard as the other fields.
+It's marked with a `ponytail:` comment in the code rather than treated as confirmed, because
+the only live response checked so far (`DLST020314162024`) had a single charge — whether
+`caseTypeSub` reliably holds every charged section on a multi-charge case, comma-joined or
+some other format, is unconfirmed, and this reads like a single act+section string rather
+than the structured field this app's manual entry implies.
+
+**Upgrade condition:** a CNR with more than one charged act/section, to confirm
+`caseTypeSub`'s format holds (or find the real field if it doesn't). Until then, treat
+auto-filled `acts_sections` values as worth a lawyer's spot-check, same as any other
+eCourts-sourced field on a case eCourts hasn't fully indexed.
+
 ---
 
 ## 2. Feature gaps vs. the market (from the competitive review)
@@ -52,8 +113,8 @@ Not started. Ordered by the priority set in the market brief.
 | 1 | ~~eCourts / CNR sync~~ | Done (§1) | Manual sync only — see follow-ups above |
 | 2 | ~~Document OCR~~ | Done (§1.1 below) | Scanned PDFs and image uploads now feed the existing summarize/translate pipeline |
 | 3 | ~~E-signatures~~ | Done (§4 below) | Leegality, PDF documents only |
-| 4 | Conflict-of-interest check | Ethics-adjacent, expected by bar associations | Lower urgency than 5 |
-| 5 | Basic trust accounting / reconciliation | Table stakes at every competitor; MyCase's automated 3-way reconciliation is the bar | Lower urgency than 4 |
+| 4 | ~~Conflict-of-interest check~~ | Done (§5 below) | Firm-wide name search, MyCase-style — not Clio's full report/status workflow |
+| 5 | ~~Basic trust accounting / reconciliation~~ | Done (below) | Per-firm client ledger and 3-way reconciliation; bank balance entered by hand |
 
 ### Document OCR — how it landed
 
@@ -108,6 +169,68 @@ to keep serving it.
   distinctly, and the Documents page shows a red pill plus a "Resend" action for either,
   instead of the document looking stuck pending forever.
 
+### Conflict-of-interest check — how it landed
+
+Researched Clio's approach (a full workflow: multi-field search, flex/exact matching,
+per-result status marking, a closeable PDF report associated with a matter) against
+MyCase's (no dedicated feature at all — "conflict checking" is just their existing global
+search bar). Built the MyCase-style version: the ethical requirement is catching the match
+*before* opening the file, not generating an audit-ready report on day one.
+
+The real gap this exposed: a `case` only ever recorded **the client** — there was nowhere
+to record the **opposing party**, the single most important name a conflict check needs.
+Added `case_parties` (`case_id`, `name`, `role`) for that. `GET /conflict-check?name=...`
+(`app/controllers/conflict_check.py`) is deliberately **not** scoped to the caller's own
+cases the way every other list endpoint in this app is — it fetches every case and every
+party firm-wide and matches in Python (plain case-insensitive substring, not fuzzy/
+phonetic — fine at a small firm's scale). Scoping it would hide exactly the conflicts that
+matter: a colleague's client you'd never otherwise see. Wired into `CreateCasePage` as an
+advisory search (doesn't block case creation) and into the case detail page as a "Parties"
+card for recording the opposing party, which is what makes that name searchable for the
+*next* lawyer's check.
+
+**Left out of v1, deliberately** (Clio's fuller workflow, not needed yet):
+
+- Conflict-status marking (clear / potential / waived) per result.
+- A generated, downloadable, shareable report tied to a matter as an audit record.
+- Fuzzy/phonetic name matching — a real search index (`pg_trgm`, `similarity()`) is the
+  upgrade path if plain substring matching starts missing real matches, or the firm's data
+  grows large enough that fetching every case/party per search gets slow.
+
+### Trust accounting — how it landed
+
+Ledger in `trust_transactions`, endpoints in `app/controllers/trust.py`, a Trust account
+card on the client detail page and a Trust tab in the admin console.
+
+Two things worth knowing if you touch this:
+
+**Trust money is per firm, not per client.** A client can retain several firms (see
+`org_clients`), and each firm has its own trust bank account, so every row carries an
+`org_id` and a "balance" always means *with this firm*. The super-admin belongs to no firm
+and has to name one via `?org_id=`.
+
+**The three legs have to come from different places or the check is theatre.** Leg 1 is
+the hand-entered bank statement. Leg 3 is recomputed from `trust_transactions.amount`.
+Leg 2 is the `trust_control_totals` table — the firm's control account, one row per date,
+posted to by the `trust_guard_and_post()` trigger and never recomputed afterwards.
+Editing an amount in the database, or deleting a row, moves leg 3 and not leg 2, which is
+the entire point; derive both from the same amounts and they agree by construction no
+matter what has been tampered with.
+
+Both legs are filed under `transaction_date`, never insert order. An earlier revision
+stamped the control total onto each ledger row instead, and read leg 2 off the last row
+by date — so a deposit that cleared on the 5th but was keyed in on the 12th reported a
+gap the size of the deposit against books that were perfectly correct. Anything that
+removes ledger rows outside the API (the user-delete cascade is the only one) has to post
+a reversing entry to the control account or it reintroduces exactly that false alarm.
+
+That same trigger is where the no-negative-balance rule actually holds: the controller
+checks it too, for a clear error message, but a controller check is read-then-write and
+two concurrent disbursements both pass it.
+
+Not built: bank-feed import, multi-currency, interest on held funds, and per-client
+statements as a downloadable document.
+
 ---
 
 ## 3. Compliance (not an engineering task)
@@ -124,6 +247,189 @@ blocking continued feature work, per the [market brief](https://claude.ai/code/a
 
 Technical groundwork already in place: layered RBAC + per-object case ownership checks
 (`app/middleware/auth.py`), and an audit trail on case status changes and now eCourts
-syncs (`case_timeline`, `add_timeline_event()`). Still open: documented encryption-at-rest
-posture and a data-retention/deletion policy — engineering-led, but should be reviewed
-against the standard above, not just DPDP minimums.
+syncs (`case_timeline`, `add_timeline_event()`).
+
+### Encryption posture
+
+- **In transit** — Supabase's REST, Auth, and Storage APIs are TLS-only; this is Supabase's
+  platform guarantee, not app config. The FastAPI backend itself must be served over HTTPS in
+  production, but this repo doesn't pin a production host yet (see `SETUP.md`), so that's a
+  deployment-time requirement to confirm when one is chosen, not something the app code
+  enforces or could enforce on its own.
+- **At rest** — Supabase's underlying Postgres database and Storage buckets are encrypted at
+  rest by default (AWS-managed keys), as part of the Supabase platform. Not something this
+  app configures, and not something it could opt out of.
+- **File access control** — documents and message attachments live in private Storage
+  buckets, never a public one; every read goes through a short-lived signed URL
+  (`documents.py`'s document preview/download, `messages.py`'s `_attachment_url()`) rather
+  than a permanent link. Encryption at rest is paired with per-request, time-limited access,
+  not a bucket anyone with the URL can read forever.
+- **No application-level (field-level) encryption, deliberately.** Supabase's at-rest
+  encryption already covers the "disk or backup stolen" threat model, which is what DPDP and
+  the confidentiality standard above are actually concerned with. Encrypting specific columns
+  ourselves would need key management this app doesn't have, and would break the `ilike`/
+  full-text matching the conflict-check and judgment search rely on. Revisit only if a
+  specific field (a bank account number, a national ID) needs to stay unreadable even to
+  someone with raw database access — nothing currently stored needs that.
+
+### Data retention & deletion policy
+
+- **Active data has no automatic expiry.** Cases, documents, messages, invoices, hearings,
+  and everything else persist indefinitely once created — nothing in the app deletes them
+  by age on its own. Note: bar associations typically set a minimum retention period for
+  closed matters (often several years, varying by matter type), and nothing here encodes
+  that yet. That minimum has to come from the legal review below, not an engineering guess.
+
+- **A single document's deletion is soft, then permanent after a grace period.**
+  `delete_document()` (`app/controllers/documents.py`) sets `is_deleted`/`deleted_at`; the
+  storage object itself is only physically removed by `reap_storage.py`, run manually, after
+  a 30-day default grace period (`--days` overridable, dry-run by default). The `documents`
+  row is kept forever afterward as a tombstone — what was deleted, by whom, when — even once
+  the underlying file is gone. `reap_storage.py` isn't scheduled yet ([#17](https://github.com/eyeofshreyas/BE-Project/issues/17)), so in
+  practice the grace period only actually expires when someone runs it by hand.
+
+- **Account deletion — the mechanism behind DPDP's "right to erasure" — is a hard,
+  irreversible cascade, not a soft delete.** `delete_user_cascade()`
+  (`migrate_delete_user_cascade.sql`), reached through `DELETE /users/{id}` and gated by
+  `_assert_deletable()`:
+  - Deleting a **client** deletes their entire case tree outright — cases, hearings,
+    meetings, invoices, payments, documents (rows and storage objects), notes, timeline,
+    AI summaries, conveyancing matters, judgement references, notifications. No grace
+    period, no undo. Refused up front while the client's trust balance is above zero.
+  - Deleting a **lawyer** leaves cases alone (the client owns them, not the lawyer) — only
+    their own case assignments, notes, client-request invites, and conversations are
+    removed. Their attribution on records that survive (a case-timeline entry, a document
+    upload, a conducted meeting) is anonymized — `created_by`/`uploaded_by`/etc. set to
+    null — rather than the record itself being deleted, since it isn't this person's data
+    to take with them.
+  - A deleted client's trust-ledger detail is removed, but a reversing entry is posted to
+    `trust_control_totals` first, so the firm's aggregate books stay correct even though
+    that individual's transaction history is gone.
+  - **Gap:** the person's Supabase Auth login is *not* removed by this cascade (see the
+    correctness backlog, §4.2) — a "deleted" account can still authenticate until someone
+    removes it from the Auth dashboard by hand.
+
+- **Not covered here, and not an app-code decision:** Supabase's own backup retention (a
+  project setting, not something this codebase configures) doesn't have a stated policy
+  either. Worth a line in the same legal review once a production Supabase plan/region is
+  chosen.
+
+Still open: confirming the production backend host actually terminates TLS once one is
+chosen (a hosting-config item, not an app-code one), and setting the actual minimum
+retention period for closed matters — that number has to come from the legal review, not
+from this document.
+
+---
+
+## 4. Audit findings (2026-09-18)
+
+A read of the backend and frontend against the open issue list turned up eighteen things
+none of the existing issues covered. Unlike everything above, **these were defects, not
+deferred features.** All but §4.4 (frontend refresh token) and §4.6 (genuinely deferred,
+see below) have since been fixed — this section is kept as the record of what was found
+and closed, not as an active queue.
+
+Six were filed: [#20](https://github.com/eyeofshreyas/BE-Project/issues/20)–[#25](https://github.com/eyeofshreyas/BE-Project/issues/25),
+covered by §4.5 below. §4.1–§4.3 describe exploitable paths on a public repo and were fixed
+directly rather than filed as public issues.
+
+Step-by-step fixes, with test code, are in
+`docs/superpowers/plans/2026-09-18-audit-findings-remediation.md` (gitignored, local only).
+
+### 4.1 Money paths
+
+- ~~**Razorpay verify never binds the order to the invoice**~~ — Done. `verify_razorpay_payment()`
+  now fetches the order back and rejects the payment unless its `receipt` matches the
+  invoice's `invoice_number`, closing the gap where a captured payment for one invoice
+  could be POSTed against a different one.
+
+- ~~**Invoice `total_amount` is whatever the client sends**~~ — Done. `InvoiceCreate` now has
+  a `@model_validator(mode="after")` rejecting any `total_amount != amount + tax`.
+
+### 4.2 Correctness
+
+- ~~**The e-sign webhook isn't idempotent**~~ — Done. `app/controllers/esign.py`'s upload
+  now passes `{"upsert": "true"}`, so a Leegality redelivery overwrites the existing
+  `signed-{document_id}.pdf` instead of 500ing on it.
+
+- ~~**Org admins can preview a client delete but the delete 404s**~~ — Done.
+  `_assert_deletable()` now delegates scoping to `_assert_same_org_or_404()` instead of
+  comparing `org_id` raw, so a client's `NULL` `org_id` is handled the same way in both the
+  preview and the delete.
+
+- ~~**Deleting a user leaves their Supabase Auth account**~~ — Done.
+  `app/controllers/users.py` now calls `supabase.auth.admin.delete_user()` (matched by
+  email, listed via `auth.admin.list_users()`) after the cascade, logged but not fatal —
+  same stance as the storage cleanup beside it.
+
+- ~~**`/ai/summarize` reads soft-deleted documents**~~ — Done. `app/ml/summarize.py` now
+  filters `is_deleted=False` the same as the other two call sites.
+
+### 4.3 Resources
+
+- ~~**Message attachments are buffered in full before the size check**~~ — Done.
+  `app/controllers/messages.py` now reads `file.file.read(MAX_ATTACHMENT_BYTES + 1)`,
+  matching `documents.read_upload()`.
+
+- ~~**Every login and signup leaks an httpx connection pool**~~ — Done, closes
+  [#25](https://github.com/eyeofshreyas/BE-Project/issues/25). `new_auth_client()` is now a
+  `@contextmanager` that closes its `httpx.Client` when the call is done.
+
+- ~~**A failed `documents` insert orphans the uploaded file**~~ — Done.
+  `app/controllers/documents.py`'s `upload_document` now removes the storage object if the
+  row insert raises.
+
+### 4.4 Frontend
+
+- **The refresh token is returned, typed, and never used** — `frontend/src/api/client.ts:88`.
+  `/login` hands back `refresh_token` and `types/api.ts:13` declares it, but nothing stores
+  it and there's no `/refresh` endpoint. When the access token expires (an hour, by
+  Supabase's default) the 401 handler does `window.location.href = '/login'` — a full page
+  navigation — so every user is logged out roughly hourly, mid-task, losing whatever was in
+  the form they were filling in. The 401 handler is right; treating a routine expiry as the
+  end of a session isn't. **Fix:** a `/refresh` route plus single-flight refresh-and-replay
+  in `request()`, so six parallel dashboard 401s trigger one refresh, not six. No frontend
+  test framework exists yet (#16), so this half is verified by clicking through.
+
+### 4.5 Repo hygiene — all filed, all done in code
+
+Note: this repo's PRs target `develop`, so GitHub's closing keywords don't auto-close these
+against `main` — the issues may still show OPEN even though each fix below has landed.
+
+- ~~[#20](https://github.com/eyeofshreyas/BE-Project/issues/20) **No `LICENSE`.**~~ Done —
+  `LICENSE` exists at repo root.
+- ~~[#21](https://github.com/eyeofshreyas/BE-Project/issues/21) **No `SECURITY.md`.**~~ Done —
+  `SECURITY.md` exists at repo root.
+- ~~[#22](https://github.com/eyeofshreyas/BE-Project/issues/22) **No issue or PR templates.**~~
+  Done — `.github/ISSUE_TEMPLATE/` (`bug_report.md`, `feature_request.md`, `config.yml`) and
+  `.github/pull_request_template.md` exist.
+- ~~[#23](https://github.com/eyeofshreyas/BE-Project/issues/23) **No `CODE_OF_CONDUCT.md`.**~~
+  Done — `CODE_OF_CONDUCT.md` exists at repo root.
+- ~~[#24](https://github.com/eyeofshreyas/BE-Project/issues/24) **No `frontend/.env.example`.**~~
+  Done — `frontend/.env.example` exists.
+
+### 4.6 Genuinely deferred — these have real triggers
+
+Unlike the rest of §4, these two are correct as written and shouldn't be touched
+speculatively. Both rewrites are wide and land on hot paths.
+
+- **Case scoping expands to an unbounded `IN` list.** `get_scoped_case_ids()`
+  (`app/middleware/auth.py:58`) materialises every visible case id, and callers pass the
+  whole set to `.in_()` (`documents.py:56`, `billing.py:94`, ~6 others). PostgREST puts
+  those ids in the query string, so this hits a URL-length limit — as a 414 on every list
+  page at once, not a gradual slowdown. The fix is to push scoping into the query: an
+  `org_id` filter for admins, a view or RPC for the lawyer/client joins
+  (`migrate_delete_user_cascade.sql` is the precedent for that kind of SQL function).
+  **Unblocked by:** a firm's case count passing roughly a thousand, or a 414 / oversized-URL
+  error actually appearing in logs.
+
+- **Every request costs a Supabase Auth round trip.** `supabase.auth.get_user(token)`
+  (`app/middleware/auth.py:26`) validates a *signed* JWT over the network, then a `users`
+  select loads the profile. A dashboard mount fires ~6 parallel requests, so that's 12
+  extra calls per page load, and it's the reason the 503 branch in that function has to
+  exist at all. Verifying locally against the project's JWKS removes them. Keep the profile
+  select regardless — `is_active` and `role_id` are LexFlow's own state, and a suspended
+  user must stop working immediately. **Unblocked by:** latency actually being complained
+  about, or Auth flakiness showing up as 503s in logs. `CONTRIBUTING.md` §3 lists
+  `middleware/auth.py` under "don't relax these" — this needs the full suite green and a
+  careful review, not a quick patch.

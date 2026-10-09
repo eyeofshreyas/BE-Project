@@ -50,3 +50,22 @@ def test_an_oversized_file_is_not_fully_buffered():
     with pytest.raises(HTTPException):
         read_upload(UploadFile(filename="big.mp4", file=backing))
     assert backing.max_read == MAX_DOCUMENT_BYTES + 1
+
+
+def test_an_executable_is_refused():
+    """The browser's accept attribute is only a hint -- an .exe posted straight at the API used
+    to land in the case file and in storage."""
+    with pytest.raises(HTTPException) as exc:
+        read_upload(UploadFile(filename="payload.exe", file=io.BytesIO(b"MZ\x90\x00")))
+    assert exc.value.status_code == 400
+
+
+def test_a_file_with_no_extension_is_refused():
+    with pytest.raises(HTTPException) as exc:
+        read_upload(UploadFile(filename="noextension", file=io.BytesIO(b"data")))
+    assert exc.value.status_code == 400
+
+
+def test_the_document_types_the_pickers_offer_are_allowed():
+    for name in ("brief.PDF", "agreement.docx", "scan.jpeg", "walkthrough.mp4"):
+        assert read_upload(UploadFile(filename=name, file=io.BytesIO(b"data"))) == b"data"

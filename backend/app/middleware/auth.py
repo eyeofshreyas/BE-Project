@@ -12,11 +12,16 @@ logger = logging.getLogger(__name__)
 ADMIN = 1
 LAWYER = 2
 CLIENT = 3
+SUPER_ADMIN = 4
 
 
-def get_current_user(authorization: str = Header(...)):
-    """Verify the Bearer token against Supabase Auth. 401 if rejected, 503 if Supabase Auth is
-    unreachable. Calls: `supabase.auth.get_user()`. Used directly only by main.py's /protected route."""
+def get_current_user(authorization: str | None = Header(None)):
+    """Verify the Bearer token against Supabase Auth. 401 if missing or rejected, 503 if Supabase
+    Auth is unreachable. Calls: `supabase.auth.get_user()`. Used directly only by main.py's
+    /protected route. Header is optional so a missing one 401s like a bad one, rather than
+    falling through to FastAPI's 422 for a missing required header."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     token = authorization.replace("Bearer ", "")
     try:
         user = supabase.auth.get_user(token)
@@ -33,7 +38,7 @@ def get_current_user(authorization: str = Header(...)):
 def get_current_profile(current_user=Depends(get_current_user)):
     """Look up the LexFlow `users` row for the verified user's email; 401 if none, 403 if inactive.
     Calls: `get_current_user()`. The dependency almost every route uses."""
-    rows = supabase.table("users").select("user_id,role_id,full_name,email,is_active").eq("email", current_user.email).execute().data
+    rows = supabase.table("users").select("user_id,role_id,full_name,email,is_active,org_id").eq("email", current_user.email).execute().data
     if not rows:
         raise HTTPException(status_code=401, detail="No LexFlow profile for this account")
     if not rows[0]["is_active"]:
@@ -52,16 +57,20 @@ def require_roles(*allowed_role_ids: int):
 
 
 def get_scoped_case_ids(profile: dict) -> set[int] | None:
-    """Case IDs this profile may see. None means unrestricted (admin only)."""
-    if profile["role_id"] == ADMIN:
+    """Case IDs this profile may see. None means unrestricted (super-admin only)."""
+    if profile["role_id"] == SUPER_ADMIN:
         return None
+
+    if profile["role_id"] == ADMIN:
+        case_rows = supabase.table("cases").select("case_id").eq("org_id", profile["org_id"]).execute().data
+        return {row["case_id"] for row in case_rows}
 
     if profile["role_id"] == LAWYER:
         lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
         if not lawyer_rows:
             return set()
         # is_active tracks current case_lawyers assignment (see cases.py's
-        # _active_lawyer_name) -- a lawyer taken off a case loses access to it.
+        # _active_case_lawyers) -- a lawyer taken off a case loses access to it.
         case_rows = (
             supabase.table("case_lawyers")
             .select("case_id")
@@ -76,8 +85,14 @@ def get_scoped_case_ids(profile: dict) -> set[int] | None:
         client_rows = supabase.table("clients").select("client_id").eq("user_id", profile["user_id"]).execute().data
         if not client_rows:
             return set()
-        case_rows = supabase.table("cases").select("case_id").eq("client_id", client_rows[0]["client_id"]).execute().data
-        return {row["case_id"] for row in case_rows}
+        client_id = client_rows[0]["client_id"]
+        case_rows = supabase.table("cases").select("case_id,org_id").eq("client_id", client_id).execute().data
+        # A firm can suspend its own relationship with a client without affecting that
+        # client's other firms -- see docs/superpowers/specs/2026-09-13-per-firm-client-suspension-design.md.
+        # Absence of an org_clients row means active; no backfill needed.
+        suspended_rows = supabase.table("org_clients").select("org_id").eq("client_id", client_id).eq("is_active", False).execute().data
+        suspended_org_ids = {row["org_id"] for row in suspended_rows}
+        return {row["case_id"] for row in case_rows if row["org_id"] not in suspended_org_ids}
 
     return set()
 

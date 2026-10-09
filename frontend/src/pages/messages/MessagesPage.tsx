@@ -11,7 +11,7 @@ import styles from './MessagesPage.module.css'
 
 const MUTED = '#6E6759'
 const CLIENT_ROLE_ID = 3
-const POLL_MS = 12000
+const POLL_MS = 4000
 
 function initialsOf(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
@@ -115,12 +115,21 @@ export default function MessagesPage() {
   const [listError, setListError] = useState('')
   const [search, setSearch] = useState('')
   const autoOpened = useRef(false)
+  // On a phone the list and chat panes can't both fit -- show one at a time. Defaults to
+  // the chat pane only when the user arrived via a direct link to a conversation; otherwise
+  // they land on the inbox list first, same as any messaging app.
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>(conversationId ? 'chat' : 'list')
 
   const [conversation, setConversation] = useState<ConversationDetail | null>(null)
   const [threadError, setThreadError] = useState('')
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [attachment, setAttachment] = useState<File | null>(null)
+  // `pendingDraft` renders the optimistic "Sending…" bubble while sendMessage() is in
+  // flight; `justSentId` marks the most recently confirmed own message so its bubble
+  // reads "Sent" for a beat instead of jumping straight to a bare timestamp.
+  const [pendingDraft, setPendingDraft] = useState<{ body: string; attachmentName?: string } | null>(null)
+  const [justSentId, setJustSentId] = useState<number | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -161,6 +170,8 @@ export default function MessagesPage() {
     let cancelled = false
     setConversation(null)
     setThreadError('')
+    setPendingDraft(null)
+    setJustSentId(null)
     function load() {
       getConversation(Number(conversationId))
         .then((c) => {
@@ -186,7 +197,7 @@ export default function MessagesPage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' })
-  }, [conversation?.messages.length])
+  }, [conversation?.messages.length, pendingDraft])
 
   async function handleSend() {
     const body = draft.trim()
@@ -195,10 +206,12 @@ export default function MessagesPage() {
     setSending(true)
     setDraft('')
     setAttachment(null)
+    setPendingDraft({ body, attachmentName: file?.name })
     try {
       const message = await sendMessage(Number(conversationId), body, file)
       setThreadError('')
       setConversation((prev) => (prev ? { ...prev, messages: [...prev.messages, message] } : prev))
+      setJustSentId(message.id)
       const preview = message.body || message.attachment_name || 'Attachment'
       setConversations((prev) => prev.map((c) => (c.id === Number(conversationId) ? { ...c, last_message: preview, last_message_at: message.created_at } : c)))
     } catch (err) {
@@ -207,6 +220,7 @@ export default function MessagesPage() {
       setThreadError(err instanceof Error ? err.message : 'Failed to send your message.')
     } finally {
       setSending(false)
+      setPendingDraft(null)
     }
   }
 
@@ -221,7 +235,7 @@ export default function MessagesPage() {
 
       {!listError && (
           <div className={styles.split}>
-            <div className={styles.threadList}>
+            <div className={`${styles.threadList} ${mobileView === 'chat' ? styles.hiddenMobile : ''}`}>
               <div className={styles.threadListHead}>
                 <div className={styles.threadListTitle}>Messages</div>
                 <div className={styles.threadListCount}>{loadingList ? 'Loading…' : `${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`}</div>
@@ -237,7 +251,7 @@ export default function MessagesPage() {
                   <div
                     key={c.id}
                     className={`${styles.threadRow} ${String(c.id) === conversationId ? styles.active : ''}`}
-                    onClick={() => navigate(`/messages/${c.id}`)}
+                    onClick={() => { navigate(`/messages/${c.id}`); setMobileView('chat') }}
                   >
                     <div className={styles.avatar}>{c.other_party_name ? initialsOf(c.other_party_name) : '—'}</div>
                     <div className={styles.threadMeta}>
@@ -256,7 +270,7 @@ export default function MessagesPage() {
               </div>
             </div>
 
-            <div className={styles.chatPane}>
+            <div className={`${styles.chatPane} ${mobileView === 'list' ? styles.hiddenMobile : ''}`}>
               {!conversationId || !conversation ? (
                 <div className={styles.chatEmpty}>
                   <div className={styles.chatEmptyIcon}><Icon name="message-circle" size={21} color={MUTED} /></div>
@@ -265,6 +279,9 @@ export default function MessagesPage() {
               ) : (
                 <>
                   <div className={styles.chatHead}>
+                    <div className={styles.backBtn} onClick={() => setMobileView('list')} title="Back to conversations">
+                      <span style={{ display: 'flex', transform: 'rotate(90deg)' }}><Icon name="chevron-down" size={18} color={MUTED} /></span>
+                    </div>
                     <div className={styles.avatar}>{conversation.other_party_name ? initialsOf(conversation.other_party_name) : '—'}</div>
                     <div>
                       <div className={styles.chatName}>{conversation.other_party_name ?? 'Unknown'}</div>
@@ -283,14 +300,22 @@ export default function MessagesPage() {
                               <div key={m.id} className={`${styles.bubble} ${m.attachment_url && !m.body ? styles.mediaOnly : ''}`}>
                                 {m.attachment_url && <Attachment message={m} />}
                                 {m.body}
-                                <span className={styles.bubbleTime}>{formatBubbleTime(m.created_at)}</span>
+                                <span className={styles.bubbleTime}>{m.id === justSentId ? 'Sent · ' : ''}{formatBubbleTime(m.created_at)}</span>
                               </div>
                             ))}
                           </div>
                         </Fragment>
                       ))}
-                      {conversation.messages.length === 0 && (
+                      {conversation.messages.length === 0 && !pendingDraft && (
                         <div className={styles.emptyThread}>No messages yet — say hello.</div>
+                      )}
+                      {pendingDraft && (
+                        <div className={`${styles.bubbleGroup} ${styles.mine}`}>
+                          <div className={styles.bubble} style={{ opacity: 0.65 }}>
+                            {pendingDraft.attachmentName && !pendingDraft.body ? pendingDraft.attachmentName : pendingDraft.body}
+                            <span className={styles.bubbleTime}>Sending…</span>
+                          </div>
+                        </div>
                       )}
                       <div ref={bottomRef} />
                     </div>

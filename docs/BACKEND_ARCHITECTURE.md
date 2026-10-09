@@ -62,13 +62,13 @@ get_current_profile(current_user)        looks up the LexFlow `users` row for
 require_roles(*role_ids)  get_scoped_case_ids(profile)  ensure_case_access(case_id, profile)
 checks *what* the caller   returns the set of case_ids   raises 403 if case_id isn't in
 is (ADMIN=1/LAWYER=2/      this profile may see (None    get_scoped_case_ids(profile) --
-CLIENT=3). Does NOT        = unrestricted, admin only).  i.e. closes the gap require_roles
-check *which* records      A lawyer's set = case_lawyers  leaves open: role-correct but
-they may touch.            rows with is_active=True;      not authorized for *this*
-                           a client's = cases for their    specific case/invoice/hearing/
-                           client_id.                      etc. Use whenever a case_id
-                                                            the caller already supplied
-                                                            (path param, body field) needs
+CLIENT=3/SUPER_ADMIN=4).   = unrestricted, super-admin    i.e. closes the gap require_roles
+Does NOT check *which*     only). An org admin's set =    leaves open: role-correct but
+records they may touch.    cases for their own org_id;    not authorized for *this*
+                           a lawyer's = case_lawyers       specific case/invoice/hearing/
+                           rows with is_active=True;       etc. Use whenever a case_id
+                           a client's = cases for their    the caller already supplied
+                           client_id.                      (path param, body field) needs
                                                             a per-record check.
 ```
 
@@ -77,7 +77,8 @@ Which controllers use which:
 - **`require_roles` only** -- routes with no per-record ownership to check,
   just a role gate: `users.py` (admin-only user management; `update_own_profile`
   uses `get_current_profile` alone, since a user editing their own row needs no
-  role at all), `admin.py` (platform-wide stats/activity/analytics/settings),
+  role at all), `admin.py` (stats/activity/analytics/settings -- org-scoped
+  for ADMIN, platform-wide for SUPER_ADMIN),
   `client_requests.py`'s `send_client_request`/`respond_client_request`
   (ownership is checked by hand against `lawyer_id`/`client_id` instead,
   since there's no case yet), `clients.py`'s `list_clients`.
@@ -89,7 +90,8 @@ Which controllers use which:
   already has a `case_id`) -- `create_invoice`, `create_hearing`,
   `create_meeting`, `create_judgement`, `create_expense`, `add_case_note`,
   `update_case_note`, `delete_case_note`, `change_case_status`,
-  `unassign_lawyer`, `upload_document`, `delete_document`, and both
+  `add_lawyer_to_case`, `remove_lawyer_from_case`, `list_available_case_lawyers`,
+  `upload_document`, `delete_document`, and both
   `case_ai_summary.py` handlers. `conveyancing.py`'s `_ensure_matter_access` and
   `documents.py`/`billing.py`/`hearings.py`/`meetings.py`'s internal
   `_get_*` helpers resolve a non-case ID (`matter_id`, `document_id`,
@@ -174,7 +176,30 @@ into `case_ai_summaries`.
   status is trusted from the browser. Both 500 via `_razorpay_auth()` if
   `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are unset; the rest of the app runs
   fine without them.
-- **SMTP** (`app/core/email.py`) -- invoice reminders and password mail.
+- **SMTP** (`app/core/email.py`) -- invoice reminders, password mail, and lawyer/client
+  invites. Invite emails (`admin.invite_lawyer`, `client_requests.send_client_request`) send
+  via FastAPI `BackgroundTasks` after the response goes out, since the invite row is already
+  committed and there's nothing left for the caller to wait on.
+
+## Background jobs (`BackgroundTasks`)
+
+Two request-thread-blocking calls -- eCourts sync and document-triggered `/ai/summarize` --
+were moved to FastAPI `BackgroundTasks` jobs: the endpoint validates, writes a pending/syncing
+status, queues the task, and returns immediately. The frontend polls the existing read
+endpoint for the result. There's no request left to raise an `HTTPException` to once the
+background function runs, so failures are written into the same status column instead of
+returned to a caller.
+
+- **eCourts sync** (`controllers/ecourts.py`) -- `sync_case_from_ecourts` sets
+  `cases.ecourts_sync_status = "syncing"` and queues `_run_ecourts_sync`; poll `GET /cases`
+  for `ecourts_sync_status` to flip to `"idle"` (success, see `ecourts_status`/`ecourts_raw`)
+  or `"error"` (see `ecourts_sync_error`).
+- **Document summarize** (`app/ml/summarize.py`) -- `summarize_text` only queues a job when
+  `document_id` is given and no text was posted (text extraction + OCR + model inference is
+  the slow path; pasted text is still answered inline). It upserts `ai_summaries.status =
+  "pending"` and queues `_run_summarize_job`; poll `GET /documents/{id}/summary` for `status`
+  to flip to `"done"` (see `summary_text`) or `"error"` (see `error_message`).
+- Both jobs' status columns were added by `migrate_async_jobs.sql`.
 
 ## Domain -> route -> controller -> model map
 
@@ -189,8 +214,10 @@ into `case_ai_summaries`.
 | Conveyancing matters | `routes/conveyancing.py` | `controllers/conveyancing.py` | `models/conveyancing.py` |
 | Documents | `routes/documents.py` | `controllers/documents.py` | `models/documents.py` |
 | Billing (invoices/payments/expenses) | `routes/billing.py` | `controllers/billing.py` | `models/billing.py` |
+| Trust accounting (client money/reconciliation) | `routes/trust.py` | `controllers/trust.py` | `models/trust.py` |
 | Meetings | `routes/meetings.py` | `controllers/meetings.py` | `models/meetings.py` |
 | Hearings | `routes/hearings.py` | `controllers/hearings.py` | `models/hearings.py` |
+| eCourts CNR sync (`/cases/:id/sync-ecourts`) | `routes/cases.py` | `controllers/ecourts.py` | `models/cases.py` |
 | Judgements | `routes/judgements.py` | `controllers/judgements.py` | `models/judgements.py` |
 | Reference data (courts/case types/judges/roles/document types) | `routes/reference.py` | `controllers/reference.py` | `models/reference.py` |
 | Users (admin roster, edit, hard delete + self-service profile) | `routes/users.py` | `controllers/users.py` | `models/users.py` |

@@ -3,23 +3,29 @@
 import hashlib
 import hmac
 from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
 
 import httpx
 from fastapi import Depends, HTTPException
 from app.core.config import RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
+from app.core.money import money, to_float
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.billing import (
     InvoiceSummary, InvoiceCreate, PaymentSummary, PaymentCreate, ExpenseSummary, ExpenseCreate,
     RazorpayOrder, RazorpayVerify,
 )
 
 RAZORPAY_API = "https://api.razorpay.com/v1"
+PLATFORM_FEE_RATE = Decimal("0.005")
 RAZORPAY_METHOD_LABELS = {"card": "Credit/Debit Card", "netbanking": "Net Banking", "upi": "UPI", "wallet": "Wallet", "emi": "EMI"}
+
+# ponytail: hard cap, not real pagination -- same reasoning as cases.MAX_CASES.
+MAX_INVOICES = 1000
 
 INVOICES_SELECT = (
     "invoice_id,invoice_number,amount,tax,total_amount,issue_date,due_date,payment_status,remarks,case_id,"
-    "cases(case_number,clients(users(full_name)))"
+    "cases(case_number,org_id,clients(users(full_name)))"
 )
 
 PAYMENTS_SELECT = "payment_id,invoice_id,amount,payment_method,transaction_reference,payment_date,payment_status"
@@ -46,8 +52,24 @@ def _to_expense_summary(row: dict) -> dict:
     }
 
 
-def _invoice_status_for(total_paid: float, total_amount: float) -> str:
+def _total_paid(invoice_id: int) -> Decimal:
+    """Sum of an invoice's Completed payments, as an exact Decimal -- summing the raw floats
+    Supabase returns would drift after enough rows."""
+    paid = supabase.table("payments").select("amount").eq("invoice_id", invoice_id).eq("payment_status", "Completed").execute().data
+    return sum((money(p["amount"]) for p in paid), Decimal("0"))
+
+
+def _amount_due(invoice_id: int, total_amount) -> Decimal:
+    """What's still outstanding on an invoice. Every path that collects money goes through
+    this -- `create_payment()`, `create_razorpay_order()`, and trust's
+    `pay_invoice_from_trust()` -- so none of them can charge against the full total when
+    part of it has already been paid. Calls: `_total_paid()`."""
+    return money(total_amount) - _total_paid(invoice_id)
+
+
+def _invoice_status_for(total_paid: Decimal, total_amount) -> str:
     """Derive payment_status ("Paid"/"Partially Paid"/"Pending") from amount paid vs. owed."""
+    total_amount = money(total_amount)
     if total_paid >= total_amount:
         return "Paid"
     if total_paid > 0:
@@ -55,9 +77,28 @@ def _invoice_status_for(total_paid: float, total_amount: float) -> str:
     return "Pending"
 
 
-def _to_invoice_summary(row: dict) -> dict:
-    """Shape a raw `invoices` row (joined with cases/clients) into the InvoiceSummary dict."""
+def _org_payment_accounts(org_ids: set[int]) -> dict[int, dict]:
+    """Map each org_id to its {org_id, razorpay_account_id, razorpay_account_status}
+    platform_settings row. Batched so listing N invoices costs one extra query, not N --
+    callers needing a single org's row just pass a one-element set."""
+    if not org_ids:
+        return {}
+    rows = supabase.table("platform_settings").select(
+        "org_id,razorpay_account_id,razorpay_account_status"
+    ).in_("org_id", list(org_ids)).execute().data
+    return {r["org_id"]: r for r in rows}
+
+
+def _to_invoice_summary(row: dict, accounts: dict[int, dict] | None = None) -> dict:
+    """Shape a raw `invoices` row (joined with cases/clients/org) into the InvoiceSummary dict.
+    `accounts` is the org_id -> platform_settings row map from `_org_payment_accounts()`;
+    carries `org_id`/`razorpay_account_id` too for create_razorpay_order's internal use --
+    response_model=InvoiceSummary drops them before they reach the wire, since that model
+    doesn't declare them."""
+    accounts = accounts or {}
     case = row.get("cases")
+    org_id = case["org_id"] if case else None
+    account = accounts.get(org_id) if org_id is not None else None
     return {
         "id": row["invoice_id"],
         "invoice_number": row["invoice_number"],
@@ -69,23 +110,29 @@ def _to_invoice_summary(row: dict) -> dict:
         "issue_date": row["issue_date"],
         "due_date": row["due_date"],
         "payment_status": row["payment_status"],
+        "razorpay_enabled": bool(account and account["razorpay_account_status"] == "activated"),
+        "org_id": org_id,
+        "razorpay_account_id": account["razorpay_account_id"] if account else None,
     }
 
 
 # shared fetch+scope-check used by get_invoice, list_invoice_payments, and
 # create_payment so each doesn't reimplement the 404/403 checks.
 def _get_invoice(invoice_id: int, case_ids: set[int] | None = None) -> dict:
-    """Fetch one invoice by ID; 404 if missing, 403 if outside case_ids. Calls: `_to_invoice_summary()`."""
+    """Fetch one invoice by ID; 404 if missing, 403 if outside case_ids. Calls: `_to_invoice_summary()`, `_org_payment_accounts()`."""
     rows = supabase.table("invoices").select(INVOICES_SELECT).eq("invoice_id", invoice_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Invoice not found")
     if case_ids is not None and rows[0]["case_id"] not in case_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this invoice")
-    return _to_invoice_summary(rows[0])
+    case = rows[0].get("cases")
+    org_id = case["org_id"] if case else None
+    accounts = _org_payment_accounts({org_id} if org_id is not None else set())
+    return _to_invoice_summary(rows[0], accounts)
 
 
 def list_invoices(profile: dict = Depends(get_current_profile)):
-    """List invoices for cases in the caller's scope. Calls: `get_scoped_case_ids()`, `_to_invoice_summary()`."""
+    """List invoices for cases in the caller's scope. Calls: `get_scoped_case_ids()`, `_to_invoice_summary()`, `_org_payment_accounts()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None and not case_ids:
         return []
@@ -93,8 +140,10 @@ def list_invoices(profile: dict = Depends(get_current_profile)):
     query = supabase.table("invoices").select(INVOICES_SELECT)
     if case_ids is not None:
         query = query.in_("case_id", list(case_ids))
-    rows = query.order("invoice_id", desc=True).execute().data
-    return [_to_invoice_summary(row) for row in rows]
+    rows = query.order("invoice_id", desc=True).limit(MAX_INVOICES).execute().data
+    org_ids = {r["cases"]["org_id"] for r in rows if r.get("cases")}
+    accounts = _org_payment_accounts(org_ids)
+    return [_to_invoice_summary(row, accounts) for row in rows]
 
 
 def get_invoice(invoice_id: int, profile: dict = Depends(get_current_profile)):
@@ -102,7 +151,7 @@ def get_invoice(invoice_id: int, profile: dict = Depends(get_current_profile)):
     return _get_invoice(invoice_id, get_scoped_case_ids(profile))
 
 
-def send_invoice_reminder(invoice_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def send_invoice_reminder(invoice_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Notify the invoice's client (in-app) that payment is due. Calls: `ensure_case_access()`."""
     rows = supabase.table("invoices").select(
         "invoice_number,total_amount,case_id,cases(client_id,case_number)"
@@ -132,7 +181,7 @@ def send_invoice_reminder(invoice_id: int, profile: dict = Depends(require_roles
     return {"message": "Reminder sent."}
 
 
-def create_invoice(data: InvoiceCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_invoice(data: InvoiceCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Create an invoice for a case the caller has access to. Calls: `ensure_case_access()`, `_get_invoice()`."""
     ensure_case_access(data.case_id, profile)
     row = supabase.table("invoices").insert({
@@ -155,10 +204,18 @@ def list_invoice_payments(invoice_id: int, profile: dict = Depends(get_current_p
     return supabase.table("payments").select(PAYMENTS_SELECT).eq("invoice_id", invoice_id).order("payment_date", desc=True).execute().data
 
 
-def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Record a payment against an invoice the caller has access to, then recompute and persist
     the invoice's payment_status. Calls: `_get_invoice()`, `get_scoped_case_ids()`, `_invoice_status_for()`."""
-    _get_invoice(data.invoice_id, get_scoped_case_ids(profile))
+    invoice = _get_invoice(data.invoice_id, get_scoped_case_ids(profile))
+    # A payment can't exceed what's still outstanding -- without this the invoice silently
+    # goes to Paid on any amount, and the books show more collected than was ever billed.
+    due = _amount_due(data.invoice_id, invoice["total_amount"])
+    if data.payment_status == "Completed" and money(data.amount) > due:
+        raise HTTPException(
+            status_code=400,
+            detail=f"That is more than this invoice has outstanding ({due:.2f}).",
+        )
     payment = supabase.table("payments").insert(data.model_dump()).execute().data[0]
     _recompute_invoice_status(data.invoice_id)
     return payment
@@ -166,13 +223,11 @@ def create_payment(data: PaymentCreate, profile: dict = Depends(require_roles(AD
 
 def _recompute_invoice_status(invoice_id: int) -> None:
     """Recompute and persist an invoice's payment_status from its Completed payments.
-    Calls: `_invoice_status_for()`."""
+    Calls: `_total_paid()`, `_invoice_status_for()`."""
     invoice = supabase.table("invoices").select("total_amount").eq("invoice_id", invoice_id).execute().data
     if not invoice:
         return
-    paid = supabase.table("payments").select("amount").eq("invoice_id", invoice_id).eq("payment_status", "Completed").execute().data
-    total_paid = sum(p["amount"] for p in paid)
-    new_status = _invoice_status_for(total_paid, invoice[0]["total_amount"])
+    new_status = _invoice_status_for(_total_paid(invoice_id), invoice[0]["total_amount"])
     supabase.table("invoices").update({"payment_status": new_status}).eq("invoice_id", invoice_id).execute()
 
 
@@ -185,20 +240,28 @@ def _razorpay_auth() -> tuple[str, str]:
 
 def create_razorpay_order(invoice_id: int, profile: dict = Depends(get_current_profile)):
     """Start a Razorpay checkout for an invoice's outstanding balance (total minus Completed
-    payments so far). The client-side Checkout.js modal opens against the returned order_id;
-    `key_id` is Razorpay's public key, safe to hand to the browser. Calls: `_get_invoice()`,
-    `_razorpay_auth()`."""
+    payments so far), split via Route so 99.5% transfers to the firm's linked account and 0.5%
+    stays with the platform. 403s if the firm's linked account isn't activated yet -- there's
+    nowhere for the firm's share to go otherwise. `key_id` is Razorpay's public key, safe to
+    hand to the browser. Calls: `_get_invoice()`, `_razorpay_auth()`."""
     key_id, key_secret = _razorpay_auth()
     invoice = _get_invoice(invoice_id, get_scoped_case_ids(profile))
-    paid = supabase.table("payments").select("amount").eq("invoice_id", invoice_id).eq("payment_status", "Completed").execute().data
-    due = invoice["total_amount"] - sum(p["amount"] for p in paid)
+    due = _amount_due(invoice_id, invoice["total_amount"])
     if due <= 0:
         raise HTTPException(status_code=400, detail="This invoice is already paid.")
+    if not invoice["razorpay_enabled"]:
+        raise HTTPException(status_code=403, detail="Payments aren't enabled yet for this firm.")
 
+    paise = int((due * 100).to_integral_value(rounding=ROUND_HALF_UP))
+    fee_paise = int((Decimal(paise) * PLATFORM_FEE_RATE).to_integral_value(rounding=ROUND_HALF_UP))
+    firm_paise = paise - fee_paise
     resp = httpx.post(
         f"{RAZORPAY_API}/orders",
         auth=(key_id, key_secret),
-        json={"amount": round(due * 100), "currency": "INR", "receipt": invoice["invoice_number"]},
+        json={
+            "amount": paise, "currency": "INR", "receipt": invoice["invoice_number"],
+            "transfers": [{"account": invoice["razorpay_account_id"], "amount": firm_paise, "currency": "INR"}],
+        },
         timeout=15,
     )
     if resp.status_code >= 400:
@@ -230,19 +293,44 @@ def verify_razorpay_payment(invoice_id: int, data: RazorpayVerify, profile: dict
     if payment.get("order_id") != data.razorpay_order_id or payment.get("status") != "captured":
         raise HTTPException(status_code=400, detail="Payment was not captured.")
 
+    # The signature and the payment fetch only prove this order/payment pair is Razorpay's --
+    # not that the order was raised for *this* invoice. create_razorpay_order() stamps the
+    # invoice_number as the order's receipt, so read it back and bind the two.
+    order_resp = httpx.get(f"{RAZORPAY_API}/orders/{data.razorpay_order_id}", auth=(key_id, key_secret), timeout=15)
+    if order_resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Could not confirm order with Razorpay.")
+    if order_resp.json().get("receipt") != invoice["invoice_number"]:
+        raise HTTPException(status_code=400, detail="This payment was not made for this invoice.")
+
     # idempotency: a retried/double-submitted verify call must not double-record the same
     # Razorpay payment (e.g. the client re-firing after a dropped response).
     existing = supabase.table("payments").select(PAYMENTS_SELECT).eq("transaction_reference", data.razorpay_payment_id).execute().data
     if existing:
         return existing[0]
 
+    # The transfer is what actually moves the firm's share -- fetched independently rather
+    # than trusted from the order's own `transfers` request, since Razorpay is the only source
+    # of truth for whether it actually went through. A failed fetch doesn't block recording
+    # the payment itself (the client genuinely paid); it's flagged for manual reconciliation.
+    try:
+        transfers_resp = httpx.get(f"{RAZORPAY_API}/payments/{data.razorpay_payment_id}/transfers", auth=(key_id, key_secret), timeout=15)
+        transfer = (transfers_resp.json().get("items") or [{}])[0] if transfers_resp.status_code < 400 else {}
+    except httpx.HTTPError:
+        transfer = {}
+    firm_amount_paise = transfer.get("amount")
+    platform_fee_paise = (payment["amount"] - firm_amount_paise) if firm_amount_paise is not None else None
+    transfer_status = transfer.get("status", "failed")
+
     row = supabase.table("payments").insert({
         "invoice_id": invoice_id,
-        "amount": payment["amount"] / 100,
+        "amount": to_float(money(payment["amount"]) / 100),
         "payment_method": RAZORPAY_METHOD_LABELS.get(payment.get("method"), payment.get("method")),
         "transaction_reference": data.razorpay_payment_id,
         "payment_date": datetime.now(timezone.utc).date().isoformat(),
         "payment_status": "Completed",
+        "platform_fee_paise": platform_fee_paise,
+        "firm_amount_paise": firm_amount_paise,
+        "transfer_status": transfer_status,
     }).execute().data[0]
     _recompute_invoice_status(invoice_id)
     return row
@@ -266,7 +354,7 @@ def list_expenses(matter_id: int | None = None, profile: dict = Depends(get_curr
     return [_to_expense_summary(row) for row in rows]
 
 
-def create_expense(data: ExpenseCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_expense(data: ExpenseCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Log an expense for a matter whose owning case the caller has access to.
     Calls: `ensure_case_access()`, `_to_expense_summary()`."""
     matter_rows = supabase.table("conveyancing_matters").select("case_id").eq("matter_id", data.matter_id).execute().data

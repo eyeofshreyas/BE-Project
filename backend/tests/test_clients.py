@@ -4,7 +4,7 @@
 from unittest.mock import MagicMock, patch
 
 from app.middleware import auth
-from app.controllers.clients import list_clients
+from app.controllers.clients import list_clients, list_my_suspensions
 
 
 def _fake_supabase(lawyer_id: int, case_ids: list[int], case_rows: list[dict], client_rows: list[dict], status_rows: list[dict]):
@@ -92,7 +92,77 @@ def test_lawyer_sees_only_their_clients_with_active_case_counts():
         assert result[0]["pending_amount"] == 5000
 
 
+def test_org_admin_only_sees_clients_with_a_case_in_their_org():
+    """Verifies an org admin's client list is built from cases in their own org, not every client platform-wide. Exercises: `GET /clients` (`clients.list_clients()`)."""
+    profile = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
+    client_row = {
+        "client_id": 7, "address": "1 Main St", "preferred_language": "English",
+        "users": {"full_name": "Test Client", "email": "c@example.com", "phone": "123"},
+    }
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "cases":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 7}]
+        elif name == "clients":
+            m.select.return_value.in_.return_value.execute.return_value.data = [client_row]
+        elif name == "invoices":
+            m.select.return_value.in_.return_value.execute.return_value.data = []
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.clients.supabase", fake):
+        result = list_clients(profile)
+    assert [c["id"] for c in result] == [7]
+    tables["cases"].select.return_value.eq.assert_called_once_with("org_id", 7)
+
+
+def test_list_my_suspensions_returns_only_suspended_firm_names():
+    """Verifies the client sees the names of firms that have suspended them, not every firm
+    they've ever worked with. Exercises: `GET /clients/me/suspensions`
+    (`clients.list_my_suspensions()`)."""
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"client_id": 7}]
+        elif name == "org_clients":
+            m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [
+                {"organizations": {"name": "Suspended Firm LLC"}}
+            ]
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    profile = {"role_id": auth.CLIENT, "user_id": 1}
+    with patch("app.controllers.clients.supabase", fake):
+        result = list_my_suspensions(profile)
+    assert result == [{"firm_name": "Suspended Firm LLC"}]
+
+
+def test_list_my_suspensions_empty_for_client_with_no_profile_row():
+    """Verifies a client with no matching `clients` row gets an empty list rather than an
+    error. Exercises: `GET /clients/me/suspensions` (`clients.list_my_suspensions()`)."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+    profile = {"role_id": auth.CLIENT, "user_id": 1}
+    with patch("app.controllers.clients.supabase", fake):
+        assert list_my_suspensions(profile) == []
+
+
 if __name__ == "__main__":
     test_lawyer_with_no_cases_sees_no_clients()
     test_lawyer_sees_only_their_clients_with_active_case_counts()
+    test_org_admin_only_sees_clients_with_a_case_in_their_org()
+    test_list_my_suspensions_returns_only_suspended_firm_names()
+    test_list_my_suspensions_empty_for_client_with_no_profile_row()
     print("ok")

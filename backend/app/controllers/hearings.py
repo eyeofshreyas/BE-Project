@@ -5,7 +5,7 @@ from datetime import date
 from fastapi import Depends, HTTPException
 from app.controllers.case_history import add_timeline_event
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.hearings import HearingSummary, HearingCreate, HearingUpdate
 
 HEARINGS_SELECT = (
@@ -85,7 +85,7 @@ def get_hearing(hearing_id: int, profile: dict = Depends(get_current_profile)):
     return _get_hearing(hearing_id, get_scoped_case_ids(profile))
 
 
-def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Create a hearing for a case the caller has access to, and update the case's
     next_hearing_date. Calls: `ensure_case_access()`, `_sync_next_hearing_date()`, `_get_hearing()`."""
     ensure_case_access(data.case_id, profile)
@@ -95,12 +95,16 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
     # The repeat is only refused until the caller says it's deliberate, since a case genuinely
     # can be listed twice at one slot.
     if not data.allow_duplicate:
-        clash = (
+        query = (
             supabase.table("hearings").select("hearing_id")
             .eq("case_id", data.case_id).eq("hearing_date", data.hearing_date)
-            .eq("hearing_time", data.hearing_time).eq("judge_id", data.judge_id)
-            .execute().data
+            .eq("judge_id", data.judge_id)
         )
+        # hearing_time is optional (a listing with no time set yet). .eq() would send the
+        # literal string "None" to Postgres and error out on the time column, so a hearing
+        # with no time needs an IS NULL comparison instead.
+        query = query.is_("hearing_time", "null") if data.hearing_time is None else query.eq("hearing_time", data.hearing_time)
+        clash = query.execute().data
         if clash:
             raise HTTPException(
                 status_code=409,
@@ -133,7 +137,7 @@ def create_hearing(data: HearingCreate, profile: dict = Depends(require_roles(AD
     return hearing
 
 
-def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Update a hearing's status/outcome/notes; also re-syncs the case's next_hearing_date
     since a status change can affect which hearing is now the nearest upcoming one, and records
     a timeline event when the hearing reaches a new status -- what happened at a hearing is case
@@ -144,6 +148,12 @@ def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if not updates:
         return _get_hearing(hearing_id)
+
+    # "Completed" asserts the hearing already happened -- a future hearing_date can't have an
+    # outcome yet. Adjourned/Cancelled are fine to set ahead of time (that's how a hearing gets
+    # called off in advance), so only Completed is checked against the date.
+    if updates.get("hearing_status") == "Completed" and before["hearing_date"] > date.today().isoformat():
+        raise HTTPException(status_code=400, detail="This hearing is still in the future and can't be marked Completed yet.")
 
     rows = supabase.table("hearings").update(updates).eq("hearing_id", hearing_id).execute().data
     if not rows:

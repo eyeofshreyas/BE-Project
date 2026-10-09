@@ -35,7 +35,7 @@
 -- === Reference data ===
 
 insert into roles (role_id, role_name, description) values
-  (1, 'Admin', 'Full system access'),
+  (1, 'Law Firm Manager', 'Full system access'),
   (2, 'Lawyer', 'Manages cases, clients and billing'),
   (3, 'Client', 'Views own cases, documents and invoices')
 on conflict (role_id) do nothing;
@@ -97,8 +97,8 @@ insert into lawyers (user_id, bar_council_number, specialization, experience_yea
 select u.user_id, v.bar_council_number, v.specialization, v.experience_years
 from (values
   ('rohan.mehta@example.com', 'KAR/1234/2012', 'Civil Litigation', 14),
-  ('priya.nair@example.com', 'KAR/5678/2016', 'Family Law', 9),
-  ('karan.verma@example.com', 'KAR/9012/2019', 'Corporate Law', 6)
+  ('priya.nair@example.com', 'KAR/5678/2016', 'Family & Matrimonial Law', 9),
+  ('karan.verma@example.com', 'KAR/9012/2019', 'Corporate & Commercial Law', 6)
 ) as v(email, bar_council_number, specialization, experience_years)
 join users u on u.email = v.email
 where not exists (select 1 from lawyers where lawyers.user_id = u.user_id);

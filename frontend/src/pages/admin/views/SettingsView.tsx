@@ -1,61 +1,58 @@
 /** Admin console "Settings" tab: profile (`updateOwnProfile()`), security (password reset
- * via `forgotPassword()`), platform toggles (`getPlatformSettings()`/`updatePlatformSettings()`),
- * appearance (stored per-browser), and a static about panel. */
+ * via `forgotPassword()`), and a static about panel. */
 import { useEffect, useState } from 'react'
 import { Icon, type IconName } from '../../../components/icons'
 import { C } from '../../../components/theme'
-import { forgotPassword, getPlatformSettings, updateOwnProfile, updatePlatformSettings } from '../../../api/client'
-import type { PlatformSettings, UserProfile } from '../../../types/api'
+import { forgotPassword, getRazorpayAccountStatus, submitRazorpayOnboarding, updateOwnProfile } from '../../../api/client'
+import type { RazorpayAccountStatus, RazorpayOnboardingPayload, UserProfile } from '../../../types/api'
 import styles from '../../../components/AppShell.module.css'
 
 const MENU: { key: string; label: string; icon: IconName }[] = [
   { key: 'profile', label: 'Profile', icon: 'user' },
   { key: 'security', label: 'Security', icon: 'shield' },
-  { key: 'platform', label: 'Platform', icon: 'settings' },
-  { key: 'appearance', label: 'Appearance', icon: 'palette' },
+  { key: 'payments', label: 'Payments', icon: 'banknote' },
   { key: 'about', label: 'About', icon: 'info' },
 ]
 
-const THEME_KEY = 'lexflow_theme'
-type Theme = 'Light' | 'Dark' | 'System'
-
-/** Small controlled on/off switch (sliding dot) used throughout this view's toggle rows. */
-function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
-  return (
-    <div className={styles.toggleTrack} style={{ width: 40, height: 22, background: value ? C.primary : C.border, justifyContent: value ? 'flex-end' : 'flex-start' }} onClick={onChange}>
-      <div className={styles.toggleDot} style={{ width: 18, height: 18 }} />
-    </div>
-  )
-}
-
 /**
  * Left-nav-switched settings panels. Profile fields seed from the cached
- * `lexflow_profile`; platform toggles load from `/admin/settings`. "Save Changes"
- * writes both back and reports the outcome through `onSave`, which the parent toasts.
+ * `lexflow_profile`. "Save Changes" writes them back and reports the outcome
+ * through `onSave`, which the parent toasts.
  */
 export default function SettingsView({ profile, onSave, onProfileChange }: { profile: UserProfile | null; onSave: (message: string) => void; onProfileChange: (profile: UserProfile) => void }) {
   const [tab, setTab] = useState('profile')
   const [fullName, setFullName] = useState(profile?.full_name ?? '')
   const [phone, setPhone] = useState(profile?.phone ?? '')
-  const [settings, setSettings] = useState<PlatformSettings | null>(null)
   const [saving, setSaving] = useState(false)
-  // ponytail: the theme picker is per-browser only -- nothing renders a dark palette yet,
-  // so there's no point round-tripping it to the server until there is.
-  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem(THEME_KEY) as Theme | null) ?? 'Light')
+  const [razorpay, setRazorpay] = useState<RazorpayAccountStatus | null>(null)
+  const [razorpayLoading, setRazorpayLoading] = useState(true)
+  const [onboardForm, setOnboardForm] = useState<RazorpayOnboardingPayload>({
+    business_name: '', business_type: 'partnership', pan: '', contact_email: '', contact_phone: '',
+    bank_account_number: '', bank_ifsc: '',
+  })
+  const [onboarding, setOnboarding] = useState(false)
 
   useEffect(() => {
-    getPlatformSettings().then(setSettings).catch((e: Error) => onSave(e.message))
-  }, [])
+    if (profile?.role_id === 4) { setRazorpayLoading(false); return } // Super Admin has no org to onboard
+    getRazorpayAccountStatus().then(setRazorpay).catch(() => setRazorpay(null)).finally(() => setRazorpayLoading(false))
+  }, [profile])
 
-  function toggle(key: keyof PlatformSettings) {
-    setSettings((prev) => (prev ? { ...prev, [key]: !prev[key] } : prev))
+  async function submitOnboarding() {
+    setOnboarding(true)
+    try {
+      const result = await submitRazorpayOnboarding(onboardForm)
+      setRazorpay(result)
+      onSave('Payment account submitted for review.')
+    } catch (e) {
+      onSave((e as Error).message)
+    } finally {
+      setOnboarding(false)
+    }
   }
 
   function reset() {
     setFullName(profile?.full_name ?? '')
     setPhone(profile?.phone ?? '')
-    setTheme((localStorage.getItem(THEME_KEY) as Theme | null) ?? 'Light')
-    getPlatformSettings().then(setSettings).catch((e: Error) => onSave(e.message))
   }
 
   async function save() {
@@ -63,8 +60,6 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
     try {
       const updated = await updateOwnProfile({ full_name: fullName.trim(), phone: phone.trim() })
       if (profile) onProfileChange({ ...profile, full_name: updated.full_name, phone: updated.phone })
-      if (settings) await updatePlatformSettings(settings)
-      localStorage.setItem(THEME_KEY, theme)
       onSave('Settings saved.')
     } catch (e) {
       onSave((e as Error).message)
@@ -87,7 +82,6 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
   const fieldLabel = { fontSize: 12.5, fontWeight: 600, color: '#575145', marginBottom: 7 }
   const inputWrap = { display: 'flex', alignItems: 'center', gap: 9, background: '#F6F2E9', border: `1.5px solid ${C.border}`, borderRadius: 3, padding: '11px 13px' }
   const inputStyle = { border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 13.5, color: C.text, fontFamily: "'Public Sans',sans-serif", minWidth: 0 }
-  const rowStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 2px', borderBottom: `1px solid ${C.border}` }
   const rowLastStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 2px' }
   const rowTitle = { fontSize: 13.5, fontWeight: 600, color: C.text }
   const rowDesc = { fontSize: 12, color: C.muted, marginTop: 2 }
@@ -102,7 +96,7 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
         <div className={styles.pageTitle}>Platform Settings</div>
         <div className={styles.pageSubtitle}>Manage your admin account, platform configuration and preferences.</div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 20, alignItems: 'start' }}>
+      <div className={styles.stackOnMobile} style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 20, alignItems: 'start' }}>
         <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {MENU.map((m) => {
             const active = tab === m.key
@@ -121,9 +115,9 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
               <div className={styles.cardTitle}>Admin Profile</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, paddingBottom: 16, borderBottom: `1px solid ${C.border}` }}>
                 <div style={{ width: 56, height: 56, borderRadius: 3, background: 'linear-gradient(135deg,#23306B,#CFC6B0)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FCFAF4', fontFamily: "'Spectral',serif", fontWeight: 700, fontSize: 18, flexShrink: 0 }}>{adminInitials}</div>
-                <div><div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{fullName}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>Super Admin</div></div>
+                <div><div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{fullName}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{profile?.role_id === 4 ? 'Super Admin' : 'Admin'}</div></div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16 }}>
                 <div><div style={fieldLabel}>Full Name</div><div style={inputWrap}><Icon name="user" size={16} color={C.muted} /><input value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} /></div></div>
                 <div>
                   <div style={fieldLabel}>Email Address</div>
@@ -146,31 +140,41 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
             </div>
           )}
 
-          {tab === 'platform' && (
+          {tab === 'payments' && (
             <div style={cardStyle}>
-              <div className={styles.cardTitle}>Platform Configuration</div>
-              {!settings && <div style={{ fontSize: 13, color: C.muted }}>Loading…</div>}
-              {settings && <>
-                <div style={rowStyle}><div><div style={rowTitle}>Maintenance Mode</div><div style={rowDesc}>Temporarily block user access during upkeep.</div></div><Toggle value={settings.maintenance_mode} onChange={() => toggle('maintenance_mode')} /></div>
-                <div style={rowStyle}><div><div style={rowTitle}>New Signup Alerts</div><div style={rowDesc}>Notify admins when a new user registers.</div></div><Toggle value={settings.new_signup_alerts} onChange={() => toggle('new_signup_alerts')} /></div>
-                <div style={rowStyle}><div><div style={rowTitle}>Weekly Reports</div><div style={rowDesc}>Email a platform summary report every week.</div></div><Toggle value={settings.weekly_reports} onChange={() => toggle('weekly_reports')} /></div>
-                <div style={rowLastStyle}><div><div style={rowTitle}>Automatic Backups</div><div style={rowDesc}>Back up platform data daily.</div></div><Toggle value={settings.auto_backup} onChange={() => toggle('auto_backup')} /></div>
-              </>}
-            </div>
-          )}
-
-          {tab === 'appearance' && (
-            <div style={cardStyle}>
-              <div className={styles.cardTitle}>Appearance</div>
-              <div>
-                <div style={fieldLabel}>Theme</div>
-                <div style={{ display: 'flex', gap: 6, background: '#F6F2E9', border: `1px solid ${C.border}`, borderRadius: 3, padding: 4 }}>
-                  {(['Light', 'Dark', 'System'] as const).map((t) => (
-                    <div key={t} style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 600, padding: 11, borderRadius: 3, cursor: 'pointer', background: theme === t ? C.primary : 'transparent', color: theme === t ? '#FCFAF4' : C.text }} onClick={() => setTheme(t)}>{t}</div>
-                  ))}
+              <div className={styles.cardTitle}>Payment Account</div>
+              {razorpayLoading ? (
+                <div style={rowDesc}>Loading…</div>
+              ) : razorpay?.status === 'activated' ? (
+                <div style={rowLastStyle}>
+                  <div><div style={rowTitle}>Connected</div><div style={rowDesc}>Client payments settle to this firm's linked Razorpay account.</div></div>
                 </div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Saved in this browser only.</div>
-              </div>
+              ) : razorpay?.status === 'pending' ? (
+                <div style={rowLastStyle}>
+                  <div><div style={rowTitle}>Under review</div><div style={rowDesc}>Razorpay is reviewing your submitted details. This can take a few days.</div></div>
+                </div>
+              ) : (
+                <>
+                  {razorpay?.status === 'needs_clarification' && razorpay.error && (
+                    <div style={{ ...rowDesc, color: '#B3282D' }}>Razorpay needs more information: {razorpay.error}</div>
+                  )}
+                  {razorpay?.status === 'rejected' && (
+                    <div style={{ ...rowDesc, color: '#B3282D' }}>Your previous submission was rejected{razorpay.error ? `: ${razorpay.error}` : '.'} Please correct and resubmit.</div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16 }}>
+                    <div><div style={fieldLabel}>Business Name</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.business_name} onChange={(e) => setOnboardForm({ ...onboardForm, business_name: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>Business Type</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.business_type} onChange={(e) => setOnboardForm({ ...onboardForm, business_type: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>PAN</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.pan} onChange={(e) => setOnboardForm({ ...onboardForm, pan: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>Contact Email</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.contact_email} onChange={(e) => setOnboardForm({ ...onboardForm, contact_email: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>Contact Phone</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.contact_phone} onChange={(e) => setOnboardForm({ ...onboardForm, contact_phone: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>Bank Account Number</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.bank_account_number} onChange={(e) => setOnboardForm({ ...onboardForm, bank_account_number: e.target.value })} /></div></div>
+                    <div><div style={fieldLabel}>Bank IFSC</div><div style={inputWrap}><input style={inputStyle} value={onboardForm.bank_ifsc} onChange={(e) => setOnboardForm({ ...onboardForm, bank_ifsc: e.target.value })} /></div></div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <div style={{ ...btnPrimary, opacity: onboarding ? 0.6 : 1 }} onClick={() => !onboarding && submitOnboarding()}>{onboarding ? 'Submitting…' : 'Connect Razorpay Account'}</div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -181,10 +185,12 @@ export default function SettingsView({ profile, onSave, onProfileChange }: { pro
             </div>
           )}
 
-          <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: '16px 20px', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <div style={btnGhost} onClick={reset}>Cancel</div>
-            <div style={btnPrimary} onClick={() => { if (!saving) save() }}>{saving ? 'Saving…' : 'Save Changes'}</div>
-          </div>
+          {tab === 'profile' && (
+            <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: '16px 20px', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={btnGhost} onClick={reset}>Cancel</div>
+              <div style={btnPrimary} onClick={() => { if (!saving) save() }}>{saving ? 'Saving…' : 'Save Changes'}</div>
+            </div>
+          )}
         </div>
       </div>
     </>

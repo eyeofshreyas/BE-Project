@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 from fastapi import Depends, File, HTTPException, UploadFile
 from app.db.supabase_client import supabase
 from app.controllers.documents import DOCUMENTS_BUCKET, read_upload
-from app.middleware.auth import ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, get_current_profile, require_roles, get_scoped_case_ids, ensure_case_access
 from app.models.conveyancing import Stats, StatusCount, MatterSummary, ConveyancingSummary, Property, DueDiligence, DueDiligenceUpdate, ProgressStage, PropertyRegistration, MatterDocument, MatterDetail, MatterCreate, MatterUpdate
 
 MATTERS_SELECT = (
@@ -140,13 +140,16 @@ def _next_matter_seq(year: int) -> int:
     return max([n for n in used if n is not None], default=0) + 1
 
 
-def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Create a conveyancing matter: `conveyancing_matters.case_id`/`properties.address` are
     NOT NULL, so this opens a lightweight `cases` row first (case_type 'Property', the first
     available court, the picked client, the form's priority) the same way `create_case()` does,
     assigns the creator as the case's lawyer if they are one (so it shows as Responsible Lawyer
     on the dashboard), then inserts the property and matter, and finally a `conveyancing_parties`
     row linking the client in as the Client."""
+    if profile["org_id"] is None:
+        raise HTTPException(status_code=400, detail="Conveyancing matters are created within an organization.")
+
     case_type_rows = supabase.table("case_types").select("case_type_id").eq("case_type_name", "Property").execute().data
     court_rows = supabase.table("courts").select("court_id").limit(1).execute().data
     if not case_type_rows or not court_rows:
@@ -162,6 +165,7 @@ def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMI
         "client_id": data.client_id,
         "court_id": court_rows[0]["court_id"],
         "case_type_id": case_type_rows[0]["case_type_id"],
+        "org_id": profile["org_id"],
         "status": "Open",
         "priority": data.priority,
     }).execute().data[0]
@@ -214,7 +218,7 @@ def create_matter(data: MatterCreate, profile: dict = Depends(require_roles(ADMI
     return {"matter_id": matter_row["matter_id"], "matter_number": matter_number}
 
 
-def update_matter(matter_id: int, data: MatterUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def update_matter(matter_id: int, data: MatterUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Edit a matter's registration status and/or its scheduled registration (date + office),
     upserting the `property_registrations` row since a matter may not have one yet. Backs both
     the dashboard's row Edit action and the Schedule Registration quick action.
@@ -275,7 +279,7 @@ def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profil
         lawyer = reg.get("lawyers")
         registration = {**reg, "registered_by": lawyer["users"]["full_name"] if lawyer else None}
 
-    doc_rows = supabase.table("matter_documents").select("*,documents(file_name,mime_type),lawyers(users(full_name))").eq("matter_id", matter_id).execute().data
+    doc_rows = supabase.table("matter_documents").select("*,documents(file_name,mime_type,is_deleted),lawyers(users(full_name))").eq("matter_id", matter_id).execute().data
     documents = [
         {
             "matter_document_id": d["matter_document_id"],
@@ -287,6 +291,9 @@ def get_matter_detail(matter_id: int, profile: dict = Depends(get_current_profil
             "verified_by": d["lawyers"]["users"]["full_name"] if d.get("lawyers") else None,
         }
         for d in doc_rows
+        # the embed follows the FK regardless of the linked document's own soft-delete
+        # flag, so a deleted document would otherwise keep showing up here
+        if not (d.get("documents") and d["documents"].get("is_deleted"))
     ]
 
     return {
@@ -336,22 +343,30 @@ def upload_matter_document(
     )
 
     doc_type_rows = supabase.table("document_types").select("document_type_id").eq("type_name", "Contract").execute().data
-    doc_row = supabase.table("documents").insert({
-        "case_id": case_id,
-        "document_type_id": doc_type_rows[0]["document_type_id"] if doc_type_rows else None,
-        "uploaded_by": profile["user_id"],
-        "file_name": file.filename or storage_path,
-        "file_path": storage_path,
-        "file_size": len(content),
-        "mime_type": file.content_type,
-    }).execute().data[0]
+    doc_row = None
 
-    link_row = supabase.table("matter_documents").insert({
-        "matter_id": matter_id,
-        "document_id": doc_row["document_id"],
-        "is_required": False,
-        "is_verified": False,
-    }).execute().data[0]
+    try:
+        doc_row = supabase.table("documents").insert({
+            "case_id": case_id,
+            "document_type_id": doc_type_rows[0]["document_type_id"] if doc_type_rows else None,
+            "uploaded_by": profile["user_id"],
+            "file_name": file.filename or storage_path,
+            "file_path": storage_path,
+            "file_size": len(content),
+            "mime_type": file.content_type,
+        }).execute().data[0]
+
+        link_row = supabase.table("matter_documents").insert({
+            "matter_id": matter_id,
+            "document_id": doc_row["document_id"],
+            "is_required": False,
+            "is_verified": False,
+        }).execute().data[0]
+    except Exception:
+        supabase.storage.from_(DOCUMENTS_BUCKET).remove([storage_path])
+        if doc_row is not None:
+            supabase.table("documents").delete().eq("document_id", doc_row["document_id"]).execute()
+        raise
 
     return {
         "matter_document_id": link_row["matter_document_id"],
@@ -364,7 +379,7 @@ def upload_matter_document(
     }
 
 
-def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Update a matter's due-diligence checklist fields. Calls: `_ensure_matter_access()`."""
     _ensure_matter_access(matter_id, profile)
 
@@ -380,7 +395,7 @@ def update_due_diligence(matter_id: int, data: DueDiligenceUpdate, profile: dict
     return {**result, "lawyer_name": lawyer["users"]["full_name"] if lawyer else None}
 
 
-def complete_progress_stage(matter_id: int, progress_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def complete_progress_stage(matter_id: int, progress_id: int, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Mark one registration-progress stage complete and recompute the matter's
     completion_percentage from all stages. Calls: `_ensure_matter_access()`."""
     _ensure_matter_access(matter_id, profile)

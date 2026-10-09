@@ -6,9 +6,9 @@ export type IconName =
   | 'calendar' | 'bar-chart-2' | 'pie-chart' | 'bell' | 'settings' | 'log-out' | 'search'
   | 'chevron-down' | 'plus' | 'download' | 'receipt' | 'banknote' | 'alert-triangle'
   | 'check-circle' | 'database' | 'server' | 'hard-drive' | 'eye' | 'edit' | 'ban'
-  | 'trash-2' | 'mail' | 'phone' | 'shield' | 'palette' | 'info' | 'x' | 'gavel' | 'clock' | 'filter'
+  | 'trash-2' | 'mail' | 'phone' | 'shield' | 'info' | 'x' | 'gavel' | 'clock' | 'filter'
   | 'home' | 'more-horizontal' | 'star' | 'upload-cloud' | 'globe' | 'message-circle' | 'send'
-  | 'paperclip' | 'play-circle' | 'signature'
+  | 'paperclip' | 'play-circle' | 'signature' | 'building' | 'copy' | 'menu'
 
 /** Renders a stroke SVG icon selected by `name`; `size`/`color`/`strokeWidth` are the only customization points. */
 export function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 1.8 }: Props) {
@@ -46,9 +46,9 @@ export function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 1.
     case 'mail': return <svg {...common}><rect x={3} y={5} width={18} height={14} rx={2} /><path d="M3 6l9 7 9-7" /></svg>
     case 'phone': return <svg {...common}><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C9.5 19 5 14.5 5 8a2 2 0 0 1 1-2z" /></svg>
     case 'shield': return <svg {...common}><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /><path d="M9 12l2 2 4-4" /></svg>
-    case 'palette': return <svg {...common}><path d="M12 3a9 9 0 1 0 .3 18c1.2 0 1.9-.9 1.9-1.9 0-.5-.2-1-.5-1.4-.3-.4-.5-.9-.5-1.4 0-1.1.9-1.9 1.9-1.9H17a4 4 0 0 0 4-4c0-4.6-4-7.4-9-7.4z" /><circle cx={7.5} cy={10.5} r={1.2} /><circle cx={11} cy={7.5} r={1.2} /><circle cx={15} cy={8.5} r={1.2} /></svg>
     case 'info': return <svg {...common}><circle cx={12} cy={12} r={9} /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
     case 'x': return <svg {...common}><path d="M18 6L6 18" /><path d="M6 6l12 12" /></svg>
+    case 'menu': return <svg {...common}><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></svg>
     case 'gavel': return <svg {...common}><path d="M14 4l6 6" /><path d="M4 14l6 6" /><path d="M9.5 8.5l-6 6" /><path d="M15.5 2.5l6 6" /><path d="M10.5 13.5L18 6" /><path d="M2 22h10" /></svg>
     case 'clock': return <svg {...common}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l3.5 2" /></svg>
     case 'filter': return <svg {...common}><path d="M4 5h16l-6 8v6l-4-2v-4z" /></svg>
@@ -62,5 +62,7 @@ export function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 1.
     case 'paperclip': return <svg {...common}><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10.5 19a2 2 0 0 1-3-3l8-8" /></svg>
     case 'play-circle': return <svg {...common}><circle cx={12} cy={12} r={9} /><path d="M10 8.5l6 3.5-6 3.5z" /></svg>
     case 'signature': return <svg {...common}><path d="M3 17c1.5-3 3-3 4-1.5s2.5 2.5 3.5-1S12 11 13 14.5s2 3.5 3.5 1S19 11 21 11" /><path d="M4 20h16" /></svg>
+    case 'building': return <svg {...common}><rect x={4} y={3} width={16} height={18} rx={1} /><path d="M9 8h1M14 8h1M9 12h1M14 12h1M9 16h1M14 16h1" /><path d="M10 21v-4h4v4" /></svg>
+    case 'copy': return <svg {...common}><rect x={9} y={9} width={12} height={12} rx={2} /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></svg>
   }
 }

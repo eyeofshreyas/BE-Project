@@ -2,13 +2,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { listClients, listInvoices } from '../../api/client'
-import type { ClientSummary } from '../../types/api'
+import type { ClientSummary, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { Dropdown } from '../conveyancing/ConveyancingDashboardPage'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
 const MUTED = '#6E6759'
 const PRIMARY_DARK = '#1A2551'
+const LAWYER = 2
 const STATUSES = ['All Statuses', 'Active', 'Pending', 'Closed']
 const SORTS = ['Newest', 'Oldest', 'Name (A-Z)'] as const
 const STATUS_STYLE_MAP: Record<string, [string, string]> = {
@@ -25,10 +26,21 @@ function moneyRound(n: number) {
   return `₹${Math.round(n).toLocaleString()}`
 }
 
+function loadProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
 /** Loads all clients via `listClients()`; supports search, status filter, and sort; "Add Client" navigates to `/clients/new`. */
 export default function ClientsPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const profile = loadProfile()
+  const canInviteClient = profile?.role_id === LAWYER
   const [clients, setClients] = useState<ClientSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -141,7 +153,9 @@ export default function ClientsPage() {
           />
           <Dropdown value={statusFilter} options={STATUSES} labelFor={(s) => s} onChange={setStatusFilter} />
           <Dropdown value={sort} options={[...SORTS]} labelFor={(s) => `Sort By: ${s}`} onChange={(v) => setSort(v as (typeof SORTS)[number])} />
-          <div className={styles.primaryChip} onClick={() => navigate('/clients/new')}><Icon name="plus" size={15} color="#FCFAF4" /> Add Client</div>
+          {canInviteClient && (
+            <div className={styles.primaryChip} onClick={() => navigate('/clients/new')}><Icon name="plus" size={15} color="#FCFAF4" /> Add Client</div>
+          )}
         </div>
 
         {loading && <div style={{ padding: '24px 4px', color: MUTED, fontSize: 13.5 }}>Loading clients…</div>}
@@ -152,28 +166,28 @@ export default function ClientsPage() {
             {filtered.map((c) => {
               const [color, bg] = STATUS_STYLE_MAP[c.status] || ['#575145', '#F0ECDF']
               return (
-                <div key={c.id} onClick={() => navigate(`/clients/${c.id}`)} style={{ background: '#FCFAF4', border: '1px solid #CFC6B0', borderRadius: 3, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
+                <div key={c.id} onClick={() => navigate(`/clients/${c.id}`)} style={{ background: '#FCFAF4', border: '1px solid #CFC6B0', borderRadius: 3, padding: '12px 16px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, cursor: 'pointer' }}>
                   <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#F3EBD9', color: PRIMARY_DARK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, fontFamily: "'Spectral', serif", flexShrink: 0 }}>
                     {initialsOf(c.full_name)}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 140 }}>
                     <div style={{ fontFamily: "'Spectral', serif", fontSize: 13.5, fontWeight: 600, color: '#1A1A17' }}>{c.full_name}</div>
                     <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{c.email}</div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: 9.5, fontWeight: 600, color: '#8C857A', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>Status</div>
                     <span className={styles.statusBadge} style={{ color, background: bg, marginTop: 2 }}>{c.status}</span>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: 9.5, fontWeight: 600, color: '#8C857A', fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>Active Cases</div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17', marginTop: 2 }}>{c.active_cases}</div>
                   </div>
                   {c.pending_amount > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#B3282D', background: '#F7E4E5', borderRadius: 3, padding: '5px 10px', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#B3282D', background: '#F7E4E5', borderRadius: 3, padding: '5px 10px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                       <Icon name="alert-triangle" size={12} color="#B3282D" />{moneyRound(c.pending_amount)} PENDING
                     </div>
                   )}
-                  <div style={{ display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
                     <a href={`mailto:${c.email}`} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #CFC6B0', background: '#FCFAF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, textDecoration: 'none' }} title="Email">
                       <Icon name="mail" size={14} />
                     </a>
@@ -190,7 +204,7 @@ export default function ClientsPage() {
                       <Icon name="banknote" size={14} />
                     </div>
                   </div>
-                  <div className={styles.darkBtn} onClick={() => navigate(`/clients/${c.id}`)} title="View client">DETAILS</div>
+                  <div className={styles.darkBtn} style={{ flexShrink: 0 }} onClick={() => navigate(`/clients/${c.id}`)} title="View client">DETAILS</div>
                 </div>
               )
             })}

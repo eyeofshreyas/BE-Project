@@ -1,11 +1,17 @@
-"""Controller for listing clients, scoped by role: all clients for admins, only clients
-on cases the lawyer is actively assigned to via case_lawyers for lawyers."""
+"""Controller for listing clients, scoped by role: every client for the super-admin, clients
+with a case in the org for an org admin, only clients on cases the lawyer is actively
+assigned to via case_lawyers for lawyers."""
 
 from fastapi import Depends
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, require_roles
+from app.middleware.auth import ADMIN, CLIENT, LAWYER, SUPER_ADMIN, require_roles
 
 CLIENTS_SELECT = "client_id,address,preferred_language,users(full_name,email,phone)"
+
+# ponytail: hard cap, not real pagination -- same reasoning as cases.MAX_CASES. Matters
+# most for the super-admin's platform-wide branch below; the org/lawyer branches are
+# already bounded by their own client_id list.
+MAX_CLIENTS = 1000
 CLOSED_STATUSES = {"Completed", "Closed"}
 ACTIVE_STATUSES = {"Open", "In Progress"}
 
@@ -26,11 +32,19 @@ def _to_client_summary(row: dict, active_cases: int, status: str, pending_amount
     }
 
 
-def list_clients(profile: dict = Depends(require_roles(ADMIN, LAWYER))):
-    """List clients visible to the caller (all for admin, case-linked for lawyer), each with
-    computed active-case count, status, and pending invoice amount. Calls: `_to_client_summary()`."""
-    if profile["role_id"] == ADMIN:
-        client_rows = supabase.table("clients").select(CLIENTS_SELECT).execute().data
+def list_clients(profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
+    """List clients visible to the caller: every client for the super-admin, clients with a
+    case in the caller's own org for an org admin, case-linked clients for a lawyer -- each
+    with computed active-case count, status, and pending invoice amount. Calls:
+    `_to_client_summary()`."""
+    if profile["role_id"] == SUPER_ADMIN:
+        client_rows = supabase.table("clients").select(CLIENTS_SELECT).limit(MAX_CLIENTS).execute().data
+    elif profile["role_id"] == ADMIN:
+        case_rows = supabase.table("cases").select("client_id").eq("org_id", profile["org_id"]).execute().data
+        client_ids = list({r["client_id"] for r in case_rows if r["client_id"]})
+        if not client_ids:
+            return []
+        client_rows = supabase.table("clients").select(CLIENTS_SELECT).in_("client_id", client_ids).execute().data
     else:
         # a lawyer's visible clients = clients on cases they're actively
         # assigned to via case_lawyers -- that assignment is only ever
@@ -95,3 +109,16 @@ def list_clients(profile: dict = Depends(require_roles(ADMIN, LAWYER))):
         _to_client_summary(row, counts.get(row["client_id"], 0), status_for(row["client_id"]), pending.get(row["client_id"], 0))
         for row in client_rows
     ]
+
+
+def list_my_suspensions(profile: dict = Depends(require_roles(CLIENT))):
+    """List the firms that have suspended the caller's own client account, by name -- backs
+    the client dashboard's suspension banner. A client with no clients row (shouldn't
+    happen, but the same defensive check every other client-scoped function makes) sees an
+    empty list rather than an error."""
+    client_rows = supabase.table("clients").select("client_id").eq("user_id", profile["user_id"]).execute().data
+    if not client_rows:
+        return []
+    rows = supabase.table("org_clients").select("organizations(name)") \
+        .eq("client_id", client_rows[0]["client_id"]).eq("is_active", False).execute().data
+    return [{"firm_name": row["organizations"]["name"]} for row in rows if row.get("organizations")]

@@ -81,12 +81,13 @@ export default function CasesListPage() {
   return <StaffCasesView />
 }
 
-type SortKey = 'case' | 'client' | 'type' | 'priority' | 'status' | 'hearing'
+type SortKey = 'case' | 'client' | 'lawyer' | 'type' | 'priority' | 'status' | 'hearing'
 
 /** Sort value per column. Cases with no hearing sort to the end of an ascending sort. */
 const SORT_VALUES: Record<SortKey, (c: CaseSummary) => string | number> = {
   case: (c) => (c.case_title ?? c.id).toLowerCase(),
   client: (c) => (c.client ?? '').toLowerCase(),
+  lawyer: (c) => (c.lawyer ?? '').toLowerCase(),
   type: (c) => (c.case_type ?? '').toLowerCase(),
   priority: (c) => PRIORITY_RANK[c.priority] ?? 9,
   status: (c) => statusLabel(c.status),
@@ -184,6 +185,7 @@ function StaffCasesView() {
                 <tr>
                   <SortHead label="Case" sortKey="case" />
                   <SortHead label="Client" sortKey="client" />
+                  <SortHead label="Assigned Lawyer" sortKey="lawyer" />
                   <SortHead label="Type" sortKey="type" />
                   <SortHead label="Priority" sortKey="priority" />
                   <SortHead label="Status" sortKey="status" />
@@ -200,6 +202,7 @@ function StaffCasesView() {
                         <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: '#23306B', marginTop: 2 }}>{c.id}</div>
                       </td>
                       <td className={styles.td}>{c.client ?? 'No client'}</td>
+                      <td className={styles.td}>{c.lawyer ?? '—'}</td>
                       <td className={styles.td}>{c.case_type ?? '—'}</td>
                       <td className={styles.td}>
                         <span className={cd.priority}>
@@ -216,7 +219,7 @@ function StaffCasesView() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td className={styles.td} colSpan={6} style={{ padding: '28px 22px' }}>
+                    <td className={styles.td} colSpan={7} style={{ padding: '28px 22px' }}>
                       <div className={cd.empty}>
                         {cases.length === 0 ? 'No cases on file yet.' : 'No cases match this search.'}
                       </div>
@@ -264,6 +267,7 @@ function ClientCasesView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Open' | 'Closed'>('All')
   // Enter escalates from the instant substring filter to the backend's semantic
   // ranking; null means no AI search is in effect and the plain filter applies.
   const [aiHits, setAiHits] = useState<CaseSearchResult[] | null>(null)
@@ -287,11 +291,12 @@ function ClientCasesView() {
   }, [])
 
   const searchLower = search.trim().toLowerCase()
-  const filtered = aiHits
+  const filtered = (aiHits
     ? aiHits.map((h) => cases.find((c) => c.case_id === h.case_id)).filter((c): c is CaseSummary => !!c)
     : cases.filter((c) =>
         !searchLower || c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower) || (c.lawyer ?? '').toLowerCase().includes(searchLower)
       )
+  ).filter((c) => statusFilter === 'All' || (statusFilter === 'Open' ? !CLOSED_STATUSES.has(c.status) : CLOSED_STATUSES.has(c.status)))
   const excerptByCase = Object.fromEntries((aiHits ?? []).map((h) => [h.case_id, h.excerpt]))
 
   async function runAiSearch() {
@@ -323,10 +328,10 @@ function ClientCasesView() {
   const caseNumbers = Object.fromEntries(cases.map((c) => [c.case_id, c.id]))
 
   const statCards = [
-    { label: 'Cases on file', value: cases.length, sublabel: null, icon: 'briefcase' as const },
-    { label: 'Open', value: activeCases.length, sublabel: null, icon: 'bar-chart-2' as const },
-    { label: 'Hearings ahead', value: scheduledHearings.length, sublabel: nextHearing ? `Next ${hearingLabel(nextHearing.hearing_date).toLowerCase()}` : null, icon: 'calendar' as const },
-    { label: 'Closed', value: closedCases.length, sublabel: null, icon: 'check-circle' as const },
+    { label: 'Cases on file', value: cases.length, sublabel: null, icon: 'briefcase' as const, filter: 'All' as const },
+    { label: 'Open', value: activeCases.length, sublabel: null, icon: 'bar-chart-2' as const, filter: 'Open' as const },
+    { label: 'Hearings ahead', value: scheduledHearings.length, sublabel: nextHearing ? `Next ${hearingLabel(nextHearing.hearing_date).toLowerCase()}` : null, icon: 'calendar' as const, filter: null },
+    { label: 'Closed', value: closedCases.length, sublabel: null, icon: 'check-circle' as const, filter: 'Closed' as const },
   ]
 
   return (
@@ -346,7 +351,16 @@ function ClientCasesView() {
           <>
             <div className={styles.statCards}>
               {statCards.map((s) => (
-                <div key={s.label} className={styles.statCard}>
+                <div
+                  key={s.label}
+                  className={styles.statCard}
+                  style={{
+                    cursor: 'pointer',
+                    ...(s.filter && statusFilter === s.filter ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : {}),
+                  }}
+                  onClick={() => (s.filter ? setStatusFilter(s.filter) : navigate('/hearings'))}
+                  title={s.filter ? `Show ${s.label.toLowerCase()}` : 'View hearings'}
+                >
                   <div className={styles.statIconRow}><div className={styles.statIconWrap}><Icon name={s.icon} size={18} color="#1A2551" /></div></div>
                   <div>
                     <div className={styles.statValue}>{s.value}</div>

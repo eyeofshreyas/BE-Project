@@ -2,19 +2,22 @@
  * optional checklists), timeline, meetings, and documents (preview on `/documents/:documentId`).
  * Role controls which actions (status change, unassign, add/edit note, upload) are shown. */
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
-  unassignLawyer, getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
-  listHearings, createHearing, listJudges, updateHearing, updateMeeting, deleteDocument,
-  setCaseCnr, syncCaseEcourts, requestSignature,
+  removeLawyerFromCase, addLawyerToCase, listAvailableCaseLawyers,
+  getCaseAiSummary, generateCaseAiSummary, listSimilarOwnCases, getOrCreateConversation, createMeeting,
+  listHearings, createHearing, listJudges, createJudge, listCourts, updateHearing, updateMeeting, deleteDocument,
+  setCaseCnr, syncCaseEcourts, updateCaseFilingDetails, updateCaseClaimValue, requestSignature, listCaseParties, addCaseParty,
 } from '../../api/client'
 import type {
   CaseSummary, NoteSummary, ChecklistItem, TimelineEvent, DocumentSummary, MeetingSummary,
-  DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption,
+  DocumentTypeOption, UserProfile, CaseAiSummary, CaseSearchResult, HearingSummary, JudgeOption, CourtOption, PartySummary,
+  AvailableLawyer,
 } from '../../types/api'
 import { formatDate as formatDateWith } from '../../utils/date'
+import { formatCompactINR } from '../../utils/money'
 import { canRenderInline, uploadRejection, ESIGN_RESENDABLE, esignPill } from '../../utils/files'
 import { Icon } from '../../components/icons'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
@@ -120,11 +123,12 @@ export function Empty({ children, action }: { children: React.ReactNode; action?
 export default function CaseDetailPage() {
   const { caseId } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const profile = loadProfile()
   const canManage = profile?.role_id === LAWYER || profile?.role_id === ADMIN
   const canAddNote = profile?.role_id === LAWYER
   const canMessage = profile?.role_id === LAWYER
-  const canUploadDocs = profile?.role_id === CLIENT || profile?.role_id === LAWYER
+  const canUploadDocs = profile?.role_id === CLIENT || profile?.role_id === LAWYER || profile?.role_id === ADMIN
 
   const [caseInfo, setCaseInfo] = useState<CaseSummary | null>(null)
   const [notes, setNotes] = useState<NoteSummary[]>([])
@@ -148,11 +152,27 @@ export default function CaseDetailPage() {
   const [aiLoading, setAiLoading] = useState(false)
 
   const [statusSaving, setStatusSaving] = useState(false)
-  const [unassigning, setUnassigning] = useState(false)
+  const [teamFormOpen, setTeamFormOpen] = useState(false)
+  const [availableLawyers, setAvailableLawyers] = useState<AvailableLawyer[]>([])
+  const [availableLoading, setAvailableLoading] = useState(false)
+  const [selectedLawyerId, setSelectedLawyerId] = useState('')
+  const [addingTeammate, setAddingTeammate] = useState(false)
+  const [removingLawyerId, setRemovingLawyerId] = useState<number | null>(null)
+  const [confirmRemoveLawyerId, setConfirmRemoveLawyerId] = useState<number | null>(null)
+  const [confirmDeleteNoteId, setConfirmDeleteNoteId] = useState<number | null>(null)
+  const [confirmCloseCase, setConfirmCloseCase] = useState(false)
   const [cnrEditing, setCnrEditing] = useState(false)
   const [cnrInput, setCnrInput] = useState('')
   const [cnrSaving, setCnrSaving] = useState(false)
   const [syncingEcourts, setSyncingEcourts] = useState(false)
+  const [filingDetailsEditing, setFilingDetailsEditing] = useState(false)
+  const [filingNumberInput, setFilingNumberInput] = useState('')
+  const [registrationNumberInput, setRegistrationNumberInput] = useState('')
+  const [actsSectionsInput, setActsSectionsInput] = useState('')
+  const [filingDetailsSaving, setFilingDetailsSaving] = useState(false)
+  const [claimValueEditing, setClaimValueEditing] = useState(false)
+  const [claimValueInput, setClaimValueInput] = useState('')
+  const [claimValueSaving, setClaimValueSaving] = useState(false)
   const [messaging, setMessaging] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -164,7 +184,14 @@ export default function CaseDetailPage() {
   const [schedulingHearing, setSchedulingHearing] = useState(false)
   const [hearings, setHearings] = useState<HearingSummary[]>([])
   const [judges, setJudges] = useState<JudgeOption[]>([])
+  const [courts, setCourts] = useState<CourtOption[]>([])
   const [hearingJudgeId, setHearingJudgeId] = useState('')
+  const [judgeFormOpen, setJudgeFormOpen] = useState(false)
+  const [newJudgeName, setNewJudgeName] = useState('')
+  const [newJudgeCourtId, setNewJudgeCourtId] = useState('')
+  const [newJudgeDesignation, setNewJudgeDesignation] = useState('')
+  const [addingJudge, setAddingJudge] = useState(false)
+  const [judgeError, setJudgeError] = useState('')
   const [hearingDate, setHearingDate] = useState('')
   const [hearingTime, setHearingTime] = useState('')
   const [hearingCourtroom, setHearingCourtroom] = useState('')
@@ -196,6 +223,13 @@ export default function CaseDetailPage() {
   const [signing, setSigning] = useState(false)
   const [signError, setSignError] = useState('')
 
+  const [parties, setParties] = useState<PartySummary[]>([])
+  const [partyName, setPartyName] = useState('')
+  const [partyRole, setPartyRole] = useState('Opposing Party')
+  const [partyFormOpen, setPartyFormOpen] = useState(false)
+  const [addingParty, setAddingParty] = useState(false)
+  const [partyError, setPartyError] = useState('')
+
   const numericCaseId = Number(caseId)
 
   useEffect(() => {
@@ -203,7 +237,7 @@ export default function CaseDetailPage() {
     // React Router keeps this component mounted when one case links to another, so anything
     // scoped to a single case has to be cleared by hand or it is read as the new case's.
     setSimilarCases(null)
-    Promise.all([listCases(), canManage ? listCaseNotes(numericCaseId) : Promise.resolve([]), listCaseTimeline(numericCaseId), listDocuments(), listMeetings(numericCaseId), listHearings()])
+    Promise.all([listCases(), canManage ? listCaseNotes(numericCaseId) : Promise.resolve([]), listCaseTimeline(numericCaseId), listDocuments(), canManage ? listMeetings(numericCaseId) : Promise.resolve([]), listHearings()])
       .then(([cases, n, t, docs, m, h]) => {
         const found = cases.find((c) => c.case_id === numericCaseId)
         if (!found) { setError("This case doesn't exist or you don't have access to it."); return }
@@ -218,8 +252,32 @@ export default function CaseDetailPage() {
       .finally(() => setLoading(false))
     if (canUploadDocs) listDocumentTypes().then(setDocumentTypes).catch(() => {})
     if (canManage) listJudges().then(setJudges).catch(() => {})
+    // The courts table has duplicate rows for the same name under different court_ids
+    // (stale seed data) -- collapsing to one entry per name keeps a lawyer from picking
+    // two different IDs for what reads as the same court, which would let the same judge
+    // through the same-court duplicate check twice.
+    if (canManage) listCourts().then((rows) => {
+      const byName = new Map<string, CourtOption>()
+      for (const c of rows) {
+        const existing = byName.get(c.court_name)
+        if (!existing || c.court_id < existing.court_id) byName.set(c.court_name, c)
+      }
+      setCourts([...byName.values()])
+    }).catch(() => {})
     if (canManage) getCaseAiSummary(numericCaseId).then(setAiSummary).catch(() => setAiSummary(null))
+    if (canManage) listCaseParties(numericCaseId).then(setParties).catch(() => {})
   }, [numericCaseId, canUploadDocs, canManage])
+
+  // Deep link from the dashboard's "Schedule Hearing" quick action (?hearing=1): open the
+  // form as soon as the case has loaded, instead of making the lawyer find the button again.
+  useEffect(() => {
+    if (!loading && canManage && searchParams.get('hearing') === '1') {
+      setHearingOpen(true)
+      setScheduleKind('hearing')
+      meetingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setSearchParams((prev) => { prev.delete('hearing'); return prev }, { replace: true })
+    }
+  }, [loading, canManage])
 
   function showToast(msg: string) {
     setToast(msg)
@@ -290,10 +348,10 @@ export default function CaseDetailPage() {
   }
 
   async function removeNote(noteId: number) {
-    if (!window.confirm('Delete this note?')) return
     try {
       await deleteCaseNote(numericCaseId, noteId)
       setNotes((prev) => prev.filter((n) => n.id !== noteId))
+      setConfirmDeleteNoteId(null)
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to delete note.')
     }
@@ -340,7 +398,7 @@ export default function CaseDetailPage() {
   }
 
   function closeCase() {
-    if (!window.confirm('Close this case?')) return
+    setConfirmCloseCase(false)
     updateStatus('Closed')
   }
 
@@ -357,17 +415,45 @@ export default function CaseDetailPage() {
     }
   }
 
-  async function unassign() {
-    if (!caseInfo || !window.confirm('Remove the assigned lawyer from this case?')) return
-    setUnassigning(true)
+  async function openTeamForm() {
+    setTeamFormOpen(true)
+    setAvailableLoading(true)
     try {
-      const updated = await unassignLawyer(numericCaseId)
-      setCaseInfo(updated)
-      showToast('Lawyer unassigned.')
+      setAvailableLawyers(await listAvailableCaseLawyers(numericCaseId))
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to unassign lawyer.')
+      showToast(err instanceof Error ? err.message : 'Failed to load available lawyers.')
     } finally {
-      setUnassigning(false)
+      setAvailableLoading(false)
+    }
+  }
+
+  async function submitTeammate() {
+    if (!selectedLawyerId) return
+    setAddingTeammate(true)
+    try {
+      const updated = await addLawyerToCase(numericCaseId, Number(selectedLawyerId))
+      setCaseInfo(updated)
+      setTeamFormOpen(false)
+      setSelectedLawyerId('')
+      showToast('Teammate added to case.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to add teammate.')
+    } finally {
+      setAddingTeammate(false)
+    }
+  }
+
+  async function removeTeammate(lawyerId: number) {
+    setConfirmRemoveLawyerId(null)
+    setRemovingLawyerId(lawyerId)
+    try {
+      const updated = await removeLawyerFromCase(numericCaseId, lawyerId)
+      setCaseInfo(updated)
+      showToast('Lawyer removed from case.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to remove lawyer.')
+    } finally {
+      setRemovingLawyerId(null)
     }
   }
 
@@ -387,19 +473,82 @@ export default function CaseDetailPage() {
     }
   }
 
-  /** Pulls the latest status for this case from eCourts by its CNR (`POST /cases/:id/sync-ecourts`)
-   * and refreshes the timeline, since a sync logs its own event there. */
+  /** Queues a pull of the latest status for this case from eCourts by its CNR
+   * (`POST /cases/:id/sync-ecourts`) -- the HTTP round trip runs as a backend job, so this
+   * polls `listCases()` (there's no single-case GET) until ecourts_sync_status leaves
+   * "syncing", then refreshes the timeline, since a completed sync logs its own event there. */
   async function syncEcourts() {
     setSyncingEcourts(true)
     try {
-      const updated = await syncCaseEcourts(numericCaseId)
+      let updated = await syncCaseEcourts(numericCaseId)
       setCaseInfo(updated)
-      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
-      showToast('Synced with eCourts.')
+      for (let attempt = 0; attempt < 15 && updated.ecourts_sync_status === 'syncing'; attempt++) {
+        await new Promise((r) => setTimeout(r, 2000))
+        const found = (await listCases()).find((c) => c.case_id === numericCaseId)
+        if (!found) break
+        updated = found
+        setCaseInfo(updated)
+      }
+      if (updated.ecourts_sync_status === 'error') {
+        showToast(updated.ecourts_sync_error || 'Failed to sync with eCourts.')
+      } else if (updated.ecourts_sync_status === 'syncing') {
+        showToast('Still syncing with eCourts -- check back in a moment.')
+      } else {
+        listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+        showToast('Synced with eCourts.')
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to sync with eCourts.')
     } finally {
       setSyncingEcourts(false)
+    }
+  }
+
+  function openFilingDetailsEdit() {
+    setFilingNumberInput(caseInfo?.filing_number ?? '')
+    setRegistrationNumberInput(caseInfo?.registration_number ?? '')
+    setActsSectionsInput(caseInfo?.acts_sections ?? '')
+    setFilingDetailsEditing(true)
+  }
+
+  /** Saves the court's own filing number, registration number, and acts/sections -- manually
+   * entered; eCourts sync doesn't fill these in (see docs/FUTURE_SCOPE.md). */
+  async function saveFilingDetails() {
+    setFilingDetailsSaving(true)
+    try {
+      const updated = await updateCaseFilingDetails(numericCaseId, {
+        filing_number: filingNumberInput.trim(),
+        registration_number: registrationNumberInput.trim(),
+        acts_sections: actsSectionsInput.trim(),
+      })
+      setCaseInfo(updated)
+      setFilingDetailsEditing(false)
+      showToast('Filing details saved.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save filing details.')
+    } finally {
+      setFilingDetailsSaving(false)
+    }
+  }
+
+  function openClaimValueEdit() {
+    setClaimValueInput(caseInfo?.claim_value != null ? String(caseInfo.claim_value) : '')
+    setClaimValueEditing(true)
+  }
+
+  /** Saves the case's estimated claim value, or clears it if the field is left blank. */
+  async function saveClaimValue() {
+    setClaimValueSaving(true)
+    try {
+      const trimmed = claimValueInput.trim()
+      const updated = await updateCaseClaimValue(numericCaseId, trimmed === '' ? null : Number(trimmed))
+      setCaseInfo(updated)
+      setClaimValueEditing(false)
+      showToast('Claim value saved.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save claim value.')
+    } finally {
+      setClaimValueSaving(false)
     }
   }
 
@@ -458,8 +607,8 @@ export default function CaseDetailPage() {
     // Pre-fill from this case's own client -- on the case page there's only one client
     // it could reasonably be, unlike the firm-wide Documents library. Still editable, for
     // a signer who isn't the case's client (a builder, opposing counsel, etc.).
-    setSignerName(caseInfo.client ?? '')
-    setSignerEmail(caseInfo.client_email ?? '')
+    setSignerName(caseInfo?.client ?? '')
+    setSignerEmail(caseInfo?.client_email ?? '')
     setSignError('')
   }
 
@@ -481,6 +630,54 @@ export default function CaseDetailPage() {
     }
   }
 
+  /** Adds a non-client party (opposing party, co-party, etc.) to this case
+   * (`POST /cases/:id/parties`) -- this is what makes the name searchable for the next
+   * lawyer's conflict check, not just a case-detail note. */
+  async function submitParty() {
+    if (!partyName.trim()) return
+    setAddingParty(true)
+    setPartyError('')
+    try {
+      const created = await addCaseParty(numericCaseId, partyName.trim(), partyRole.trim() || 'Opposing Party')
+      setParties((prev) => [...prev, created])
+      setPartyName('')
+      setPartyRole('Opposing Party')
+      setPartyFormOpen(false)
+      listCaseTimeline(numericCaseId).then(setTimeline).catch(() => {})
+    } catch (err) {
+      setPartyError(err instanceof Error ? err.message : 'Failed to add party.')
+    } finally {
+      setAddingParty(false)
+    }
+  }
+
+  /** Adds a judge not yet in the reference list (`POST /reference/judges`) -- e.g. one an
+   * eCourts sync reported that isn't seeded here -- and selects it for the hearing being
+   * scheduled. */
+  async function submitJudge() {
+    if (!newJudgeName.trim() || !newJudgeCourtId) return
+    setAddingJudge(true)
+    setJudgeError('')
+    try {
+      const created = await createJudge({
+        judge_name: newJudgeName.trim(),
+        court_id: Number(newJudgeCourtId),
+        designation: newJudgeDesignation.trim() || undefined,
+      })
+      setJudges((prev) => [...prev, created].sort((a, b) => a.judge_name.localeCompare(b.judge_name)))
+      setHearingJudgeId(String(created.judge_id))
+      setNewJudgeName('')
+      setNewJudgeCourtId('')
+      setNewJudgeDesignation('')
+      setJudgeFormOpen(false)
+    } catch (err) {
+      const status = (err as { status?: number }).status
+      setJudgeError(status === 409 ? 'This judge already exists at that court.' : err instanceof Error ? err.message : 'Failed to add judge.')
+    } finally {
+      setAddingJudge(false)
+    }
+  }
+
   function closeScheduleForm() {
     setHearingOpen(false)
     setDuplicateHearing('')
@@ -489,6 +686,8 @@ export default function CaseDetailPage() {
     setHearingTime('')
     setHearingCourtroom('')
     setHearingNotes('')
+    setJudgeFormOpen(false)
+    setJudgeError('')
     setMeetingTitle('')
     setMeetingWhen('')
     setMeetingAgenda('')
@@ -652,15 +851,13 @@ export default function CaseDetailPage() {
           <div className={cd.facts}>
             <Fact label="Client" value={caseInfo.client ?? 'Not recorded'} />
             <Fact label="Case type" value={caseInfo.case_type ?? 'Not set'} />
+            <Fact label="Filed on" value={caseInfo.filing_date ? formatDay(caseInfo.filing_date) : 'Not recorded'} />
             <Fact label="Next hearing" value={caseInfo.hearing ? formatDay(caseInfo.hearing) : 'Not scheduled'}>
               {caseInfo.hearing && (
                 <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => navigate('/hearings')}>View in calendar</button>
               )}
             </Fact>
             <Fact label="Responsible lawyer" value={caseInfo.lawyer ?? 'Not assigned'}>
-              {canManage && caseInfo.lawyer && (
-                <div className={cd.factAction} onClick={() => !unassigning && unassign()}>{unassigning ? 'Removing…' : 'Unassign'}</div>
-              )}
               {!canManage && caseInfo.lawyer_id && (
                 <button className={cd.linkAction} style={{ fontSize: 11.5, marginTop: 4 }} onClick={() => !messaging && openConversation(caseInfo.lawyer_id)}>{messaging ? 'Opening…' : 'Message'}</button>
               )}
@@ -830,12 +1027,38 @@ export default function CaseDetailPage() {
 
                   {scheduleKind === 'hearing' ? (
                     <>
-                      <select value={hearingJudgeId} onChange={(e) => { setHearingJudgeId(e.target.value); setDuplicateHearing('') }} style={inputStyle}>
-                        <option value="">Select a judge…</option>
-                        {judges.map((j) => (
-                          <option key={j.judge_id} value={j.judge_id}>{j.judge_name}{j.court_name ? ` — ${j.court_name}` : ''}</option>
-                        ))}
-                      </select>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <select value={hearingJudgeId} onChange={(e) => { setHearingJudgeId(e.target.value); setDuplicateHearing('') }} style={{ ...inputStyle, flex: 1 }}>
+                          <option value="">Select a judge…</option>
+                          {judges.map((j) => (
+                            <option key={j.judge_id} value={j.judge_id}>{j.judge_name}{j.court_name ? ` — ${j.court_name}` : ''}</option>
+                          ))}
+                        </select>
+                        {!judgeFormOpen && <button className={cd.linkAction} onClick={() => setJudgeFormOpen(true)}>Add judge</button>}
+                      </div>
+                      {judgeFormOpen && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', background: '#FCFAF4', borderRadius: 3 }}>
+                          <input value={newJudgeName} onChange={(e) => setNewJudgeName(e.target.value)} placeholder="Judge name" style={inputStyle} />
+                          <Dropdown
+                            value={newJudgeCourtId}
+                            options={['', ...courts.map((c) => String(c.court_id))]}
+                            labelFor={(v) => courts.find((c) => String(c.court_id) === v)?.court_name ?? 'Select a court…'}
+                            onChange={setNewJudgeCourtId}
+                          />
+                          <input value={newJudgeDesignation} onChange={(e) => setNewJudgeDesignation(e.target.value)} placeholder="Designation (optional)" style={inputStyle} />
+                          {judgeError && <div style={{ fontSize: 12, color: '#B3282D' }}>{judgeError}</div>}
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <div
+                              className={styles.primaryChip}
+                              style={{ opacity: addingJudge || !newJudgeName.trim() || !newJudgeCourtId ? 0.6 : 1 }}
+                              onClick={() => !addingJudge && submitJudge()}
+                            >
+                              {addingJudge ? 'Adding…' : 'Add judge'}
+                            </div>
+                            <div className={styles.ghostChip} onClick={() => { setJudgeFormOpen(false); setJudgeError('') }}>Cancel</div>
+                          </div>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', gap: 8 }}>
                         <input type="date" value={hearingDate} onChange={(e) => { setHearingDate(e.target.value); setDuplicateHearing('') }} style={{ ...inputStyle, flex: 1 }} />
                         <input type="time" value={hearingTime} onChange={(e) => { setHearingTime(e.target.value); setDuplicateHearing('') }} style={{ ...inputStyle, flex: 1 }} />
@@ -1098,14 +1321,22 @@ export default function CaseDetailPage() {
             </Card>
 
             {canManage && caseInfo.status !== 'Closed' && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <span className={cd.dangerLink} onClick={closeCase}>Close case</span>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                {confirmCloseCase ? (
+                  <>
+                    <span style={{ fontSize: 13, color: MUTED }}>Close this case?</span>
+                    <span className={cd.dangerLink} onClick={closeCase}>Close case</span>
+                    <span className={cd.linkAction} onClick={() => setConfirmCloseCase(false)}>Cancel</span>
+                  </>
+                ) : (
+                  <span className={cd.dangerLink} onClick={() => setConfirmCloseCase(true)}>Close case</span>
+                )}
               </div>
             )}
           </div>
 
           <div className={cd.col}>
-            {canMessage && caseInfo.client && (
+            {canManage && caseInfo.client && (
               <Card title="Client">
                 <div className={cd.clientRow}>
                   <div className={cd.avatar}>{initialsOf(caseInfo.client)}</div>
@@ -1120,20 +1351,184 @@ export default function CaseDetailPage() {
                     {caseInfo.client_phone && <div className={cd.contactItem}><Icon name="phone" size={14} color="#8C857A" />{caseInfo.client_phone}</div>}
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                  <div
-                    className={styles.primaryChip}
-                    style={{ flex: 1, justifyContent: 'center', opacity: messaging || !caseInfo.client_id ? 0.6 : 1, cursor: messaging || !caseInfo.client_id ? 'default' : 'pointer' }}
-                    onClick={() => !messaging && openConversation(caseInfo.client_id)}
-                  >
-                    <Icon name="message-circle" size={15} color="#FCFAF4" /> {messaging ? 'Opening…' : 'Message'}
+                {(canMessage || caseInfo.client_phone) && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                    {canMessage && (
+                      <div
+                        className={styles.primaryChip}
+                        style={{ flex: 1, justifyContent: 'center', opacity: messaging || !caseInfo.client_id ? 0.6 : 1, cursor: messaging || !caseInfo.client_id ? 'default' : 'pointer' }}
+                        onClick={() => !messaging && openConversation(caseInfo.client_id)}
+                      >
+                        <Icon name="message-circle" size={15} color="#FCFAF4" /> {messaging ? 'Opening…' : 'Message'}
+                      </div>
+                    )}
+                    {caseInfo.client_phone && (
+                      <a href={`tel:${caseInfo.client_phone}`} className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
+                        <Icon name="phone" size={15} color={MUTED} /> Call
+                      </a>
+                    )}
                   </div>
-                  {caseInfo.client_phone && (
-                    <a href={`tel:${caseInfo.client_phone}`} className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
-                      <Icon name="phone" size={15} color={MUTED} /> Call
-                    </a>
-                  )}
-                </div>
+                )}
+              </Card>
+            )}
+
+            {canManage && (
+              <Card
+                title="Filing details"
+                action={!filingDetailsEditing ? <button className={cd.linkAction} onClick={openFilingDetailsEdit}>Edit</button> : undefined}
+              >
+                {filingDetailsEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input value={filingNumberInput} onChange={(e) => setFilingNumberInput(e.target.value)} placeholder="Filing number" style={inputStyle} />
+                    <input value={registrationNumberInput} onChange={(e) => setRegistrationNumberInput(e.target.value)} placeholder="Registration number" style={inputStyle} />
+                    <input value={actsSectionsInput} onChange={(e) => setActsSectionsInput(e.target.value)} placeholder="Acts & sections (e.g. IPC 420, 406)" style={inputStyle} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div className={styles.primaryChip} style={{ opacity: filingDetailsSaving ? 0.6 : 1 }} onClick={() => !filingDetailsSaving && saveFilingDetails()}>
+                        {filingDetailsSaving ? 'Saving…' : 'Save'}
+                      </div>
+                      <div className={styles.ghostChip} onClick={() => setFilingDetailsEditing(false)}>Cancel</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <Fact label="Filing number" value={caseInfo.filing_number ?? 'Not recorded'} />
+                    <Fact label="Registration number" value={caseInfo.registration_number ?? 'Not recorded'} />
+                    <Fact label="Acts & sections" value={caseInfo.acts_sections ?? 'Not recorded'} />
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {canManage && (
+              <Card
+                title="Claim value"
+                action={!claimValueEditing ? <button className={cd.linkAction} onClick={openClaimValueEdit}>Edit</button> : undefined}
+              >
+                {claimValueEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input
+                      type="number"
+                      min="0"
+                      value={claimValueInput}
+                      onChange={(e) => setClaimValueInput(e.target.value)}
+                      placeholder="Claim value in INR (leave blank to clear)"
+                      style={inputStyle}
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div className={styles.primaryChip} style={{ opacity: claimValueSaving ? 0.6 : 1 }} onClick={() => !claimValueSaving && saveClaimValue()}>
+                        {claimValueSaving ? 'Saving…' : 'Save'}
+                      </div>
+                      <div className={styles.ghostChip} onClick={() => setClaimValueEditing(false)}>Cancel</div>
+                    </div>
+                  </div>
+                ) : (
+                  <Fact label="Claim value" value={caseInfo.claim_value != null ? formatCompactINR(caseInfo.claim_value) : 'Not recorded'} />
+                )}
+              </Card>
+            )}
+
+            {canManage && (
+              <Card
+                title="Parties"
+                count={parties.length}
+                action={!partyFormOpen ? <button className={cd.linkAction} onClick={() => setPartyFormOpen(true)}>Add</button> : undefined}
+              >
+                {partyFormOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                    <input value={partyName} onChange={(e) => setPartyName(e.target.value)} placeholder="Name" style={inputStyle} />
+                    <input value={partyRole} onChange={(e) => setPartyRole(e.target.value)} placeholder="Role (e.g. Opposing Party)" style={inputStyle} />
+                    {partyError && <div style={{ fontSize: 12, color: '#B3282D' }}>{partyError}</div>}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div className={styles.primaryChip} style={{ opacity: addingParty || !partyName.trim() ? 0.6 : 1 }} onClick={addingParty ? undefined : submitParty}>
+                        {addingParty ? 'Adding…' : 'Add party'}
+                      </div>
+                      <div className={styles.ghostChip} onClick={() => { setPartyFormOpen(false); setPartyError('') }}>Cancel</div>
+                    </div>
+                  </div>
+                )}
+                {parties.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {parties.map((p) => (
+                      <div key={p.id} className={cd.listRow}>
+                        <div className={cd.rowTitle}>{p.name}</div>
+                        <div className={cd.metaRow}><span>{p.role}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : !partyFormOpen && (
+                  <Empty action={<div className={styles.ghostChip} onClick={() => setPartyFormOpen(true)}><Icon name="user-plus" size={15} color={MUTED} /> Add a party</div>}>
+                    No other parties recorded. Adding the opposing party here makes their name
+                    searchable in future conflict checks, firm-wide.
+                  </Empty>
+                )}
+              </Card>
+            )}
+
+            {canManage && (
+              <Card
+                title="Case Team"
+                count={caseInfo.lawyers.length}
+                action={!teamFormOpen ? <button className={cd.linkAction} onClick={openTeamForm}>Add</button> : undefined}
+              >
+                {teamFormOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                    {availableLoading ? (
+                      <div style={{ fontSize: 12.5, color: MUTED }}>Loading lawyers…</div>
+                    ) : (
+                      <select value={selectedLawyerId} onChange={(e) => setSelectedLawyerId(e.target.value)} style={inputStyle}>
+                        <option value="">Select a lawyer…</option>
+                        {availableLawyers.map((l) => (
+                          <option key={l.lawyer_id} value={l.lawyer_id}>{l.name} ({l.email})</option>
+                        ))}
+                      </select>
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div className={styles.primaryChip} style={{ opacity: addingTeammate || !selectedLawyerId ? 0.6 : 1 }} onClick={addingTeammate || !selectedLawyerId ? undefined : submitTeammate}>
+                        {addingTeammate ? 'Adding…' : 'Add to case'}
+                      </div>
+                      <div className={styles.ghostChip} onClick={() => { setTeamFormOpen(false); setSelectedLawyerId('') }}>Cancel</div>
+                    </div>
+                  </div>
+                )}
+                {caseInfo.lawyers.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {caseInfo.lawyers.map((l) => {
+                      // Self-removing the Primary leaves the case without one -- only an
+                      // admin can assign a new Primary afterward, so that specific removal
+                      // gets a sharper warning than the generic Remove/Keep confirm.
+                      const isSelfPrimary = l.assigned_role === 'Primary' && profile?.email === l.email
+                      return (
+                        <div key={l.lawyer_id} className={cd.listRow}>
+                          <div className={cd.rowTitle}>
+                            {l.name}
+                            {l.assigned_role && <span style={{ fontWeight: 400, color: MUTED, fontSize: 12 }}> · {l.assigned_role}</span>}
+                          </div>
+                          {confirmRemoveLawyerId === l.lawyer_id && isSelfPrimary && (
+                            <div style={{ fontSize: 12.5, color: '#B3282D', marginTop: 2 }}>
+                              You're the Primary on this case. Removing yourself leaves it without one --
+                              only an admin can assign a new Primary afterward.
+                            </div>
+                          )}
+                          <div className={cd.metaRow}>
+                            <span>{l.email}</span>
+                            {confirmRemoveLawyerId === l.lawyer_id ? (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeTeammate(l.lawyer_id)}>
+                                  {removingLawyerId === l.lawyer_id ? 'Removing…' : isSelfPrimary ? 'Remove anyway' : 'Remove'}
+                                </button>
+                                <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(null)}>Keep</button>
+                              </span>
+                            ) : (
+                              <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(l.lawyer_id)}>Remove</button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : !teamFormOpen && (
+                  <Empty>No lawyers assigned to this case yet.</Empty>
+                )}
               </Card>
             )}
 
@@ -1210,9 +1605,16 @@ export default function CaseDetailPage() {
                           <button className={cd.iconBtn} onClick={() => setNoteForm({ id: n.id, title: n.title ?? '', note: n.note, checklist: n.checklist ?? [] })} title="Edit note" aria-label="Edit note">
                             <Icon name="edit" size={14} color={MUTED} />
                           </button>
-                          <button className={cd.iconBtn} onClick={() => removeNote(n.id)} title="Delete note" aria-label="Delete note">
-                            <Icon name="trash-2" size={14} color="#B3282D" />
-                          </button>
+                          {confirmDeleteNoteId === n.id ? (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                              <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeNote(n.id)}>Delete</button>
+                              <button className={cd.linkAction} onClick={() => setConfirmDeleteNoteId(null)}>Keep</button>
+                            </span>
+                          ) : (
+                            <button className={cd.iconBtn} onClick={() => setConfirmDeleteNoteId(n.id)} title="Delete note" aria-label="Delete note">
+                              <Icon name="trash-2" size={14} color="#B3282D" />
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

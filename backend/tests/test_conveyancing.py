@@ -7,10 +7,10 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.middleware import auth
-from app.controllers.conveyancing import update_due_diligence, complete_progress_stage, update_matter, _next_matter_seq
-from app.models.conveyancing import DueDiligenceUpdate, MatterUpdate
+from app.controllers.conveyancing import update_due_diligence, complete_progress_stage, update_matter, create_matter, _next_matter_seq, upload_matter_document
+from app.models.conveyancing import DueDiligenceUpdate, MatterUpdate, MatterCreate
 
-
+import pytest
 def _fake_supabase(rows_by_table):
     fake = MagicMock()
 
@@ -65,6 +65,61 @@ def test_update_matter_rejects_matter_on_out_of_scope_case():
             assert e.status_code == 403
 
 
+def test_create_matter_sets_org_id_from_callers_profile():
+    """Verifies create_matter's underlying `cases` insert carries org_id from the caller's own
+    profile -- cases.org_id is NOT NULL, and this is a third case-creation path (besides
+    create_case and respond_client_request) that needed the same fix. Exercises:
+    `POST /conveyancing/matters` (`conveyancing.create_matter()`)."""
+    profile = {"role_id": auth.LAWYER, "user_id": 1, "org_id": 7}
+    fake = MagicMock()
+    tables: dict[str, MagicMock] = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "case_types":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"case_type_id": 1, "case_type_name": "Property"}]
+        elif name == "courts":
+            m.select.return_value.limit.return_value.execute.return_value.data = [{"court_id": 1}]
+        elif name == "cases":
+            m.select.return_value.execute.return_value.data = []
+            m.insert.return_value.execute.return_value.data = [{"case_id": 42, "case_number": "PROP2026001"}]
+        elif name == "lawyers":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"lawyer_id": 5}]
+        elif name == "properties":
+            m.insert.return_value.execute.return_value.data = [{"property_id": 1}]
+        elif name == "conveyancing_matters":
+            m.select.return_value.execute.return_value.data = []
+            m.insert.return_value.execute.return_value.data = [{"matter_id": 9}]
+        elif name in ("registration_progress", "due_diligence"):
+            m.insert.return_value.execute.return_value = MagicMock()
+        elif name == "clients":
+            m.select.return_value.eq.return_value.execute.return_value.data = []
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    with patch("app.controllers.conveyancing.supabase", fake):
+        create_matter(MatterCreate(matter_name="Test Matter", matter_type="Purchase", client_id=99), profile)
+
+    inserted = tables["cases"].insert.call_args[0][0]
+    assert inserted["org_id"] == 7
+
+
+def test_create_matter_rejects_super_admin_with_no_org():
+    """Verifies a super-admin caller (org_id None) is rejected with 400 before any DB work --
+    cases.org_id is NOT NULL, so create_matter's cases insert would otherwise hard-fail with a
+    constraint violation instead of a clean error, same pattern as admin.get_settings/
+    update_settings. Exercises: `POST /conveyancing/matters` (`conveyancing.create_matter()`)."""
+    profile = {"role_id": auth.SUPER_ADMIN, "user_id": 1, "org_id": None}
+    try:
+        create_matter(MatterCreate(matter_name="Test Matter", matter_type="Purchase", client_id=99), profile)
+        assert False, "expected HTTPException"
+    except HTTPException as e:
+        assert e.status_code == 400
+
+
 def test_next_matter_seq_skips_numbers_already_in_use():
     """Verifies the generated matter/case number clears every number already taken -- counting
     rows produced PROP2026010 while that case_number existed, breaking every create. Exercises:
@@ -82,6 +137,8 @@ if __name__ == "__main__":
     test_update_due_diligence_rejects_matter_on_out_of_scope_case()
     test_complete_progress_stage_rejects_matter_on_out_of_scope_case()
     test_update_matter_rejects_matter_on_out_of_scope_case()
+    test_create_matter_sets_org_id_from_callers_profile()
+    test_create_matter_rejects_super_admin_with_no_org()
     test_next_matter_seq_skips_numbers_already_in_use()
     print("ok")
 
@@ -139,3 +196,76 @@ def test_no_meetings_and_no_slots_is_zero():
 
 def test_a_client_with_no_matters_queries_nothing():
     assert _summary([], meetings=[], registrations=[])["stats"]["upcoming_appointments"] == 0
+
+
+def test_upload_matter_document_removes_storage_object_when_document_insert_fails():
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    file = MagicMock()
+    file.filename = "contract.pdf"
+    file.content_type = "application/pdf"
+    file.file.read.return_value = b"%PDF-1.4 test"
+
+    fake = MagicMock()
+    tables = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "conveyancing_matters":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"matter_id": 5, "case_id": 10}]
+        elif name == "document_types":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"document_type_id": 2}]
+        elif name == "documents":
+            m.insert.return_value.execute.side_effect = RuntimeError("document insert failed")
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    storage = fake.storage.from_.return_value
+
+    with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
+         patch("app.controllers.conveyancing.supabase", fake):
+        with pytest.raises(RuntimeError):
+            upload_matter_document(5, file, profile)
+
+    uploaded_path = storage.upload.call_args.args[0]
+    storage.remove.assert_called_once_with([uploaded_path])
+
+
+def test_upload_matter_document_cleans_document_row_when_link_insert_fails():
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    file = MagicMock()
+    file.filename = "contract.pdf"
+    file.content_type = "application/pdf"
+    file.file.read.return_value = b"%PDF-1.4 test"
+
+    fake = MagicMock()
+    tables = {}
+
+    def table(name):
+        if name in tables:
+            return tables[name]
+        m = MagicMock()
+        if name == "conveyancing_matters":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"matter_id": 5, "case_id": 10}]
+        elif name == "document_types":
+            m.select.return_value.eq.return_value.execute.return_value.data = [{"document_type_id": 2}]
+        elif name == "documents":
+            m.insert.return_value.execute.return_value.data = [{"document_id": 99, "file_name": "contract.pdf", "mime_type": "application/pdf"}]
+        elif name == "matter_documents":
+            m.insert.return_value.execute.side_effect = RuntimeError("link insert failed")
+        tables[name] = m
+        return m
+
+    fake.table.side_effect = table
+    storage = fake.storage.from_.return_value
+
+    with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
+         patch("app.controllers.conveyancing.supabase", fake):
+        with pytest.raises(RuntimeError):
+            upload_matter_document(5, file, profile)
+
+    uploaded_path = storage.upload.call_args.args[0]
+    storage.remove.assert_called_once_with([uploaded_path])
+    tables["documents"].delete.return_value.eq.assert_called_once_with("document_id", 99)

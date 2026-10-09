@@ -34,6 +34,7 @@ pip install -r requirements.txt
 
 ```bash
 cd data_prep && python3 prepare_in_abs.py && cd ..     # ~3 min, downloads from Zenodo
+cd data_prep && python3 prepare_ilc.py && cd ..        # ~1 min, downloads ILC (second eval set) from Hugging Face
 cd similar_cases && python3 build_index.py && cd ..    # ~9 min, embeds the corpus
 ```
 

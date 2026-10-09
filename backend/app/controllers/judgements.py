@@ -2,8 +2,11 @@
 
 from fastapi import Depends
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, get_current_profile, get_scoped_case_ids, require_roles
 from app.models.judgements import JudgementCreate
+
+# ponytail: hard cap, not real pagination -- same reasoning as cases.MAX_CASES.
+MAX_JUDGEMENTS = 1000
 
 JUDGEMENTS_SELECT = (
     "judgement_id,case_id,citation,court,bench,judgement_date,outcome,summary,reasoning,"
@@ -49,11 +52,11 @@ def list_judgements(profile: dict = Depends(get_current_profile)):
     query = supabase.table("judgements").select(JUDGEMENTS_SELECT)
     if case_ids is not None:
         query = query.in_("case_id", list(case_ids))
-    rows = query.order("judgement_date", desc=True).execute().data
+    rows = query.order("judgement_date", desc=True).limit(MAX_JUDGEMENTS).execute().data
     return [_to_judgement_summary(row) for row in rows]
 
 
-def create_judgement(data: JudgementCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def create_judgement(data: JudgementCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Create a judgement for a case the caller has access to. Calls: `ensure_case_access()`,
     `_to_judgement_summary()`."""
     ensure_case_access(data.case_id, profile)

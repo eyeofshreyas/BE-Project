@@ -1,7 +1,7 @@
 """Pydantic response schemas for the admin console: overview stats, the platform-wide
 activity feed, analytics, and platform settings."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 class AdminStats(BaseModel):
@@ -57,9 +57,52 @@ class AdminAnalytics(BaseModel):
     storage: StorageUsage
 
 
-class PlatformSettings(BaseModel):
-    """The single pinned `platform_settings` row (see migrate_platform_settings.sql)."""
-    maintenance_mode: bool
-    new_signup_alerts: bool
-    weekly_reports: bool
-    auto_backup: bool
+class LawyerInviteCreate(BaseModel):
+    """Request body for inviting a lawyer into the caller's organization."""
+    email: EmailStr
+
+
+class RazorpayOnboardingCreate(BaseModel):
+    """Request body for submitting a law firm's Razorpay Route KYC to create its linked account."""
+    business_name: str
+    business_type: str
+    pan: str
+    contact_email: EmailStr
+    contact_phone: str
+    bank_account_number: str
+    bank_ifsc: str
+
+
+class RazorpayAccountStatus(BaseModel):
+    """The caller's org's Razorpay Route onboarding status, for the admin console's Payment
+    Account panel."""
+    status: str
+    error: str | None
+
+
+class FirmAnalyticsCase(BaseModel):
+    """One case row shaped for the Firm Analytics tab's exposure filters and sum."""
+    case_id: int
+    case_title: str | None
+    client: str | None
+    client_id: int | None
+    case_type: str | None
+    status: str
+    claim_value: float | None
+    lawyer_ids: list[int]
+    lawyers: list[str]
+
+
+class LawyerWorkload(BaseModel):
+    """One lawyer's row in the Counsel Workload table."""
+    lawyer_id: int
+    lawyer_name: str
+    active_cases: int
+    upcoming_hearings: int
+    conflict_dates: list[str]
+
+
+class FirmAnalytics(BaseModel):
+    """Everything the Firm Analytics tab renders."""
+    cases: list[FirmAnalyticsCase]
+    workload: list[LawyerWorkload]

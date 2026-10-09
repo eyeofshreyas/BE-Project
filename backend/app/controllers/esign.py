@@ -8,6 +8,7 @@ See docs/FUTURE_SCOPE.md for why this is bought rather than built in-house."""
 import base64
 import hashlib
 import hmac
+import logging
 
 import httpx
 from fastapi import Depends, HTTPException
@@ -15,8 +16,10 @@ from app.controllers.case_history import add_timeline_event
 from app.controllers.documents import DOCUMENTS_BUCKET, DOCUMENTS_SELECT, _to_document_summary
 from app.core.config import LEEGALITY_API_BASE, LEEGALITY_AUTH_TOKEN, LEEGALITY_PRIVATE_SALT, LEEGALITY_WORKFLOW_PROFILE_ID
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, require_roles
 from app.models.documents import SignatureRequestCreate
+
+logger = logging.getLogger(__name__)
 
 
 def _leegality_auth() -> str:
@@ -26,13 +29,13 @@ def _leegality_auth() -> str:
     return LEEGALITY_AUTH_TOKEN
 
 
-def request_signature(document_id: int, data: SignatureRequestCreate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def request_signature(document_id: int, data: SignatureRequestCreate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Send a stored PDF to Leegality for signing by the given signers -- only PDFs can be sent,
     same restriction the Document Execution API itself enforces. Calls: `ensure_case_access()`,
     `_leegality_auth()`."""
     token = _leegality_auth()
 
-    rows = supabase.table("documents").select("case_id,file_path,mime_type,file_name").eq("document_id", document_id).execute().data
+    rows = supabase.table("documents").select("case_id,file_path,mime_type,file_name").eq("document_id", document_id).eq("is_deleted", False).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Document not found")
     doc = rows[0]
@@ -122,18 +125,27 @@ def handle_esign_webhook(payload: dict):
     update: dict = {"esign_status": status}
 
     if status == "COMPLETED":
-        details = httpx.get(
-            f"{LEEGALITY_API_BASE}/v3.3/document/details",
-            headers={"X-Auth-Token": LEEGALITY_AUTH_TOKEN},
-            params={"documentId": document_id, "file": "true"},
-            timeout=30,
-        )
-        file_url = details.json().get("data", {}).get("file")
-        if file_url:
-            signed_bytes = httpx.get(file_url, timeout=30).content
-            signed_path = f"case-{doc['case_id']}/signed-{document_id}.pdf"
-            supabase.storage.from_(DOCUMENTS_BUCKET).upload(signed_path, signed_bytes, {"content-type": "application/pdf"})
-            update["esign_signed_file_path"] = signed_path
+        try:
+            details = httpx.get(
+                f"{LEEGALITY_API_BASE}/v3.3/document/details",
+                headers={"X-Auth-Token": LEEGALITY_AUTH_TOKEN},
+                params={"documentId": document_id, "file": "true"},
+                timeout=30,
+            )
+            file_url = details.json().get("data", {}).get("file")
+            if file_url:
+                signed_bytes = httpx.get(file_url, timeout=30).content
+                signed_path = f"case-{doc['case_id']}/signed-{document_id}.pdf"
+                supabase.storage.from_(DOCUMENTS_BUCKET).upload(
+                    signed_path,
+                    signed_bytes,
+                    {"content-type": "application/pdf", "upsert": "true"},
+                )
+                update["esign_signed_file_path"] = signed_path
+        except Exception as err:
+            # Fetching/storing the signed PDF is best-effort -- esign_status still has to land
+            # below, or a flaky Leegality request leaves the document stuck at SENT forever.
+            logger.warning("Failed to store signed PDF for document %s: %s", document_id, err)
 
     supabase.table("documents").update(update).eq("document_id", doc["document_id"]).execute()
     return {"message": "ok"}

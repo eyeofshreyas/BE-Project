@@ -27,6 +27,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env      # then fill in SUPABASE_URL and SUPABASE_KEY
+cp frontend/.env.example frontend/.env
 ```
 
 `SUPABASE_URL` / `SUPABASE_KEY` are required — the server refuses to start
@@ -44,6 +45,63 @@ these without a tunnel (ngrok or similar) during development. Set it on
 **both** the invitee's **Webhook URL** (success events) and **Error Webhook
 URL** (rejections/failures) — they're separate fields, and a rejection only
 reaches LexFlow if the second one is filled in too.
+
+### Local webhook testing (ngrok)
+
+**Why ngrok is needed here:** when a firm submits its Razorpay onboarding
+KYC, Razorpay reviews it and then calls *your server back* to report the
+result (`account.activated` / `account.needs_clarification` /
+`account.rejected`) at `/webhooks/razorpay` — see
+`app/controllers/payments_webhook.py`. Razorpay's servers live on the public
+internet and have no way to reach `localhost:8000` on your machine directly;
+`localhost` only means something to processes on that same machine. Without
+a public URL for Razorpay to call, onboarding submissions stay stuck on
+"pending" forever during local development.
+
+[ngrok](https://ngrok.com/download) solves this by opening a tunnel: it
+hands you a public HTTPS URL that forwards straight through to your local
+port 8000, so Razorpay's webhook calls actually reach your real local
+server. Leegality's e-signature webhook has the exact same problem, for the
+same reason.
+
+This is a **local-development-only** need. Once the backend is deployed
+somewhere with a real domain, Razorpay's webhook points at
+`https://your-real-domain.com/webhooks/razorpay` directly and ngrok isn't
+involved at all.
+
+```bash
+# Install (pick one):
+brew install ngrok              # macOS
+sudo apt install ngrok          # Debian/Ubuntu, if the ngrok apt repo is set up
+choco install ngrok             # Windows (Chocolatey)
+# or download the binary/installer directly from https://ngrok.com/download
+
+ngrok config add-authtoken <your-token>   # from your ngrok dashboard, one-time
+```
+
+With the backend running, start the tunnel alongside it:
+
+```bash
+./start.sh --ngrok        # or: start.bat --ngrok on Windows
+```
+
+(`--ngrok` is opt-in — plain `./start.sh` never touches ngrok, so it's not
+required unless you're testing the webhook.) Or run it standalone in a
+separate terminal: `ngrok http 8000`.
+
+ngrok prints a `Forwarding` line with a URL like
+`https://ab12-34-56-78-90.ngrok-free.app`. In the Razorpay dashboard's
+Webhooks tab, create a webhook pointing at
+`https://<that-ngrok-id>.ngrok-free.app/webhooks/razorpay`, subscribed to the
+`account.activated` / `account.needs_clarification` / `account.rejected`
+events — the only three `payments_webhook.py` acts on. Razorpay shows you a
+webhook secret when you create it; put that in `RAZORPAY_WEBHOOK_SECRET` in
+`.env` (restart the backend after changing it).
+
+On the free ngrok tier, the forwarding URL changes every time you restart
+`ngrok http`, so you'll need to update the webhook URL in the Razorpay
+dashboard each session. A paid ngrok plan with a reserved domain avoids that,
+but isn't required just to test the flow locally.
 
 OCR on scanned PDFs/images (used by `/ai/summarize` and `/ai/translate` via
 `extract_document_text()`) needs the `tesseract-ocr` and `poppler-utils`

@@ -2,16 +2,19 @@
 by CNR number. No official government API exists for this -- services.ecourts.gov.in is a
 CAPTCHA-gated portal -- so this goes through eCourtsIndia's third-party partner API instead."""
 
+import logging
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import Depends, HTTPException
+from fastapi import BackgroundTasks, Depends, HTTPException
 from app.controllers.case_history import add_timeline_event
 from app.controllers.cases import CASES_SELECT, _to_case_summary
 from app.core.config import ECOURTS_API_BASE, ECOURTS_API_KEY
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, ensure_case_access, require_roles
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, ensure_case_access, require_roles
 from app.models.cases import CnrUpdate
+
+logger = logging.getLogger(__name__)
 
 
 def _ecourts_auth() -> str:
@@ -21,7 +24,7 @@ def _ecourts_auth() -> str:
     return ECOURTS_API_KEY
 
 
-def set_case_cnr(case_id: int, data: CnrUpdate, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def set_case_cnr(case_id: int, data: CnrUpdate, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Attach a case's 16-character eCourts CNR number so it can be synced.
     Calls: `ensure_case_access()`."""
     ensure_case_access(case_id, profile)
@@ -33,11 +36,75 @@ def set_case_cnr(case_id: int, data: CnrUpdate, profile: dict = Depends(require_
     return _to_case_summary(row)
 
 
-def sync_case_from_ecourts(case_id: int, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
-    """Pull the latest record for a case from eCourtsIndia by its CNR, store the raw
-    response, and log a timeline event. Auto-creating hearing rows from the response's
-    hearing-history is a follow-up once that field's exact shape is confirmed against a
-    live call -- ponytail: sync status/parties now, wire hearings once the schema is known.
+def _run_ecourts_sync(case_id: int, cnr: str, token: str, user_id: int) -> None:
+    """Background counterpart to sync_case_from_ecourts's inline checks: makes the
+    eCourtsIndia call, stores the result, and logs a timeline event. There's no request left
+    to raise an HTTPException to by the time this runs, so failures land in
+    cases.ecourts_sync_status/ecourts_sync_error instead."""
+    try:
+        resp = httpx.get(
+            f"{ECOURTS_API_BASE}/api/partner/case/{cnr}",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=15,
+        )
+        if resp.status_code == 404:
+            raise ValueError("This CNR isn't indexed by eCourts yet. Try again shortly.")
+        if resp.status_code >= 400:
+            raise ValueError("eCourts sync failed.")
+        record = resp.json()["data"]
+        # ponytail: log the raw payload until hearing-history auto-import is written (see
+        # docs/FUTURE_SCOPE.md §1.1); drop this once that mapping is in place.
+        logger.info("eCourts raw response for CNR %s: %s", cnr, record)
+        # caseStatus/courtCode live under courtCaseData, not at the top level of `data`
+        # -- see docs/FUTURE_SCOPE.md §1.1 for the confirmed response shape.
+        case_data = record.get("courtCaseData", {})
+
+        # Additive: only overwrite a field if this response actually carried one. A response
+        # shape eCourts changes on us (a renamed field, a court type that nests it differently
+        # -- courtCaseData itself was one such surprise, see docs/FUTURE_SCOPE.md §1.1) must
+        # not silently blank out a value a previous, working sync (or a manual edit) already
+        # set.
+        updates = {
+            "ecourts_raw": record,
+            "ecourts_last_synced_at": datetime.now(timezone.utc).isoformat(),
+            "ecourts_sync_status": "idle",
+            "ecourts_sync_error": None,
+        }
+        if case_data.get("caseStatus") is not None:
+            updates["ecourts_status"] = case_data["caseStatus"]
+        if case_data.get("filingNumber") is not None:
+            updates["filing_number"] = case_data["filingNumber"]
+        if case_data.get("registrationNumber") is not None:
+            updates["registration_number"] = case_data["registrationNumber"]
+        # ponytail: best-effort mapping, not a confirmed acts/sections field -- caseTypeSub is
+        # the only candidate seen in a live response so far (e.g. "Indian Penal Code - 411,"),
+        # and that was from a single-charge case. Upgrade once a multi-charge CNR confirms it,
+        # or finds the real field -- see docs/FUTURE_SCOPE.md §1.3.
+        if case_data.get("caseTypeSub"):
+            updates["acts_sections"] = case_data["caseTypeSub"].strip().rstrip(",").strip()
+        supabase.table("cases").update(updates).eq("case_id", case_id).execute()
+
+        add_timeline_event(
+            case_id, "ecourts_synced",
+            f"Synced with eCourts — status: {case_data.get('caseStatus', 'unknown')}",
+            f"CNR {cnr}, court {case_data.get('courtCode', 'n/a')}.",
+            user_id,
+        )
+    except Exception as exc:
+        logger.exception("Background eCourts sync failed for case %s", case_id)
+        supabase.table("cases").update({
+            "ecourts_sync_status": "error",
+            "ecourts_sync_error": str(exc)[:500],
+        }).eq("case_id", case_id).execute()
+
+
+def sync_case_from_ecourts(case_id: int, background_tasks: BackgroundTasks, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
+    """Queue a background pull of the latest record for a case from eCourtsIndia by its CNR
+    (the HTTP round trip is slow enough to move off the request thread) and return
+    immediately with ecourts_sync_status="syncing"; poll GET /cases for ecourts_sync_status
+    to flip to "idle"/"error". Auto-creating hearing rows from the response's hearing-history
+    is a follow-up once that field's exact shape is confirmed against a live call --
+    ponytail: sync status/parties now, wire hearings once the schema is known.
     Calls: `ensure_case_access()`, `_ecourts_auth()`."""
     ensure_case_access(case_id, profile)
     token = _ecourts_auth()
@@ -49,29 +116,8 @@ def sync_case_from_ecourts(case_id: int, profile: dict = Depends(require_roles(A
     if not cnr:
         raise HTTPException(status_code=400, detail="This case has no CNR number set yet. Add one first.")
 
-    resp = httpx.get(
-        f"{ECOURTS_API_BASE}/api/partner/case/{cnr}",
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=15,
-    )
-    if resp.status_code == 404:
-        raise HTTPException(status_code=404, detail="This CNR isn't indexed by eCourts yet. Try again shortly.")
-    if resp.status_code >= 400:
-        raise HTTPException(status_code=502, detail="eCourts sync failed.")
-    record = resp.json()["data"]
-
-    supabase.table("cases").update({
-        "ecourts_status": record.get("caseStatus"),
-        "ecourts_raw": record,
-        "ecourts_last_synced_at": datetime.now(timezone.utc).isoformat(),
-    }).eq("case_id", case_id).execute()
-
-    add_timeline_event(
-        case_id, "ecourts_synced",
-        f"Synced with eCourts — status: {record.get('caseStatus', 'unknown')}",
-        f"CNR {cnr}, court {record.get('courtCode', 'n/a')}.",
-        profile["user_id"],
-    )
+    supabase.table("cases").update({"ecourts_sync_status": "syncing", "ecourts_sync_error": None}).eq("case_id", case_id).execute()
+    background_tasks.add_task(_run_ecourts_sync, case_id, cnr, token, profile["user_id"])
 
     row = supabase.table("cases").select(CASES_SELECT).eq("case_id", case_id).execute().data[0]
     return _to_case_summary(row)

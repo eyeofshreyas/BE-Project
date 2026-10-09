@@ -1,6 +1,7 @@
 requests
 tqdm
 rouge-score
+pypdf==6.18.1
 
 # fine-tuning/eval/inference deps -- 1B model + QLoRA fits on a 4GB GPU (see SETUP.md)
 # install torch first: pip install torch --index-url https://download.pytorch.org/whl/cu126

@@ -20,12 +20,27 @@ export interface SignupPayload {
   password: string
   full_name: string
   phone: string
-  role: 'lawyer' | 'client'
+  role: 'lawyer' | 'client' | 'admin'
   bar_council_number?: string
   specialization?: string
   experience_years?: number
   address?: string
   preferred_language?: string
+  org_name?: string
+}
+
+export interface LawyerAssignment {
+  lawyer_id: number
+  name: string
+  email: string
+  phone: string | null
+  assigned_role: string | null
+}
+
+export interface AvailableLawyer {
+  lawyer_id: number
+  name: string
+  email: string
 }
 
 export interface CaseSummary {
@@ -42,6 +57,7 @@ export interface CaseSummary {
   lawyer: string | null
   lawyer_email: string | null
   lawyer_phone: string | null
+  lawyers: LawyerAssignment[]
   court: string | null
   case_type: string | null
   status: string
@@ -51,6 +67,12 @@ export interface CaseSummary {
   cnr_number: string | null
   ecourts_status: string | null
   ecourts_last_synced_at: string | null
+  ecourts_sync_status: 'idle' | 'syncing' | 'error'
+  ecourts_sync_error: string | null
+  filing_number: string | null
+  registration_number: string | null
+  acts_sections: string | null
+  claim_value: number | null
 }
 
 export interface CaseCreatePayload {
@@ -213,11 +235,13 @@ export interface DocumentSummary {
 }
 
 export interface AiSummary {
-  summary_text: string
+  summary_text: string | null
   translated_text: string | null
   keywords: string | null
   important_dates: string | null
   important_sections: string | null
+  status: 'pending' | 'done' | 'error'
+  error_message: string | null
 }
 
 export interface UserSummary {
@@ -227,7 +251,9 @@ export interface UserSummary {
   phone: string
   role: string | null
   is_active: boolean
+  suspended: boolean
   created_at: string
+  specialization: string | null
 }
 
 export interface NotificationSummary {
@@ -337,6 +363,10 @@ export interface ClientSummary {
   pending_amount: number
 }
 
+export interface SuspendedFirm {
+  firm_name: string
+}
+
 export interface HearingSummary {
   id: number
   case_id: number
@@ -383,6 +413,21 @@ export interface RazorpayOrder {
   key_id: string
 }
 
+export interface RazorpayAccountStatus {
+  status: 'not_started' | 'pending' | 'needs_clarification' | 'activated' | 'rejected'
+  error: string | null
+}
+
+export interface RazorpayOnboardingPayload {
+  business_name: string
+  business_type: string
+  pan: string
+  contact_email: string
+  contact_phone: string
+  bank_account_number: string
+  bank_ifsc: string
+}
+
 export interface InvoiceSummary {
   id: number
   invoice_number: string
@@ -394,6 +439,7 @@ export interface InvoiceSummary {
   issue_date: string
   due_date: string | null
   payment_status: string
+  razorpay_enabled: boolean
 }
 
 export interface PaymentSummary {
@@ -500,9 +546,88 @@ export interface AdminAnalytics {
   storage: { used_bytes: number; quota_bytes: number }
 }
 
-export interface PlatformSettings {
-  maintenance_mode: boolean
-  new_signup_alerts: boolean
-  weekly_reports: boolean
-  auto_backup: boolean
+export interface FirmAnalyticsCase {
+  case_id: number
+  case_title: string | null
+  client: string | null
+  client_id: number | null
+  case_type: string | null
+  status: string
+  claim_value: number | null
+  lawyer_ids: number[]
+  lawyers: string[]
+}
+
+export interface LawyerWorkload {
+  lawyer_id: number
+  lawyer_name: string
+  active_cases: number
+  upcoming_hearings: number
+  conflict_dates: string[]
+}
+
+export interface FirmAnalytics {
+  cases: FirmAnalyticsCase[]
+  workload: LawyerWorkload[]
+}
+
+export interface PartySummary {
+  id: number
+  case_id: number
+  name: string
+  role: string
+  created_at: string
+}
+
+export interface ConflictMatch {
+  source: 'client' | 'party'
+  name: string
+  case_id: number
+  case_number: string
+  lawyer: string | null
+  role: string | null
+}
+
+export interface ConflictSearchHistoryEntry {
+  search_id: number
+  name: string | null
+  case_number: string | null
+  result_count: number
+  created_at: string
+  searched_by: string | null
+}
+
+export interface TrustTransaction {
+  id: number
+  client_id: number
+  case_id: number | null
+  type: 'deposit' | 'disbursement' | 'invoice_payment'
+  amount: number
+  transaction_date: string
+  description: string | null
+  created_at: string
+}
+
+export interface TrustLedger {
+  client_id: number
+  org_id: number
+  transactions: TrustTransaction[]
+}
+
+export interface TrustBalance {
+  client_id: number
+  org_id: number
+  balance: number
+}
+
+/** The three totals that must agree -- see backend/app/controllers/trust.py. */
+export interface TrustReconciliation {
+  as_of: string
+  org_id: number
+  bank_balance: number | null
+  bank_statement_date: string | null
+  ledger_total: number
+  client_total: number
+  reconciled: boolean
+  client_balances: { client_id: number; balance: number }[]
 }

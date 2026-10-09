@@ -94,10 +94,10 @@ def test_request_signature_writes_status_and_timeline_event():
 
     fake = MagicMock()
     docs_mock = MagicMock()
-    docs_mock.select.return_value.eq.return_value.execute.side_effect = [
-        MagicMock(data=[doc_first]),
-        MagicMock(data=[doc_summary_row]),
-    ]
+    # request_signature filters out soft-deleted rows (.eq(document_id).eq(is_deleted)); the
+    # re-read for the response shape still matches on document_id alone.
+    docs_mock.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[doc_first])
+    docs_mock.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[doc_summary_row])
 
     def docs_update(payload):
         writes.append(("documents", payload))
@@ -211,6 +211,170 @@ def test_webhook_downloads_signed_file_on_completion():
         assert result == {"message": "ok"}
         assert writes[0]["esign_status"] == "COMPLETED"
         assert writes[0]["esign_signed_file_path"] == "case-10/signed-LEG123.pdf"
+
+def test_webhook_redelivery_is_idempotent():
+    """Verifies a redelivered Completed webhook succeeds when the signed PDF
+    already exists and still writes COMPLETED status."""
+    salt = "shh"
+    document_id = "LEG123"
+    mac = hmac.new(salt.encode(), document_id.encode(), hashlib.sha1).hexdigest()
+
+    writes = []
+    fake = MagicMock()
+
+    def table(name):
+        m = MagicMock()
+        if name == "documents":
+            m.select.return_value.eq.return_value.execute.return_value.data = [
+                {"document_id": 1, "case_id": 10, "file_name": "Deed.pdf"}
+            ]
+
+            def update(payload):
+                writes.append(payload)
+                return MagicMock(eq=MagicMock(return_value=MagicMock(execute=MagicMock())))
+
+            m.update.side_effect = update
+        return m
+
+    fake.table.side_effect = table
+    fake.storage.from_.return_value.upload.return_value = None
+
+    details_response = MagicMock(status_code=200)
+    details_response.json.return_value = {
+        "data": {"file": "https://cdn.leegality.com/short-lived-url"}
+    }
+    file_response = MagicMock(content=b"%PDF-1.4 signed bytes")
+
+    payload = {
+        "documentId": document_id,
+        "documentStatus": "Completed",
+        "mac": mac,
+    }
+
+    with patch("app.controllers.esign.supabase", fake), \
+         patch("app.controllers.esign.LEEGALITY_PRIVATE_SALT", salt), \
+         patch("app.controllers.esign.LEEGALITY_AUTH_TOKEN", "test"), \
+         patch(
+             "app.controllers.esign.httpx.get",
+             side_effect=[
+                 details_response,
+                 file_response,
+                 details_response,
+                 file_response,
+             ],
+        ):
+        result1 = handle_esign_webhook(payload)
+        result2 = handle_esign_webhook(payload)
+
+        assert result1 == {"message": "ok"}
+        assert result2 == {"message": "ok"}
+        assert writes[0]["esign_status"] == "COMPLETED"
+        assert writes[1]["esign_status"] == "COMPLETED"
+
+
+def test_webhook_writes_status_when_signed_file_upload_fails():
+    """Verifies a Completed webhook still writes COMPLETED status when
+    storing the signed PDF fails."""
+    salt = "shh"
+    document_id = "LEG123"
+    mac = hmac.new(salt.encode(), document_id.encode(), hashlib.sha1).hexdigest()
+
+    writes = []
+    fake = MagicMock()
+
+    def table(name):
+        m = MagicMock()
+        if name == "documents":
+            m.select.return_value.eq.return_value.execute.return_value.data = [
+                {"document_id": 1, "case_id": 10, "file_name": "Deed.pdf"}
+            ]
+
+            def update(payload):
+                writes.append(payload)
+                return MagicMock(
+                    eq=MagicMock(return_value=MagicMock(execute=MagicMock()))
+                )
+
+            m.update.side_effect = update
+        return m
+
+    fake.table.side_effect = table
+    fake.storage.from_.return_value.upload.side_effect = Exception(
+        "Storage upload failed"
+    )
+
+    details_response = MagicMock(status_code=200)
+    details_response.json.return_value = {
+        "data": {"file": "https://cdn.leegality.com/short-lived-url"}
+    }
+    file_response = MagicMock(content=b"%PDF-1.4 signed bytes")
+
+    payload = {
+        "documentId": document_id,
+        "documentStatus": "Completed",
+        "mac": mac,
+    }
+
+    with patch("app.controllers.esign.supabase", fake), \
+         patch("app.controllers.esign.LEEGALITY_PRIVATE_SALT", salt), \
+         patch("app.controllers.esign.LEEGALITY_AUTH_TOKEN", "test"), \
+         patch(
+             "app.controllers.esign.httpx.get",
+             side_effect=[details_response, file_response],
+         ):
+        result = handle_esign_webhook(payload)
+
+    assert result == {"message": "ok"}
+    assert writes[0]["esign_status"] == "COMPLETED"
+
+
+def test_webhook_writes_status_when_leegality_fetch_fails():
+    """Verifies a Completed webhook still writes COMPLETED status when fetching the
+    document details or downloading the signed PDF from Leegality raises -- not just
+    when the storage upload itself fails."""
+    salt = "shh"
+    document_id = "LEG123"
+    mac = hmac.new(salt.encode(), document_id.encode(), hashlib.sha1).hexdigest()
+
+    writes = []
+    fake = MagicMock()
+
+    def table(name):
+        m = MagicMock()
+        if name == "documents":
+            m.select.return_value.eq.return_value.execute.return_value.data = [
+                {"document_id": 1, "case_id": 10, "file_name": "Deed.pdf"}
+            ]
+
+            def update(payload):
+                writes.append(payload)
+                return MagicMock(
+                    eq=MagicMock(return_value=MagicMock(execute=MagicMock()))
+                )
+
+            m.update.side_effect = update
+        return m
+
+    fake.table.side_effect = table
+
+    payload = {
+        "documentId": document_id,
+        "documentStatus": "Completed",
+        "mac": mac,
+    }
+
+    with patch("app.controllers.esign.supabase", fake), \
+         patch("app.controllers.esign.LEEGALITY_PRIVATE_SALT", salt), \
+         patch("app.controllers.esign.LEEGALITY_AUTH_TOKEN", "test"), \
+         patch(
+             "app.controllers.esign.httpx.get",
+             side_effect=Exception("Leegality request timed out"),
+         ):
+        result = handle_esign_webhook(payload)
+
+    assert result == {"message": "ok"}
+    assert writes[0]["esign_status"] == "COMPLETED"
+    assert "esign_signed_file_path" not in writes[0]
 
 
 def test_webhook_marks_rejected_distinctly_from_pending():
@@ -341,7 +505,30 @@ if __name__ == "__main__":
     test_request_signature_writes_status_and_timeline_event()
     test_webhook_rejects_bad_mac()
     test_webhook_downloads_signed_file_on_completion()
+    test_webhook_redelivery_is_idempotent()
+    test_webhook_writes_status_when_signed_file_upload_fails()
+    test_webhook_writes_status_when_leegality_fetch_fails()
     test_webhook_marks_rejected_distinctly_from_pending()
     test_webhook_marks_expired_distinctly_from_pending()
     test_unconfigured_webhook_gives_clean_error_not_a_crash()
     print("ok")
+
+
+def test_a_deleted_document_cannot_be_sent_for_signature():
+    """Soft-deleted documents stayed reachable by id -- e-signing one would have pulled a file
+    the firm had already removed from the case."""
+    profile = {"role_id": 2, "user_id": 1}
+    fake = MagicMock()
+    docs_mock = MagicMock()
+    docs_mock.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+    fake.table.side_effect = lambda name: docs_mock if name == "documents" else MagicMock()
+
+    with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
+         patch("app.controllers.esign.supabase", fake), \
+         patch("app.controllers.esign.LEEGALITY_AUTH_TOKEN", "test"), \
+         patch("app.controllers.esign.LEEGALITY_WORKFLOW_PROFILE_ID", "wf1"):
+        try:
+            request_signature(1, SIGNERS, profile)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 404

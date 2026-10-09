@@ -56,7 +56,9 @@ def list_documents(profile: dict = Depends(get_current_profile)):
 
     summarized_ids: set[int] = set()
     if rows:
-        summary_rows = supabase.table("ai_summaries").select("document_id").in_(
+        # Only "done" counts as summarized -- a "pending" row exists as soon as /ai/summarize
+        # queues the background job, before there's anything to show.
+        summary_rows = supabase.table("ai_summaries").select("document_id").eq("status", "done").in_(
             "document_id", [r["document_id"] for r in rows]
         ).execute().data
         summarized_ids = {r["document_id"] for r in summary_rows}
@@ -79,14 +81,32 @@ def delete_document(document_id: int, profile: dict = Depends(get_current_profil
     return {"message": "Document deleted"}
 
 
+# What the case/matter file pickers offer (accept=".pdf,.doc,.docx,image/*,video/*").
+# The browser's accept attribute is a convenience, not a check -- anything can be posted
+# straight at the API, and an executable has no business in a case file.
+ALLOWED_DOCUMENT_EXTENSIONS = {
+    "pdf", "doc", "docx", "odt", "rtf", "txt",
+    "jpg", "jpeg", "png", "gif", "webp", "heic", "tif", "tiff", "bmp",
+    "mp4", "mov", "avi", "mkv", "webm",
+}
+
+
 def read_upload(file: UploadFile) -> bytes:
-    """Read an upload into memory, refusing an empty file or one over MAX_DOCUMENT_BYTES.
+    """Read an upload into memory, refusing an empty file, one over MAX_DOCUMENT_BYTES, or
+    one whose extension isn't an allowed document/image/video type.
 
     Reads one byte past the cap rather than the whole file, so an oversized upload never
     gets fully buffered in the API process. Starlette has already spooled the request body
     by the time a handler runs, so this bounds memory and stops the storage write -- it
     does not stop the bytes arriving. A Content-Length check in middleware would, if
     someone uploading 2 GB of video becomes a real problem."""
+    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else ""
+    if extension not in ALLOWED_DOCUMENT_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="That file type isn't accepted. Upload a PDF, Word document, image, or video.",
+        )
+
     content = file.file.read(MAX_DOCUMENT_BYTES + 1)
     if not content:
         raise HTTPException(status_code=400, detail="That file is empty")
@@ -113,15 +133,19 @@ def upload_document(
         storage_path, content, {"content-type": file.content_type or "application/octet-stream"}
     )
 
-    row = supabase.table("documents").insert({
-        "case_id": case_id,
-        "document_type_id": document_type_id,
-        "uploaded_by": profile["user_id"],
-        "file_name": file.filename or storage_path,
-        "file_path": storage_path,
-        "file_size": len(content),
-        "mime_type": file.content_type,
-    }).execute().data[0]
+    try:
+        row = supabase.table("documents").insert({
+            "case_id": case_id,
+            "document_type_id": document_type_id,
+            "uploaded_by": profile["user_id"],
+            "file_name": file.filename or storage_path,
+            "file_path": storage_path,
+            "file_size": len(content),
+            "mime_type": file.content_type,
+        }).execute().data[0]
+    except Exception:
+        supabase.storage.from_(DOCUMENTS_BUCKET).remove([storage_path])
+        raise
 
     result = supabase.table("documents").select(DOCUMENTS_SELECT).eq("document_id", row["document_id"]).execute().data[0]
     return _to_document_summary(result)
@@ -132,7 +156,7 @@ def get_document_download_url(document_id: int, download: bool = False, profile:
     `download=true` marks the URL as an attachment so the browser saves instead of opening it inline.
     Calls: `get_scoped_case_ids()`."""
     case_ids = get_scoped_case_ids(profile)
-    rows = supabase.table("documents").select("case_id,file_path").eq("document_id", document_id).execute().data
+    rows = supabase.table("documents").select("case_id,file_path").eq("document_id", document_id).eq("is_deleted", False).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Document not found")
     if case_ids is not None and rows[0]["case_id"] not in case_ids:
@@ -215,13 +239,13 @@ def get_document_summary(document_id: int, profile: dict = Depends(get_current_p
     404 if none exists yet. Calls: `get_scoped_case_ids()`."""
     case_ids = get_scoped_case_ids(profile)
     if case_ids is not None:
-        doc_rows = supabase.table("documents").select("case_id").eq("document_id", document_id).execute().data
+        doc_rows = supabase.table("documents").select("case_id").eq("document_id", document_id).eq("is_deleted", False).execute().data
         if not doc_rows or doc_rows[0]["case_id"] not in case_ids:
             raise HTTPException(status_code=403, detail="You don't have access to this document")
 
     rows = (
         supabase.table("ai_summaries")
-        .select("summary_text,translated_text,keywords,important_dates,important_sections")
+        .select("summary_text,translated_text,keywords,important_dates,important_sections,status,error_message")
         .eq("document_id", document_id)
         .order("summary_id", desc=True)
         .limit(1)

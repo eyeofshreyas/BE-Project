@@ -4,7 +4,7 @@
 
 from datetime import datetime, timezone
 
-from fastapi import Depends, HTTPException
+from fastapi import BackgroundTasks, Depends, HTTPException
 from app.core.config import FRONTEND_URL
 from app.core.email import send_email
 from app.db.supabase_client import supabase
@@ -41,7 +41,7 @@ def _to_summary(row: dict) -> dict:
     }
 
 
-def send_client_request(data: ClientRequestCreate, profile: dict = Depends(require_roles(LAWYER))):
+def send_client_request(data: ClientRequestCreate, background_tasks: BackgroundTasks, profile: dict = Depends(require_roles(LAWYER))):
     """Send an invite to a client by email (existing user or not-yet-registered), notify
     an existing user in-app, and always email a link. Calls: `send_email()`, `_to_summary()`."""
     lawyer_rows = supabase.table("lawyers").select("lawyer_id").eq("user_id", profile["user_id"]).execute().data
@@ -69,21 +69,25 @@ def send_client_request(data: ClientRequestCreate, profile: dict = Depends(requi
     row = supabase.table("client_requests").insert(insert).execute().data[0]
     result = supabase.table("client_requests").select(CLIENT_REQUESTS_SELECT).eq("request_id", row["request_id"]).execute().data[0]
 
+    org_rows = supabase.table("organizations").select("name").eq("org_id", profile["org_id"]).execute().data if profile.get("org_id") else []
+    firm_name = org_rows[0]["name"] if org_rows else "their firm"
+
     if user_rows:
         supabase.table("notifications").insert({
             "user_id": user_rows[0]["user_id"],
             "case_id": None,
             "title": "New client request",
-            "message": f"{profile['full_name']} would like to connect with you on LexFlow.",
+            "message": f"{profile['full_name']} of {firm_name} would like to connect with you on LexFlow.",
             "notification_type": "client_request",
             "is_read": False,
         }).execute()
 
     destination = "/signup" if "invite_email" in insert else "/login"
-    send_email(
+    background_tasks.add_task(
+        send_email,
         data.email,
-        f"{profile['full_name']} invited you to LexFlow",
-        f"{profile['full_name']} would like to connect with you on LexFlow.\n\n"
+        f"{profile['full_name']} of {firm_name} invited you to LexFlow",
+        f"{profile['full_name']} of {firm_name} would like to connect with you on LexFlow.\n\n"
         f"Go to {FRONTEND_URL}{destination} to view and respond to this request.",
     )
 
@@ -131,7 +135,13 @@ def respond_client_request(request_id: int, data: ClientRequestDecision, profile
         raise HTTPException(status_code=400, detail="This request has already been responded to")
 
     now = datetime.now(timezone.utc).isoformat()
-    lawyer_user_id = supabase.table("lawyers").select("user_id").eq("lawyer_id", request_row["lawyer_id"]).execute().data[0]["user_id"]
+    lawyer_row = supabase.table("lawyers").select("user_id,users(org_id)").eq("lawyer_id", request_row["lawyer_id"]).execute().data[0]
+    lawyer_user_id = lawyer_row["user_id"]
+    # cases.org_id is NOT NULL -- a lawyer whose account isn't linked to a firm (shouldn't
+    # happen via /signup, which always requires an org-scoped invite, but data can drift)
+    # would otherwise crash the insert below with a raw DB constraint error.
+    if data.decision == "accept" and lawyer_row["users"]["org_id"] is None:
+        raise HTTPException(status_code=500, detail="This lawyer's account isn't linked to a firm. Contact support.")
 
     if data.decision == "decline":
         supabase.table("client_requests").update({"status": "declined", "responded_at": now}).eq("request_id", request_id).execute()
@@ -151,6 +161,7 @@ def respond_client_request(request_id: int, data: ClientRequestDecision, profile
             "client_id": client_id,
             "court_id": request_row["court_id"],
             "case_type_id": request_row["case_type_id"],
+            "org_id": lawyer_row["users"]["org_id"],
             "status": "Open",
             "priority": "Medium",
         }).execute().data[0]

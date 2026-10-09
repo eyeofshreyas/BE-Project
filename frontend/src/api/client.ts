@@ -27,6 +27,8 @@ import type {
   HearingSummary,
   ClientSummary,
   RazorpayOrder,
+  RazorpayAccountStatus,
+  RazorpayOnboardingPayload,
   JudgementSummary,
   JudgementCreatePayload,
   CaseCreatePayload,
@@ -38,6 +40,10 @@ import type {
   MatterProgressStage,
   ConversationSummary,
   ConversationDetail,
+  TrustBalance,
+  TrustLedger,
+  TrustTransaction,
+  TrustReconciliation,
   MessageSummary,
   SimilarCaseResult,
   SimilarCaseDetail,
@@ -46,8 +52,13 @@ import type {
   AdminStats,
   ActivityEvent,
   AdminAnalytics,
-  PlatformSettings,
+  FirmAnalytics,
   UserDeleteImpact,
+  PartySummary,
+  ConflictMatch,
+  ConflictSearchHistoryEntry,
+  AvailableLawyer,
+  SuspendedFirm,
 } from '../types/api'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -196,13 +207,36 @@ export function getDocumentSummary(documentId: number) {
 }
 
 /** Summarizes a document. With no `text`, the backend reads the stored file's own text --
- * pass text only to override that (a scan, or a file type it can't read). */
+ * pass text only to override that (a scan, or a file type it can't read). Extracting that
+ * text (OCR included) runs in the backend as a queued job, so this returns immediately with
+ * status "pending" in that case; poll getDocumentSummary() for the result. Passing `text`
+ * skips extraction and answers with status "done" and the summary inline. */
 export function summarizeDocument(documentId: number, text = '') {
-  return post<{ summary: string }>('/ai/summarize', { text, document_id: documentId })
+  return post<{ summary: string; status: 'pending' | 'done' }>('/ai/summarize', { text, document_id: documentId })
 }
 
 export function requestSignature(documentId: number, signers: { name: string; email: string }[]) {
   return post<DocumentSummary>(`/documents/${documentId}/request-signature`, { signers })
+}
+
+export function listCaseParties(caseId: number) {
+  return get<PartySummary[]>(`/cases/${caseId}/parties`)
+}
+
+export function addCaseParty(caseId: number, name: string, role?: string) {
+  return post<PartySummary>(`/cases/${caseId}/parties`, { name, role })
+}
+
+export function searchConflicts(criteria: { name?: string; clientId?: number; caseNumber?: string }) {
+  const params = new URLSearchParams()
+  if (criteria.name) params.set('name', criteria.name)
+  if (criteria.clientId != null) params.set('client_id', String(criteria.clientId))
+  if (criteria.caseNumber) params.set('case_number', criteria.caseNumber)
+  return get<ConflictMatch[]>(`/conflict-check?${params.toString()}`)
+}
+
+export function listConflictSearchHistory() {
+  return get<ConflictSearchHistoryEntry[]>('/conflict-check/history')
 }
 
 export function findSimilarCases(query: string, topK = 5) {
@@ -234,12 +268,32 @@ export function setUserStatus(userId: number, isActive: boolean) {
   return patch<UserSummary>(`/users/${userId}/status`, { is_active: isActive })
 }
 
-export function adminUpdateUser(userId: number, payload: { full_name: string; phone: string }) {
+export function setClientFirmStatus(userId: number, isActive: boolean) {
+  return patch<UserSummary>(`/users/${userId}/firm-status`, { is_active: isActive })
+}
+
+export function adminUpdateUser(userId: number, payload: { full_name: string; phone: string; specialization?: string }) {
   return patch<UserSummary>(`/users/${userId}`, payload)
+}
+
+export function listLawyerSpecializations() {
+  return get<string[]>('/reference/lawyer-specializations')
 }
 
 export function getUserDeleteImpact(userId: number) {
   return get<UserDeleteImpact>(`/users/${userId}/impact`)
+}
+
+export function inviteLawyer(email: string) {
+  return post<{ message: string }>('/admin/lawyer-invites', { email })
+}
+
+export function getRazorpayAccountStatus() {
+  return get<RazorpayAccountStatus>('/admin/razorpay-account')
+}
+
+export function submitRazorpayOnboarding(payload: RazorpayOnboardingPayload) {
+  return post<RazorpayAccountStatus>('/admin/razorpay-account', payload)
 }
 
 /** Irreversible: removes the user and everything cascading off them. Show the impact first. */
@@ -263,12 +317,12 @@ export function getAdminAnalytics() {
   return get<AdminAnalytics>('/admin/analytics')
 }
 
-export function getPlatformSettings() {
-  return get<PlatformSettings>('/admin/settings')
+export function getFirmAnalytics() {
+  return get<FirmAnalytics>('/admin/firm-analytics')
 }
 
-export function updatePlatformSettings(payload: PlatformSettings) {
-  return patch<PlatformSettings>('/admin/settings', payload)
+export function updateCaseClaimValue(caseId: number, claimValue: number | null) {
+  return patch<CaseSummary>(`/cases/${caseId}/claim-value`, { claim_value: claimValue })
 }
 
 export function listNotifications() {
@@ -331,8 +385,16 @@ export function changeCaseStatus(caseId: number, newStatus: string) {
   return patch<{ current_status: string | null }>(`/cases/${caseId}/status`, { new_status: newStatus })
 }
 
-export function unassignLawyer(caseId: number) {
-  return post<CaseSummary>(`/cases/${caseId}/unassign-lawyer`, {})
+export function removeLawyerFromCase(caseId: number, lawyerId: number) {
+  return del<CaseSummary>(`/cases/${caseId}/lawyers/${lawyerId}`)
+}
+
+export function addLawyerToCase(caseId: number, lawyerId: number, assignedRole = 'Associate') {
+  return post<CaseSummary>(`/cases/${caseId}/lawyers`, { lawyer_id: lawyerId, assigned_role: assignedRole })
+}
+
+export function listAvailableCaseLawyers(caseId: number) {
+  return get<AvailableLawyer[]>(`/cases/${caseId}/available-lawyers`)
 }
 
 export function setCaseCnr(caseId: number, cnrNumber: string) {
@@ -341,6 +403,10 @@ export function setCaseCnr(caseId: number, cnrNumber: string) {
 
 export function syncCaseEcourts(caseId: number) {
   return post<CaseSummary>(`/cases/${caseId}/sync-ecourts`, {})
+}
+
+export function updateCaseFilingDetails(caseId: number, payload: { filing_number?: string; registration_number?: string; acts_sections?: string }) {
+  return patch<CaseSummary>(`/cases/${caseId}/filing-details`, payload)
 }
 
 export function listInvoices() {
@@ -377,6 +443,10 @@ export function listHearings() {
 
 export function listJudges() {
   return get<JudgeOption[]>('/reference/judges')
+}
+
+export function createJudge(payload: { judge_name: string; court_id: number; designation?: string }) {
+  return post<JudgeOption>('/reference/judges', payload)
 }
 
 /** `allow_duplicate` re-sends a hearing the backend refused as a possible double-submit. */
@@ -419,6 +489,10 @@ export function updateHearingStatus(hearingId: number, hearing_status: string) {
 
 export function listClients() {
   return get<ClientSummary[]>('/clients')
+}
+
+export function listMySuspensions() {
+  return get<SuspendedFirm[]>('/clients/me/suspensions')
 }
 
 export function sendInvoiceReminder(invoiceId: number) {
@@ -484,3 +558,27 @@ export function sendMessage(conversationId: number, body: string, file?: File | 
   return postForm<MessageSummary>(`/messages/conversations/${conversationId}/messages`, formData)
 }
 
+
+export function getTrustBalance(clientId: number) {
+  return get<TrustBalance>(`/trust/clients/${clientId}/balance`)
+}
+
+export function getTrustLedger(clientId: number) {
+  return get<TrustLedger>(`/trust/clients/${clientId}/transactions`)
+}
+
+export function createTrustTransaction(payload: { client_id: number; case_id?: number | null; type: 'deposit' | 'disbursement'; amount: number; transaction_date: string; description?: string }) {
+  return post<TrustTransaction>('/trust/transactions', payload)
+}
+
+export function payInvoiceFromTrust(invoiceId: number) {
+  return post<{ invoice_id: number; client_id: number; amount_paid: number; remaining_trust_balance: number }>(`/invoices/${invoiceId}/pay-from-trust`, {})
+}
+
+export function getTrustReconciliation(asOf?: string) {
+  return get<TrustReconciliation>(`/trust/reconciliation${asOf ? `?as_of=${asOf}` : ''}`)
+}
+
+export function createTrustBankStatement(payload: { statement_date: string; bank_balance: number; notes?: string }) {
+  return post('/trust/bank-statements', payload)
+}

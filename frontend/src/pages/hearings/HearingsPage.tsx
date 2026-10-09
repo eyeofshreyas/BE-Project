@@ -278,16 +278,16 @@ function ClientHearingsView() {
         {!loading && (
           <>
             <div className={styles.statCards}>
-              <div className={styles.statCard}>
+              <div className={styles.statCard} style={{ cursor: 'pointer' }} onClick={() => setViewDate(new Date())} title="Jump calendar to today">
                 <div className={styles.statIconRow}><span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>Today's Hearings</span><Icon name="calendar" size={16} color={PRIMARY} /></div>
                 <div className={styles.statValue}>{String(todaysCount).padStart(2, '0')}</div>
               </div>
-              <div className={styles.statCard}>
+              <div className={styles.statCard} style={{ cursor: 'pointer' }} onClick={() => setViewDate(new Date())} title="Jump calendar to today">
                 <div className={styles.statIconRow}><span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>Upcoming</span><Icon name="calendar" size={16} color={PRIMARY} /></div>
                 <div className={styles.statValue}>{String(upcomingCount).padStart(2, '0')}</div>
                 <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>across {hearings.length} total</div>
               </div>
-              <div className={styles.statCard}>
+              <div className={styles.statCard} style={{ cursor: 'pointer' }} onClick={() => setViewDate(new Date())} title="Jump calendar to today">
                 <div className={styles.statIconRow}><span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>Calendar Events</span><Icon name="calendar" size={16} color={PRIMARY} /></div>
                 <div className={styles.statValue}>{hearings.length}</div>
               </div>

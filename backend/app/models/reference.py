@@ -36,6 +36,13 @@ class Judge(BaseModel):
     court_name: str | None
 
 
+class JudgeCreate(BaseModel):
+    """Request body for adding a judge."""
+    judge_name: str
+    court_id: int
+    designation: str | None = None
+
+
 class DocumentType(BaseModel):
     """Document type lookup row."""
     document_type_id: int

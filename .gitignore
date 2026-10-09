@@ -1,5 +1,6 @@
 backend/.venv/
 backend/.env
+frontend/.env
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -11,4 +12,9 @@ logs/
 .worktrees/
 .firecrawl/
 mermaid-skill/
+brag-output/
 CLAUDE.md
+.claude/
+.agents/
+PRESENTATION_NOTES.md
+finetune-summarizer/

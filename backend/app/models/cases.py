@@ -1,17 +1,43 @@
 """Pydantic request/response schemas for cases."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CaseCreate(BaseModel):
-    """Request body for creating a case."""
+    """Request body for creating a case. Strings are stripped first, so a title of only
+    spaces fails min_length rather than creating an untitled case."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     case_type_id: int
-    case_title: str
+    case_title: str = Field(min_length=1)
     client_id: int
     court_id: int
     priority: str = "Medium"
     next_hearing_date: str | None = None
     description: str | None = None
+    claim_value: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+
+class LawyerAssignment(BaseModel):
+    """One active case_lawyers row, shaped for the case-team list."""
+    lawyer_id: int
+    name: str
+    email: str
+    phone: str | None
+    assigned_role: str | None
+
+
+class AvailableLawyer(BaseModel):
+    """A lawyer in the case's own organization, offered by the add-teammate picker."""
+    lawyer_id: int
+    name: str
+    email: str
+
+
+class AddLawyerRequest(BaseModel):
+    """Request body for adding a teammate to a case."""
+    lawyer_id: int
+    assigned_role: str = "Associate"
 
 
 class CaseSummary(BaseModel):
@@ -29,6 +55,7 @@ class CaseSummary(BaseModel):
     lawyer: str | None
     lawyer_email: str | None
     lawyer_phone: str | None
+    lawyers: list[LawyerAssignment]
     court: str | None
     case_type: str | None
     status: str
@@ -38,8 +65,31 @@ class CaseSummary(BaseModel):
     cnr_number: str | None
     ecourts_status: str | None
     ecourts_last_synced_at: str | None
+    ecourts_sync_status: str
+    ecourts_sync_error: str | None
+    filing_number: str | None
+    registration_number: str | None
+    acts_sections: str | None
+    claim_value: float | None
 
 
 class CnrUpdate(BaseModel):
     """Request body for attaching a case's eCourts CNR number."""
     cnr_number: str
+
+
+class CaseFilingUpdate(BaseModel):
+    """Request body for editing a case's court-assigned filing/registration numbers and
+    acts/sections -- manually entered (see docs/FUTURE_SCOPE.md for why eCourts sync doesn't
+    fill these in yet). Every field optional; only the ones sent are written."""
+    filing_number: str | None = None
+    registration_number: str | None = None
+    acts_sections: str | None = None
+
+
+class CaseClaimValueUpdate(BaseModel):
+    """Request body for setting or revising a case's claim value -- the estimated
+    monetary value of the matter, used by the Firm Analytics tab's exposure total.
+    Always writes exactly what's sent, including null (clearing it) -- there's no
+    other field on this model to leave alone."""
+    claim_value: float | None = Field(default=None, ge=0, allow_inf_nan=False)

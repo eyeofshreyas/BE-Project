@@ -153,11 +153,11 @@ export default function GenerateInvoicePage() {
           <span className={styles.statusBadge} style={{ color: '#1A2551', background: '#E6E0CE' }}>DRAFT STATUS</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 20, alignItems: 'start' }}>
+        <div className={styles.stackOnMobile} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 20, alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
             <div className={styles.panelCard}>
               <div className={styles.panelTitle}>Client Details</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
                 <div ref={clientBoxRef} style={{ position: 'relative' }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#575145', marginBottom: 5 }}>Client Name</div>
                   <input
@@ -204,21 +204,23 @@ export default function GenerateInvoicePage() {
                 <div className={styles.ghostChip} style={{ padding: '6px 12px', fontSize: 12.5 }} onClick={addItem}><Icon name="plus" size={13} color="#575145" /> Add Item</div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 110px 28px', gap: 8, fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>
-                  <div>Description</div><div>Qty / Hrs</div><div>Rate (₹)</div><div>Amount</div><div />
-                </div>
-                {parsedItems.map((it, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 110px 28px', gap: 8, alignItems: 'center' }}>
-                    <input value={it.description} onChange={(e) => updateItem(i, 'description', e.target.value)} style={fieldStyle()} />
-                    <input type="number" min="0" value={it.qty} onChange={(e) => updateItem(i, 'qty', e.target.value)} style={fieldStyle()} />
-                    <input type="number" min="0" value={it.rate} onChange={(e) => updateItem(i, 'rate', e.target.value)} style={fieldStyle()} />
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17', textAlign: 'right' }}>{money(it.amount)}</div>
-                    <div onClick={() => items.length > 1 && removeItem(i)} style={{ cursor: items.length > 1 ? 'pointer' : 'default', opacity: items.length > 1 ? 1 : 0.3, display: 'flex', justifyContent: 'center' }}>
-                      <Icon name="trash-2" size={15} color="#B3282D" />
-                    </div>
+              <div style={{ overflowX: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, minWidth: 480 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 90px 110px 110px 28px', gap: 8, fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em' }}>
+                    <div>Description</div><div>Qty / Hrs</div><div>Rate (₹)</div><div>Amount</div><div />
                   </div>
-                ))}
+                  {parsedItems.map((it, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 90px 110px 110px 28px', gap: 8, alignItems: 'center' }}>
+                      <input value={it.description} onChange={(e) => updateItem(i, 'description', e.target.value)} style={fieldStyle()} />
+                      <input type="number" min="0" value={it.qty} onChange={(e) => updateItem(i, 'qty', e.target.value)} style={fieldStyle()} />
+                      <input type="number" min="0" value={it.rate} onChange={(e) => updateItem(i, 'rate', e.target.value)} style={fieldStyle()} />
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A17', textAlign: 'right' }}>{money(it.amount)}</div>
+                      <div onClick={() => items.length > 1 && removeItem(i)} style={{ cursor: items.length > 1 ? 'pointer' : 'default', opacity: items.length > 1 ? 1 : 0.3, display: 'flex', justifyContent: 'center' }}>
+                        <Icon name="trash-2" size={15} color="#B3282D" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div style={{ borderTop: '1px solid #F1EDE0', marginTop: 16, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -290,12 +292,12 @@ export default function GenerateInvoicePage() {
                 </div>
 
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px 60px 70px', gap: 6, fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', borderBottom: '1px solid #F1EDE0', paddingBottom: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 40px 60px 70px', gap: 6, fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', borderBottom: '1px solid #F1EDE0', paddingBottom: 6 }}>
                     <div>Description</div><div>Hrs</div><div>Rate</div><div style={{ textAlign: 'right' }}>Amount</div>
                   </div>
                   {parsedItems.filter((it) => it.description.trim()).map((it, i) => (
-                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 40px 60px 70px', gap: 6, fontSize: 11.5, padding: '7px 0', borderBottom: '1px solid #F8F2E4' }}>
-                      <div style={{ color: PRIMARY, fontWeight: 600 }}>{it.description}</div>
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 40px 60px 70px', gap: 6, fontSize: 11.5, padding: '7px 0', borderBottom: '1px solid #F8F2E4' }}>
+                      <div style={{ color: PRIMARY, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.description}</div>
                       <div style={{ color: MUTED }}>{it.qty}</div>
                       <div style={{ color: MUTED }}>{money(Number(it.rate) || 0).replace('.00', '')}</div>
                       <div style={{ textAlign: 'right', fontWeight: 600 }}>{money(it.amount).replace('.00', '')}</div>

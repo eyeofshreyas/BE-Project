@@ -5,7 +5,7 @@
  * checklist. A client sees the same page read-only but can still upload a requested document. */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument, updateDueDiligence, completeProgressStage } from '../../api/client'
+import { getMatterDetail, getDocumentDownloadUrl, uploadMatterDocument, deleteDocument, updateDueDiligence, completeProgressStage } from '../../api/client'
 import type { MatterDetail, UserProfile } from '../../types/api'
 import { Icon } from '../../components/icons'
 import { canRenderInline, uploadRejection } from '../../utils/files'
@@ -67,6 +67,7 @@ export default function MatterDetailPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -118,6 +119,16 @@ export default function MatterDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to update due diligence.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function removeDocument(documentId: number) {
+    try {
+      await deleteDocument(documentId)
+      setMatter((prev) => (prev ? { ...prev, documents: prev.documents.filter((d) => d.document_id !== documentId) } : prev))
+      setConfirmDeleteDoc(null)
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Failed to delete the document.')
     }
   }
 
@@ -259,12 +270,12 @@ export default function MatterDetailPage() {
                     <div key={d.matter_document_id} style={{ padding: '10px 14px', border: '1px solid #CFC6B0', borderRadius: 3 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <Icon name="file-text" size={17} color={MUTED} />
-                        <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1A17' }}>{d.file_name ?? 'Document'}</div>
-                        <span className={styles.statusBadge} style={d.is_verified ? { color: '#4A6B4E', background: '#E4EDE5' } : { color: '#8A6A2F', background: '#F3EBD9' }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1A17', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file_name ?? 'Document'}</div>
+                        <span className={styles.statusBadge} style={{ flexShrink: 0, ...(d.is_verified ? { color: '#4A6B4E', background: '#E4EDE5' } : { color: '#8A6A2F', background: '#F3EBD9' }) }}>
                           {d.is_verified ? 'Verified' : d.is_required ? 'Required' : 'Pending'}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
+                      <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
                         <span
                           style={{ fontSize: 12.5, fontWeight: 600, color: '#23306B', cursor: 'pointer' }}
                           onClick={() => (d.mime_type && canRenderInline(d.mime_type) ? navigate(`/documents/${d.document_id}`) : downloadDoc(d.document_id))}
@@ -272,6 +283,14 @@ export default function MatterDetailPage() {
                           Preview
                         </span>
                         <span style={{ fontSize: 12.5, fontWeight: 600, color: '#23306B', cursor: 'pointer' }} onClick={() => downloadDoc(d.document_id)}>Download</span>
+                        {confirmDeleteDoc === d.document_id ? (
+                          <>
+                            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#B3282D', cursor: 'pointer' }} onClick={() => removeDocument(d.document_id)}>Confirm Delete</span>
+                            <span style={{ fontSize: 12.5, fontWeight: 600, color: MUTED, cursor: 'pointer' }} onClick={() => setConfirmDeleteDoc(null)}>Keep</span>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#B3282D', cursor: 'pointer' }} onClick={() => setConfirmDeleteDoc(d.document_id)}>Delete</span>
+                        )}
                       </div>
                     </div>
                   ))}

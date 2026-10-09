@@ -34,9 +34,13 @@ class DownloadUrl(BaseModel):
 
 
 class AiSummary(BaseModel):
-    """AI-generated document summary, translation, and extracted metadata."""
-    summary_text: str
+    """AI-generated document summary, translation, and extracted metadata. status is "pending"
+    while the /ai/summarize background job (see app/ml/summarize.py) is still running, "error"
+    if it failed (see error_message), or "done" once summary_text is populated."""
+    summary_text: str | None
     translated_text: str | None
     keywords: str | None
     important_dates: str | None
     important_sections: str | None
+    status: str
+    error_message: str | None

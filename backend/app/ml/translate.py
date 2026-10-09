@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.db.supabase_client import supabase
-from app.middleware.auth import ADMIN, LAWYER, require_roles, ensure_case_access
+from app.middleware.auth import ADMIN, SUPER_ADMIN, LAWYER, require_roles, ensure_case_access
 from app.ml.subprocess_utils import run_ml_subprocess
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -43,7 +43,7 @@ class TranslateResponse(BaseModel):
 
 
 @router.post("/translate", response_model=TranslateResponse)
-def translate_text(data: TranslateRequest, profile: dict = Depends(require_roles(ADMIN, LAWYER))):
+def translate_text(data: TranslateRequest, profile: dict = Depends(require_roles(ADMIN, SUPER_ADMIN, LAWYER))):
     """Translate `data.text` to the target language via the IndicTrans2 subprocess; if
     document_id is given, checks case access and upserts the result into ai_summaries.
     Calls: `ensure_case_access()`, `run_ml_subprocess()`, `supabase.table("ai_summaries").upsert()`."""

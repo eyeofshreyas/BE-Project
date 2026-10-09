@@ -12,6 +12,8 @@ class UserSummary(BaseModel):
     role: str | None
     is_active: bool
     created_at: str
+    suspended: bool = False
+    specialization: str | None = None
 
 
 class StatusUpdate(BaseModel):
@@ -19,10 +21,19 @@ class StatusUpdate(BaseModel):
     is_active: bool
 
 
+class ClientFirmStatusUpdate(BaseModel):
+    """Request body for suspending/reactivating a client's relationship with the caller's
+    own firm -- distinct from StatusUpdate, which flips a user's global account status."""
+    is_active: bool
+
+
 class ProfileUpdate(BaseModel):
-    """Request body for a user editing their own profile."""
+    """Request body for a user editing their own profile, or an admin editing someone else's.
+    `specialization` only applies when the target is a Lawyer (see users.update_user()) --
+    ignored everywhere else, including a lawyer editing their own profile."""
     full_name: str
     phone: str
+    specialization: str | None = None
 
 
 class UserDeleteImpact(BaseModel):

@@ -13,7 +13,7 @@ from pydantic import BaseModel, EmailStr
 from supabase_auth.errors import AuthApiError
 from postgrest.exceptions import APIError as PostgrestAPIError
 from app.core.config import CORS_ORIGINS, LOG_LEVEL
-from app.db.supabase_client import supabase
+from app.db.supabase_client import supabase, new_auth_client
 from app.middleware.auth import get_current_user
 from app.middleware.rate_limit import rate_limit
 
@@ -43,6 +43,9 @@ from app.routes.judgements import router as judgements_router
 from app.routes.messages import router as messages_router
 from app.routes.admin import router as admin_router
 from app.routes.esign import router as esign_router
+from app.routes.payments_webhook import router as payments_webhook_router
+from app.routes.conflict_check import router as conflict_check_router
+from app.routes.trust import router as trust_router, invoice_trust_router
 
 app = FastAPI()
 
@@ -55,6 +58,15 @@ async def unhandled_errors_as_json(request, call_next):
     Registered before CORSMiddleware so it runs *inside* it and the 500 keeps its CORS headers."""
     try:
         return await call_next(request)
+    except PostgrestAPIError as e:
+        # A unique-constraint violation is the caller re-sending something that already
+        # exists (an invoice number, a bar council number), not a server fault -- answer
+        # 409 rather than burying it in a generic 500.
+        if e.code == "23505":
+            logger.info("Duplicate rejected on %s %s: %s", request.method, request.url.path, e.details)
+            return JSONResponse(status_code=409, content={"detail": "That record already exists."})
+        logger.exception("Unhandled database error on %s %s", request.method, request.url.path)
+        return JSONResponse(status_code=500, content={"detail": "Something went wrong on our side. Please try again."})
     except Exception:
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
         return JSONResponse(status_code=500, content={"detail": "Something went wrong on our side. Please try again."})
@@ -87,8 +99,10 @@ app.include_router(judgements_router)
 app.include_router(messages_router)
 app.include_router(admin_router)
 app.include_router(esign_router)
-
-ROLE_IDS = {"lawyer": 2, "client": 3}
+app.include_router(payments_webhook_router)
+app.include_router(conflict_check_router)
+app.include_router(trust_router)
+app.include_router(invoice_trust_router)
 
 # --- Schemas ---
 class SignupRequest(BaseModel):
@@ -97,7 +111,8 @@ class SignupRequest(BaseModel):
     password: str
     full_name: str
     phone: str
-    role: Literal["lawyer", "client"]
+    role: Literal["lawyer", "client", "admin"]
+    org_name: str | None = None
     bar_council_number: str | None = None
     specialization: str | None = None
     experience_years: int | None = None
@@ -108,6 +123,9 @@ class LoginRequest(BaseModel):
     """Request body for /login."""
     email: EmailStr
     password: str
+class RefreshRequest(BaseModel):
+    """Request body for /refresh."""
+    refresh_token: str
 
 class ForgotPasswordRequest(BaseModel):
     """Request body for /forgot-password."""
@@ -122,70 +140,61 @@ def read_root():
 @app.post("/signup", dependencies=[Depends(rate_limit(5, 60))])
 def signup(data: SignupRequest):
     """Create a Supabase Auth account, then a LexFlow `users` row and role-specific profile
-    (lawyer/client); for a client signup, backfills any pending client_requests invites sent
-    to this email before the account existed. Calls: `supabase.auth.sign_up()`."""
+    (lawyer/client/admin) in one DB transaction (see migrate_signup_transaction.sql); for a
+    client signup, backfills any pending client_requests invites sent to this email before
+    the account existed; for a lawyer signup, requires a matching pending lawyer_invites row
+    and marks it accepted; for an admin signup, creates the organization itself.
+    Calls: `supabase.auth.sign_up()`, `supabase.rpc("complete_signup")`."""
+    if data.role == "admin" and not (data.org_name or "").strip():
+        raise HTTPException(status_code=400, detail="Enter your organization's name.")
+
+    invite_row = None
+    if data.role == "lawyer":
+        invites = supabase.table("lawyer_invites").select("invite_id,org_id") \
+            .eq("email", data.email).eq("status", "pending").execute().data
+        if not invites:
+            raise HTTPException(status_code=403, detail="Ask your firm's admin for an invite.")
+        invite_row = invites[0]
+
     try:
-        supabase.auth.sign_up({
-            "email": data.email,
-            "password": data.password
-        })
+        with new_auth_client() as auth_client:
+            auth_client.auth.sign_up({
+                "email": data.email,
+                "password": data.password
+            })
     except Exception:
         logger.exception("Signup failed for %s", data.email)
         raise HTTPException(status_code=400, detail="Signup failed. Check your details and try again.")
 
+    # Everything below is one DB transaction -- if any part fails, all of it rolls back, so
+    # there's no half-created org/users/profile row to clean up by hand. The auth account
+    # above is a separate system and can't share that transaction; it survives a failure
+    # here, and signing up again reuses it.
     try:
-        user_row = supabase.table("users").insert({
-            "role_id": ROLE_IDS[data.role],
-            "full_name": data.full_name,
-            "email": data.email,
-            "password_hash": "managed_by_supabase_auth",
-            "phone": data.phone,
-        }).execute().data[0]
+        supabase.rpc("complete_signup", {
+            "p_role": data.role,
+            "p_email": data.email,
+            "p_full_name": data.full_name,
+            "p_phone": data.phone,
+            "p_org_name": data.org_name,
+            "p_invite_id": invite_row["invite_id"] if invite_row else None,
+            "p_bar_council_number": data.bar_council_number,
+            "p_specialization": data.specialization,
+            "p_experience_years": data.experience_years,
+            "p_address": data.address,
+            "p_preferred_language": data.preferred_language,
+        }).execute()
     except PostgrestAPIError as e:
-        if e.code == "23505":
+        if e.message == "duplicate_email":
             raise HTTPException(status_code=409, detail="An account with this email already exists. Try logging in instead.")
-        logger.exception("User row insert failed after auth signup for %s", data.email)
+        if e.message == "duplicate_bar_council_number":
+            raise HTTPException(status_code=409, detail="That bar council number is already registered.")
+        if e.message == "invite_not_pending":
+            raise HTTPException(status_code=403, detail="Ask your firm's admin for an invite.")
+        logger.exception("Profile setup failed after auth signup for %s", data.email)
         raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
     except Exception:
-        logger.exception("User row insert failed after auth signup for %s", data.email)
-        raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
-
-    try:
-        if data.role == "lawyer":
-            supabase.table("lawyers").insert({
-                "user_id": user_row["user_id"],
-                "bar_council_number": data.bar_council_number,
-                "specialization": data.specialization,
-                "experience_years": data.experience_years,
-            }).execute()
-        else:
-            client_row = supabase.table("clients").insert({
-                "user_id": user_row["user_id"],
-                "address": data.address,
-                "preferred_language": data.preferred_language,
-            }).execute().data[0]
-            # A lawyer may have invited this email before the account existed;
-            # attach any such pending requests now that a client_id exists.
-            backfilled = supabase.table("client_requests").update({"client_id": client_row["client_id"]}) \
-                .eq("invite_email", data.email).is_("client_id", "null").eq("status", "pending").execute().data
-            if backfilled:
-                supabase.table("notifications").insert({
-                    "user_id": user_row["user_id"],
-                    "case_id": None,
-                    "title": "New client request",
-                    "message": "You have a pending request from a lawyer on LexFlow.",
-                    "notification_type": "client_request",
-                    "is_read": False,
-                }).execute()
-    except Exception as e:
-        # A users row without its lawyers/clients row logs in fine but 400s on every
-        # role endpoint ("No lawyer profile for this account"), so undo it by hand --
-        # there is no transaction across REST calls. The auth account survives; signing
-        # up again reuses it.
-        supabase.table("users").delete().eq("user_id", user_row["user_id"]).execute()
         logger.exception("Profile setup failed after auth signup for %s", data.email)
-        if data.role == "lawyer" and isinstance(e, PostgrestAPIError) and e.code == "23505":
-            raise HTTPException(status_code=409, detail="That bar council number is already registered.")
         raise HTTPException(status_code=500, detail="Account created but profile setup failed. Contact support.")
 
     return {"message": "Signup successful. Check your email to verify your account."}
@@ -195,10 +204,11 @@ def login(data: LoginRequest):
     """Authenticate against Supabase Auth and return tokens plus the LexFlow profile row.
     Calls: `supabase.auth.sign_in_with_password()`."""
     try:
-        result = supabase.auth.sign_in_with_password({
-            "email": data.email,
-            "password": data.password
-        })
+        with new_auth_client() as auth_client:
+            result = auth_client.auth.sign_in_with_password({
+                "email": data.email,
+                "password": data.password
+            })
     except AuthApiError as e:
         if e.code == "email_not_confirmed":
             raise HTTPException(status_code=403, detail="Please confirm your email before logging in -- check your inbox for the verification link.")
@@ -213,6 +223,32 @@ def login(data: LoginRequest):
         "user_email": result.user.email,
         "profile": profile_rows[0] if profile_rows else None,
     }
+@app.post("/refresh", dependencies=[Depends(rate_limit(10, 60))])
+def refresh(data: RefreshRequest):
+    """Exchange a Supabase refresh token for a new access token."""
+    try:
+        with new_auth_client() as auth_client:
+            result = auth_client.auth.refresh_session(data.refresh_token)
+
+        if not result.session:
+            raise HTTPException(
+                status_code=401,
+                detail="Unable to refresh session"
+            )
+
+        return {
+            "access_token": result.session.access_token,
+            "refresh_token": result.session.refresh_token,
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Token refresh failed")
+        raise HTTPException(
+            status_code=401,
+            detail="Session expired"
+        )
 
 @app.post("/forgot-password", dependencies=[Depends(rate_limit(5, 60))])
 def forgot_password(data: ForgotPasswordRequest):

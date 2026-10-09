@@ -69,6 +69,7 @@
 }
 
 .label {
+  display: block;
   font-size: 12.5px;
   font-weight: 600;
   color: #575145;
@@ -94,6 +95,7 @@
   padding: 10px;
   border-radius: 3px;
   cursor: pointer;
+  border: none;
 }
 
 .row2 {
@@ -128,6 +130,9 @@
   display: flex;
   cursor: pointer;
   flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
 }
 
 .strengthBars {
@@ -179,6 +184,21 @@
   cursor: pointer;
 }
 
+/* The real checkbox, hidden under the styled square but still focusable -- clip rather
+   than display:none, which would take it out of the tab order along with the pixels. */
+.checkboxInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  margin: 0;
+}
+
+.checkboxInput:focus-visible + .checkbox {
+  outline: 2px solid #23306B;
+  outline-offset: 2px;
+}
+
 .checkbox {
   width: 18px;
   height: 18px;
@@ -218,10 +238,19 @@
   cursor: pointer;
   margin-top: 4px;
   box-shadow: 0 6px 16px rgba(35, 48, 107, .28);
+  width: 100%;
+  border: none;
 }
 
-.submitBtn:hover {
+.submitBtn:hover:not(:disabled) {
   box-shadow: 0 8px 20px rgba(35, 48, 107, .34);
+}
+
+/* Disabled while the signup request is in flight -- a second submit would come back
+   as a duplicate-email error on the account the first one just created. */
+.submitBtn:disabled {
+  cursor: default;
+  opacity: .85;
 }
 
 .spinner {

@@ -1,5 +1,5 @@
 /** `/billing` route: role-dispatches to a lawyer-facing management view (`StaffBillingView`) or a read-only client view (`ClientInvoicesView`). */
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { listInvoices, sendInvoiceReminder, listInvoicePayments, createRazorpayOrder, verifyRazorpayPayment } from '../../api/client'
 import type { InvoiceSummary, PaymentSummary, UserProfile } from '../../types/api'
@@ -7,6 +7,7 @@ import { Icon } from '../../components/icons'
 import { formatDate } from '../../utils/date'
 import styles from '../conveyancing/ConveyancingDashboardPage.module.css'
 
+const ADMIN = 1
 const LAWYER = 2
 const CLIENT = 3
 
@@ -92,7 +93,7 @@ function StaffBillingView() {
   const navigate = useNavigate()
   const location = useLocation()
   const profile = loadProfile()
-  const canManage = profile?.role_id === LAWYER
+  const canManage = profile?.role_id === LAWYER || profile?.role_id === ADMIN
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -100,12 +101,27 @@ function StaffBillingView() {
   const [statusFilter, setStatusFilter] = useState('All')
   const [timeFilter, setTimeFilter] = useState<(typeof TIME_FILTERS)[number]>('All Time')
   const [toast, setToast] = useState<string | null>((location.state as { toast?: string } | null)?.toast ?? null)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [paymentsByInvoice, setPaymentsByInvoice] = useState<Map<number, PaymentSummary[]>>(new Map())
+  const [paymentsLoading, setPaymentsLoading] = useState(false)
 
   const [remindingId, setRemindingId] = useState<number | null>(null)
 
   useEffect(() => {
     refresh()
   }, [])
+
+  function toggleExpanded(invoiceId: number) {
+    const next = expandedId === invoiceId ? null : invoiceId
+    setExpandedId(next)
+    if (next !== null && !paymentsByInvoice.has(next)) {
+      setPaymentsLoading(true)
+      listInvoicePayments(next)
+        .then((rows) => setPaymentsByInvoice((prev) => new Map(prev).set(next, rows)))
+        .catch(() => setPaymentsByInvoice((prev) => new Map(prev).set(next, [])))
+        .finally(() => setPaymentsLoading(false))
+    }
+  }
 
   useEffect(() => {
     if (!toast) return
@@ -143,7 +159,7 @@ function StaffBillingView() {
   const filtered = invoices.filter((inv) => {
     const status = displayStatus(inv)
     const matchesSearch = !searchLower || inv.invoice_number.toLowerCase().includes(searchLower) || (inv.client ?? '').toLowerCase().includes(searchLower) || (inv.case_number ?? '').toLowerCase().includes(searchLower)
-    const matchesStatus = statusFilter === 'All' || status === statusFilter
+    const matchesStatus = statusFilter === 'All' || (statusFilter === 'Unpaid' ? status !== 'Paid' : status === statusFilter)
     const matchesTime = withinTimeFilter(inv.issue_date, timeFilter)
     return matchesSearch && matchesStatus && matchesTime
   })
@@ -169,7 +185,7 @@ function StaffBillingView() {
         </div>
 
         <div className={styles.statCards}>
-          <div className={styles.statCard} style={{ gap: 4 }}>
+          <div className={styles.statCard} style={{ gap: 4, cursor: 'pointer', ...(statusFilter === 'All' ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : {}) }} onClick={() => setStatusFilter('All')} title="Show all invoices">
             <div className={styles.statIconRow}>
               <div className={styles.statLabel} style={{ margin: 0 }}>Total Billed</div>
               <div className={styles.statIconWrap}><Icon name="file-text" size={16} color={PRIMARY} /></div>
@@ -177,7 +193,7 @@ function StaffBillingView() {
             <div className={styles.statValue} style={{ fontSize: 22 }}>{moneyRound(totalBilled)}</div>
             <div style={{ fontSize: 11.5, color: MUTED }}>Professional fees, all invoices</div>
           </div>
-          <div className={styles.statCard} style={{ gap: 4 }}>
+          <div className={styles.statCard} style={{ gap: 4, cursor: 'pointer', ...(statusFilter === 'Paid' ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : {}) }} onClick={() => setStatusFilter('Paid')} title="Show paid invoices">
             <div className={styles.statIconRow}>
               <div className={styles.statLabel} style={{ margin: 0 }}>Revenue Collected</div>
               <div className={styles.statIconWrap}><Icon name="bar-chart-2" size={16} color={PRIMARY} /></div>
@@ -186,7 +202,7 @@ function StaffBillingView() {
             <div style={{ fontSize: 11.5, color: MUTED }}>{recoveryPct}% recovery rate</div>
             <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${recoveryPct}%` }} /></div>
           </div>
-          <div className={styles.statCard} style={{ gap: 4 }}>
+          <div className={styles.statCard} style={{ gap: 4, cursor: 'pointer', ...(statusFilter === 'Unpaid' ? { background: '#F3EBD9', border: '1px solid #EAD49B' } : {}) }} onClick={() => setStatusFilter('Unpaid')} title="Show unpaid invoices">
             <div className={styles.statIconRow}>
               <div className={styles.statLabel} style={{ margin: 0 }}>Outstanding Balance</div>
               <div className={styles.statIconWrap}><Icon name="info" size={16} color={PRIMARY} /></div>
@@ -212,7 +228,7 @@ function StaffBillingView() {
             style={{ flex: 1, minWidth: 220, padding: '9px 14px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}
           />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '9px 12px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}>
-            {['All', 'Paid', 'Partially Paid', 'Pending', 'Overdue'].map((s) => <option key={s} value={s}>{s === 'All' ? 'Status: All' : s}</option>)}
+            {['All', 'Paid', 'Unpaid', 'Partially Paid', 'Pending', 'Overdue'].map((s) => <option key={s} value={s}>{s === 'All' ? 'Status: All' : s}</option>)}
           </select>
           <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as (typeof TIME_FILTERS)[number])} style={{ padding: '9px 12px', borderRadius: 3, border: '1px solid #CFC6B0', fontSize: 13.5, background: '#FCFAF4' }}>
             {TIME_FILTERS.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -241,37 +257,82 @@ function StaffBillingView() {
                 {filtered.map((inv) => {
                   const status = displayStatus(inv)
                   const [color, bg] = STATUS_STYLE_MAP[status] || DEFAULT_STATUS_STYLE
+                  const expanded = expandedId === inv.id
+                  const payments = paymentsByInvoice.get(inv.id) ?? []
                   return (
-                    <tr key={inv.id} className={styles.tr}>
-                      <td className={styles.tdMono} style={{ color: status === 'Overdue' ? '#B3282D' : undefined, fontWeight: status === 'Overdue' ? 700 : undefined }}>{inv.invoice_number}</td>
-                      <td className={styles.tdClient}>{inv.client ?? '—'}</td>
-                      <td className={styles.tdMono}>{inv.case_number ?? '—'}</td>
-                      <td className={styles.td}>{money(inv.amount)}</td>
-                      <td className={styles.td}>{inv.tax != null ? money(inv.tax) : '—'}</td>
-                      <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{status}</span></td>
-                      <td className={styles.td}>
-                        {canManage && (
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                            {status !== 'Paid' && (
-                              <div
-                                onClick={() => remindingId !== inv.id && remind(inv)}
-                                style={{ fontSize: 11.5, fontWeight: 600, color: '#B3282D', border: '1px solid #E9B8B8', borderRadius: 3, padding: '6px 10px', cursor: 'pointer', opacity: remindingId === inv.id ? 0.6 : 1, whiteSpace: 'nowrap' }}
-                              >
-                                {remindingId === inv.id ? 'Sending…' : 'Send Reminder'}
-                              </div>
+                    <Fragment key={inv.id}>
+                      <tr className={styles.tr} style={{ cursor: 'pointer' }} onClick={() => toggleExpanded(inv.id)}>
+                        <td className={styles.tdMono} style={{ color: status === 'Overdue' ? '#B3282D' : undefined, fontWeight: status === 'Overdue' ? 700 : undefined }}>{inv.invoice_number}</td>
+                        <td className={styles.tdClient}>{inv.client ?? '—'}</td>
+                        <td className={styles.tdMono}>{inv.case_number ?? '—'}</td>
+                        <td className={styles.td}>{money(inv.amount)}</td>
+                        <td className={styles.td}>{inv.tax != null ? money(inv.tax) : '—'}</td>
+                        <td className={styles.td}><span className={styles.statusBadge} style={{ color, background: bg }}>{status}</span></td>
+                        <td className={styles.td}>
+                          {canManage && (
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
+                              {status !== 'Paid' && (
+                                <div
+                                  onClick={() => remindingId !== inv.id && remind(inv)}
+                                  style={{ fontSize: 11.5, fontWeight: 600, color: '#B3282D', border: '1px solid #E9B8B8', borderRadius: 3, padding: '6px 10px', cursor: 'pointer', opacity: remindingId === inv.id ? 0.6 : 1, whiteSpace: 'nowrap' }}
+                                >
+                                  {remindingId === inv.id ? 'Sending…' : 'Send Reminder'}
+                                </div>
+                              )}
+                              {inv.payment_status !== 'Paid' && (
+                                <div
+                                  onClick={() => navigate(`/billing/invoices/${inv.id}/record-payment`)}
+                                  style={{ fontSize: 11.5, fontWeight: 600, color: '#575145', border: '1px solid #CFC6B0', borderRadius: 3, padding: '6px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                >
+                                  Record Payment
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                      {expanded && (
+                        <tr>
+                          <td className={styles.td} colSpan={7} style={{ background: '#FBF8F0', padding: '16px 20px' }}>
+                            <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', fontSize: 13 }}>
+                              <div><span style={{ color: MUTED }}>Issued</span> <strong>{formatDate(inv.issue_date)}</strong></div>
+                              <div><span style={{ color: MUTED }}>Due</span> <strong>{inv.due_date ? formatDate(inv.due_date) : 'Not set'}</strong></div>
+                              <div><span style={{ color: MUTED }}>Total</span> <strong>{money(inv.total_amount)}</strong></div>
+                            </div>
+                            <div style={{ marginTop: 14, fontSize: 11.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '.08em' }}>Payment history</div>
+                            {paymentsLoading && payments.length === 0 && <div style={{ padding: '10px 0', color: MUTED, fontSize: 13 }}>Loading…</div>}
+                            {!paymentsLoading && payments.length === 0 && <div style={{ padding: '10px 0', color: MUTED, fontSize: 13 }}>No payments recorded yet.</div>}
+                            {payments.length > 0 && (
+                              <table className={styles.table} style={{ marginTop: 6 }}>
+                                <thead>
+                                  <tr>
+                                    <th className={styles.th}>Reference</th>
+                                    <th className={styles.th}>Amount</th>
+                                    <th className={styles.th}>Method</th>
+                                    <th className={styles.th}>Date</th>
+                                    <th className={styles.th}>Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {payments.map((p) => {
+                                    const [pColor, pBg] = TXN_STATUS_STYLE[p.payment_status] || TXN_DEFAULT_STYLE
+                                    return (
+                                      <tr key={p.payment_id} className={styles.tr}>
+                                        <td className={styles.tdMono}>{p.transaction_reference ?? `TXN-${p.payment_id}`}</td>
+                                        <td className={styles.td}>{money(p.amount)}</td>
+                                        <td className={styles.td}>{p.payment_method ?? '—'}</td>
+                                        <td className={styles.td}>{formatDate(p.payment_date)}</td>
+                                        <td className={styles.td}><span className={styles.statusBadge} style={{ color: pColor, background: pBg }}>{p.payment_status}</span></td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
                             )}
-                            {inv.payment_status !== 'Paid' && (
-                              <div
-                                onClick={() => navigate(`/billing/invoices/${inv.id}/record-payment`)}
-                                style={{ fontSize: 11.5, fontWeight: 600, color: '#575145', border: '1px solid #CFC6B0', borderRadius: 3, padding: '6px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                              >
-                                Record Payment
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   )
                 })}
                 {filtered.length === 0 && (
@@ -344,6 +405,7 @@ function ClientInvoicesView() {
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState<string | null>(null)
   const [payingId, setPayingId] = useState<number | null>(null)
+  const [cardFilter, setCardFilter] = useState<'all' | 'pending' | 'paid'>('all')
 
   function fireAction(label: string) {
     setToast(`${label}…`)
@@ -407,7 +469,8 @@ function ClientInvoicesView() {
 
   const searchLower = search.toLowerCase()
   const filtered = invoices.filter((inv) =>
-    !searchLower || inv.invoice_number.toLowerCase().includes(searchLower) || inv.payment_status.toLowerCase().includes(searchLower)
+    (!searchLower || inv.invoice_number.toLowerCase().includes(searchLower) || inv.payment_status.toLowerCase().includes(searchLower)) &&
+    (cardFilter === 'all' || (cardFilter === 'paid' ? inv.payment_status === 'Paid' : inv.payment_status !== 'Paid'))
   )
 
   const pendingInvoices = invoices.filter((i) => i.payment_status !== 'Paid')
@@ -447,8 +510,8 @@ function ClientInvoicesView() {
 
         {!loading && !error && (
           <>
-            <div className={styles.statCards} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-              <div className={styles.statCard} style={{ background: '#FEF6EA', border: '1px solid #F3EBD9' }}>
+            <div className={styles.statCards}>
+              <div className={styles.statCard} style={{ background: '#FEF6EA', border: cardFilter === 'pending' ? '1.5px solid #8A6A2F' : '1px solid #F3EBD9', cursor: 'pointer' }} onClick={() => setCardFilter('pending')} title="Show pending invoices">
                 <div className={styles.statIconRow}>
                   <div className={styles.statIconWrap} style={{ background: '#F3EBD9' }}><Icon name="clock" size={16} color="#8A6A2F" /></div>
                   <span className={styles.statusBadge} style={{ color: '#8A6A2F', background: '#F3EBD9' }}>OPEN</span>
@@ -457,7 +520,7 @@ function ClientInvoicesView() {
                 <div className={styles.statLabel}>Pending</div>
                 <div style={{ fontSize: 11.5, color: MUTED }}>Awaiting payment</div>
               </div>
-              <div className={styles.statCard} style={{ background: '#EEF9F1', border: '1px solid #BFE6CB' }}>
+              <div className={styles.statCard} style={{ background: '#EEF9F1', border: cardFilter === 'paid' ? '1.5px solid #4A6B4E' : '1px solid #BFE6CB', cursor: 'pointer' }} onClick={() => setCardFilter('paid')} title="Show paid invoices">
                 <div className={styles.statIconRow}>
                   <div className={styles.statIconWrap} style={{ background: '#BFE6CB' }}><Icon name="check-circle" size={16} color="#4A6B4E" /></div>
                   <span className={styles.statusBadge} style={{ color: '#4A6B4E', background: '#E4EDE5' }}>CLEARED</span>
@@ -466,7 +529,7 @@ function ClientInvoicesView() {
                 <div className={styles.statLabel}>Paid</div>
                 <div style={{ fontSize: 11.5, color: MUTED }}>Settled invoices</div>
               </div>
-              <div className={styles.statCard} style={{ background: '#23306B', border: '1px solid #23306B' }}>
+              <div className={styles.statCard} style={{ background: '#23306B', border: cardFilter === 'all' ? '1.5px solid #CFC6B0' : '1px solid #23306B', cursor: 'pointer' }} onClick={() => setCardFilter('all')} title="Show all invoices">
                 <div className={styles.statIconRow}>
                   <div className={styles.statIconWrap} style={{ background: '#33302A' }}><Icon name="banknote" size={16} color="#CFC6B0" /></div>
                   <span className={styles.statusBadge} style={{ color: '#CFC6B0', background: '#33302A' }}>TOTAL</span>
@@ -501,9 +564,15 @@ function ClientInvoicesView() {
                           <td className={styles.td}>
                             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
                               {inv.payment_status !== 'Paid' && (
-                                <div className={styles.darkBtn} style={{ opacity: payingId === inv.id ? .6 : 1, cursor: payingId === inv.id ? 'default' : 'pointer' }} onClick={() => payingId !== inv.id && payInvoice(inv)}>
-                                  {payingId === inv.id ? 'Processing…' : 'Pay Now'}
-                                </div>
+                                inv.razorpay_enabled ? (
+                                  <div className={styles.darkBtn} style={{ opacity: payingId === inv.id ? .6 : 1, cursor: payingId === inv.id ? 'default' : 'pointer' }} onClick={() => payingId !== inv.id && payInvoice(inv)}>
+                                    {payingId === inv.id ? 'Processing…' : 'Pay Now'}
+                                  </div>
+                                ) : (
+                                  <div className={styles.darkBtn} style={{ opacity: 0.5, cursor: 'default' }} title="Online payment isn't set up for this firm yet.">
+                                    Pay Now
+                                  </div>
+                                )
                               )}
                               <span style={{ fontSize: 12, fontWeight: 600, color: '#23306B', cursor: 'pointer' }} onClick={() => downloadInvoice(inv)}>Download</span>
                             </div>

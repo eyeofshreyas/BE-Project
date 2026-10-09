@@ -2,6 +2,7 @@
  * platform-wide activity feed (`listAdminActivity()`). Notifications live in their own
  * tab -- see `NotificationsView`. */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Icon, type IconName } from '../../../components/icons'
 import { C } from '../../../components/theme'
 import { getAdminStats, listAdminActivity } from '../../../api/client'
@@ -11,19 +12,27 @@ import styles from '../../../components/AppShell.module.css'
 
 type QuickAction = { label: string; icon: 'user-plus' | 'plus' | 'file-text'; primary?: boolean; onClick: () => void }
 
+type DashboardTab = 'users' | 'cases' | 'documents' | 'analytics'
+
+// 'tab' switches the admin console's own sidebar tab; 'route' is a standalone page outside
+// the console shell. Revenue links into Billing, which Super Admin can't see (see
+// AdminConsolePage's hiddenForSuperAdmin nav items) -- same restriction applies here.
+type CardTarget = { kind: 'tab'; tab: DashboardTab } | { kind: 'route'; path: string; hiddenForSuperAdmin?: boolean }
+
 const NUMBER_FMT = new Intl.NumberFormat('en-IN')
 const RUPEE_FMT = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
 
-/** The eight overview cards, in display order: label, icon, and how to read the value off `AdminStats`. */
-const OVERVIEW_CARDS: { label: string; icon: IconName; value: (s: AdminStats) => string }[] = [
-  { label: 'Total Users', icon: 'users', value: (s) => NUMBER_FMT.format(s.total_users) },
-  { label: 'Active Lawyers', icon: 'briefcase', value: (s) => NUMBER_FMT.format(s.active_lawyers) },
-  { label: 'Registered Clients', icon: 'user', value: (s) => NUMBER_FMT.format(s.registered_clients) },
-  { label: 'Active Cases', icon: 'scale', value: (s) => NUMBER_FMT.format(s.active_cases) },
-  { label: 'Documents Uploaded', icon: 'file-text', value: (s) => NUMBER_FMT.format(s.documents_uploaded) },
-  { label: 'AI Summaries Generated', icon: 'sparkles', value: (s) => NUMBER_FMT.format(s.ai_summaries) },
-  { label: 'Revenue This Month', icon: 'banknote', value: (s) => RUPEE_FMT.format(s.revenue_this_month) },
-  { label: 'Pending Hearings', icon: 'calendar', value: (s) => NUMBER_FMT.format(s.pending_hearings) },
+/** The eight overview cards, in display order: label, icon, how to read the value off
+ * `AdminStats`, and where clicking the card should take the user. */
+const OVERVIEW_CARDS: { label: string; icon: IconName; value: (s: AdminStats) => string; target: CardTarget }[] = [
+  { label: 'Total Users', icon: 'users', value: (s) => NUMBER_FMT.format(s.total_users), target: { kind: 'tab', tab: 'users' } },
+  { label: 'Active Lawyers', icon: 'briefcase', value: (s) => NUMBER_FMT.format(s.active_lawyers), target: { kind: 'tab', tab: 'users' } },
+  { label: 'Registered Clients', icon: 'user', value: (s) => NUMBER_FMT.format(s.registered_clients), target: { kind: 'route', path: '/clients' } },
+  { label: 'Active Cases', icon: 'scale', value: (s) => NUMBER_FMT.format(s.active_cases), target: { kind: 'tab', tab: 'cases' } },
+  { label: 'Documents Uploaded', icon: 'file-text', value: (s) => NUMBER_FMT.format(s.documents_uploaded), target: { kind: 'tab', tab: 'documents' } },
+  { label: 'AI Summaries Generated', icon: 'sparkles', value: (s) => NUMBER_FMT.format(s.ai_summaries), target: { kind: 'tab', tab: 'analytics' } },
+  { label: 'Revenue This Month', icon: 'banknote', value: (s) => RUPEE_FMT.format(s.revenue_this_month), target: { kind: 'route', path: '/billing', hiddenForSuperAdmin: true } },
+  { label: 'Pending Hearings', icon: 'calendar', value: (s) => NUMBER_FMT.format(s.pending_hearings), target: { kind: 'route', path: '/hearings' } },
 ]
 
 /** Timeline `event_type` -> icon. Unknown types (added later, backend-side) fall back to the clock. */
@@ -51,11 +60,32 @@ function categoryOf(type: string): string {
  * Renders `quickActions` (passed from `AdminConsolePage`), the overview stat grid and
  * the recent-activity feed. Stats and activity load on mount.
  */
-export default function DashboardView({ quickActions, adminName }: { quickActions: QuickAction[]; adminName: string | null }) {
+export default function DashboardView({
+  quickActions,
+  adminName,
+  onGoTo,
+  isSuperAdmin,
+}: {
+  quickActions: QuickAction[]
+  adminName: string | null
+  onGoTo: (tab: DashboardTab) => void
+  isSuperAdmin: boolean
+}) {
+  const navigate = useNavigate()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [activity, setActivity] = useState<ActivityEvent[]>([])
   const [error, setError] = useState<string | null>(null)
   const [activityFilter, setActivityFilter] = useState('All')
+
+  function cardClickable(target: CardTarget) {
+    return target.kind === 'tab' || !(target.hiddenForSuperAdmin && isSuperAdmin)
+  }
+
+  function handleCardClick(target: CardTarget) {
+    if (!cardClickable(target)) return
+    if (target.kind === 'tab') onGoTo(target.tab)
+    else navigate(target.path)
+  }
 
   useEffect(() => {
     Promise.all([getAdminStats(), listAdminActivity()])
@@ -89,9 +119,13 @@ export default function DashboardView({ quickActions, adminName }: { quickAction
 
       {error && <div style={{ background: '#FCFAF4', border: `1px solid ${C.danger}`, borderRadius: 3, padding: '12px 16px', fontSize: 13, color: C.danger }}>{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 12 }}>
         {OVERVIEW_CARDS.map((c) => (
-          <div key={c.label} style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(158deg,#FCFAF4 0%,#F1EDE0 100%)', border: `1px solid ${C.border}`, borderRadius: 3, padding: '15px 16px 13px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 1px 2px rgba(35, 48, 107,.05)' }}>
+          <div
+            key={c.label}
+            onClick={() => handleCardClick(c.target)}
+            style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(158deg,#FCFAF4 0%,#F1EDE0 100%)', border: `1px solid ${C.border}`, borderRadius: 3, padding: '15px 16px 13px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 1px 2px rgba(35, 48, 107,.05)', cursor: cardClickable(c.target) ? 'pointer' : 'default' }}
+          >
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg,#23306B,#1A2551)' }} />
             <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(150deg,#F6EDDC 0%,#E6E0CE 100%)', border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Icon name={c.icon} size={18} color={C.primaryDark} />

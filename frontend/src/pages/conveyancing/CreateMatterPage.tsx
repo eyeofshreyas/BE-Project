@@ -128,7 +128,7 @@ export default function CreateMatterPage() {
             <input placeholder="e.g. Smith - 123 Main St Purchase" value={matterName} onChange={(e) => setMatterName(e.target.value)} style={inputStyle} />
           </Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
             <Field label="Matter Type">
               <select value={matterType} onChange={(e) => setMatterType(e.target.value)} style={inputStyle}>
                 {MATTER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -155,8 +155,8 @@ export default function CreateMatterPage() {
           <SectionTitle>Client</SectionTitle>
 
           <Field label="Select Client" required>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <div style={{ position: 'relative', flex: 1 }} onBlur={() => setTimeout(() => setClientDropdownOpen(false), 120)}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 160 }} onBlur={() => setTimeout(() => setClientDropdownOpen(false), 120)}>
                 <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Icon name="search" size={14} color={MUTED} />
                   <input
@@ -189,7 +189,7 @@ export default function CreateMatterPage() {
             <input placeholder="Enter full property address" value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} style={inputStyle} />
           </Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
             <Field label="Property Type">
               <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)} style={inputStyle}>
                 {PROPERTY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}

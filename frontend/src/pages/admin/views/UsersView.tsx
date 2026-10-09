@@ -5,21 +5,34 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../../components/icons'
 import { C, pillStyle } from '../../../components/theme'
-import { adminUpdateUser, deleteUser, getUserDeleteImpact, listUsers, setUserStatus } from '../../../api/client'
+import { adminUpdateUser, deleteUser, getUserDeleteImpact, inviteLawyer, listLawyerSpecializations, listUsers, setClientFirmStatus, setUserStatus } from '../../../api/client'
 import type { UserDeleteImpact, UserSummary } from '../../../types/api'
 import { downloadCsv } from '../../../utils/files'
 import styles from '../../../components/AppShell.module.css'
 
+const SUPER_ADMIN = 4
+
+function isSuperAdmin(): boolean {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw).role_id === SUPER_ADMIN : false
+  } catch {
+    return false
+  }
+}
+
 const USER_COLUMNS = ['User', 'Role', 'Email', 'Phone', 'Status', 'Registered', 'Actions']
 
-const ROLE_COLORS: Record<string, string> = { Lawyer: C.primary, Client: '#575145', Admin: C.danger }
+const ROLE_COLORS: Record<string, string> = { Lawyer: C.primary, Client: '#575145', 'Law Firm Manager': C.danger, 'Super Admin': C.danger }
 
 /** Chip label -> the `role` it keeps, or null for "everyone". */
 const FILTERS: { label: string; role: string | null }[] = [
   { label: 'All Users', role: null },
   { label: 'Lawyers', role: 'Lawyer' },
   { label: 'Clients', role: 'Client' },
-  { label: 'Admins', role: 'Admin' },
+  // One manager per org (see backend's one_admin_per_org index), so this count is also the
+  // count of registered law firms.
+  { label: 'Law Firm Managers', role: 'Law Firm Manager' },
 ]
 
 type PanelMode = 'view' | 'edit' | 'delete'
@@ -75,21 +88,29 @@ export default function UsersView() {
   const [role, setRole] = useState<string | null>(null)
   const [panel, setPanel] = useState<{ user: UserSummary; mode: PanelMode } | null>(null)
   const [impact, setImpact] = useState<UserDeleteImpact | null>(null)
-  const [draft, setDraft] = useState({ full_name: '', phone: '' })
+  const [draft, setDraft] = useState({ full_name: '', phone: '', specialization: '' })
+  const [specializations, setSpecializations] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteBusy, setInviteBusy] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+  const [inviteSent, setInviteSent] = useState(false)
+  const canDeleteClients = useMemo(isSuperAdmin, [])
 
   useEffect(() => {
     listUsers()
       .then(setUsers)
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load users.'))
       .finally(() => setLoading(false))
+    listLawyerSpecializations().then(setSpecializations).catch(() => {})
   }, [])
 
   const visible = useMemo(() => (role ? users.filter((u) => u.role === role) : users), [users, role])
 
   function openPanel(user: UserSummary, mode: PanelMode) {
     setPanel({ user, mode })
-    setDraft({ full_name: user.full_name, phone: user.phone })
+    setDraft({ full_name: user.full_name, phone: user.phone, specialization: user.specialization ?? '' })
     if (mode === 'edit') return
     // View and delete both want the same answer: what is attached to this person?
     setImpact(null)
@@ -104,7 +125,9 @@ export default function UsersView() {
   function saveEdit() {
     if (!panel) return
     setBusy(true)
-    adminUpdateUser(panel.user.id, { full_name: draft.full_name.trim(), phone: draft.phone.trim() })
+    // ponytail: "Not set" just leaves the existing specialization alone -- no clear flow, add if that's ever needed.
+    const payload = { full_name: draft.full_name.trim(), phone: draft.phone.trim(), ...(panel.user.role === 'Lawyer' && draft.specialization ? { specialization: draft.specialization } : {}) }
+    adminUpdateUser(panel.user.id, payload)
       .then((updated) => {
         setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
         closePanel()
@@ -125,6 +148,23 @@ export default function UsersView() {
       .finally(() => setBusy(false))
   }
 
+  function openInvite() {
+    setInviteOpen(true)
+    setInviteEmail('')
+    setInviteError('')
+    setInviteSent(false)
+  }
+
+  function sendInvite() {
+    if (!inviteEmail.trim()) { setInviteError('Enter an email address.'); return }
+    setInviteBusy(true)
+    setInviteError('')
+    inviteLawyer(inviteEmail.trim())
+      .then(() => setInviteSent(true))
+      .catch((err) => setInviteError(err instanceof Error ? err.message : 'Failed to send invite.'))
+      .finally(() => setInviteBusy(false))
+  }
+
   function toggleStatus(user: UserSummary) {
     setBusy(true)
     setUserStatus(user.id, !user.is_active)
@@ -138,6 +178,17 @@ export default function UsersView() {
       .finally(() => setBusy(false))
   }
 
+  function toggleClientFirmStatus(user: UserSummary) {
+    setBusy(true)
+    setClientFirmStatus(user.id, user.suspended)
+      .then((updated) => {
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
+        setPanel((prev) => (prev && prev.user.id === updated.id ? { ...prev, user: updated } : prev))
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to update this client\'s status.'))
+      .finally(() => setBusy(false))
+  }
+
   return (
     <>
       <div className={styles.pageHeadRow}>
@@ -145,6 +196,7 @@ export default function UsersView() {
           <div className={styles.pageTitle}>Users</div>
           <div className={styles.pageSubtitle}>Lawyers, clients and administrators registered on LexFlow.</div>
         </div>
+        <div style={BTN_PRIMARY} onClick={openInvite}>Invite lawyer</div>
       </div>
 
       <div className={styles.card}>
@@ -189,22 +241,53 @@ export default function UsersView() {
                         <span style={{ fontWeight: 600, color: '#1A1A17' }}>{u.full_name}</span>
                       </div>
                     </td>
-                    <td className={styles.td}>{u.role && <span className={styles.pill} style={pillStyle(ROLE_COLORS[u.role] ?? C.muted)}>{u.role}</span>}</td>
+                    <td className={styles.td}>
+                      {u.role && <span className={styles.pill} style={pillStyle(ROLE_COLORS[u.role] ?? C.muted)}>{u.role}</span>}
+                      {u.specialization && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{u.specialization}</div>}
+                    </td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{u.email}</td>
                     <td className={styles.td} style={{ color: '#6E6759' }}>{u.phone}</td>
-                    <td className={styles.td}><span className={styles.pill} style={pillStyle(u.is_active ? C.success : C.danger)}>{u.is_active ? 'Active' : 'Suspended'}</span></td>
+                    <td className={styles.td}>
+                      {u.role === 'Client' ? (
+                        <span className={styles.pill} style={pillStyle(u.suspended ? C.danger : C.success)}>{u.suspended ? 'Suspended' : 'Active'}</span>
+                      ) : (
+                        <span className={styles.pill} style={pillStyle(u.is_active ? C.success : C.danger)}>{u.is_active ? 'Active' : 'Suspended'}</span>
+                      )}
+                    </td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{formatRegistered(u.created_at)}</td>
                     <td className={styles.td}>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <span className={styles.actionBtn} title="View" onClick={() => openPanel(u, 'view')}><Icon name="eye" size={15} color="#575145" /></span>
-                        <span className={styles.actionBtn} title="Edit" onClick={() => openPanel(u, 'edit')}><Icon name="edit" size={15} color="#575145" /></span>
-                        {u.is_active ? (
-                          <span className={styles.actionBtn} title="Suspend" onClick={() => toggleStatus(u)}><Icon name="ban" size={15} color={C.warning} /></span>
-                        ) : (
-                          <span className={styles.actionBtn} title="Reactivate" onClick={() => toggleStatus(u)}><Icon name="check-circle" size={15} color={C.success} /></span>
-                        )}
-                        <span className={styles.actionBtnDanger} title="Delete permanently" onClick={() => openPanel(u, 'delete')}><Icon name="trash-2" size={15} color={C.danger} /></span>
-                      </div>
+                      {u.role === 'Client' ? (
+                        // A client is global -- the same person can have cases with other firms too -- so an
+                        // org admin can't Delete from here (it would destroy their account and cases with
+                        // every other firm they work with). View/Edit only touch shared contact info.
+                        // Suspend/reactivate is per-firm (org_clients), never touching the client's global
+                        // account. The super-admin has platform-wide authority, so they get Delete too.
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <span className={styles.actionBtn} title="View" onClick={() => openPanel(u, 'view')}><Icon name="eye" size={15} color="#575145" /></span>
+                          <span className={styles.actionBtn} title="Edit" onClick={() => openPanel(u, 'edit')}><Icon name="edit" size={15} color="#575145" /></span>
+                          <span
+                            className={styles.actionBtn}
+                            title={u.suspended ? 'Reactivate for this firm' : 'Suspend from this firm'}
+                            onClick={() => toggleClientFirmStatus(u)}
+                          >
+                            <Icon name={u.suspended ? 'check-circle' : 'ban'} size={15} color={u.suspended ? C.success : C.warning} />
+                          </span>
+                          {canDeleteClients && (
+                            <span className={styles.actionBtnDanger} title="Delete permanently" onClick={() => openPanel(u, 'delete')}><Icon name="trash-2" size={15} color={C.danger} /></span>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <span className={styles.actionBtn} title="View" onClick={() => openPanel(u, 'view')}><Icon name="eye" size={15} color="#575145" /></span>
+                          <span className={styles.actionBtn} title="Edit" onClick={() => openPanel(u, 'edit')}><Icon name="edit" size={15} color="#575145" /></span>
+                          {u.is_active ? (
+                            <span className={styles.actionBtn} title="Suspend" onClick={() => toggleStatus(u)}><Icon name="ban" size={15} color={C.warning} /></span>
+                          ) : (
+                            <span className={styles.actionBtn} title="Reactivate" onClick={() => toggleStatus(u)}><Icon name="check-circle" size={15} color={C.success} /></span>
+                          )}
+                          <span className={styles.actionBtnDanger} title="Delete permanently" onClick={() => openPanel(u, 'delete')}><Icon name="trash-2" size={15} color={C.danger} /></span>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -236,14 +319,33 @@ export default function UsersView() {
                   <div style={FIELD_LABEL}>Phone Number</div>
                   <input value={draft.phone} onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))} style={INPUT} />
                 </div>
+                {panel.user.role === 'Lawyer' && (
+                  <div>
+                    <div style={FIELD_LABEL}>Specialization</div>
+                    <select value={draft.specialization} onChange={(e) => setDraft((d) => ({ ...d, specialization: e.target.value }))} style={INPUT}>
+                      <option value="">Not set</option>
+                      {specializations.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div style={{ fontSize: 12, color: C.muted }}>Email can't be changed here — it's the only link between this row and the account's login.</div>
               </>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12 }}>
                   <div><div style={FIELD_LABEL}>Email</div><div style={{ fontSize: 13.5, color: C.text, wordBreak: 'break-all' }}>{panel.user.email}</div></div>
                   <div><div style={FIELD_LABEL}>Phone</div><div style={{ fontSize: 13.5, color: C.text }}>{panel.user.phone}</div></div>
-                  <div><div style={FIELD_LABEL}>Status</div><span className={styles.pill} style={pillStyle(panel.user.is_active ? C.success : C.danger)}>{panel.user.is_active ? 'Active' : 'Suspended'}</span></div>
+                  <div>
+                    <div style={FIELD_LABEL}>Status</div>
+                    {panel.user.role === 'Client' ? (
+                      <span className={styles.pill} style={pillStyle(panel.user.suspended ? C.danger : C.success)}>{panel.user.suspended ? 'Suspended (this firm)' : 'Active'}</span>
+                    ) : (
+                      <span className={styles.pill} style={pillStyle(panel.user.is_active ? C.success : C.danger)}>{panel.user.is_active ? 'Active' : 'Suspended'}</span>
+                    )}
+                  </div>
+                  {panel.user.specialization && (
+                    <div><div style={FIELD_LABEL}>Specialization</div><div style={{ fontSize: 13.5, color: C.text }}>{panel.user.specialization}</div></div>
+                  )}
                 </div>
 
                 <div>
@@ -267,7 +369,7 @@ export default function UsersView() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <div style={BTN_GHOST} onClick={closePanel}>{panel.mode === 'view' ? 'Close' : 'Cancel'}</div>
-              {panel.mode !== 'edit' && (
+              {panel.mode !== 'edit' && panel.user.role !== 'Client' && (
                 <div
                   style={{ ...BTN_GHOST, color: panel.user.is_active ? C.warning : C.success, borderColor: panel.user.is_active ? C.warning : C.success, opacity: busy ? 0.6 : 1 }}
                   onClick={() => { if (!busy) toggleStatus(panel.user) }}
@@ -275,8 +377,52 @@ export default function UsersView() {
                   {panel.user.is_active ? 'Suspend account' : 'Reactivate account'}
                 </div>
               )}
+              {panel.mode !== 'edit' && panel.user.role === 'Client' && (
+                <div
+                  style={{ ...BTN_GHOST, color: panel.user.suspended ? C.success : C.warning, borderColor: panel.user.suspended ? C.success : C.warning, opacity: busy ? 0.6 : 1 }}
+                  onClick={() => { if (!busy) toggleClientFirmStatus(panel.user) }}
+                >
+                  {panel.user.suspended ? 'Reactivate for this firm' : 'Suspend from this firm'}
+                </div>
+              )}
               {panel.mode === 'edit' && <div style={{ ...BTN_PRIMARY, opacity: busy ? 0.6 : 1 }} onClick={() => { if (!busy) saveEdit() }}>{busy ? 'Saving…' : 'Save changes'}</div>}
               {panel.mode === 'delete' && <div style={{ ...BTN_PRIMARY, background: C.danger, boxShadow: 'none', opacity: busy || !impact ? 0.6 : 1 }} onClick={() => { if (!busy && impact) confirmDelete() }}>{busy ? 'Deleting…' : 'Delete permanently'}</div>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inviteOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(35, 48, 107,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }} onClick={() => setInviteOpen(false)}>
+          <div style={{ background: '#FCFAF4', border: `1px solid ${C.border}`, borderRadius: 3, padding: 28, width: 'min(420px,100%)', display: 'flex', flexDirection: 'column', gap: 16 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div style={{ fontFamily: "'Spectral',serif", fontSize: 20, fontWeight: 700, color: C.text }}>Invite a lawyer</div>
+              <span className={styles.actionBtn} onClick={() => setInviteOpen(false)} title="Close"><Icon name="x" size={15} color="#6E6759" /></span>
+            </div>
+
+            {inviteSent ? (
+              <div style={{ fontSize: 13.5, color: C.text }}>Invite sent to <strong>{inviteEmail}</strong>. They can now sign up as a lawyer with this email and will join your law firm automatically.</div>
+            ) : (
+              <>
+                <div>
+                  <div style={FIELD_LABEL}>Email address</div>
+                  <input
+                    type="email"
+                    placeholder="lawyer@example.com"
+                    value={inviteEmail}
+                    onChange={(e) => { setInviteEmail(e.target.value); setInviteError('') }}
+                    style={INPUT}
+                  />
+                </div>
+                {inviteError && <div style={{ fontSize: 12.5, color: C.danger }}>{inviteError}</div>}
+              </>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={BTN_GHOST} onClick={() => setInviteOpen(false)}>{inviteSent ? 'Close' : 'Cancel'}</div>
+              {!inviteSent && (
+                <div style={{ ...BTN_PRIMARY, opacity: inviteBusy ? 0.6 : 1 }} onClick={() => { if (!inviteBusy) sendInvite() }}>{inviteBusy ? 'Sending…' : 'Send invite'}</div>
+              )}
             </div>
           </div>
         </div>
