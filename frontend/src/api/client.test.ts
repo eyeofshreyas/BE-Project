@@ -34,12 +34,12 @@ afterEach(() => {
 })
 
 describe('request() -- 401', () => {
-  it('clears the stored session and redirects to /login when refresh fails', async () => {
+  it('clears the stored session and redirects to /login when refresh fails, without resolving', async () => {
     localStorage.setItem('lexflow_token', 'stale-token')
     localStorage.setItem('lexflow_profile', '{"user_id":1}')
     localStorage.setItem('lexflow_refresh_token', 'stale-refresh-token')
 
-    // Protected request fails, then the refresh request fails.
+    // The protected request fails, followed by a failed refresh request.
     vi.mocked(fetch)
       .mockResolvedValueOnce(
         jsonResponse(401, { detail: 'Session expired' }),
@@ -48,12 +48,26 @@ describe('request() -- 401', () => {
         jsonResponse(401, { detail: 'Session expired' }),
       )
 
-    await expect(listCourts()).rejects.toThrow()
+    let settled = false
+
+    listCourts().then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
+
+    // Allow the request and refresh handlers to run without awaiting
+    // a promise that is expected to remain unresolved.
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(localStorage.getItem('lexflow_token')).toBeNull()
     expect(localStorage.getItem('lexflow_profile')).toBeNull()
     expect(localStorage.getItem('lexflow_refresh_token')).toBeNull()
     expect(window.location.href).toBe('/login')
+    expect(settled).toBe(false)
   })
 })
 
