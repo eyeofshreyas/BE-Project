@@ -231,8 +231,8 @@ translate simply couldn't read them at all.
 eCourtsIndia API is too slow to hold the request open for); the case's `ecourts_sync_status`
 flips to `"syncing"` right away and the frontend polls the case list for it to settle at
 `"idle"` (success) or `"error"`. The eCourtsIndia API (a third-party layer over the
-government's own CAPTCHA-gated portal, which has no public API) returns that case's live
-status and party/court details, storing the provider's own status string separately from
+government's own eCourts portal, a publicly accessible search website rather than an API)
+returns that case's live status and party/court details, storing the provider's own status string separately from
 LexFlow's own workflow status — and logs what changed to the case timeline. Auto-creating
 hearing rows from the response is deferred until its exact field shape is confirmed against
 a live call (see `FUTURE_SCOPE.md`).

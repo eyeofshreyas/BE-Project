@@ -1,25 +1,83 @@
-/** Admin console "Documents" tab: read-only table of all uploaded documents (`listDocuments()`). */
+/** Admin console "Documents" tab: table of all uploaded documents (`listDocuments()`),
+ * with the same open/case-navigation behavior as the lawyer-facing documents page. */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { C } from '../../../components/theme'
-import { listDocuments } from '../../../api/client'
-import type { DocumentSummary } from '../../../types/api'
+import { listDocuments, listCases, getDocumentDownloadUrl, deleteDocument } from '../../../api/client'
+import type { DocumentSummary, CaseSummary, UserProfile } from '../../../types/api'
 import { formatDate } from '../../../utils/date'
+import { Icon } from '../../../components/icons'
 import styles from '../../../components/AppShell.module.css'
 
-const DOC_COLUMNS = ['File', 'Type', 'Case', 'Uploaded By', 'Upload Date']
+const SUPER_ADMIN = 4
+
+const DOC_COLUMNS = ['File', 'Type', 'Case', 'Uploaded By', 'Upload Date', 'Actions']
+
+function loadProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
 
 /** Fetches all documents via `listDocuments()` and lists them. */
 export default function DocumentsView() {
+  const navigate = useNavigate()
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
+  const [cases, setCases] = useState<CaseSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
+  // Super Admin can see that a document belongs to a case, but can't open that case's
+  // full detail -- same restriction as the Cases tab.
+  const canOpenCase = loadProfile()?.role_id !== SUPER_ADMIN
 
   useEffect(() => {
-    listDocuments()
-      .then(setDocuments)
+    Promise.all([listDocuments(), listCases()])
+      .then(([docs, allCases]) => { setDocuments(docs); setCases(allCases) })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load documents.'))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(''), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  function caseIdOf(caseNumber: string | null) {
+    return cases.find((c) => c.id === caseNumber)?.case_id
+  }
+
+  function openCase(caseNumber: string | null) {
+    if (!canOpenCase) return
+    const caseId = caseIdOf(caseNumber)
+    if (caseId) navigate(`/cases/${caseId}`)
+    else setToast("That case isn't in your list.")
+  }
+
+  async function openDocument(id: number) {
+    const tab = window.open('', '_blank')
+    try {
+      const { url } = await getDocumentDownloadUrl(id)
+      if (tab) tab.location.href = url
+    } catch {
+      tab?.close()
+      setToast('Failed to open document.')
+    }
+  }
+
+  async function removeDocument(id: number) {
+    if (!window.confirm('Delete this document? This cannot be undone.')) return
+    try {
+      await deleteDocument(id)
+      setDocuments((prev) => prev.filter((d) => d.id !== id))
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : 'Failed to delete document.')
+    }
+  }
 
   return (
     <>
@@ -45,9 +103,25 @@ export default function DocumentsView() {
                   <tr key={doc.id} className={styles.tr}>
                     <td className={styles.td} style={{ fontWeight: 600, color: '#1A1A17' }}>{doc.file_name}</td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{doc.document_type ?? '—'}</td>
-                    <td className={styles.td} style={{ color: '#6E6759' }}>{doc.case_number ?? '—'}</td>
+                    <td
+                      className={styles.td}
+                      style={{
+                        color: '#6E6759',
+                        cursor: canOpenCase && caseIdOf(doc.case_number) ? 'pointer' : 'default',
+                        textDecoration: canOpenCase && caseIdOf(doc.case_number) ? 'underline' : 'none',
+                      }}
+                      onClick={() => openCase(doc.case_number)}
+                    >
+                      {doc.case_number ?? '—'}
+                    </td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{doc.uploaded_by ?? '—'}</td>
                     <td className={styles.td} style={{ color: '#33302A' }}>{formatDate(doc.upload_date)}</td>
+                    <td className={styles.td}>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <div onClick={() => openDocument(doc.id)} className={styles.actionBtn} title="Open"><Icon name="globe" size={14} color="#575145" /></div>
+                        <div onClick={() => removeDocument(doc.id)} className={styles.actionBtnDanger} title="Delete"><Icon name="trash-2" size={14} color="#B3282D" /></div>
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 {documents.length === 0 && (
@@ -58,6 +132,8 @@ export default function DocumentsView() {
           </div>
         )}
       </div>
+
+      {toast && <div className={styles.toast}>{toast}</div>}
     </>
   )
 }

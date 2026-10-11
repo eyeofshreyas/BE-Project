@@ -26,3 +26,13 @@ class ConflictMatch(BaseModel):
     case_number: str
     lawyer: str | None
     role: str | None  # the party's role when source == "party"; None for a client match
+
+
+class ConflictSearchHistoryEntry(BaseModel):
+    """One past conflict search, for the compliance audit trail."""
+    search_id: int
+    name: str | None
+    case_number: str | None
+    result_count: int
+    created_at: str
+    searched_by: str | None

@@ -335,7 +335,7 @@ function StaffConveyancingView() {
                   </div>
 
                   <div style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, fontFamily: "'IBM Plex Mono',monospace", textTransform: 'uppercase', letterSpacing: '.13em', marginBottom: 10 }}>Matter Type</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 18 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(90px,1fr))', gap: 8, marginBottom: 18 }}>
                     {FILTER_MATTER_TYPES.map((t) => {
                       const selected = draftType === t.label
                       return (
@@ -431,7 +431,7 @@ function StaffConveyancingView() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 20, alignItems: 'start' }}>
               <div className={styles.panelCard}>
                 <div className={styles.panelTitle}>Quick Actions</div>
                 <div className={styles.quickActionsList}>

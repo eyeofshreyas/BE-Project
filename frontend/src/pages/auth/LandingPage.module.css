@@ -1,9 +1,9 @@
 .page {
   width: 100%;
-  min-width: 1024px;
   background: #F6F2E9;
   font-family: 'Public Sans', sans-serif;
   color: #1A1A17;
+  overflow-x: hidden;
 }
 
 .nav {
@@ -104,7 +104,7 @@
 
 .hero {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 56px;
   align-items: center;
   padding: 88px 64px 96px;
@@ -303,7 +303,7 @@
 
 .challengesGrid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
   margin-top: 48px;
   text-align: left;
@@ -363,7 +363,7 @@
 
 .featuresGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
 }
 
@@ -413,7 +413,7 @@
   max-width: 1200px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 56px;
   align-items: center;
 }
@@ -585,7 +585,7 @@
   max-width: 1200px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 32px;
 }
 
@@ -641,4 +641,24 @@
   justify-content: space-between;
   font-size: 11.5px;
   color: #8C857A;
+}
+
+@media (max-width: 860px) {
+  .nav { padding: 16px 20px; }
+  .navLinks { display: none; }
+  .hero { grid-template-columns: 1fr; padding: 48px 20px 64px; gap: 32px; }
+  .challengesSection, .featuresSection, .whySection, .onboardingSection { padding: 56px 20px; }
+  .challengesGrid, .featuresGrid { grid-template-columns: repeat(2, 1fr); }
+  .whyInner { grid-template-columns: 1fr; }
+  .onboardingSteps { flex-direction: column; align-items: flex-start; gap: 24px; }
+  .onboardingLine { display: none; }
+  .contactSection { padding: 0 20px 56px; }
+  .contactBox { padding: 40px 24px; }
+  .footer { padding: 40px 20px; }
+  .footerInner { grid-template-columns: 1fr 1fr; gap: 32px; }
+}
+
+@media (max-width: 480px) {
+  .challengesGrid, .featuresGrid, .footerInner { grid-template-columns: 1fr; }
+  .footerBottom { flex-direction: column; gap: 8px; }
 }

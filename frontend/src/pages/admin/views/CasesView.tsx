@@ -1,14 +1,26 @@
 /** Admin console "Cases" tab: table of every case on the platform (`listCases()`), with a
  * CSV export and per-row links to the case page and its documents. */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { C, pillStyle } from '../../../components/theme'
 import { listCases } from '../../../api/client'
 import { formatDate } from '../../../utils/date'
-import type { CaseSummary } from '../../../types/api'
+import type { CaseSummary, UserProfile } from '../../../types/api'
 import { downloadCsv } from '../../../utils/files'
 import styles from '../../../components/AppShell.module.css'
 
+const SUPER_ADMIN = 4
+
 const CASE_COLUMNS = ['Case ID', 'Client', 'Assigned Lawyer', 'Court', 'Status', 'Next Hearing', 'Priority']
+
+function loadProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
 
 const STATUS_COLORS: Record<string, string> = {
   Active: C.success, Pending: C.warning, Closed: '#8C857A', 'On Hold': C.danger,
@@ -17,12 +29,15 @@ const STATUS_COLORS: Record<string, string> = {
 const PRIORITY_COLORS: Record<string, string> = { High: C.danger, Medium: C.warning, Low: C.success }
 
 /** Fetches all cases via `listCases()` and renders them as a status/priority-badged table.
- * A read-only overview -- admin doesn't get into a case's own detail page or document
- * library from here. */
+ * Each row opens that case's detail page, same as the lawyer-facing cases list. */
 export default function CasesView() {
+  const navigate = useNavigate()
   const [cases, setCases] = useState<CaseSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Super Admin gets a platform-wide overview for oversight, but can't open a case's full
+  // detail (notes, documents, AI summary) -- that stays private to the firm.
+  const canOpenCase = loadProfile()?.role_id !== SUPER_ADMIN
 
   useEffect(() => {
     listCases()
@@ -60,7 +75,12 @@ export default function CasesView() {
               </thead>
               <tbody>
                 {cases.map((row) => (
-                  <tr key={row.id} className={styles.tr}>
+                  <tr
+                    key={row.id}
+                    className={styles.tr}
+                    style={{ cursor: canOpenCase ? 'pointer' : 'default' }}
+                    onClick={canOpenCase ? () => navigate(`/cases/${row.case_id}`) : undefined}
+                  >
                     <td className={styles.td}>
                       <span style={{ fontWeight: 700, color: '#8A6A2F' }}>{row.id}</span>
                     </td>

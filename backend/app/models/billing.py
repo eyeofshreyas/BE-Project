@@ -17,6 +17,7 @@ class InvoiceSummary(BaseModel):
     issue_date: str
     due_date: str | None
     payment_status: str
+    razorpay_enabled: bool
 
 
 class InvoiceCreate(BaseModel):

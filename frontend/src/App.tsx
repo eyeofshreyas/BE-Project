@@ -10,6 +10,8 @@ const LandingPage = lazy(() => import('./pages/auth/LandingPage'))
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
 const SignUpPage = lazy(() => import('./pages/auth/SignUpPage'))
 const RoleSelectionPage = lazy(() => import('./pages/auth/RoleSelectionPage'))
+const PrivacyPolicyPage = lazy(() => import('./pages/auth/PrivacyPolicyPage'))
+const TermsPage = lazy(() => import('./pages/auth/TermsPage'))
 const AdminConsolePage = lazy(() => import('./pages/admin/AdminConsolePage'))
 const ConveyancingDashboardPage = lazy(() => import('./pages/conveyancing/ConveyancingDashboardPage'))
 const CreateMatterPage = lazy(() => import('./pages/conveyancing/CreateMatterPage'))
@@ -49,6 +51,8 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/role-selection" element={<RoleSelectionPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminConsolePage /></ProtectedRoute>} />
         <Route path="/conveyancing" element={<ProtectedRoute><AppLayout><ConveyancingDashboardPage /></AppLayout></ProtectedRoute>} />
         <Route path="/conveyancing/matters/new" element={<ProtectedRoute><AppLayout><CreateMatterPage /></AppLayout></ProtectedRoute>} />

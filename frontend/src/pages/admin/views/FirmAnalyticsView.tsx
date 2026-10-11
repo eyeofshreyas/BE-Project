@@ -211,7 +211,7 @@ export default function FirmAnalyticsView() {
               <span className={styles.actionBtn} onClick={() => setSelectedLawyer(null)} title="Close"><Icon name="x" size={15} color="#6E6759" /></span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 12 }}>
               <div>
                 <div style={FILTER_LABEL}>Active Cases</div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{selectedLawyer.active_cases}</div>

@@ -28,6 +28,14 @@ create table if not exists trust_transactions (
     created_at       timestamptz   not null default now()
 );
 
+-- `create table if not exists` above is a no-op against a table that already exists from
+-- the pre-org-scoping version of this file, so it never added org_id there. Add it
+-- explicitly for that upgrade path; a fresh install just gets a redundant no-op column add.
+alter table trust_transactions add column if not exists org_id bigint references organizations(org_id);
+update trust_transactions set org_id = (select org_id from cases where cases.case_id = trust_transactions.case_id)
+ where org_id is null and case_id is not null;
+alter table trust_transactions alter column org_id set not null;
+
 -- ─────────────────────────────────────────────────────────────
 -- 2. Manual bank balance log  (leg 1)
 -- ─────────────────────────────────────────────────────────────
@@ -41,6 +49,18 @@ create table if not exists trust_bank_statements (
     recorded_at      timestamptz   not null default now(),
     unique (org_id, statement_date)
 );
+
+alter table trust_bank_statements add column if not exists org_id bigint references organizations(org_id);
+alter table trust_bank_statements alter column org_id set not null;
+-- No existing-row backfill source for this one (a bank statement carries no case/client to
+-- derive org_id from) -- fine today since the table is empty; if it isn't, backfill by hand
+-- before this ALTER runs.
+
+-- The pre-org-scoping version UNIQUE'd statement_date alone, which would now wrongly stop
+-- two different firms recording a statement on the same date. Swap it for the composite one.
+alter table trust_bank_statements drop constraint if exists trust_bank_statements_statement_date_key;
+alter table trust_bank_statements drop constraint if exists trust_bank_statements_org_id_statement_date_key;
+alter table trust_bank_statements add constraint trust_bank_statements_org_id_statement_date_key unique (org_id, statement_date);
 
 -- ─────────────────────────────────────────────────────────────
 -- 3. The firm's control account  (leg 2)

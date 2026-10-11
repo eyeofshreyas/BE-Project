@@ -1,7 +1,6 @@
 .page {
   display: flex;
   height: 100vh;
-  min-width: 1280px;
   width: 100%;
   overflow: hidden;
   font-family: 'Public Sans', sans-serif;
@@ -144,6 +143,21 @@
   flex-shrink: 0;
 }
 
+.hamburgerBtn {
+  composes: resetBtn;
+  display: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 3px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebarBackdrop {
+  display: none;
+}
+
 .logoutRow {
   composes: resetBtnBlock;
   display: flex;
@@ -199,6 +213,7 @@
   color: #1A1A17;
   background: transparent;
   flex: 1;
+  min-width: 0;
   font-family: 'Public Sans', sans-serif;
 }
 
@@ -526,4 +541,84 @@
   font-weight: 600;
   color: #CFC6B0;
   cursor: pointer;
+}
+
+@media (max-width: 860px) {
+  .hamburgerBtn {
+    display: flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform .2s ease-out;
+    box-shadow: 0 0 24px rgba(0, 0, 0, .2);
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+
+  .sidebarBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 26, 23, .4);
+    z-index: 45;
+  }
+
+  .topbar {
+    padding: 0 16px;
+    gap: 12px;
+  }
+
+  .searchBox {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .searchDropdown {
+    width: 100%;
+  }
+
+  .todayLabel {
+    display: none;
+  }
+
+  .profileNameBlock {
+    display: none;
+  }
+
+  /* !important needed -- the chevron span also carries an inline display:flex. */
+  .profileChevron {
+    display: none !important;
+  }
+
+  .profileBtn {
+    gap: 0;
+    padding: 4px;
+  }
+
+  .content {
+    padding: 20px 16px 28px;
+  }
+
+  /* Escape hatch for inline grid-template-columns set on one-off page layouts
+     (asymmetric sidebar+content/panel splits) -- !important is needed because
+     those are React inline styles, which otherwise always win over a class. */
+  .stackOnMobile {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Grid items default to min-width:auto, which floors them at their content's
+     unbroken min-content width (e.g. a long filename) regardless of the
+     column's own track sizing -- without this, long text can still force the
+     single stacked column wider than the viewport. */
+  .stackOnMobile > * {
+    min-width: 0;
+  }
 }

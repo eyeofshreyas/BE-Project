@@ -149,6 +149,12 @@ def update_hearing(hearing_id: int, data: HearingUpdate, profile: dict = Depends
     if not updates:
         return _get_hearing(hearing_id)
 
+    # "Completed" asserts the hearing already happened -- a future hearing_date can't have an
+    # outcome yet. Adjourned/Cancelled are fine to set ahead of time (that's how a hearing gets
+    # called off in advance), so only Completed is checked against the date.
+    if updates.get("hearing_status") == "Completed" and before["hearing_date"] > date.today().isoformat():
+        raise HTTPException(status_code=400, detail="This hearing is still in the future and can't be marked Completed yet.")
+
     rows = supabase.table("hearings").update(updates).eq("hearing_id", hearing_id).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Hearing not found")

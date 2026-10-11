@@ -55,3 +55,26 @@ The following are out of scope:
 - Localhost-only development behavior
 - Issues that require access to secrets that are not intended to be publicly available
 - Vulnerabilities that only affect an intentionally modified local development environment
+
+## Data Protection (DPDP Act 2023)
+
+LexFlow processes personal data of clients, lawyers, and admins as a data fiduciary under
+India's Digital Personal Data Protection Act, 2023. The user-facing notice (what's
+collected, why, retention, and the Grievance Officer contact) is published at `/privacy`
+and linked from the signup consent checkbox; `users.privacy_notice_accepted_at`
+(`backend/migrate_privacy_notice.sql`) records when each account holder agreed to it.
+
+**Retention.** Active account and case data is kept for as long as the account or matter
+is active. Closed case files are retained afterward — [retention period, e.g. 7 years] —
+to meet legal record-keeping obligations before being eligible for deletion. Outside that
+window, `delete_user_cascade.sql` (via `DELETE /admin/users/{id}`) permanently removes an
+account and everything cascading off it on request.
+
+**Breach notification.** A suspected personal-data breach is handled as a security
+incident under this policy: triage it the same way a reported vulnerability is (see
+"What to Expect" above), using the audit trail already captured in reports/admin
+activity to scope what was accessed. If the incident involves personal data, the
+Grievance Officer (contact on `/privacy`) is notified immediately so the Act's
+notification obligations to the Data Protection Board and affected data principals can be
+met without delay. [Name the person/role responsible for making that call and running
+notification, e.g. the repository maintainer or a designated DPO.]

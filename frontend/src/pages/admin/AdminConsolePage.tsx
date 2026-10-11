@@ -12,7 +12,6 @@ import DashboardView from './views/DashboardView'
 import UsersView from './views/UsersView'
 import CasesView from './views/CasesView'
 import DocumentsView from './views/DocumentsView'
-import BillingView from './views/BillingView'
 import ConflictSearchView from './views/ConflictSearchView'
 import TrustReconciliationView from './views/TrustReconciliationView'
 import NotificationsView from './views/NotificationsView'
@@ -20,13 +19,15 @@ import ReportsView from './views/ReportsView'
 import AnalyticsView from './views/AnalyticsView'
 import FirmAnalyticsView from './views/FirmAnalyticsView'
 import SettingsView from './views/SettingsView'
-import { listNotifications, markNotificationRead } from '../../api/client'
-import type { UserProfile, NotificationSummary } from '../../types/api'
+import { listNotifications, markNotificationRead, listCases, listClients, listDocuments } from '../../api/client'
+import type { UserProfile, NotificationSummary, CaseSummary, ClientSummary, DocumentSummary } from '../../types/api'
 import styles from '../../components/AppShell.module.css'
 
 type PageKey = 'dashboard' | 'users' | 'cases' | 'documents' | 'billing' | 'trust' | 'conflicts' | 'notifications' | 'reports' | 'analytics' | 'firm-analytics' | 'settings'
 
 const ADMIN = 1
+const SUPER_ADMIN = 4
+const SEARCH_RESULT_LIMIT = 5
 
 const ROLE_LABELS: Record<number, string> = { 1: 'Law Firm Manager', 2: 'Lawyer', 3: 'Client', 4: 'Super Admin' }
 
@@ -45,14 +46,14 @@ function loadProfile(): UserProfile | null {
   }
 }
 
-const NAV_ITEMS: { key: PageKey; label: string; icon: IconName; adminOnly?: boolean }[] = [
+const NAV_ITEMS: { key: PageKey; label: string; icon: IconName; adminOnly?: boolean; hiddenForSuperAdmin?: boolean }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
   { key: 'users', label: 'Users', icon: 'users' },
   { key: 'cases', label: 'Cases', icon: 'scale' },
   { key: 'documents', label: 'Documents', icon: 'file-text' },
-  { key: 'billing', label: 'Billing', icon: 'receipt' },
-  { key: 'trust', label: 'Trust', icon: 'shield' },
-  { key: 'conflicts', label: 'Conflict Search', icon: 'shield' },
+  { key: 'billing', label: 'Billing', icon: 'receipt', hiddenForSuperAdmin: true },
+  { key: 'trust', label: 'Trust', icon: 'shield', hiddenForSuperAdmin: true },
+  { key: 'conflicts', label: 'Conflict Search', icon: 'shield', hiddenForSuperAdmin: true },
   { key: 'reports', label: 'Reports', icon: 'bar-chart-2' },
   { key: 'analytics', label: 'Analytics', icon: 'pie-chart' },
   { key: 'firm-analytics', label: 'Firm Analytics', icon: 'banknote', adminOnly: true },
@@ -67,10 +68,13 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: IconName; adminOnly?: bool
  */
 export default function AdminConsolePage() {
   const [activePage, setActivePage] = useState<PageKey>('dashboard')
-  const [profileOpen, setProfileOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(loadProfile)
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [searchData, setSearchData] = useState<{ cases: CaseSummary[]; clients: ClientSummary[]; documents: DocumentSummary[] } | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -96,7 +100,38 @@ export default function AdminConsolePage() {
   }
 
   function closeMenus() {
-    setProfileOpen(false)
+    setSearchOpen(false)
+  }
+
+  // Loaded once per session on first use, then filtered client-side on every
+  // keystroke -- same scoped list endpoints AppLayout's own search uses, so
+  // results respect the manager's own org-scoped access.
+  function openSearch() {
+    setSearchOpen(true)
+    if (searchData) return
+    Promise.all([listCases(), listClients(), listDocuments()])
+      .then(([cases, clients, documents]) => setSearchData({ cases, clients, documents }))
+      .catch(() => setSearchData({ cases: [], clients: [], documents: [] }))
+  }
+
+  const searchLower = searchQuery.trim().toLowerCase()
+  // Super Admin can't open a case's full detail (see CasesView), so don't surface
+  // a search result that would dead-end there.
+  const matchedCases = !searchData || !searchLower || profile?.role_id === SUPER_ADMIN ? [] : searchData.cases
+    .filter((c) => c.id.toLowerCase().includes(searchLower) || (c.case_title ?? '').toLowerCase().includes(searchLower))
+    .slice(0, SEARCH_RESULT_LIMIT)
+  const matchedClients = !searchData || !searchLower ? [] : searchData.clients
+    .filter((c) => c.full_name.toLowerCase().includes(searchLower) || c.email.toLowerCase().includes(searchLower))
+    .slice(0, SEARCH_RESULT_LIMIT)
+  const matchedDocuments = !searchData || !searchLower ? [] : searchData.documents
+    .filter((d) => d.file_name.toLowerCase().includes(searchLower))
+    .slice(0, SEARCH_RESULT_LIMIT)
+  const hasSearchResults = matchedCases.length > 0 || matchedClients.length > 0 || matchedDocuments.length > 0
+
+  function goToSearchResult(path: string) {
+    navigate(path)
+    setSearchQuery('')
+    setSearchOpen(false)
   }
 
   function goTo(key: PageKey) {
@@ -113,11 +148,14 @@ export default function AdminConsolePage() {
     { label: 'Generate Report', icon: 'file-text' as const, primary: true, onClick: () => goTo('reports') },
   ]
 
-  const visibleNavItems = NAV_ITEMS.filter((item) => !item.adminOnly || profile?.role_id === ADMIN)
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => (!item.adminOnly || profile?.role_id === ADMIN) && (!item.hiddenForSuperAdmin || profile?.role_id !== SUPER_ADMIN),
+  )
 
   return (
     <div className={styles.page}>
-      <div className={styles.sidebar}>
+      {sidebarOpen && <div className={styles.sidebarBackdrop} onClick={() => setSidebarOpen(false)} />}
+      <div className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.sidebarBrandRow}>
           <img src={logo} alt="LexFlow" className={styles.sidebarLogo} />
           <div>
@@ -129,7 +167,7 @@ export default function AdminConsolePage() {
           {visibleNavItems.map((item) => {
             const active = item.key === activePage
             return (
-              <div key={item.key} className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => goTo(item.key)} title={item.label}>
+              <div key={item.key} className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => { if (item.key === 'billing') navigate('/billing'); else goTo(item.key); setSidebarOpen(false) }} title={item.label}>
                 <span className={styles.navIcon}><Icon name={item.icon} size={18} color={active ? C.primaryDark : '#8C857A'} /></span>
                 <span className={styles.navLabel} style={{ fontWeight: active ? 600 : 500, color: active ? C.text : '#575145' }}>{item.label}</span>
               </div>
@@ -137,7 +175,7 @@ export default function AdminConsolePage() {
           })}
         </div>
         <div className={styles.sidebarFooter}>
-          <div className={styles.navRow} style={{ background: activePage === 'settings' ? '#E6E0CE' : 'transparent' }} onClick={() => goTo('settings')} title="Settings">
+          <div className={styles.navRow} style={{ background: activePage === 'settings' ? '#E6E0CE' : 'transparent' }} onClick={() => { goTo('settings'); setSidebarOpen(false) }} title="Settings">
             <span className={styles.navIcon}><Icon name="settings" size={18} color={activePage === 'settings' ? C.primaryDark : '#8C857A'} /></span>
             <span className={styles.navLabel} style={{ fontWeight: activePage === 'settings' ? 600 : 500, color: activePage === 'settings' ? C.text : '#575145' }}>Settings</span>
           </div>
@@ -150,9 +188,59 @@ export default function AdminConsolePage() {
 
       <div className={styles.main}>
         <div className={styles.topbar}>
-          <div className={styles.searchBox}>
-            <Icon name="search" size={17} color="#8C857A" />
-            <input placeholder="Search users, lawyers, clients, cases, documents..." className={styles.searchInput} />
+          <button type="button" className={styles.hamburgerBtn} onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle menu">
+            <Icon name="menu" size={20} color="#575145" />
+          </button>
+          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+            <div className={styles.searchBox}>
+              <Icon name="search" size={17} color="#8C857A" />
+              <input
+                placeholder="Search cases, clients, documents..."
+                className={styles.searchInput}
+                value={searchQuery}
+                onFocus={openSearch}
+                onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true) }}
+              />
+            </div>
+            {searchOpen && searchQuery.trim() && (
+              <div className={styles.searchDropdown}>
+                {!searchData && <div className={styles.searchEmpty}>Loading…</div>}
+                {searchData && !hasSearchResults && <div className={styles.searchEmpty}>No matches for "{searchQuery.trim()}".</div>}
+                {matchedCases.length > 0 && (
+                  <div className={styles.searchGroup}>
+                    <div className={styles.searchGroupLabel}>Cases</div>
+                    {matchedCases.map((c) => (
+                      <button key={c.id} type="button" className={styles.searchResultItem} onClick={() => goToSearchResult(`/cases/${c.case_id}`)}>
+                        <Icon name="briefcase" size={14} color="#575145" />
+                        <span>{c.case_title ?? c.id}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {matchedClients.length > 0 && (
+                  <div className={styles.searchGroup}>
+                    <div className={styles.searchGroupLabel}>Clients</div>
+                    {matchedClients.map((c) => (
+                      <button key={c.id} type="button" className={styles.searchResultItem} onClick={() => goToSearchResult(`/clients/${c.id}`)}>
+                        <Icon name="users" size={14} color="#575145" />
+                        <span>{c.full_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {matchedDocuments.length > 0 && (
+                  <div className={styles.searchGroup}>
+                    <div className={styles.searchGroupLabel}>Documents</div>
+                    {matchedDocuments.map((d) => (
+                      <button key={d.id} type="button" className={styles.searchResultItem} onClick={() => goToSearchResult(`/documents/${d.id}`)}>
+                        <Icon name="file-text" size={14} color="#575145" />
+                        <span>{d.file_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className={styles.topbarRight}>
             <div className={styles.todayLabel}>{TODAY}</div>
@@ -162,26 +250,19 @@ export default function AdminConsolePage() {
             </div>
             <div className={styles.vDivider} />
             <div style={{ position: 'relative' }}>
-              <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v) }}>
+              <div className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); goTo('settings') }}>
                 <div className={styles.avatarCircle}>{profile ? initialsOf(profile.full_name) : '—'}</div>
-                <div style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{profile?.full_name ?? 'Unknown user'}</div><div style={{ fontSize: 11, color: '#8C857A' }}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'User') : ''}</div></div>
-                <span style={{ color: '#8C857A', display: 'flex' }}><Icon name="chevron-down" size={15} color="#8C857A" /></span>
+                <div className={styles.profileNameBlock} style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{profile?.full_name ?? 'Unknown user'}</div><div style={{ fontSize: 11, color: '#8C857A' }}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'User') : ''}</div></div>
               </div>
-              {profileOpen && (
-                <div className={styles.profileDropdown}>
-                  <div className={styles.profileDropdownItem}>Admin Profile</div>
-                </div>
-              )}
             </div>
           </div>
         </div>
 
         <div className={styles.content} onClick={closeMenus}>
-          {activePage === 'dashboard' && <DashboardView quickActions={quickActions} adminName={profile?.full_name ?? null} />}
+          {activePage === 'dashboard' && <DashboardView quickActions={quickActions} adminName={profile?.full_name ?? null} onGoTo={goTo} isSuperAdmin={profile?.role_id === SUPER_ADMIN} />}
           {activePage === 'users' && <UsersView />}
           {activePage === 'cases' && <CasesView />}
           {activePage === 'documents' && <DocumentsView />}
-          {activePage === 'billing' && <BillingView />}
           {activePage === 'trust' && <TrustReconciliationView />}
           {activePage === 'conflicts' && <ConflictSearchView />}
           {activePage === 'notifications' && <NotificationsView notifications={notifications} onMarkRead={markRead} />}

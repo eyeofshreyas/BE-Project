@@ -59,10 +59,11 @@ def _run_ecourts_sync(case_id: int, cnr: str, token: str, user_id: int) -> None:
         # -- see docs/FUTURE_SCOPE.md §1.1 for the confirmed response shape.
         case_data = record.get("courtCaseData", {})
 
-        # Additive: only overwrite ecourts_status if this response actually carried one. A
-        # response shape eCourts changes on us (a renamed field, a court type that nests it
-        # differently -- courtCaseData itself was one such surprise, see docs/FUTURE_SCOPE.md
-        # §1.1) must not silently blank out a status a previous, working sync already set.
+        # Additive: only overwrite a field if this response actually carried one. A response
+        # shape eCourts changes on us (a renamed field, a court type that nests it differently
+        # -- courtCaseData itself was one such surprise, see docs/FUTURE_SCOPE.md §1.1) must
+        # not silently blank out a value a previous, working sync (or a manual edit) already
+        # set.
         updates = {
             "ecourts_raw": record,
             "ecourts_last_synced_at": datetime.now(timezone.utc).isoformat(),
@@ -71,6 +72,16 @@ def _run_ecourts_sync(case_id: int, cnr: str, token: str, user_id: int) -> None:
         }
         if case_data.get("caseStatus") is not None:
             updates["ecourts_status"] = case_data["caseStatus"]
+        if case_data.get("filingNumber") is not None:
+            updates["filing_number"] = case_data["filingNumber"]
+        if case_data.get("registrationNumber") is not None:
+            updates["registration_number"] = case_data["registrationNumber"]
+        # ponytail: best-effort mapping, not a confirmed acts/sections field -- caseTypeSub is
+        # the only candidate seen in a live response so far (e.g. "Indian Penal Code - 411,"),
+        # and that was from a single-charge case. Upgrade once a multi-charge CNR confirms it,
+        # or finds the real field -- see docs/FUTURE_SCOPE.md §1.3.
+        if case_data.get("caseTypeSub"):
+            updates["acts_sections"] = case_data["caseTypeSub"].strip().rstrip(",").strip()
         supabase.table("cases").update(updates).eq("case_id", case_id).execute()
 
         add_timeline_event(

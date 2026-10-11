@@ -7,6 +7,7 @@ import hashlib
 import hmac
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 from fastapi import HTTPException
 
@@ -21,8 +22,9 @@ ADMIN_PROFILE = {"role_id": auth.ADMIN, "user_id": 1, "org_id": 7}
 INVOICE = {
     "invoice_id": 7, "case_id": 10, "invoice_number": "INV-7", "amount": 1000, "tax": 0,
     "total_amount": 1000, "issue_date": "2026-01-01", "due_date": None,
-    "payment_status": "Pending", "cases": None,
+    "payment_status": "Pending", "cases": {"case_number": "C-10", "org_id": 7, "clients": None},
 }
+ACTIVE_ACCOUNT = {"org_id": 7, "razorpay_account_id": "acc_firm7", "razorpay_account_status": "activated"}
 
 
 def _signature(order_id: str, payment_id: str, secret: str = KEY_SECRET) -> str:
@@ -30,9 +32,10 @@ def _signature(order_id: str, payment_id: str, secret: str = KEY_SECRET) -> str:
     return hmac.new(secret.encode(), f"{order_id}|{payment_id}".encode(), hashlib.sha256).hexdigest()
 
 
-def _billing_supabase(payments=(), existing=(), inserted_sink=None, updated_sink=None):
-    """Fake supabase for the billing module: one invoice, a payments table whose
-    Completed rows are `payments`, and a transaction_reference lookup returning `existing`."""
+def _billing_supabase(payments=(), existing=(), inserted_sink=None, updated_sink=None, accounts=(ACTIVE_ACCOUNT,)):
+    """Fake supabase for the billing module: one invoice (belonging to org 7), a payments
+    table whose Completed rows are `payments`, a transaction_reference lookup returning
+    `existing`, and a platform_settings table serving `accounts` for the org-status lookup."""
     fake = MagicMock()
 
     def table(name):
@@ -46,9 +49,7 @@ def _billing_supabase(payments=(), existing=(), inserted_sink=None, updated_sink
                 return MagicMock(eq=MagicMock(return_value=MagicMock(execute=MagicMock())))
             m.update.side_effect = update
         elif name == "payments":
-            # .eq(invoice_id).eq(payment_status) -> Completed payments
             m.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = list(payments)
-            # .eq(transaction_reference) -> the idempotency lookup
             m.select.return_value.eq.return_value.execute.return_value.data = list(existing)
 
             def insert(payload):
@@ -56,6 +57,8 @@ def _billing_supabase(payments=(), existing=(), inserted_sink=None, updated_sink
                     inserted_sink.update(payload)
                 return MagicMock(execute=MagicMock(return_value=MagicMock(data=[{**payload, "payment_id": 99}])))
             m.insert.side_effect = insert
+        elif name == "platform_settings":
+            m.select.return_value.in_.return_value.execute.return_value.data = list(accounts)
         return m
 
     fake.table.side_effect = table
@@ -82,12 +85,18 @@ CAPTURED = {"order_id": "order_abc", "status": "captured", "amount": 100000, "me
 ORDER = {"id": "order_abc", "receipt": "INV-7"}  # matches INVOICE["invoice_number"]
 
 
-def _verify(data, billing_fake, http_payload=CAPTURED, http_status=200, order_payload=ORDER, order_status=200):
+def _verify(data, billing_fake, http_payload=CAPTURED, http_status=200, order_payload=ORDER, order_status=200,
+            transfers_payload=None, transfers_status=200, transfers_raises=None):
     """Run verify_razorpay_payment with Razorpay's key config and HTTP calls stubbed out.
-    The payment fetch (/payments/{id}) and order fetch (/orders/{id}) are routed by URL."""
+    The payment fetch (/payments/{id}), order fetch (/orders/{id}), and transfers fetch
+    (/payments/{id}/transfers) are routed by URL."""
     def fake_get(url, **kwargs):
         if "/orders/" in url:
             return _razorpay_response(order_status, order_payload)
+        if url.endswith("/transfers"):
+            if transfers_raises is not None:
+                raise transfers_raises
+            return _razorpay_response(transfers_status, transfers_payload or {"items": [{"amount": 99500, "status": "processed"}]})
         return _razorpay_response(http_status, http_payload)
 
     with patch("app.controllers.billing.RAZORPAY_KEY_ID", KEY_ID), \
@@ -160,7 +169,8 @@ def test_payment_for_a_different_invoices_order_is_rejected():
 
 def test_amount_recorded_comes_from_razorpay_not_the_caller():
     """Verifies the banked amount is Razorpay's captured paise converted to rupees, not anything
-    the caller supplied, and that the payment lands as Completed with the gateway reference.
+    the caller supplied, that the payment lands as Completed with the gateway reference, and
+    that the transfer split is recorded from Razorpay's transfers response.
     Exercises: `POST /invoices/{id}/razorpay/verify` (`billing.verify_razorpay_payment()`)."""
     inserted, updated = {}, {}
     data = RazorpayVerify(
@@ -172,6 +182,44 @@ def test_amount_recorded_comes_from_razorpay_not_the_caller():
     assert inserted["payment_status"] == "Completed"
     assert inserted["transaction_reference"] == "pay_abc"
     assert inserted["payment_method"] == "UPI"    # mapped from Razorpay's "upi"
+    assert inserted["platform_fee_paise"] == 500      # 0.5% of 100000
+    assert inserted["firm_amount_paise"] == 99500
+    assert inserted["transfer_status"] == "processed"
+
+
+def test_verify_records_failed_transfer_status_when_transfer_fetch_errors():
+    """A payment is still recorded as Completed (the client did pay) even when the transfers
+    fetch itself errors -- but transfer_status is flagged 'failed' for manual reconciliation
+    rather than silently assuming the firm got paid.
+    Exercises: `POST /invoices/{id}/razorpay/verify` (`billing.verify_razorpay_payment()`)."""
+    inserted = {}
+    data = RazorpayVerify(
+        razorpay_order_id="order_abc", razorpay_payment_id="pay_abc",
+        razorpay_signature=_signature("order_abc", "pay_abc"),
+    )
+    _verify(data, _billing_supabase(inserted_sink=inserted), transfers_status=500)
+    assert inserted["payment_status"] == "Completed"
+    assert inserted["transfer_status"] == "failed"
+    assert inserted["firm_amount_paise"] is None
+    assert inserted["platform_fee_paise"] is None
+
+
+def test_verify_records_failed_transfer_status_when_transfer_fetch_raises():
+    """Same as the sibling test above, but the transfers fetch fails at the connection level
+    (timeout/DNS/refused) instead of returning a 4xx/5xx -- a payment Razorpay genuinely
+    captured must still be recorded as Completed, flagged for manual reconciliation, rather
+    than 500ing the whole verify call after the client has already been charged.
+    Exercises: `POST /invoices/{id}/razorpay/verify` (`billing.verify_razorpay_payment()`)."""
+    inserted = {}
+    data = RazorpayVerify(
+        razorpay_order_id="order_abc", razorpay_payment_id="pay_abc",
+        razorpay_signature=_signature("order_abc", "pay_abc"),
+    )
+    _verify(data, _billing_supabase(inserted_sink=inserted), transfers_raises=httpx.ConnectError("connection refused"))
+    assert inserted["payment_status"] == "Completed"
+    assert inserted["transfer_status"] == "failed"
+    assert inserted["firm_amount_paise"] is None
+    assert inserted["platform_fee_paise"] is None
 
 
 def test_a_retried_verify_does_not_bank_the_same_payment_twice():
@@ -264,5 +312,102 @@ def test_order_is_raised_for_the_outstanding_balance_in_paise():
         result = create_razorpay_order(7, ADMIN_PROFILE)
 
     assert posted["amount"] == 60000          # 600 rupees outstanding, in paise
+    assert posted["transfers"] == [{"account": "acc_firm7", "amount": 59700, "currency": "INR"}]
     assert result["key_id"] == KEY_ID
     assert KEY_SECRET not in str(result)
+
+
+def test_order_blocked_when_firms_account_is_not_activated():
+    """Pay Now can't start a checkout for a firm whose linked account isn't activated yet.
+    Exercises: `POST /invoices/{id}/razorpay/order` (`billing.create_razorpay_order()`)."""
+    pending_account = {"org_id": 7, "razorpay_account_id": "acc_firm7", "razorpay_account_status": "pending"}
+    with patch("app.controllers.billing.RAZORPAY_KEY_ID", KEY_ID), \
+         patch("app.controllers.billing.RAZORPAY_KEY_SECRET", KEY_SECRET), \
+         patch("app.middleware.auth.supabase", _auth_supabase()), \
+         patch("app.controllers.billing.supabase", _billing_supabase(accounts=[pending_account])):
+        with pytest.raises(HTTPException) as err:
+            create_razorpay_order(7, ADMIN_PROFILE)
+    assert err.value.status_code == 403
+
+
+def test_order_transfer_sends_995_percent_to_the_firm():
+    """The order's transfers instruction routes 99.5% to the firm's linked account, leaving
+    0.5% as the platform fee. Exercises: `POST /invoices/{id}/razorpay/order`
+    (`billing.create_razorpay_order()`)."""
+    posted = {}
+
+    def fake_post(url, **kwargs):
+        posted.update(kwargs.get("json", {}))
+        return _razorpay_response(200, {"id": "order_new", "amount": posted["amount"], "currency": "INR"})
+
+    with patch("app.controllers.billing.RAZORPAY_KEY_ID", KEY_ID), \
+         patch("app.controllers.billing.RAZORPAY_KEY_SECRET", KEY_SECRET), \
+         patch("app.middleware.auth.supabase", _auth_supabase()), \
+         patch("app.controllers.billing.supabase", _billing_supabase()), \
+         patch("app.controllers.billing.httpx.post", side_effect=fake_post):
+        create_razorpay_order(7, ADMIN_PROFILE)
+
+    assert posted["transfers"] == [{"account": "acc_firm7", "amount": 99500, "currency": "INR"}]
+
+
+def test_order_transfer_rounds_a_tiny_amount_without_going_negative():
+    """A ₹0.01 outstanding balance (1 paise) still produces a non-negative, correctly-rounded
+    split rather than throwing or sending a negative transfer.
+    Exercises: `POST /invoices/{id}/razorpay/order` (`billing.create_razorpay_order()`)."""
+    posted = {}
+
+    def fake_post(url, **kwargs):
+        posted.update(kwargs.get("json", {}))
+        return _razorpay_response(200, {"id": "order_new", "amount": posted["amount"], "currency": "INR"})
+
+    tiny_invoice_total = 0.01
+    with patch("app.controllers.billing.RAZORPAY_KEY_ID", KEY_ID), \
+         patch("app.controllers.billing.RAZORPAY_KEY_SECRET", KEY_SECRET), \
+         patch("app.middleware.auth.supabase", _auth_supabase()), \
+         patch("app.controllers.billing.supabase", _billing_supabase()), \
+         patch("app.controllers.billing.httpx.post", side_effect=fake_post), \
+         patch.dict(INVOICE, {"total_amount": tiny_invoice_total}):
+        create_razorpay_order(7, ADMIN_PROFILE)
+
+    assert posted["amount"] == 1
+    transfer = posted["transfers"][0]
+    assert transfer["amount"] >= 0
+    assert transfer["amount"] <= posted["amount"]
+
+
+def test_org_payment_accounts_batches_by_org_id():
+    """Looks up multiple orgs' linked-account rows in a single query, keyed by org_id.
+    Exercises: internal helper `billing._org_payment_accounts()`."""
+    from app.controllers.billing import _org_payment_accounts
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.in_.return_value.execute.return_value.data = [ACTIVE_ACCOUNT]
+    with patch("app.controllers.billing.supabase", fake):
+        result = _org_payment_accounts({7, 9})
+    assert result == {7: ACTIVE_ACCOUNT}
+    assert result.get(9) is None
+
+
+def test_org_payment_accounts_skips_the_query_for_an_empty_set():
+    """No org_ids means no supabase call at all -- list_invoices with zero rows shouldn't
+    still round-trip to platform_settings.
+    Exercises: internal helper `billing._org_payment_accounts()`."""
+    from app.controllers.billing import _org_payment_accounts
+    fake = MagicMock()
+    with patch("app.controllers.billing.supabase", fake):
+        assert _org_payment_accounts(set()) == {}
+    fake.table.assert_not_called()
+
+
+def test_to_invoice_summary_flags_razorpay_enabled_from_the_accounts_map():
+    """_to_invoice_summary's razorpay_enabled reflects whether this row's org has an activated
+    linked account in the passed-in map, not just whether a row exists.
+    Exercises: `GET /billing/invoices` (`billing._to_invoice_summary()`)."""
+    from app.controllers.billing import _to_invoice_summary
+    pending = {"org_id": 9, "razorpay_account_id": "acc_9", "razorpay_account_status": "pending"}
+    accounts = {7: ACTIVE_ACCOUNT, 9: pending}
+    enabled_row = _to_invoice_summary(INVOICE, accounts)
+    disabled_row = _to_invoice_summary({**INVOICE, "cases": {"case_number": "C-11", "org_id": 9, "clients": None}}, accounts)
+    no_account_row = _to_invoice_summary({**INVOICE, "cases": {"case_number": "C-12", "org_id": 999, "clients": None}}, accounts)
+    assert enabled_row["razorpay_enabled"] is True
+    assert disabled_row["razorpay_enabled"] is False
+    assert no_account_row["razorpay_enabled"] is False

@@ -30,12 +30,22 @@ const LAWYER_NAV: NavDef[] = [
 ]
 
 // An admin drilling into a case/document/etc. lands in this same shared shell (it's built
-// for lawyer use, but the backend permits admin on all of it too) -- swap the Dashboard
-// link for one back to the admin console, since /dashboard is the lawyer's own dashboard
-// and an admin arriving here has no other way back to /admin.
+// for lawyer use, but the backend permits admin on all of it too). Mirrors the Admin
+// Console's own sidebar (AdminConsolePage's NAV_ITEMS) so the nav doesn't visibly swap to
+// the lawyer's -- items with no standalone route (Users, Trust, Conflict Search, Reports,
+// Analytics, Firm Analytics are tabs inside AdminConsolePage, not pages of their own) go
+// back to /admin, same as Dashboard.
 const ADMIN_STAFF_NAV: NavDef[] = [
-  { label: 'Admin Console', icon: 'grid', path: '/admin' },
-  ...LAWYER_NAV.slice(1),
+  { label: 'Dashboard', icon: 'grid', path: '/admin' },
+  { label: 'Users', icon: 'users', path: '/admin' },
+  { label: 'Cases', icon: 'scale', path: '/cases' },
+  { label: 'Documents', icon: 'file-text', path: '/documents' },
+  { label: 'Billing', icon: 'receipt', path: '/billing' },
+  { label: 'Trust', icon: 'shield', path: '/admin' },
+  { label: 'Conflict Search', icon: 'shield', path: '/admin' },
+  { label: 'Reports', icon: 'bar-chart-2', path: '/admin' },
+  { label: 'Analytics', icon: 'pie-chart', path: '/admin' },
+  { label: 'Firm Analytics', icon: 'banknote', path: '/admin' },
 ]
 
 const CLIENT_NAV: NavDef[] = [
@@ -75,6 +85,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [profile] = useState<UserProfile | null>(loadProfile)
   const [notifications, setNotifications] = useState<NotificationSummary[]>([])
   const [profileOpen, setProfileOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -149,7 +160,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className={styles.page}>
-      <div className={styles.sidebar}>
+      {sidebarOpen && <div className={styles.sidebarBackdrop} onClick={() => setSidebarOpen(false)} />}
+      <div className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.sidebarBrandRow}>
           <img src={logo} alt="LexFlow" className={styles.sidebarLogo} />
           <div>
@@ -170,7 +182,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               )
             }
             return (
-              <button key={item.label} type="button" className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => navigate(item.path!)} title={item.label} aria-current={active ? 'page' : undefined}>
+              <button key={item.label} type="button" className={styles.navRow} style={{ background: active ? '#E6E0CE' : 'transparent' }} onClick={() => { navigate(item.path!); setSidebarOpen(false) }} title={item.label} aria-current={active ? 'page' : undefined}>
                 <span className={styles.navIcon}><Icon name={item.icon} size={18} color={active ? C.primaryDark : '#8C857A'} /></span>
                 <span className={styles.navLabel} style={{ fontWeight: active ? 600 : 500, color: active ? C.text : '#575145' }}>{item.label}</span>
                 {item.path === '/messages' && unreadMessages > 0 && (
@@ -181,7 +193,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           })}
         </div>
         <div className={styles.sidebarFooter}>
-          <button type="button" className={styles.navRow} style={{ background: location.pathname === '/settings' ? '#E6E0CE' : 'transparent' }} onClick={() => navigate('/settings')} title="Settings">
+          <button type="button" className={styles.navRow} style={{ background: location.pathname === '/settings' ? '#E6E0CE' : 'transparent' }} onClick={() => { navigate('/settings'); setSidebarOpen(false) }} title="Settings">
             <span className={styles.navIcon}><Icon name="settings" size={18} color={location.pathname === '/settings' ? C.primaryDark : '#8C857A'} /></span>
             <span className={styles.navLabel} style={{ fontWeight: location.pathname === '/settings' ? 600 : 500, color: location.pathname === '/settings' ? C.text : '#575145' }}>Settings</span>
           </button>
@@ -194,7 +206,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
       <div className={styles.main}>
         <div className={styles.topbar}>
-          <div style={{ position: 'relative' }}>
+          <button type="button" className={styles.hamburgerBtn} onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle menu">
+            <Icon name="menu" size={20} color="#575145" />
+          </button>
+          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
             <div className={styles.searchBox}>
               <Icon name="search" size={17} color="#8C857A" />
               <input
@@ -255,8 +270,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <div style={{ position: 'relative' }}>
               <button type="button" className={styles.profileBtn} onClick={(e) => { e.stopPropagation(); setProfileOpen((v) => !v) }} aria-haspopup="true" aria-expanded={profileOpen}>
                 <div className={styles.avatarCircle}>{profile ? initialsOf(profile.full_name) : '—'}</div>
-                <div style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{profile?.full_name ?? 'Unknown user'}</div><div style={{ fontSize: 11, color: '#8C857A' }}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'User') : ''}</div></div>
-                <span style={{ color: '#8C857A', display: 'flex' }}><Icon name="chevron-down" size={15} color="#8C857A" /></span>
+                <div className={styles.profileNameBlock} style={{ lineHeight: 1.25 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A17' }}>{profile?.full_name ?? 'Unknown user'}</div><div style={{ fontSize: 11, color: '#8C857A' }}>{profile ? (ROLE_LABELS[profile.role_id] ?? 'User') : ''}</div></div>
+                <span className={styles.profileChevron} style={{ color: '#8C857A', display: 'flex' }}><Icon name="chevron-down" size={15} color="#8C857A" /></span>
               </button>
               {profileOpen && (
                 <div className={styles.profileDropdown}>

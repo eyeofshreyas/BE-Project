@@ -113,7 +113,7 @@ export default function RecordPaymentPage() {
 
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#575145', marginBottom: 5 }}>Payment Method</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 8 }}>
                   {PAYMENT_METHODS.map((m) => (
                     <div
                       key={m}

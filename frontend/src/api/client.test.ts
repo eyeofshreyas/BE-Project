@@ -1,6 +1,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { login, listCourts } from './client'
+import { login, listCourts, listJudges, listUsers } from './client'
 
 function jsonResponse(status: number, body: unknown): Response {
   return {
@@ -68,6 +68,68 @@ describe('request() -- 401', () => {
     expect(localStorage.getItem('lexflow_refresh_token')).toBeNull()
     expect(window.location.href).toBe('/login')
     expect(settled).toBe(false)
+  })
+})
+
+describe('request() -- 401 with a working refresh', () => {
+  it('refreshes the access token once and replays the original request', async () => {
+    localStorage.setItem('lexflow_token', 'expired-token')
+    localStorage.setItem('lexflow_refresh_token', 'valid-refresh')
+
+    vi.mocked(fetch).mockImplementation(async (url, opts) => {
+      const path = String(url)
+      if (path.endsWith('/refresh')) {
+        return jsonResponse(200, { access_token: 'new-token', refresh_token: 'new-refresh' })
+      }
+      const headers = new Headers(opts?.headers)
+      if (headers.get('Authorization') === 'Bearer new-token') {
+        return jsonResponse(200, [{ id: 1 }])
+      }
+      return jsonResponse(401, { detail: 'expired' })
+    })
+
+    await expect(listCourts()).resolves.toEqual([{ id: 1 }])
+
+    expect(localStorage.getItem('lexflow_token')).toBe('new-token')
+    expect(localStorage.getItem('lexflow_refresh_token')).toBe('new-refresh')
+
+    const refreshCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter((c) => String(c[0]).endsWith('/refresh'))
+    expect(refreshCalls).toHaveLength(1)
+  })
+
+  it('single-flights the refresh across parallel 401s instead of refreshing per request', async () => {
+    localStorage.setItem('lexflow_token', 'expired-token')
+    localStorage.setItem('lexflow_refresh_token', 'valid-refresh')
+
+    let refreshCallCount = 0
+
+    vi.mocked(fetch).mockImplementation(async (url, opts) => {
+      const path = String(url)
+      if (path.endsWith('/refresh')) {
+        refreshCallCount++
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        return jsonResponse(200, { access_token: 'new-token', refresh_token: 'new-refresh' })
+      }
+      const headers = new Headers(opts?.headers)
+      if (headers.get('Authorization') === 'Bearer new-token') {
+        return jsonResponse(200, [{ id: 1 }])
+      }
+      return jsonResponse(401, { detail: 'expired' })
+    })
+
+    const results = await Promise.all([
+      listCourts(),
+      listJudges(),
+      listUsers(),
+      listCourts(),
+      listJudges(),
+      listUsers(),
+    ])
+
+    expect(results.every((r) => Array.isArray(r))).toBe(true)
+    expect(refreshCallCount).toBe(1)
   })
 })
 

@@ -10,16 +10,29 @@ import type { UserDeleteImpact, UserSummary } from '../../../types/api'
 import { downloadCsv } from '../../../utils/files'
 import styles from '../../../components/AppShell.module.css'
 
+const SUPER_ADMIN = 4
+
+function isSuperAdmin(): boolean {
+  try {
+    const raw = localStorage.getItem('lexflow_profile')
+    return raw ? JSON.parse(raw).role_id === SUPER_ADMIN : false
+  } catch {
+    return false
+  }
+}
+
 const USER_COLUMNS = ['User', 'Role', 'Email', 'Phone', 'Status', 'Registered', 'Actions']
 
-const ROLE_COLORS: Record<string, string> = { Lawyer: C.primary, Client: '#575145', Admin: C.danger }
+const ROLE_COLORS: Record<string, string> = { Lawyer: C.primary, Client: '#575145', 'Law Firm Manager': C.danger, 'Super Admin': C.danger }
 
 /** Chip label -> the `role` it keeps, or null for "everyone". */
 const FILTERS: { label: string; role: string | null }[] = [
   { label: 'All Users', role: null },
   { label: 'Lawyers', role: 'Lawyer' },
   { label: 'Clients', role: 'Client' },
-  { label: 'Admins', role: 'Admin' },
+  // One manager per org (see backend's one_admin_per_org index), so this count is also the
+  // count of registered law firms.
+  { label: 'Law Firm Managers', role: 'Law Firm Manager' },
 ]
 
 type PanelMode = 'view' | 'edit' | 'delete'
@@ -83,6 +96,7 @@ export default function UsersView() {
   const [inviteBusy, setInviteBusy] = useState(false)
   const [inviteError, setInviteError] = useState('')
   const [inviteSent, setInviteSent] = useState(false)
+  const canDeleteClients = useMemo(isSuperAdmin, [])
 
   useEffect(() => {
     listUsers()
@@ -243,10 +257,11 @@ export default function UsersView() {
                     <td className={styles.td} style={{ color: '#33302A' }}>{formatRegistered(u.created_at)}</td>
                     <td className={styles.td}>
                       {u.role === 'Client' ? (
-                        // A client is global -- the same person can have cases with other firms too -- so
-                        // Delete stays off-limits from here (it would destroy their account and cases with
-                        // every other firm). View/Edit only touch shared contact info. Suspend/reactivate is
-                        // per-firm (org_clients), never touching the client's global account.
+                        // A client is global -- the same person can have cases with other firms too -- so an
+                        // org admin can't Delete from here (it would destroy their account and cases with
+                        // every other firm they work with). View/Edit only touch shared contact info.
+                        // Suspend/reactivate is per-firm (org_clients), never touching the client's global
+                        // account. The super-admin has platform-wide authority, so they get Delete too.
                         <div style={{ display: 'flex', gap: 4 }}>
                           <span className={styles.actionBtn} title="View" onClick={() => openPanel(u, 'view')}><Icon name="eye" size={15} color="#575145" /></span>
                           <span className={styles.actionBtn} title="Edit" onClick={() => openPanel(u, 'edit')}><Icon name="edit" size={15} color="#575145" /></span>
@@ -257,6 +272,9 @@ export default function UsersView() {
                           >
                             <Icon name={u.suspended ? 'check-circle' : 'ban'} size={15} color={u.suspended ? C.success : C.warning} />
                           </span>
+                          {canDeleteClients && (
+                            <span className={styles.actionBtnDanger} title="Delete permanently" onClick={() => openPanel(u, 'delete')}><Icon name="trash-2" size={15} color={C.danger} /></span>
+                          )}
                         </div>
                       ) : (
                         <div style={{ display: 'flex', gap: 4 }}>
@@ -314,7 +332,7 @@ export default function UsersView() {
               </>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12 }}>
                   <div><div style={FIELD_LABEL}>Email</div><div style={{ fontSize: 13.5, color: C.text, wordBreak: 'break-all' }}>{panel.user.email}</div></div>
                   <div><div style={FIELD_LABEL}>Phone</div><div style={{ fontSize: 13.5, color: C.text }}>{panel.user.phone}</div></div>
                   <div>

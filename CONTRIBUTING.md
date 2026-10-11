@@ -117,8 +117,8 @@ In the body:
 - How you verified it — the test you added, the flow you clicked through.
 - Anything you deliberately left out, and why.
 
-CI must be green before review. Backend tests run on any `backend/**` change;
-once #15 lands, the frontend build and lint run too.
+CI must be green before review. Backend tests run on any `backend/**` change,
+and frontend lint/test/build run on any `frontend/**` change.
 
 ## 7. Review
 

@@ -141,6 +141,63 @@ def test_sync_case_writes_status_and_timeline_event():
         assert "PENDING" in timeline_writes[0]["event_title"]
 
 
+def test_sync_case_fills_filing_and_registration_number():
+    """Verifies a sync additively fills filing_number/registration_number from eCourts'
+    filingNumber/registrationNumber fields (confirmed live 2026-10-05, see
+    docs/FUTURE_SCOPE.md §1.3), and acts_sections from caseTypeSub with its trailing comma
+    stripped (best-effort mapping, unconfirmed against a multi-charge case -- see the same
+    §1.3). Exercises: `POST /cases/{id}/sync-ecourts` (`ecourts.sync_case_from_ecourts()`)."""
+    profile = {"role_id": auth.LAWYER, "user_id": 1}
+    cnr = "DLST020314162024"
+    case_row = {
+        "case_id": 10, "case_number": "LX-1", "case_title": "t", "filing_date": None, "created_at": None,
+        "status": "Open", "priority": "Medium", "next_hearing_date": None, "description": None,
+        "cnr_number": cnr, "ecourts_status": None, "ecourts_last_synced_at": None,
+        "client_id": None, "clients": None, "courts": None, "case_types": None, "case_lawyers": [],
+    }
+    writes = []
+
+    fake = MagicMock()
+    cases_mock = MagicMock()
+    cases_mock.select.return_value.eq.return_value.execute.side_effect = [
+        MagicMock(data=[{"cnr_number": cnr}]),
+        MagicMock(data=[case_row]),
+    ]
+
+    def cases_update(payload):
+        writes.append(("cases", payload))
+        return MagicMock(eq=MagicMock(return_value=MagicMock(execute=MagicMock())))
+    cases_mock.update.side_effect = cases_update
+
+    def table(name):
+        if name == "cases":
+            return cases_mock
+        m = MagicMock()
+        if name == "case_timeline":
+            m.insert.side_effect = lambda payload: MagicMock(execute=MagicMock(return_value=MagicMock(data=[payload])))
+        return m
+    fake.table.side_effect = table
+
+    fake_response = MagicMock(status_code=200)
+    fake_response.json.return_value = {"data": {"courtCaseData": {
+        "caseStatus": "DISPOSED", "filingNumber": "31398/2024", "registrationNumber": "30623/2024",
+        "caseTypeSub": "Indian Penal Code - 411,",
+    }}}
+
+    with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
+         patch("app.controllers.ecourts.supabase", fake), \
+         patch("app.controllers.case_history.supabase", fake), \
+         patch("app.controllers.ecourts.ECOURTS_API_KEY", "eci_live_test"), \
+         patch("app.controllers.ecourts.httpx.get", return_value=fake_response):
+        sync_case_from_ecourts(10, ImmediateBackgroundTasks(), profile)
+
+    case_writes = [p for (t, p) in writes if t == "cases"]
+    result_write = next(p for p in case_writes if "ecourts_raw" in p)
+    assert result_write["filing_number"] == "31398/2024"
+    assert result_write["registration_number"] == "30623/2024"
+    assert result_write["acts_sections"] == "Indian Penal Code - 411"
+
+
 def test_sync_case_does_not_blank_status_when_response_lacks_it():
     """Verifies a sync whose response has no caseStatus (a renamed field, or a court type
     that nests it differently -- courtCaseData itself was one such surprise) doesn't write
@@ -199,5 +256,6 @@ if __name__ == "__main__":
     test_set_case_cnr_rejects_wrong_length()
     test_sync_case_rejects_case_without_cnr()
     test_sync_case_writes_status_and_timeline_event()
+    test_sync_case_fills_filing_and_registration_number()
     test_sync_case_does_not_blank_status_when_response_lacks_it()
     print("ok")

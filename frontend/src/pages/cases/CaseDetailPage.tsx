@@ -2,7 +2,7 @@
  * optional checklists), timeline, meetings, and documents (preview on `/documents/:documentId`).
  * Role controls which actions (status change, unassign, add/edit note, upload) are shown. */
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   listCases, listCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote, listCaseTimeline, changeCaseStatus,
   listDocuments, listMeetings, listDocumentTypes, uploadDocument, getDocumentDownloadUrl,
@@ -123,11 +123,12 @@ export function Empty({ children, action }: { children: React.ReactNode; action?
 export default function CaseDetailPage() {
   const { caseId } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const profile = loadProfile()
   const canManage = profile?.role_id === LAWYER || profile?.role_id === ADMIN
   const canAddNote = profile?.role_id === LAWYER
   const canMessage = profile?.role_id === LAWYER
-  const canUploadDocs = profile?.role_id === CLIENT || profile?.role_id === LAWYER
+  const canUploadDocs = profile?.role_id === CLIENT || profile?.role_id === LAWYER || profile?.role_id === ADMIN
 
   const [caseInfo, setCaseInfo] = useState<CaseSummary | null>(null)
   const [notes, setNotes] = useState<NoteSummary[]>([])
@@ -266,6 +267,17 @@ export default function CaseDetailPage() {
     if (canManage) getCaseAiSummary(numericCaseId).then(setAiSummary).catch(() => setAiSummary(null))
     if (canManage) listCaseParties(numericCaseId).then(setParties).catch(() => {})
   }, [numericCaseId, canUploadDocs, canManage])
+
+  // Deep link from the dashboard's "Schedule Hearing" quick action (?hearing=1): open the
+  // form as soon as the case has loaded, instead of making the lawyer find the button again.
+  useEffect(() => {
+    if (!loading && canManage && searchParams.get('hearing') === '1') {
+      setHearingOpen(true)
+      setScheduleKind('hearing')
+      meetingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setSearchParams((prev) => { prev.delete('hearing'); return prev }, { replace: true })
+    }
+  }, [loading, canManage])
 
   function showToast(msg: string) {
     setToast(msg)
@@ -1324,7 +1336,7 @@ export default function CaseDetailPage() {
           </div>
 
           <div className={cd.col}>
-            {canMessage && caseInfo.client && (
+            {canManage && caseInfo.client && (
               <Card title="Client">
                 <div className={cd.clientRow}>
                   <div className={cd.avatar}>{initialsOf(caseInfo.client)}</div>
@@ -1339,20 +1351,24 @@ export default function CaseDetailPage() {
                     {caseInfo.client_phone && <div className={cd.contactItem}><Icon name="phone" size={14} color="#8C857A" />{caseInfo.client_phone}</div>}
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                  <div
-                    className={styles.primaryChip}
-                    style={{ flex: 1, justifyContent: 'center', opacity: messaging || !caseInfo.client_id ? 0.6 : 1, cursor: messaging || !caseInfo.client_id ? 'default' : 'pointer' }}
-                    onClick={() => !messaging && openConversation(caseInfo.client_id)}
-                  >
-                    <Icon name="message-circle" size={15} color="#FCFAF4" /> {messaging ? 'Opening…' : 'Message'}
+                {(canMessage || caseInfo.client_phone) && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                    {canMessage && (
+                      <div
+                        className={styles.primaryChip}
+                        style={{ flex: 1, justifyContent: 'center', opacity: messaging || !caseInfo.client_id ? 0.6 : 1, cursor: messaging || !caseInfo.client_id ? 'default' : 'pointer' }}
+                        onClick={() => !messaging && openConversation(caseInfo.client_id)}
+                      >
+                        <Icon name="message-circle" size={15} color="#FCFAF4" /> {messaging ? 'Opening…' : 'Message'}
+                      </div>
+                    )}
+                    {caseInfo.client_phone && (
+                      <a href={`tel:${caseInfo.client_phone}`} className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
+                        <Icon name="phone" size={15} color={MUTED} /> Call
+                      </a>
+                    )}
                   </div>
-                  {caseInfo.client_phone && (
-                    <a href={`tel:${caseInfo.client_phone}`} className={styles.ghostChip} style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
-                      <Icon name="phone" size={15} color={MUTED} /> Call
-                    </a>
-                  )}
-                </div>
+                )}
               </Card>
             )}
 
@@ -1476,27 +1492,39 @@ export default function CaseDetailPage() {
                 )}
                 {caseInfo.lawyers.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {caseInfo.lawyers.map((l) => (
-                      <div key={l.lawyer_id} className={cd.listRow}>
-                        <div className={cd.rowTitle}>
-                          {l.name}
-                          {l.assigned_role && <span style={{ fontWeight: 400, color: MUTED, fontSize: 12 }}> · {l.assigned_role}</span>}
-                        </div>
-                        <div className={cd.metaRow}>
-                          <span>{l.email}</span>
-                          {confirmRemoveLawyerId === l.lawyer_id ? (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeTeammate(l.lawyer_id)}>
-                                {removingLawyerId === l.lawyer_id ? 'Removing…' : 'Remove'}
-                              </button>
-                              <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(null)}>Keep</button>
-                            </span>
-                          ) : (
-                            <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(l.lawyer_id)}>Remove</button>
+                    {caseInfo.lawyers.map((l) => {
+                      // Self-removing the Primary leaves the case without one -- only an
+                      // admin can assign a new Primary afterward, so that specific removal
+                      // gets a sharper warning than the generic Remove/Keep confirm.
+                      const isSelfPrimary = l.assigned_role === 'Primary' && profile?.email === l.email
+                      return (
+                        <div key={l.lawyer_id} className={cd.listRow}>
+                          <div className={cd.rowTitle}>
+                            {l.name}
+                            {l.assigned_role && <span style={{ fontWeight: 400, color: MUTED, fontSize: 12 }}> · {l.assigned_role}</span>}
+                          </div>
+                          {confirmRemoveLawyerId === l.lawyer_id && isSelfPrimary && (
+                            <div style={{ fontSize: 12.5, color: '#B3282D', marginTop: 2 }}>
+                              You're the Primary on this case. Removing yourself leaves it without one --
+                              only an admin can assign a new Primary afterward.
+                            </div>
                           )}
+                          <div className={cd.metaRow}>
+                            <span>{l.email}</span>
+                            {confirmRemoveLawyerId === l.lawyer_id ? (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <button className={cd.linkAction} style={{ color: '#B3282D' }} onClick={() => removeTeammate(l.lawyer_id)}>
+                                  {removingLawyerId === l.lawyer_id ? 'Removing…' : isSelfPrimary ? 'Remove anyway' : 'Remove'}
+                                </button>
+                                <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(null)}>Keep</button>
+                              </span>
+                            ) : (
+                              <button className={cd.linkAction} onClick={() => setConfirmRemoveLawyerId(l.lawyer_id)}>Remove</button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : !teamFormOpen && (
                   <Empty>No lawyers assigned to this case yet.</Empty>

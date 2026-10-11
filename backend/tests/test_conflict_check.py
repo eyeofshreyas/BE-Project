@@ -84,7 +84,7 @@ def test_search_conflicts_finds_client_match_on_an_unscoped_case():
     }
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
          patch("app.controllers.conflict_check.supabase", _fake_supabase({"cases": [case_row], "case_parties": []})):
-        results = search_conflicts("priya", profile)
+        results = search_conflicts("priya", profile=profile)
 
     assert len(results) == 1
     assert results[0]["source"] == "client"
@@ -102,7 +102,7 @@ def test_search_conflicts_finds_party_match():
     }
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)), \
          patch("app.controllers.conflict_check.supabase", _fake_supabase({"cases": [], "case_parties": [party_row]})):
-        results = search_conflicts("metro", profile)
+        results = search_conflicts("metro", profile=profile)
 
     assert len(results) == 1
     assert results[0]["source"] == "party"
@@ -117,6 +117,20 @@ def test_search_conflicts_scoped_to_callers_org_for_lawyer():
     with patch("app.controllers.conflict_check.supabase", fake):
         search_conflicts("Smith", profile={"role_id": auth.LAWYER, "user_id": 1, "org_id": 7})
     fake.table.return_value.select.return_value.eq.assert_any_call("org_id", 7)
+
+
+def test_search_conflicts_client_id_from_another_org_is_ignored():
+    """A client_id belonging to another org must not resolve to that client's name --
+    otherwise any ADMIN/LAWYER could probe arbitrary client_ids platform-wide and learn
+    whose name is behind one. Exercises: `GET /conflict-check`
+    (`conflict_check.search_conflicts()`)."""
+    fake = MagicMock()
+    fake.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value.data = []
+    with patch("app.controllers.conflict_check.supabase", fake):
+        result = search_conflicts(client_id=99, profile={"role_id": auth.LAWYER, "user_id": 1, "org_id": 7})
+    assert result == []
+    fake.table.assert_any_call("cases")
+    assert ("clients",) not in [c.args for c in fake.table.call_args_list]
 
 
 def test_search_conflicts_unscoped_for_super_admin():
@@ -134,7 +148,7 @@ def test_search_conflicts_blank_query_returns_nothing():
     the whole firm. Exercises: `GET /conflict-check` (`conflict_check.search_conflicts()`)."""
     profile = {"role_id": auth.LAWYER, "user_id": 1}
     with patch("app.middleware.auth.supabase", _fake_supabase(LAWYER_SCOPED_TO_CASE_10)):
-        assert search_conflicts("   ", profile) == []
+        assert search_conflicts("   ", profile=profile) == []
 
 
 if __name__ == "__main__":
@@ -144,6 +158,7 @@ if __name__ == "__main__":
     test_search_conflicts_finds_client_match_on_an_unscoped_case()
     test_search_conflicts_finds_party_match()
     test_search_conflicts_scoped_to_callers_org_for_lawyer()
+    test_search_conflicts_client_id_from_another_org_is_ignored()
     test_search_conflicts_unscoped_for_super_admin()
     test_search_conflicts_blank_query_returns_nothing()
     print("ok")

@@ -267,12 +267,12 @@ export default function SignUpPage() {
               <label className={styles.agreeRow}>
                 <input type="checkbox" className={styles.checkboxInput} checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} />
                 <div className={styles.checkbox} style={{ background: agreeTerms ? PRIMARY : 'transparent', border: agreeTerms ? 'none' : `1.5px solid ${BORDER}` }}>{agreeTerms && <CheckIcon />}</div>
-                <div className={styles.agreeLabel}>I agree to the Terms &amp; Conditions</div>
+                <div className={styles.agreeLabel}>I agree to the <Link to="/terms" target="_blank" onClick={(e) => e.stopPropagation()}>Terms &amp; Conditions</Link></div>
               </label>
               <label className={styles.agreeRow}>
                 <input type="checkbox" className={styles.checkboxInput} checked={agreePrivacy} onChange={(e) => setAgreePrivacy(e.target.checked)} />
                 <div className={styles.checkbox} style={{ background: agreePrivacy ? PRIMARY : 'transparent', border: agreePrivacy ? 'none' : `1.5px solid ${BORDER}` }}>{agreePrivacy && <CheckIcon />}</div>
-                <div className={styles.agreeLabel}>I agree to the Privacy Policy</div>
+                <div className={styles.agreeLabel}>I agree to the <Link to="/privacy" target="_blank" onClick={(e) => e.stopPropagation()}>Privacy Policy</Link></div>
               </label>
             </div>
 
