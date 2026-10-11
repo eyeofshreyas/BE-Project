@@ -1,4 +1,5 @@
-/** Login form at `/login`. The only place session keys (`lexflow_token`/`lexflow_profile`) get written -- see `handleSubmit`. */
+
+/** Login form at `/login`. Stores access and refresh tokens after successful login. */
 import { useState, type CSSProperties, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import logoWhite from '../../assets/logo-white.svg'
@@ -110,9 +111,9 @@ function isValidEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 }
 
-/** Renders the split-screen login form; validates locally then calls `login()`/`forgotPassword()`. Calls: `handleSubmit`, `handleForgotPassword`. */
 export default function LoginPage() {
   const navigate = useNavigate()
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -123,16 +124,25 @@ export default function LoginPage() {
   const [toast, setToast] = useState<string | null>(null)
 
   const wrapStyle = (name: 'email' | 'password'): CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 10, background: '#FCFAF4',
-    border: `1.5px solid ${focused === name ? PRIMARY : BORDER}`, borderRadius: 3, padding: '13px 15px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    background: '#FCFAF4',
+    border: `1.5px solid ${focused === name ? PRIMARY : BORDER}`,
+    borderRadius: 3,
+    padding: '13px 15px',
     transition: 'border-color .15s, box-shadow .15s',
     boxShadow: focused === name ? '0 0 0 3px rgba(35, 48, 107,.14)' : 'none',
   })
 
-  /** Validates the email field then calls `forgotPassword()`, showing the result as a toast. */
   async function handleForgotPassword() {
-    if (!email || !isValidEmail(email)) { setError('Enter your email above first, then click "Forgot password?".'); return }
+    if (!email || !isValidEmail(email)) {
+      setError('Enter your email above first, then click "Forgot password?".')
+      return
+    }
+
     setError('')
+
     try {
       const result = await forgotPassword(email)
       setToast(result.message)
@@ -141,25 +151,51 @@ export default function LoginPage() {
     }
   }
 
-  /** Validates fields, calls `login()`, writes the session to `localStorage`, then navigates to `/admin` (role 1) or `/dashboard`. Bound to the form's submit, so Enter in either field gets here too. */
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!email || !isValidEmail(email)) { setError('Enter a valid email address.'); return }
-    if (!password || password.length < 6) { setError('Password must be at least 6 characters.'); return }
+
+    if (!email || !isValidEmail(email)) {
+      setError('Enter a valid email address.')
+      return
+    }
+
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+
     setLoading(true)
     setError('')
+
     try {
       const result = await login(email, password)
-      // Session source of truth: every loadProfile()/ProtectedRoute check and
-      // api/client.ts's authHeaders() read these same two keys back.
+
+      // Store BOTH tokens. The API client needs the refresh token
+      // when the access token expires.
       localStorage.setItem('lexflow_token', result.access_token)
       localStorage.setItem('lexflow_refresh_token', result.refresh_token)
-      if (result.profile) localStorage.setItem('lexflow_profile', JSON.stringify(result.profile))
+
+      // Save the profile for protected routes and dashboard checks.
+      if (result.profile) {
+        localStorage.setItem(
+          'lexflow_profile',
+          JSON.stringify(result.profile),
+        )
+      } else {
+        localStorage.removeItem('lexflow_profile')
+      }
+
       setToast('Signed in — redirecting to your dashboard…')
-      const dest = result.profile?.role_id === 1 || result.profile?.role_id === 4 ? '/admin' : '/dashboard'
+
+      const dest =
+        result.profile?.role_id === 1 || result.profile?.role_id === 4
+          ? '/admin'
+          : '/dashboard'
+
       setTimeout(() => navigate(dest), 900)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed.')
+    } finally {
       setLoading(false)
     }
   }
@@ -175,8 +211,15 @@ export default function LoginPage() {
             <img src={logoWhite} alt="LexFlow" className={styles.logo} />
             <div className={styles.brandName}>LexFlow</div>
           </div>
-          <div className={styles.sideHeadline}>AI-assisted legal workflow, built for how firms actually work.</div>
-          <div className={styles.sideBody}>Cases, clients, documents, and hearings — with multilingual AI summaries and semantic case search built in.</div>
+
+          <div className={styles.sideHeadline}>
+            AI-assisted legal workflow, built for how firms actually work.
+          </div>
+
+          <div className={styles.sideBody}>
+            Cases, clients, documents, and hearings — with multilingual AI
+            summaries and semantic case search built in.
+          </div>
         </div>
 
         <div className={styles.sideBottom}>
@@ -186,8 +229,11 @@ export default function LoginPage() {
               <div className={styles.featureLabel}>{f.label}</div>
             </div>
           ))}
+
           <div className={styles.divider} />
-          <div className={styles.trustedLine}>Trusted by 200+ chambers and legal teams</div>
+          <div className={styles.trustedLine}>
+            Trusted by 200+ chambers and legal teams
+          </div>
         </div>
       </div>
 
@@ -195,14 +241,17 @@ export default function LoginPage() {
         <div className={styles.formCard}>
           <div className={styles.formHead}>
             <div className={styles.welcome}>Welcome back</div>
-            <div className={styles.welcomeSub}>Log in to your LexFlow account to pick up where you left off.</div>
+            <div className={styles.welcomeSub}>
+              Log in to your LexFlow account to pick up where you left off.
+            </div>
           </div>
 
-          {/* noValidate: the fields are checked by handleSubmit, which reports through the
-              styled error row -- the browser's own bubbles would fire first and say it twice. */}
           <form className={styles.fields} onSubmit={handleSubmit} noValidate>
             <div>
-              <label className={styles.label} htmlFor="login-email">Email address</label>
+              <label className={styles.label} htmlFor="login-email">
+                Email address
+              </label>
+
               <div style={wrapStyle('email')}>
                 <MailIcon />
                 <input
@@ -212,7 +261,10 @@ export default function LoginPage() {
                   autoComplete="email"
                   placeholder="you@lawfirm.com"
                   value={email}
-                  onChange={(e) => { setEmail(e.target.value); setError('') }}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setError('')
+                  }}
                   onFocus={() => setFocused('email')}
                   onBlur={() => setFocused(null)}
                   className={styles.input}
@@ -222,9 +274,19 @@ export default function LoginPage() {
 
             <div>
               <div className={styles.labelRow}>
-                <label className={styles.label} htmlFor="login-password">Password</label>
-                <button type="button" onClick={handleForgotPassword} className={styles.forgotLink}>Forgot password?</button>
+                <label className={styles.label} htmlFor="login-password">
+                  Password
+                </label>
+
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className={styles.forgotLink}
+                >
+                  Forgot password?
+                </button>
               </div>
+
               <div style={wrapStyle('password')}>
                 <LockIcon />
                 <input
@@ -234,11 +296,15 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   placeholder="Enter your password"
                   value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError('') }}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    setError('')
+                  }}
                   onFocus={() => setFocused('password')}
                   onBlur={() => setFocused(null)}
                   className={styles.input}
                 />
+
                 <button
                   type="button"
                   className={styles.eyeBtn}
@@ -248,12 +314,15 @@ export default function LoginPage() {
                   <EyeIcon off={showPassword} />
                 </button>
               </div>
+
               {error && (
-                <div className={styles.errorRow} role="alert"><AlertIcon />{error}</div>
+                <div className={styles.errorRow} role="alert">
+                  <AlertIcon />
+                  {error}
+                </div>
               )}
             </div>
 
-            {/* A real checkbox behind the square, so the row is tabbable and Space toggles it. */}
             <label className={styles.rememberRow}>
               <input
                 type="checkbox"
@@ -261,18 +330,48 @@ export default function LoginPage() {
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
               />
-              <div className={styles.checkbox} style={{ background: remember ? PRIMARY : '#FCFAF4', border: remember ? 'none' : `1.5px solid ${BORDER}` }}>
+
+              <div
+                className={styles.checkbox}
+                style={{
+                  background: remember ? PRIMARY : '#FCFAF4',
+                  border: remember ? 'none' : `1.5px solid ${BORDER}`,
+                }}
+              >
                 {remember && (
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#FCFAF4" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width={12}
+                    height={12}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#FCFAF4"
+                    strokeWidth={2.4}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 )}
               </div>
-              <div className={styles.rememberLabel}>Remember me for 30 days</div>
+
+              <div className={styles.rememberLabel}>
+                Remember me for 30 days
+              </div>
             </label>
 
-            <button type="submit" className={styles.submitBtn} disabled={loading}>
-              {loading ? <span className={styles.spinner} /> : (<><span>Log In</span><ArrowIcon /></>)}
+            <button
+              type="submit"
+              className={styles.submitBtn}
+              disabled={loading}
+            >
+              {loading ? (
+                <span className={styles.spinner} />
+              ) : (
+                <>
+                  <span>Log In</span>
+                  <ArrowIcon />
+                </>
+              )}
             </button>
           </form>
 
@@ -283,7 +382,8 @@ export default function LoginPage() {
           </div>
 
           <div className={styles.ssoBtn}>
-            <GoogleIcon /><span>Continue with Google Workspace</span>
+            <GoogleIcon />
+            <span>Continue with Google Workspace</span>
           </div>
 
           <div className={styles.footerLine}>
